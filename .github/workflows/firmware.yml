@@ -1,6 +1,11 @@
 name: Build experimental E2631 ImmortalWrt firmware
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Create a GitHub pre-release for this build (official Release still needs user approval)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -77,6 +82,9 @@ jobs:
           (cd release && sha256sum e2631-immortalwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS)
           echo "tag=e2631-exp-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - name: Publish only after all build and artifact gates pass
+        # Dispatch defaults to a build-only run: no Release unless the caller
+        # explicitly asks for one (T5/Lead). Official Releases stay user-gated.
+        if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}

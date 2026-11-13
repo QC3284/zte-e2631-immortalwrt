@@ -86,6 +86,12 @@ ok('both workflows pin Node 22.16.0',
   (WF.firmware.match(/node-version: '22\.16\.0'/g) || []).length === 1);
 ok('firmware.yml is manual-dispatch only (no push trigger)',
   has(WF.firmware, 'workflow_dispatch:') && !/^  push:/m.test(WF.firmware));
+ok('firmware.yml can build without publishing',
+  /publish:\n\s+description: .*\n\s+type: boolean\n\s+default: false/.test(WF.firmware));
+ok('only the publish step is gated on the publish input',
+  (WF.firmware.match(/if: inputs\.publish/g) || []).length === 1);
+ok('artifacts and build logs are kept on build-only runs',
+  /Retain build logs and release files\n\s+if: always\(\)/.test(WF.firmware));
 ok('the publishing step is gated behind the build+verify steps',
   before(WF.firmware, 'name: Build, package and verify firmware', 'name: Publish only after all build and artifact gates pass'));
 ok('firmware.yml releases are prereleases only',

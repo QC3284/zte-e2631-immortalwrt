@@ -23,11 +23,15 @@ const f = (n) => path.join(dir, n);
 const crc = (b) => zlib.crc32(b) >>> 0;
 
 // --- version header, as an unsigned package would carry it -------------------
+// The version string mimics a real kit build (the packer copies the template's
+// header and overwrites this field), so the fixture exercises the slot tool's
+// "is this one of ours" path with the ImmortalWrt label, not only the legacy
+// OpenWrt one.
 const hdr = Buffer.alloc(0x200);
 const put = (o, v) => hdr.writeUInt32LE(v >>> 0, o);
 const str = (o, s) => hdr.write(s, o, s.length, 'latin1');
 put(0x08, 0x1351); put(0x0c, 0x5211);
-str(0x10, 'OpenWrt-FIXTURE');
+str(0x10, 'ImmortalWrt v1.10.0');
 str(0x6c, 'ZXHN E2631 V1.0.0');
 str(0xa8, '20261013000000');
 str(0x110, 'V1.0.0');
