@@ -449,8 +449,8 @@ assert "mt76 PKG_RELEASE bumped to 3" grep -qx 'PKG_RELEASE:=3' "$MT76"
 # and its generic backports must provide the HeYangTek SPI-NAND driver that
 # target patch 028 needs.
 if [ "$E2631_BASE_KIND" = immortalwrt ]; then
-	kver=$(sed -n 's/^LINUX_VERSION-6\.18 = \.//p' "$TREE/target/linux/generic/kernel-6.18" | head -n 1)
-	assert "ImmortalWrt base kernel is $E2631_BASE_KERNEL (kernel-6.18 says .$kver)" \
+	kver=$(sed -n 's/^LINUX_VERSION-6\.18 = //p' "$TREE/target/linux/generic/kernel-6.18" | head -n 1)
+	assert "ImmortalWrt base kernel is $E2631_BASE_KERNEL (kernel-6.18 says $kver)" \
 		test "6.18$kver" = "$E2631_BASE_KERNEL"
 	assert "base backport 436 provides the HeYangTek spi-nand driver (patch 028 needs it)" \
 		test -f "$TREE/target/linux/generic/backport-6.18/436-v7.3-mtd-spinand-add-support-for-HeYangTek-HYF1GQ4UDACAE.patch"
