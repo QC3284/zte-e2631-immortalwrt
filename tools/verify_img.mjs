@@ -182,7 +182,10 @@ ok('load == entry == 0x40008000 (both vendor slots use this)', ihLoad === 0x4000
   `${hx(ihLoad)} / ${hx(ihEp)}`);
 ok('uImage: Linux on ARM, type kernel, comp none', u[28] === 5 && u[29] === 2 && u[30] === 2 && u[31] === 0,
   `os=${u[28]} arch=${u[29]} type=${u[30]} comp=${u[31]}`);
-ok('image name names this build', /Linux|OpenWrt/i.test(u.subarray(32, 64).toString('latin1')),
+// The uImage name is stamped by the base tree's build system; the kit does not
+// control it, so accept any distro label (ImmortalWrt, or the OpenWrt one older
+// artifacts carry) as long as it is a Linux kernel image name.
+ok('image name names this build', /Linux|Wrt/i.test(u.subarray(32, 64).toString('latin1')),
   JSON.stringify(u.subarray(32, 64).toString('latin1').replace(/\0.*$/, '')));
 const tail = u.subarray(64, 64 + ihSize);
 
