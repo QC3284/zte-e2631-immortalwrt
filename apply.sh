@@ -2,15 +2,19 @@
 # Overlay the E2631 files onto a checked-out OpenWrt tree and wire them in.
 # Idempotent: re-running only refreshes the copies.
 #
-#   git clone --branch <base-branch> https://github.com/Zlion-Y/openwrt-sanechips-mirror openwrt
-#   git -C openwrt checkout $BASE_SHA
-#   ./apply.sh openwrt
+#   bash scripts/bootstrap.sh     # checks out the pinned base, then calls this
+#   ./apply.sh openwrt            # apply to a tree you already have
 #
-# scripts/bootstrap.sh does all of that, and scripts/env.sh resolves the paths.
+# Two bases are supported for one release cycle (scripts/env.sh, the rollback):
+# "immortalwrt" is the pinned ImmortalWrt commit with the sanechips target port
+# applied from base/*.patch, "legacy" is the original OpenWrt sanechips mirror
+# checkout. The tree is identified by content: immortalwrt by
+# HEAD^{tree} == E2631_BASE_TREE_SHA, legacy by HEAD == E2631_BASE_SHA.
 set -eu
 . "$(dirname "$0")/scripts/env.sh"
 
-BASE_SHA=${E2631_BASE_SHA:-db8b8d4130457dbe46558a7cea872dd2dae539e6}
+BASE_SHA=$E2631_BASE_SHA
+BASE_TREE_SHA=$E2631_BASE_TREE_SHA
 TREE=
 ALLOW_OTHER_BASE=0
 for arg in "$@"; do
@@ -30,19 +34,37 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 	echo "        $E2631_BASE_REPO#$E2631_BASE_SHA." >&2
 	exit 1; }
 
-# Say which commit the tree is actually at, and refuse a mismatch: everything
-# below edits files by pattern, so a tree at another commit can apply cleanly
-# and still be wrong (P1-1: the old NOTE printed and carried on).
+# Refuse a tree that is not the pinned base: everything below edits files by
+# pattern, so a tree at another commit can apply cleanly and still be wrong
+# (P1-1: the old NOTE printed and carried on).
+#
+# The identity differs per kind. On the ImmortalWrt base, bootstrap applies the
+# port series with git am, which makes machine-specific commit IDs - but these
+# worktree edits never commit, so HEAD^{tree} stays E2631_BASE_TREE_SHA through
+# and after apply. On the legacy base the commit itself is the pin.
 if command -v git >/dev/null 2>&1 && [ -d "$TREE/.git" ]; then
-	at=$(git -C "$TREE" rev-parse HEAD 2>/dev/null || echo unknown)
-	if [ "$at" != "$BASE_SHA" ]; then
+	if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+		at=$(git -C "$TREE" rev-parse 'HEAD^{tree}' 2>/dev/null || echo unknown)
+		expected=$BASE_TREE_SHA
+		what="tree hash"
+		hint="re-run 'bash scripts/bootstrap.sh' (it checks out the pinned ImmortalWrt commit and applies $E2631_PORT_DIR/)"
+	else
+		at=$(git -C "$TREE" rev-parse HEAD 2>/dev/null || echo unknown)
+		expected=$BASE_SHA
+		what="commit"
+		hint="check out the pinned base, or re-run with --allow-other-base to accept the mismatch"
+	fi
+	[ -n "$expected" ] || {
+		echo "apply.sh: E2631_BASE_KIND=$E2631_BASE_KIND has no pinned $what (E2631_BASE_TREE_SHA is empty)" >&2
+		echo "        base/commits.env looks incomplete; restore it from the repository." >&2
+		exit 1; }
+	if [ "$at" != "$expected" ]; then
 		if [ "$ALLOW_OTHER_BASE" = 1 ]; then
-			echo "apply.sh: WARNING $TREE is at $at, not the pinned $BASE_SHA (accepted via --allow-other-base)"
+			echo "apply.sh: WARNING $TREE is at $what $at, not the pinned $expected (accepted via --allow-other-base)"
 		else
-			echo "apply.sh: REFUSING: $TREE is at $at, not the pinned $BASE_SHA" >&2
-			echo "        the overlay edits this tree by pattern; on another commit those" >&2
-			echo "        edits can apply cleanly and still be wrong. Check out the pinned" >&2
-			echo "        base, or re-run with --allow-other-base to accept the mismatch." >&2
+			echo "apply.sh: REFUSING: $TREE is at $what $at, not the pinned $expected" >&2
+			echo "        the overlay edits this tree by pattern; on another base those" >&2
+			echo "        edits can apply cleanly and still be wrong. $hint." >&2
 			exit 1
 		fi
 	fi
@@ -60,12 +82,22 @@ if [ -f "$HERE/overlay-removed.txt" ]; then
 	while IFS= read -r f; do
 		case "$f" in ''|\#*) continue ;; esac
 		[ -e "$TREE/$f" ] || continue
+		if [ -d "$TREE/$f" ]; then
+			# A directory entry is a package that used to be vendored here
+			# and is now built from a feed (argon, homeproxy on the
+			# ImmortalWrt base). A reused tree still holds the whole
+			# directory, and rm -f cannot drop it.
+			rm -rf "$TREE/$f"
+			gone=$((gone + 1))
+			echo "removed from tree: $f/ (directory)"
+			continue
+		fi
 		rm -f "$TREE/$f"
 		gone=$((gone + 1))
 		echo "removed from tree: $f"
 		rmdir "$TREE/$(dirname "$f")" 2>/dev/null || true
 	done <"$HERE/overlay-removed.txt"
-	[ "$gone" = 0 ] || echo "apply.sh: $gone file(s) from overlay-removed.txt deleted from the tree"
+	[ "$gone" = 0 ] || echo "apply.sh: $gone path(s) from overlay-removed.txt deleted from the tree"
 fi
 
 mkdir -p "$TREE/tools"
@@ -115,12 +147,26 @@ done
 if [ -f "$TREE/feeds.conf.default" ]; then
 	sed -i -E 's@^src-git (routing|telephony|video) @#src-git \1 @' "$TREE/feeds.conf.default"
 	rm -f "$TREE/feeds.conf"
+	# bootstrap reads the packages/luci URLs from this file (the ImmortalWrt
+	# base names its immortalwrt/* forks here), so a missing line would install
+	# a partial set and a misspelled one the wrong feed's packages.
+	for f in packages luci; do
+		grep -qE "^src-git $f " "$TREE/feeds.conf.default" || {
+			echo "apply.sh: feeds.conf.default has no '$f' feed - bootstrap could not install it" >&2
+			exit 1; }
+	done
+	for f in routing telephony video; do
+		grep -qE "^src-git $f " "$TREE/feeds.conf.default" && {
+			echo "apply.sh: feeds.conf.default still enables $f (the sed above did not match)" >&2
+			exit 1; }
+	done
 fi
 
-# v1.3: Argon is vendored at overlay/package/luci/luci-theme-argon - the same
-# default theme as v1.0..v1.2, now shipped in-repo instead of cloned from a
-# third-party GitHub repository at apply time (that clone was this script's
-# only network fetch). Bootstrap stays selected as the fallback theme.
+# Argon and homeproxy are NOT vendored here any more (v1.10, ImmortalWrt base):
+# the ImmortalWrt luci feed ships luci-theme-argon and luci-app-homeproxy, and a
+# package name may enter a build from one source only. overlay-removed.txt drops
+# the old in-repo copies from trees applied before the switch; bootstrap stays
+# selected as the fallback theme.
 
 # A dead mirror is worse than a slow one: OpenWrt's curl is started with
 # --connect-timeout but no transfer watchdog, so a host that accepts the
@@ -164,6 +210,30 @@ if [ -f "$MT76" ]; then
 	grep -q 'AutoProbe,mt7915e' "$MT76" && {
 		echo "mt7915e AutoProbe still present in $MT76" >&2; exit 1; }
 	echo "mt7915e autoload removed: e2631-wifi-eeprom owns the load order"
+fi
+
+# The vendored port series adds mt76 patch 001 (outer-cache-serialized device
+# reads). The series does not touch the mt76 Makefile any more - both pinned
+# bases already carry PKG_RELEASE:=2 - so bumping the release, which keeps the
+# rebuilt module from reusing the previous image's package version, is this
+# script's job.
+MT76PATCH="$TREE/package/kernel/mt76/patches/001-wifi-mt76-serialize-register-reads-with-outer-cache.patch"
+[ -f "$MT76PATCH" ] || {
+	echo "apply.sh: mt76 port patch missing: $MT76PATCH" >&2
+	echo "        the base series did not apply (ImmortalWrt: base/0002 adds it)." >&2
+	exit 1; }
+if [ -f "$MT76" ]; then
+	rel=$(awk -F= '/^PKG_RELEASE:=/ { print $2; exit }' "$MT76")
+	case "$rel" in
+	3) : ;;
+	2) sed -i 's/^PKG_RELEASE:=2$/PKG_RELEASE:=3/' "$MT76" ;;
+	*) echo "apply.sh: unexpected mt76 PKG_RELEASE '$rel' (expected 2 or 3)" >&2
+	   echo "        the base moved; update this bump and the mt76 assertion deliberately." >&2
+	   exit 1 ;;
+	esac
+	grep -qx 'PKG_RELEASE:=3' "$MT76" || {
+		echo "apply.sh: failed to bump mt76 PKG_RELEASE to 3" >&2; exit 1; }
+	echo "mt76 PKG_RELEASE bumped to 3 (serialize-register-reads patch applied)"
 fi
 
 # The target inherits cortex-a9 hard-float defaults; this SoC has no VFP at all.
@@ -373,11 +443,34 @@ assert "mt7915e autoload removed from the mt76 package" \
 assert "VFP/NEON/Thumbee disabled in the target config" \
 	bash -c "! grep -qiE '^CONFIG_(VFP|VFPv3|NEON|KERNEL_MODE_NEON|ARM_THUMBEE)=y\$' '$CFG'"
 assert "lockup detectors flipped in the generic config" grep -q '^CONFIG_SOFTLOCKUP_DETECTOR=y' "$GEN"
+assert "mt76 port patch 001 present (serialize register reads with outer cache)" test -f "$MT76PATCH"
+assert "mt76 PKG_RELEASE bumped to 3" grep -qx 'PKG_RELEASE:=3' "$MT76"
+# The ImmortalWrt base must still be the kernel the migration was verified on,
+# and its generic backports must provide the HeYangTek SPI-NAND driver that
+# target patch 028 needs.
+if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+	kver=$(sed -n 's/^LINUX_VERSION-6\.18 = \.//p' "$TREE/target/linux/generic/kernel-6.18" | head -n 1)
+	assert "ImmortalWrt base kernel is $E2631_BASE_KERNEL (kernel-6.18 says .$kver)" \
+		test "6.18$kver" = "$E2631_BASE_KERNEL"
+	assert "base backport 436 provides the HeYangTek spi-nand driver (patch 028 needs it)" \
+		test -f "$TREE/target/linux/generic/backport-6.18/436-v7.3-mtd-spinand-add-support-for-HeYangTek-HYF1GQ4UDACAE.patch"
+fi
+# The merged target is one known file set (55 base files + 49 overlay files,
+# four of them overwritten). A count is the cheapest way to notice a half
+# applied overlay or a base update that moved files around.
+sanechips_files=$(find "$TREE/target/linux/sanechips" -type f | wc -l | tr -d ' ')
+assert "target/linux/sanechips merged file count is 104 (55 base + 49 overlay, got $sanechips_files)" \
+	test "$sanechips_files" -eq 104
+# argon and homeproxy are feed packages on this base; a reused tree must not
+# keep the old vendored directories (overlay-removed.txt lists them).
+assert "stale vendored luci-theme-argon directory is gone" test ! -d "$TREE/package/luci/luci-theme-argon"
+assert "stale vendored luci-app-homeproxy directory is gone" test ! -d "$TREE/package/luci/luci-app-homeproxy"
 assert "slot-aware partition parser wired (patch 033 + config)" \
 	bash -c "test -f '$TREE/target/linux/sanechips/patches-6.18/033-mtd-parsers-add-ZX279128S-slot-partition-parser.patch' && grep -q '^CONFIG_MTD_ZX279128S_SLOTPART=y\$' '$CFG'"
-assert "slot parser source present in files/" \
-assert "slotpart carries the partition of_node (nvmem cell -> gmac MACs)" 	grep -q 'out\[i\]\.of_node = parts\[i\]\.np;' 	"$TREE/target/linux/sanechips/files/drivers/mtd/parsers/zx279128s-slotpart.c"
-	test -f "$TREE/target/linux/sanechips/files/drivers/mtd/parsers/zx279128s-slotpart.c"
+SP="$TREE/target/linux/sanechips/files/drivers/mtd/parsers/zx279128s-slotpart.c"
+assert "slot parser source present in files/" test -f "$SP"
+assert "slotpart carries the partition of_node (nvmem cell -> gmac MACs)" \
+	grep -q 'out\[i\]\.of_node = parts\[i\]\.np;' "$SP"
 assert "FFE control plane source + wiring patch present" \
 	bash -c "test -f '$TREE/target/linux/sanechips/patches-6.18/034-zte-add-the-ZX279128S-FFE-control-plane.patch' && test -f '$TREE/target/linux/sanechips/files/drivers/net/ethernet/zte/zx279128s-ffe.c'"
 assert "overlay ppe.c carries the IPv6 trap fix" \
@@ -391,4 +484,8 @@ if [ "$APPLY_FAILED" != 0 ]; then
 	exit 1
 fi
 
-echo "overlay applied to $TREE (base $BASE_SHA); assertions recorded in $REPORT"
+if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+	echo "overlay applied to $TREE (immortalwrt base tree $BASE_TREE_SHA); assertions recorded in $REPORT"
+else
+	echo "overlay applied to $TREE (legacy base $BASE_SHA); assertions recorded in $REPORT"
+fi

@@ -39,11 +39,11 @@
  *     sysupgrade calls it before services go down and again from the ramfs.
  *
  * The identity comes from the version string the header carries: "OpenWrt"
- * for this port (mkfactory --version since v1.3-r3), "V1.0.0." for the
- * vendor scheme.  Anything else is treated as another system - including the
- * pre-r3 builds of this port, which stamped the template's vendor string;
- * for those the guard asks for --replace-other-system, which is the
- * conservative answer.
+ * (builds up to v1.9) or "ImmortalWrt" (v1.10 and later) for this port,
+ * "V1.0.0." for the vendor scheme.  Anything else is treated as another
+ * system - including the pre-r3 builds of this port, which stamped the
+ * template's vendor string; for those the guard asks for
+ * --replace-other-system, which is the conservative answer.
  *
  * Reads and writes stay inside the two slot windows.  Where the running system
  * maps a slot as one partition that partition is used; where it does not (the
@@ -828,7 +828,7 @@ static int cmd_check(const char *path)
 enum slot_identity {
 	ID_EMPTY,	/* nothing that reads back as a valid header */
 	ID_VENDOR,	/* "V1.0.0.*" - the factory scheme */
-	ID_OURS,	/* "OpenWrt ..." - this port since v1.3-r3 */
+	ID_OURS,	/* "OpenWrt ..." or "ImmortalWrt ..." - this port */
 	ID_UNKNOWN,	/* a valid header of some other provenance */
 };
 
@@ -838,7 +838,11 @@ static enum slot_identity header_identity(const uint8_t *hdr)
 		return ID_EMPTY;
 	if (crc32(hdr, H_CRC) != rd32(hdr, H_CRC))
 		return ID_EMPTY;
-	if (!strncmp((const char *)hdr + H_VERSION, "OpenWrt", 7))
+	/* Both brand strings are ours: v1.10 rebranded the version string to
+	 * "ImmortalWrt ...", and an in-place upgrade from an "OpenWrt ..." build
+	 * must still see the running slot as ID_OURS.  Factory stays V1.0.0.. */
+	if (!strncmp((const char *)hdr + H_VERSION, "OpenWrt", 7) ||
+	    !strncmp((const char *)hdr + H_VERSION, "ImmortalWrt", 11))
 		return ID_OURS;
 	if (!strncmp((const char *)hdr + H_VERSION, "V1.0.0.", 7))
 		return ID_VENDOR;

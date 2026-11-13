@@ -122,8 +122,9 @@ check-workflows: OK - CI, artifact names, version and release channel agree   # 
 
 `KERNEL_AT=0x400000` / `ROOTFS_SPAN=0x1100000` / `HEADER_AT=0x1500000` 现在在 5 份副本里一致：
 板级 DTS、`tools/verify_img.mjs`、`host/release.mjs`、`image/Makefile.e2631` 的打包参数、
-两份 preflight（host 由 T4、device 由 T2）。`scripts/layout-check.sh` 由 T4 提供，本轮验证时
-我负责的 4 份全部 PASS，device preflight 那 1 份随 T2 落地。
+两份 preflight（host 由 T4、device 由 T2）。`scripts/layout-check.sh` 由 T4 提供；T2 补上 device
+preflight 的 `E2631_KERNEL_AT/ROOTFS_SPAN/HEADER_AT` 字面量后，5 份副本全部 PASS（本轮 make check
+已绿，T2 的改动随其提交落地）。
 
 与打包模板的关系：版本头 512 字节仍从 `seed/vendor-verhdr-8b8.bin` 复制，只改 version 等字段；
 `tools/mkfactory.mjs` 用 `--rootfs-at/--header-at` 决定 body 结束位置，rootfs 窗口
@@ -138,22 +139,24 @@ check-workflows: OK - CI, artifact names, version and release channel agree   # 
 2. **manifest 的 libustream ABI 后缀**：`tools/verify_img.mjs` 已放宽为 `libustream-(mbedtls|openssl)\d+`
    家族匹配，但 ImmortalWrt feed 实际叫什么名只有构建后可见。
 3. **fwslot 身份判定**：`ImmortalWrt v1.10.0` 被判为「我们」依赖 T2 的 `header_identity()` 双前缀
-   修复（`tests/test-slot-decisions.c` 已加用例）；在此之前 `make check` 的 slot-tool 门禁是红的。
+   修复；T2 已在工作区实现并让 `tests/test-slot-decisions.c` 的 ImmortalWrt 用例通过（slot-tool
+   门禁已转绿），最终口径以 T2 的提交为准。
 4. **真实 release 通道**：目前没有任何 Release，「latest release → 资产」只能等 T5 的预发布
    或用户批准后的正式 Release 才能端到端验证；host 模拟用的是同形状的假 JSON。
 5. **真机 sysupgrade**：模拟里的 sysupgrade 是桩，真机写运行槽、失败回落、CRC 回读属于
    刷写操作，必须用户批准后由 T5/用户执行。
 6. **legacy 回退构建**留不下 vendored argon/homeproxy（同名包来自 feed），theme 回落 bootstrap、
    homeproxy 包缺失；这是删除 overlay 副本的既定代价（T2 在 `base/README.md` 记录）。
-7. **SSID 品牌**：默认开放 AP 仍叫 `E2631-OpenWrt`（T2 负责改名，matcher 保留旧名兼容已刷设备）；
-   Release 文案里不做承诺。
+7. **SSID 品牌**：默认开放 AP 的 SSID 已由 T2 从 `E2631-OpenWrt` 改为 `E2631-ImmortalWrt`，
+   `e2631-wifi-boot` 的 reset matcher 仍保留旧名以兼容已刷设备；这是首启产品行为变化，
+   现网已刷设备的升级后行为仍需真机确认，Release 文案里不做承诺。
 
 ## 7. 复现
 
 ```
 node host/sim-upgrade.mjs        # 在线更新模拟：30 checks
 node tools/check-workflows.mjs   # CI 静态一致性：39 checks
-bash scripts/layout-check.sh     # 5 份几何常量（device preflight 依赖 T2）
+bash scripts/layout-check.sh     # 5 份几何常量（已全绿，T2 提交后一致）
 make check                       # 全部门禁；未 bootstrap 时部分 SKIP 属预期
 ```
 

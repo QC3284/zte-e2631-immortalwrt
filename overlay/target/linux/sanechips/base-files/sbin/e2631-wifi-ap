@@ -10,7 +10,7 @@
 # This script is gate 2.  It only touches configuration and netifd; it never loads a
 # module, so it is safe to run before or after e2631-wifi-on.
 #
-#   e2631-wifi-ap                  # open network "E2631-OpenWrt" on every radio
+#   e2631-wifi-ap                  # open network "E2631-ImmortalWrt" on every radio
 #   e2631-wifi-ap MySSID 12345678   # WPA2-PSK (key must be >= 8 chars)
 #   e2631-wifi-ap off               # disable every interface again (driver stays loaded)
 #
@@ -44,7 +44,7 @@ if [ "${1:-}" = off ]; then
 	exit 0
 fi
 
-SSID=${1:-E2631-OpenWrt}
+SSID=${1:-E2631-ImmortalWrt}
 KEY=${2:-}
 
 # gate 1 has to be done by hand or by autoload: a missing phy is not this script's job

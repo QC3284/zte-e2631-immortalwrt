@@ -89,7 +89,7 @@ factory_wireless() {
 	for s in $sections; do
 		ssid=$(uci -q get "$s.ssid")
 		case "$ssid" in
-			''|OpenWrt|E2631|E2631-OpenWrt|"$fssid"|"$fssid-5G") ;;
+			''|OpenWrt|E2631|E2631-OpenWrt|E2631-ImmortalWrt|"$fssid"|"$fssid-5G") ;;
 			*) return 1 ;;
 		esac
 		case "$(uci -q get "$s.encryption")" in

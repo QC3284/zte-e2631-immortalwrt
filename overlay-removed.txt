@@ -10,3 +10,8 @@ target/linux/sanechips/files/arch/arm/mach-zte/zx279128s-slotfix.c
 target/linux/sanechips/patches-6.18/032-ARM-zte-Add-the-ZX279128S-slot-fixup-to-the-mach-objects.patch
 # P1-6 rename: 63_e2631_wan_ssh -> 63_e2631_wan_access (now also opens 80/443)
 target/linux/sanechips/base-files/etc/uci-defaults/63_e2631_wan_ssh
+# v1.10（ImmortalWrt 基底）：argon 主题和 homeproxy 改由 ImmortalWrt luci feed
+# 提供，overlay 里的 vendored 副本已删除（一个包名只能有一个来源）。旧构建树
+# 里还留着整个目录，所以这里按「目录」登记：apply.sh 对目录条目用 rm -rf。
+package/luci/luci-theme-argon
+package/luci/luci-app-homeproxy
