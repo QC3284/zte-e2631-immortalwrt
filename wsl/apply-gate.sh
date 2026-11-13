@@ -1,7 +1,7 @@
 #!/bin/bash
 # P1-1 gate: prove apply.sh fails fast and self-checks. Four parts, all cheap:
 #   1. it is idempotent on the real tree (report + dirty-path count stable);
-#   2. a wrong pinned base SHA refuses before touching anything;
+#   2. a tree that is not the pinned base refuses before touching it;
 #   3. the structural assertions pass on a correct minimal skeleton tree;
 #   4. four constructed defects each make it refuse.
 set -eu
@@ -26,19 +26,13 @@ d2=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
 [ "$d1" = "$d2" ] || { echo "FAIL: tree dirty-path count changed between identical runs ($d1 -> $d2)" >&2; exit 1; }
 echo "PASS: apply.sh is idempotent on the real tree ($d1 dirty paths, report stable)"
 
-if E2631_BASE_SHA=0000000000000000000000000000000000000000 \
-	bash "$REPO/apply.sh" "$REAL" >/tmp/e2631-apply-refuse.log 2>&1; then
-	echo "FAIL: apply.sh accepted a wrong pinned base" >&2; exit 1
-fi
-grep -q "REFUSING" /tmp/e2631-apply-refuse.log || { echo "FAIL: the wrong-base refusal says nothing useful" >&2; exit 1; }
-echo "PASS: a wrong pinned base refuses before touching the tree (--allow-other-base overrides)"
 
 mk_fake() {	# a minimal tree with every piece apply.sh's assertions read
 	local d=$1
 	rm -rf "$d"
 	mkdir -p "$d/target/linux/sanechips/image" "$d/target/linux/sanechips/dts" \
-		"$d/target/linux/sanechips/patches-6.18" "$d/target/linux/generic" \
-		"$d/package/kernel/mt76" "$d/scripts"
+		"$d/target/linux/sanechips/patches-6.18" "$d/target/linux/generic/backport-6.18" \
+		"$d/package/kernel/mt76/patches" "$d/scripts"
 	printf '%s\n' '$(eval $(call BuildImage))' >"$d/target/linux/sanechips/image/Makefile"
 	cp "$REPO/overlay/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts" \
 		"$d/target/linux/sanechips/dts/"
@@ -47,14 +41,42 @@ mk_fake() {	# a minimal tree with every piece apply.sh's assertions read
 		>"$d/target/linux/sanechips/config-6.18"
 	printf '# CONFIG_SOFTLOCKUP_DETECTOR is not set\n# CONFIG_DETECT_HUNG_TASK is not set\n# CONFIG_DEFAULT_HUNG_TASK_TIMEOUT is not set\n' \
 		>"$d/target/linux/generic/config-6.18"
-	printf 'AUTOLOAD:=$(call AutoProbe,mt7915e)\n' >"$d/package/kernel/mt76/Makefile"
+	# The ImmortalWrt pin also checks the kernel line and the HeYangTek backport,
+	# and the port series supplies mt76 patch 001; the skeleton must model all
+	# three or a correct skeleton looks broken.
+	printf 'LINUX_VERSION-6.18 = .60\n' >"$d/target/linux/generic/kernel-6.18"
+	: >"$d/target/linux/generic/backport-6.18/436-v7.3-mtd-spinand-add-support-for-HeYangTek-HYF1GQ4UDACAE.patch"
+	: >"$d/package/kernel/mt76/patches/001-wifi-mt76-serialize-register-reads-with-outer-cache.patch"
+	printf 'PKG_RELEASE:=2\nAUTOLOAD:=$(call AutoProbe,mt7915e)\n' >"$d/package/kernel/mt76/Makefile"
 	printf 'src-git packages https://git.openwrt.org/feed/packages.git\nsrc-git luci https://git.openwrt.org/project/luci.git\nsrc-git routing https://git.openwrt.org/feed/routing.git\n' \
 		>"$d/feeds.conf.default"
 }
-run_fake() { bash "$REPO/apply.sh" "$1" >/dev/null 2>&1; }
+# The skeleton is legacy-shaped on purpose: the immortalwrt-only pins (kernel
+# line, HeYangTek backport, the 104-file merged target) describe a complete
+# ImmortalWrt tree and cannot be modelled by a minimal fake. Those run against
+# the real tree above; here the kind-independent assertions are what gets
+# tampered with, so keep the skeleton runs on legacy semantics.
+run_fake() { env E2631_BASE_KIND=legacy bash "$REPO/apply.sh" "$1" >/dev/null 2>&1; }
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# 2. a tree that is not the pinned base refuses before anything is touched.
+#    legacy pins the base commit; immortalwrt pins the tree hash that
+#    base/0001..0004 produce, so the probe is a small git tree that is
+#    provably not that hash. apply.sh decides from the tree, never from a
+#    value the caller could accidentally override.
+mk_fake "$tmp/w0"
+git -C "$tmp/w0" init -q
+git -C "$tmp/w0" add -A
+git -C "$tmp/w0" -c user.name=apply-gate -c user.email=apply-gate@localhost \
+	commit -qm "a tree that is not the pinned base"
+if bash "$REPO/apply.sh" "$tmp/w0" >/tmp/e2631-apply-refuse.log 2>&1; then
+	echo "FAIL: apply.sh accepted a tree that is not the pinned base" >&2; exit 1
+fi
+grep -q "REFUSING" /tmp/e2631-apply-refuse.log || { echo "FAIL: the wrong-base refusal says nothing useful" >&2; exit 1; }
+echo "PASS: a tree that is not the pinned base refuses before touching it"
+
 mk_fake "$tmp/t0"
 run_fake "$tmp/t0" || { echo "FAIL: apply.sh refused a correct skeleton tree" >&2; exit 1; }
 echo "PASS: structural assertions pass on a correct skeleton"

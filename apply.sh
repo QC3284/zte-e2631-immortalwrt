@@ -455,12 +455,16 @@ if [ "$E2631_BASE_KIND" = immortalwrt ]; then
 	assert "base backport 436 provides the HeYangTek spi-nand driver (patch 028 needs it)" \
 		test -f "$TREE/target/linux/generic/backport-6.18/436-v7.3-mtd-spinand-add-support-for-HeYangTek-HYF1GQ4UDACAE.patch"
 fi
-# The merged target is one known file set (55 base files + 49 overlay files,
-# four of them overwritten). A count is the cheapest way to notice a half
-# applied overlay or a base update that moved files around.
-sanechips_files=$(find "$TREE/target/linux/sanechips" -type f | wc -l | tr -d ' ')
-assert "target/linux/sanechips merged file count is 104 (55 base + 49 overlay, got $sanechips_files)" \
-	test "$sanechips_files" -eq 104
+# The ImmortalWrt merged target is one known file set (55 base files + 49
+# overlay files, four of them overwritten). A count is the cheapest way to
+# notice a half applied overlay or a base update that moved files around. It
+# is immortalwrt-only: the legacy base commit already carries the sanechips
+# target, so that base yields a different (equally valid) file count.
+if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+	sanechips_files=$(find "$TREE/target/linux/sanechips" -type f | wc -l | tr -d ' ')
+	assert "target/linux/sanechips merged file count is 104 (55 base + 49 overlay, got $sanechips_files)" \
+		test "$sanechips_files" -eq 104
+fi
 # argon and homeproxy are feed packages on this base; a reused tree must not
 # keep the old vendored directories (overlay-removed.txt lists them).
 assert "stale vendored luci-theme-argon directory is gone" test ! -d "$TREE/package/luci/luci-theme-argon"

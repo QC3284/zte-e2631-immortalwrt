@@ -135,7 +135,7 @@ fi
 # The kernel line is the other half of the pin: 6.18.60, not "some 6.18".
 kf="$E2631_TREE/target/linux/generic/kernel-6.18"
 if [ -f "$kf" ] && [ -n "$kernel" ]; then
-	want=".${kernel##6.18}"
+	want="${kernel#6.18}"	# kernel is 6.18.60 -> ".60", the suffix kernel-6.18 carries
 	if grep -q "^LINUX_VERSION-6.18 = ${want}$" "$kf"; then
 		note "kernel-6.18 line" "LINUX_VERSION-6.18 = ${kernel#6.18}$(printf '')"
 	else
