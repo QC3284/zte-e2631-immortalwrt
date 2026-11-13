@@ -2,8 +2,8 @@
 // writing flash. Starts the file server, drives one telnet session, and prints
 // what the device reports about both slots and about the package.
 //
-//   node build/host/stage.mjs put   [--fw out/e2631-fwslot] [--pkg out/e2631-openwrt-factory.bin]
-//   node build/host/stage.mjs flash --yes ...same options...
+//   node host/stage.mjs put   [--fw out/e2631-fwslot] [--pkg out/e2631-immortalwrt-factory.bin]
+//   node host/stage.mjs flash --yes ...same options...
 //
 // "put" only reads: it copies the two files into /var on the device and runs
 // "e2631-fwslot info" and "check <package>". "flash" additionally runs
@@ -25,7 +25,7 @@ const HOST = arg('--host', '192.168.5.3');
 const PC = arg('--pc', '192.168.5.5');
 const PORT = parseInt(arg('--port', '8000'), 10);
 const FW = arg('--fw', 'out/e2631-fwslot');
-const PKG = arg('--pkg', 'out/e2631-openwrt-factory.bin');
+const PKG = arg('--pkg', 'out/e2631-immortalwrt-factory.bin');
 // Passed straight to telnet_sh.mjs: without it a session always runs out its
 // fixed schedule, so a flash that finished in 10 s still cost 9 minutes.
 const STOP = arg('--stop-on', '');

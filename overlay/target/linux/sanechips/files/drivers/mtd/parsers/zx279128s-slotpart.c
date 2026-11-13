@@ -144,7 +144,7 @@ static int zx_slotpart_parse(struct mtd_info *master,
 		 * zte,hdr-delta; defaults are this board's geometry.
 		 */
 		in->fs_delta = 0x400000;
-		in->hdr_delta = 0x1400000;
+		in->hdr_delta = 0x1500000;
 		if (!of_property_read_u32_array(np, "zte,slot0", v, 2))
 			in->base[0] = v[0];
 		if (!of_property_read_u32_array(np, "zte,slot1", v, 2))

@@ -1,6 +1,6 @@
 // Publish a finished, already-verified package to this repository's GitHub Release.
-// The kit has no CI any more, so this is the last step of the local build path:
-//   node build/host/publish.mjs --tag v1.0 --bin out/e2631-openwrt-v1.0.bin --notes out/relnotes.md
+// Use it for the local build path (CI publishes prereleases on its own):
+//   node host/publish.mjs --tag v1.0 --bin out/e2631-immortalwrt-v1.0.bin --notes out/relnotes.md
 // Token only ever comes from `git credential fill` on stdin, via spawnSync (execFileSync puts the
 // whole input into the exception object when it fails, which prints the token).
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? proces
 const TAG = arg('--tag');
 const BIN = arg('--bin');
 const NOTES = arg('--notes');
-const NAME = arg('--name', `E2631 OpenWrt ${TAG}`);
+const NAME = arg('--name', `E2631 ImmortalWrt ${TAG}`);
 if (!TAG || !BIN || !NOTES) {
   console.error('usage: publish.mjs --tag <t> --bin <file> --notes <md> [--name <title>]');
   process.exit(2);

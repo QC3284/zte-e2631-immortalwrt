@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
+      - name: Simulate the online updater on the host
+        run: node host/sim-upgrade.mjs
+      - name: Check the CI workflows, artifact names and release channel
+        run: node tools/check-workflows.mjs
       - name: Install host check tools
         run: sudo apt-get update && sudo apt-get install -y busybox gcc make python3
       - name: Run source, upgrade and slot-decision checks

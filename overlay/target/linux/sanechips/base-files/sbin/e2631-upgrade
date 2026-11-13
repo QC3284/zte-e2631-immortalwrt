@@ -1,6 +1,6 @@
 #!/bin/sh
 # Online updater for the E2631 port: check the GitHub releases of
-# Zlion-Y/zte-e2631-openwrt, download the factory package, verify it, and run
+# QC3284/zte-e2631-immortalwrt, download the factory package, verify it, and run
 # sysupgrade against it. The update rewrites the RUNNING slot in place and
 # the vendor system - in whichever slot it lives - is never written; see
 # lib/upgrade/platform.sh and docs/updates.md. (Upgrade hardening adopted
@@ -23,9 +23,9 @@
 # config archive first (System -> Backup) if you want it after the upgrade.
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
-# Keep the tested upstream channel unless the user explicitly selects a fork
-# (uci set e2631.upd.repository='owner/repo'; zwthys-cyber's hardening).
-REPOSITORY=$(uci -q get e2631.upd.repository || echo Zlion-Y/zte-e2631-openwrt)
+# The release channel is this project's own repository; uci
+# e2631.upd.repository overrides it (zwthys-cyber's hardening).
+REPOSITORY=$(uci -q get e2631.upd.repository || echo QC3284/zte-e2631-immortalwrt)
 case "$REPOSITORY" in
 */?*) ;;
 *) echo "e2631-upgrade: invalid release repository" >&2; exit 1 ;;
@@ -40,7 +40,7 @@ DLDIR=/tmp/e2631-upgrade
 log() { echo "e2631-upgrade: $*"; }
 
 # ---- version ordering ----------------------------------------------------
-# The release tag is "v1.3" while /etc/e2631-version is "OpenWrt v1.7": a
+# The release tag is "v1.10.0" while /etc/e2631-version is "ImmortalWrt v1.10.0": a
 # plain string compare reported every release as an update for every build
 # (both formats never match), so the check offered a downgrade. Normalise to
 # the dotted number, then compare component-wise as numbers.
@@ -75,14 +75,20 @@ mirror() { # print the configured accelerator prefix, may be empty
 	m=$(uci -q get e2631.upd.mirror || echo "")
 	case "$m" in
 	""|https://*) printf '%s' "$m" ;;
-	http://*) die "mirror must use HTTPS" ;;
+	http://*) die "mirror must use HTTPS, not $m" ;;
 	*) printf 'https://%s/' "$(printf '%s' "$m" | sed 's:/*$::')" ;;
 	esac
 }
 
 deref() { # deref <url>: apply the mirror to github URLs only
 	case "$1" in
-	https://github.com/*) printf '%s%s' "$(mirror)" "$1" ;;
+	https://github.com/*)
+		local m
+		# mirror() refuses a non-HTTPS accelerator: propagate that, do not
+		# print the bare url (the old printf swallowed the substitution's
+		# exit status, so an http mirror was silently ignored).
+		m=$(mirror) || return 1
+		printf '%s' "$m$1" ;;
 	*) printf '%s' "$1" ;;
 	esac
 }
@@ -146,7 +152,8 @@ cur=$(cat /etc/e2631-version 2>/dev/null || true)
 if [ -n "$cur" ] && ! version_newer "$tag" "$cur" && [ "${E2631_UPGRADE_FORCE:-0}" != 1 ]; then
 	die "$tag is not newer than the running $cur; set E2631_UPGRADE_FORCE=1 to flash it anyway"
 fi
-	log "downloading $(deref "$url")"
+	u=$(deref "$url") || exit 1	# mirror() already explained the refusal
+	log "downloading $u"
 	fetch "$url" "$bin" || die "download failed"
 	fetch "${url%/*}/SHA256SUMS" "$DLDIR/SHA256SUMS" || die "cannot download SHA256SUMS; refusing update"
 	# Accept exactly one entry for this asset (sha256sum text or binary mode).
@@ -168,7 +175,7 @@ do_apply() {
 	[ -n "$f" ] && [ -s "$f" ] || die "no package: run 'e2631-upgrade run', or 'apply <file.bin>'"
 	verify "$f" ""
 	log "settings are NOT saved by the update - download your backup first if you need it"
-	log "flashing slot 1 (the vendor slot is never touched)..."
+	log "flashing the running slot in place (the vendor slot is never touched)..."
 	if ! /sbin/sysupgrade "$f"; then
 		log "sysupgrade failed - the running image is unchanged"
 		exit 1

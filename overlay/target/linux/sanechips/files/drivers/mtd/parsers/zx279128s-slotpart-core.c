@@ -9,7 +9,7 @@
  * one whose CRC1 (over the first 0xa4 bytes of the 512-byte version header)
  * is valid, and of those the one with the higher serial - ties go to slot 0.
  * The kernel's partition table must follow that decision, because "rootfs"
- * lives at slot+0x400000 and the OTHER system's header at slot+0x1400000,
+ * lives at slot+0x400000 and the OTHER system's header at slot+0x1500000,
  * both inside whichever slot is NOT booting ours.  The v1.3 slotfix tried to
  * read cspboot's bootpara block from RAM; the zImage decompressor uses that
  * page for its own page tables (dumped on hardware: 0x40007000 holds section
@@ -45,7 +45,7 @@ static const uint8_t zx_sp_inner_magic[16] = {
 struct zx_slotpart_in {
 	uint32_t base[2];	/* absolute flash offsets of slot 0 / slot 1 */
 	uint32_t fs_delta;	/* rootfs = base + delta (0x400000) */
-	uint32_t hdr_delta;	/* other header = base + delta (0x1400000) */
+	uint32_t hdr_delta;	/* other header = base + delta (0x1500000) */
 	int have_hdr[2];	/* 1: the 512 bytes read back; 0: unreadable */
 	uint8_t hdr[2][ZX_SP_HDR_SIZE];
 };

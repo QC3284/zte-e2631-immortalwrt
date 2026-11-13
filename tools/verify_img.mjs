@@ -441,10 +441,10 @@ warn('cpu enable-method matches the string the compiled platsmp registers',
       ['luci', 'the web UI itself'],
       // Checked by name rather than by "some theme is present": the earlier
       // failure mode of that feed handling was a build that succeeded and
-      // silently shipped no LuCI at all. Argon is the vendored default
-      // (v1.0..v1.2's theme, kept by vendoring the source into this repo),
-      // Bootstrap the in-tree fallback.
-      ['luci-theme-argon', 'the default theme (vendored in-repo)'],
+      // silently shipped no LuCI at all. Argon is the default theme from the
+      // ImmortalWrt luci feed (vendored in-repo up to v1.9), Bootstrap the
+      // official fallback.
+      ['luci-theme-argon', 'the default theme (ImmortalWrt luci feed)'],
       ['luci-theme-bootstrap', 'the official fallback theme'],
       // v1.3: without the nft flowtable statement, fw4's flow_offloading is a
       // no-op - the whole hardware-acceleration story rides on this package.
@@ -465,7 +465,8 @@ warn('cpu enable-method matches the string the compiled platsmp registers',
       ['kmod-veth', 'the veth pair the mesh sandbox attaches with'],
       // v1.3: https for the online updater; the mtd tool parks/restores the
       // config backup on userdata; without it an update drops settings.
-      // (the ustream package carries the mbedtls version in its name)
+      // The ustream package carries its ABI suffix in the name and that suffix
+      // is a property of the base tree, so match the family, not one exact name.
       ['libustream-mbedtls20201210', 'https for e2631-upgrade'],
       ['mtd', 'erase/write for the config backup on userdata'],
       // The chip is an MT7916: mt7915e binds it but requests mt7916_wa/wm/
@@ -473,7 +474,14 @@ warn('cpu enable-method matches the string the compiled platsmp registers',
       // mt7915 set instead looks like a dead radio with no error anywhere else.
       ['kmod-mt7916-firmware', 'the firmware MT7916 actually requests'],
     ];
-    for (const [p, why] of need) ok(`${p} is installed (${why})`, pkgs.has(p), pkgs.has(p) ? '' : 'not in the manifest');
+    for (const [p, why] of need) {
+      // libustream-<tls><ABI>: the ABI suffix follows the base tree's mbedtls
+      // (20201210 on the sanechips mirror; ImmortalWrt may ship another one).
+      const hit = p === 'libustream-mbedtls20201210'
+        ? [...pkgs].some((n) => /^libustream-(mbedtls|openssl)\d+$/.test(n))
+        : pkgs.has(p);
+      ok(`${p} is installed (${why})`, hit, hit ? '' : 'not in the manifest');
+    }
     // FEATURES on this target still says "usb", and OpenWrt's default package
     // list keys off FEATURES. A USB kmod in the image is the user's hard no:
     // probing a controller that is not populated reboots the SoC.

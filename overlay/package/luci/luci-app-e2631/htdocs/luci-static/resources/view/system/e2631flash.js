@@ -544,7 +544,7 @@ return view.extend({
 			'click': function(ev) {
 				ui.showModal('在线升级', [
 					E('p', {},
-						'将下载最新版固件、校验后刷入 OpenWrt 所在槽位并重启（原厂系统不受影响）。' + '<br>' +
+						'将下载最新版固件、校验后刷入 ImmortalWrt 所在槽位并重启（原厂系统不受影响）。' + '<br>' +
 						'升级不保留设置：需要保留配置请先在"备份"页生成并下载备份档案，升级后再上传恢复。'),
 					E('div', { 'class': 'right' }, [
 						E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
@@ -596,7 +596,7 @@ return view.extend({
 				'style': 'white-space:pre-wrap;background:rgba(128,128,128,.1);padding:.5em;margin-top:.5em;font-size:small;min-height:2em'
 			}, ''),
 			E('p', { 'style': 'font-size:small' },
-				'升级只写 OpenWrt 所在槽位，原厂系统槽不会被触碰；升级失败自动回落原厂。命令行等价：e2631-upgrade run')
+				'升级只写 ImmortalWrt 所在槽位，原厂系统槽不会被触碰；升级失败自动回落原厂。命令行等价：e2631-upgrade run')
 		]);
 	},
 
@@ -610,7 +610,7 @@ return view.extend({
 					E('p', {},
 						'将把启动选择切到另一个槽（原厂系统）并重启。' + '<br>' +
 						'e2631-fwslot 会先校验目标槽的 CRC，校验不过不会切换。' + '<br>' +
-						'OpenWrt 所在槽不会被写入；之后可再次用原厂页面的 supgrade.html 刷回。'),
+						'ImmortalWrt 所在槽不会被写入；之后可再次用原厂页面的 supgrade.html 刷回。'),
 					E('div', { 'class': 'right' }, [
 						E('button', { 'class': 'btn', 'click': ui.hideModal }, '取消'),
 						' ',

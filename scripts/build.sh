@@ -70,7 +70,7 @@ say "images collected into $BUILDDIR"
 
 if [ "$NOPACK" = 1 ]; then
 	say "--no-pack: packing left to you"
-	say "  node host/release.mjs --dir $BUILDDIR --out $E2631_OUT/e2631-openwrt-$STAMP.bin"
+	say "  node host/release.mjs --dir $BUILDDIR --out $E2631_OUT/e2631-immortalwrt-$STAMP.bin"
 	exit 0
 fi
 
@@ -90,7 +90,7 @@ case "$E2631_TEMPLATE" in ""|/*) ;; *) E2631_TEMPLATE="$E2631_WORK/$E2631_TEMPLA
        'git checkout -- seed/vendor-verhdr-8b8.bin'. BUILD.md, 'the template', covers
        cutting your own from an official package."
 
-OUT="$E2631_OUT/e2631-openwrt-$STAMP.bin"
+OUT="$E2631_OUT/e2631-immortalwrt-$STAMP.bin"
 say "packing with template $(basename "$E2631_TEMPLATE")"
 node host/release.mjs --dir "$BUILDDIR" --template "$E2631_TEMPLATE" --out "$OUT"
 say "package: $OUT"

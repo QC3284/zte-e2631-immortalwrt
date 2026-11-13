@@ -17,15 +17,15 @@ define Device/zte_zxhn-e2631
   DEVICE_DTS := zx279128s-zte-zxhn-e2631
   DEVICE_DTS_DIR := $(TOPDIR)/target/linux/sanechips/dts
   # The package pads the kernel region so the rootfs starts at slot +0x400000
-  # and pads the rootfs so the version header block lands on +0x1400000, which
+  # and pads the rootfs so the version header block lands on +0x1500000, which
   # is where the board DTS says both are. +0x400000 is forced by cspboot, which
   # finds the rootfs at slot + ceil(declared kernel size / 128k); the cap below
   # is the marker (32 B) plus the kernel, so an oversized kernel fails here
   # instead of sliding the rootfs out from under the partition table.
-  # The 16 MiB rootfs region is what leaves room for LuCI plus an ~8 MiB
-  # overlay: the kernel splits the erase blocks behind the squashfs off as
-  # rootfs_data, and the header's checksum stops at the squashfs, so that tail
-  # is the writable part.
+  # The rootfs window is 0x1100000 (17 MiB) and has to end before the version
+  # header block at +0x1500000: the kernel splits the erase blocks behind the
+  # squashfs off as rootfs_data, and the bootloader's checksum covers the whole
+  # declared extent, so the writable tail must stay inside it.
   KERNEL_SIZE := 4096k
   KERNEL := kernel-bin | append-dtb | uImage none | zte-slot-marker | \
 	check-size $$(KERNEL_SIZE)
@@ -41,9 +41,9 @@ define Device/zte_zxhn-e2631
   # multiapd controller in a sandbox, so factory-firmware ZTE child routers
   # can mesh off this box. The ARM32 vendor binary runs natively on this
   # Cortex-A9; the service ships DISABLED (see the package's config).
-  # Argon (v1.0..v1.2's default theme) is VENDORED at
-  # overlay/package/luci/luci-theme-argon since v1.3: same theme, but no
-  # GitHub clone at apply time. Bootstrap stays in the list as the fallback.
+  # Argon is the default theme and now comes from the ImmortalWrt luci feed
+  # (up to v1.9 it was vendored at overlay/package/luci/luci-theme-argon).
+  # Bootstrap stays in the list as the fallback theme.
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7916-firmware e2631-fwslot \
 	kmod-nft-offload ubi-utils block-mount \
 	zte-mesh luci-app-zte-mesh \
@@ -74,5 +74,5 @@ define Build/e2631-factory
 	node $(TOPDIR)/tools/e2631-mkfactory.mjs pack \
 		--template $(E2631_VENDOR_TEMPLATE) \
 		--kernel $(IMAGE_KERNEL) --rootfs $(IMAGE_ROOTFS) \
-		--rootfs-at 0x400000 --header-at 0x1400000 --out $@
+		--rootfs-at 0x400000 --header-at 0x1500000 --out $@
 endef

@@ -1,4 +1,4 @@
-name: Build experimental E2631 firmware
+name: Build experimental E2631 ImmortalWrt firmware
 on:
   workflow_dispatch:
 permissions:
@@ -15,7 +15,13 @@ jobs:
     env:
       E2631_TREE: ${{ github.workspace }}/../openwrt
       E2631_OUT: ${{ github.workspace }}/../out
-      E2631_VERSION: OpenWrt v1.4
+      # The base switch is explicit here: scripts/env.sh defaults to legacy until
+      # T5 passes, but a firmware build must use the ImmortalWrt base (T2).
+      E2631_BASE_KIND: immortalwrt
+      # Version stamped into the vendor header and shown by /etc/e2631-version
+      # (user decision 2026-11-14). The stock web upgrade page only accepts the
+      # vendor "V1.0.0.8B8.8000" shape, so these artifacts install via fwslot.
+      E2631_VERSION: ImmortalWrt v1.10.0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,18 +44,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          mapfile -t packages < <(find "$E2631_OUT" -maxdepth 1 -name 'e2631-openwrt-*.bin' -type f)
+          mapfile -t packages < <(find "$E2631_OUT" -maxdepth 1 -name 'e2631-immortalwrt-*.bin' -type f)
           test "${#packages[@]}" -eq 1
-          cp "${packages[0]}" release/e2631-openwrt-experimental.bin
+          cp "${packages[0]}" release/e2631-immortalwrt-experimental.bin
+          # The pin names come from the base/ patch series: source env.sh so
+          # SOURCE-INFO records exactly the values the build asserted, not a
+          # HEAD commit (the four git-am commits carry machine-local SHAs; the
+          # tree hash is what identifies the patched base).
+          . scripts/env.sh
           {
             echo "Kit commit: $GITHUB_SHA"
-            echo "Base commit: $(git -C "$E2631_TREE" rev-parse HEAD)"
-            echo "Packages feed: $(git -C "$E2631_TREE/feeds/packages" rev-parse HEAD)"
-            echo "LuCI feed: $(git -C "$E2631_TREE/feeds/luci" rev-parse HEAD)"
+            echo "Base kind: ${E2631_BASE_KIND:-unknown}"
+            echo "ImmortalWrt base: ${E2631_IW_REPO:-unknown} ${E2631_IW_BRANCH:-} @ ${E2631_IW_SHA:-unknown}"
+            echo "ImmortalWrt tree (pristine): ${E2631_IW_TREE_SHA:-unknown}"
+            echo "Port base tree (4 patches applied): ${E2631_BASE_TREE_SHA:-unknown}"
+            echo "Port patch 0001 sha256: ${E2631_BASE_PATCH_SHA256_0001:-unknown}"
+            echo "Port patch 0002 sha256: ${E2631_BASE_PATCH_SHA256_0002:-unknown}"
+            echo "Port patch 0003 sha256: ${E2631_BASE_PATCH_SHA256_0003:-unknown}"
+            echo "Port patch 0004 sha256: ${E2631_BASE_PATCH_SHA256_0004:-unknown}"
+            echo "Kernel: ${E2631_BASE_KERNEL:-unknown}"
+            # Feed provenance: T2 clones whatever the base tree's
+            # feeds.conf.default names (immortalwrt feeds for this base), so
+            # record both the remote and the commit - the URL is the proof the
+            # build used ImmortalWrt feeds, not the OpenWrt ones.
+            echo "Packages feed: $(git -C "$E2631_TREE/feeds/packages" remote get-url origin 2>/dev/null || echo unknown)"
+            echo "Packages commit: $(git -C "$E2631_TREE/feeds/packages" rev-parse HEAD 2>/dev/null || echo unknown)"
+            echo "LuCI feed: $(git -C "$E2631_TREE/feeds/luci" remote get-url origin 2>/dev/null || echo unknown)"
+            echo "LuCI commit: $(git -C "$E2631_TREE/feeds/luci" rev-parse HEAD 2>/dev/null || echo unknown)"
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO"
           } > release/SOURCE-INFO.txt
-          (cd release && sha256sum e2631-openwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS)
+          (cd release && sha256sum e2631-immortalwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS)
           echo "tag=e2631-exp-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
       - name: Publish only after all build and artifact gates pass
         env:
@@ -57,14 +82,17 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          E2631 实验固件，仅适用于已核实硬件兼容性的 ZXHN E2631。
+          E2631 ImmortalWrt 实验固件，仅适用于已核实硬件兼容性的 ZXHN E2631。
 
           通过本次源码检查、完整编译与产物校验；**尚未真机验证，不是稳定版**。
+          基底为 ImmortalWrt，版本字符串 `ImmortalWrt v1.10.0`（非厂商 V 格式：厂商
+          网页升级页只接受 V 开头的版本号，首次写入请用 fwslot 流程；之后可用
+          `e2631-upgrade` 在线更新）。SOURCE-INFO.txt 记录 ImmortalWrt 基线与补丁哈希。
           已知问题：Wi-Fi 冷启动可能挂死（有自愈重试）；部分 SPI-NAND 批次不支持；
           首次进入应立即设置 root 密码（首启为开放设置网络）。
           下载 `.bin` 前核对设备型号、闪存批次及恢复途径，再按 SHA256SUMS 校验。
           NOTES
-          gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "E2631 experimental ${RELEASE_TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "E2631 ImmortalWrt experimental ${RELEASE_TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
       - name: Stage build logs for archiving
         if: always()
         run: |

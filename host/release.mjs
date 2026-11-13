@@ -2,9 +2,9 @@
 // package, then verify it independently. Everything stays on this machine; the
 // official template package never leaves it.
 //
-//   node build/host/release.mjs --dir <out/build-dir> --template <official.bin>
-//   node build/host/release.mjs --run <runId>            # only if you did use Actions
-//   [--out <file>] [--rootfs-at 0x400000] [--header-at 0x1800000]
+//   node host/release.mjs --dir <out/build-dir> --template <official.bin>
+//   node host/release.mjs --run <runId>            # only if you did use Actions
+//   [--out <file>] [--rootfs-at 0x400000] [--header-at 0x1500000]
 //
 // Paths that are not part of the repo (out/, the template, the base tree clone)
 // resolve against $E2631_WORK - see scripts/env.sh and .env.example - so this can
@@ -51,25 +51,27 @@ const TEMPLATE = abs(arg('--template', envv('E2631_TEMPLATE')) || path.join(REPO
 const ROOTFS_AT = arg('--rootfs-at', '0x400000');
 const HEADER_AT = arg('--header-at', '0x1500000');
 // Stamp the version into the 32-byte version field of the vendor header (the
-// string the STOCK web upgrade gate parses - it must stay vendor-formatted and
-// order at/above the running firmware, so the default is to keep the template's
-// own "V1.0.0.8B8.8000" and stay stock-web-flashable; the OpenWrt version lives
-// in /etc/e2631-version and is what LuCI shows). --version / E2631_VERSION
-// override for local fwslot-only builds. The 16-byte build field always gets a
-// stamp: --build / E2631_BUILD, else today's date, so two packs of the same
-// version can be told apart on the slot page.
+// string the STOCK web upgrade gate parses). Up to v1.9 the default kept the
+// template's own "V1.0.0.8B8.8000" so the stock page would accept the package.
+// The kit now stamps the distribution version instead (ImmortalWrt v1.10.0 via
+// E2631_VERSION), which the stock web page refuses - our packages are installed
+// through e2631-fwslot (first write) and e2631-upgrade (online updates). The
+// version LuCI shows still comes from /etc/e2631-version. The 16-byte build
+// field always gets a stamp: --build / E2631_BUILD, else today's date, so two
+// packs of the same version can be told apart on the slot page.
 const VERSION = arg('--version', envv('E2631_VERSION'));
 if (VERSION && !/^V[0-9.]+\.[0-9A-Z]{3}\.[0-9]+$/.test(VERSION)) {
   console.error(`\nWARNING: version "${VERSION}" is not vendor-formatted (like V1.0.0.8B8.8000).`);
-  console.error('       The stock web upgrade gate will refuse this package; it only');
-  console.error('       installs via the OpenWrt-side fwslot. Unset E2631_VERSION to');
-  console.error('       keep the template\'s vendor string, or pass --version in the');
-  console.error('       vendor format.\n');
+  console.error('       The stock web upgrade page will refuse this package. That is');
+  console.error('       expected for our own builds: first write it with e2631-fwslot,');
+  console.error('       then update online with e2631-upgrade. Unset E2631_VERSION to');
+  console.error('       keep the template\'s vendor string for a stock-web first install.');
+  console.error('');
 }
 const _now = new Date();
 const BUILD = arg('--build', envv('E2631_BUILD')) ||
   `${_now.getFullYear()}${String(_now.getMonth() + 1).padStart(2, '0')}${String(_now.getDate()).padStart(2, '0')}`;
-const OUT = abs(arg('--out', 'out/e2631-openwrt-factory.bin'));
+const OUT = abs(arg('--out', 'out/e2631-immortalwrt-factory.bin'));
 const DTS = path.join(REPO, 'overlay/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts');
 const LOCAL = arg('--dir') ? abs(arg('--dir')) : '';	// a directory already holding kernel/root
 if (!run && !LOCAL) {
@@ -230,5 +232,5 @@ if (tool) {
 } else {
   console.log('  tool   not in this artifact (run predates the collect change)');
 }
-console.log('\nnext:  node build/host/stage.mjs put         # deliver both, then "info" + "check" (no write)' +
-  '\n       node build/host/stage.mjs flash --yes   # write the INACTIVE slot; needs your go-ahead');
+console.log('\nnext:  node host/stage.mjs put         # deliver both, then "info" + "check" (no write)' +
+  '\n       node host/stage.mjs flash --yes   # write the INACTIVE slot; needs your go-ahead');
