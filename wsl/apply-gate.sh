@@ -16,11 +16,21 @@ if [ ! -d "$REAL/target/linux/sanechips" ]; then
 	exit 77
 fi
 
-bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 || { echo "FAIL: apply.sh refuses the real tree" >&2; exit 1; }
-r1=$(cat "$OUT/apply-report.txt")
+# Every apply run writes a report. Keep the gate's runs in this gate's own temp
+# dir: two check runs sharing E2631_OUT (two agents on one machine) otherwise
+# overwrite each other's out/apply-report.txt between the two reads below, and
+# the fake-tree runs at the end would replace the real tree's report with a
+# skeleton's. The real tree's out/apply-report.txt stays the real run's.
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+E2631_APPLY_REPORT="$tmp/real-1.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
+	{ echo "FAIL: apply.sh refuses the real tree" >&2; exit 1; }
+r1=$(cat "$tmp/real-1.txt")
 d1=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
-bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 || { echo "FAIL: apply.sh re-run failed" >&2; exit 1; }
-r2=$(cat "$OUT/apply-report.txt")
+E2631_APPLY_REPORT="$tmp/real-2.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
+	{ echo "FAIL: apply.sh re-run failed" >&2; exit 1; }
+r2=$(cat "$tmp/real-2.txt")
 d2=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
 [ "$r1" = "$r2" ] || { echo "FAIL: apply-report.txt differs between identical runs" >&2; exit 1; }
 [ "$d1" = "$d2" ] || { echo "FAIL: tree dirty-path count changed between identical runs ($d1 -> $d2)" >&2; exit 1; }
@@ -56,10 +66,10 @@ mk_fake() {	# a minimal tree with every piece apply.sh's assertions read
 # ImmortalWrt tree and cannot be modelled by a minimal fake. Those run against
 # the real tree above; here the kind-independent assertions are what gets
 # tampered with, so keep the skeleton runs on legacy semantics.
-run_fake() { env E2631_BASE_KIND=legacy bash "$REPO/apply.sh" "$1" >/dev/null 2>&1; }
-
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+run_fake() {
+	env E2631_BASE_KIND=legacy E2631_APPLY_REPORT="$1/report.txt" \
+		bash "$REPO/apply.sh" "$1" >/dev/null 2>&1
+}
 
 # 2. a tree that is not the pinned base refuses before anything is touched.
 #    legacy pins the base commit; immortalwrt pins the tree hash that
@@ -71,7 +81,7 @@ git -C "$tmp/w0" init -q
 git -C "$tmp/w0" add -A
 git -C "$tmp/w0" -c user.name=apply-gate -c user.email=apply-gate@localhost \
 	commit -qm "a tree that is not the pinned base"
-if bash "$REPO/apply.sh" "$tmp/w0" >/tmp/e2631-apply-refuse.log 2>&1; then
+if E2631_APPLY_REPORT="$tmp/w0-report.txt" bash "$REPO/apply.sh" "$tmp/w0" >/tmp/e2631-apply-refuse.log 2>&1; then
 	echo "FAIL: apply.sh accepted a tree that is not the pinned base" >&2; exit 1
 fi
 grep -q "REFUSING" /tmp/e2631-apply-refuse.log || { echo "FAIL: the wrong-base refusal says nothing useful" >&2; exit 1; }
