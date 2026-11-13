@@ -1,9 +1,10 @@
 # ImmortalWrt 基线迁移决策（T1）
 
-> 状态：决策稿，待 Lead 审阅后转入 T2
+> 状态：已采纳并在实施中（T1 决策稿 → T2 落地 base/ → T3 品牌/产物 → T4 门禁/文档；T5 端到端验证待跑）
 > 调研日期：2026-11-14（本文所有 ImmortalWrt / 上游事实均为该日实测；数据源与复现命令见 §1.4、§7.1）
-> 调研人：iwrt-baseline（T1 负责人）
-> 仓库：QC3284/zte-e2631-immortalwrt；工作副本 /home/qc233/zte/e2631-immortalwrt；HEAD `3e5440299c9a558f3da9f0bd9d429713573c870d`（main）
+> 调研人：iwrt-baseline（T1）；维护：verify-docs（T4）；基底升级流程见 §8
+> 仓库：QC3284/zte-e2631-immortalwrt；工作副本 /home/qc233/zte/e2631-immortalwrt；T1 时 HEAD `3e5440299c9a558f3da9f0bd9d429713573c870d`（main）
+> 实施记录（2026-11-14）：`base/` 已随仓库入库（4 个 patch + commits.env + README）；overlay 已按 §3 矩阵迁移；品牌定为 **ImmortalWrt v1.10.0**、产物前缀 `e2631-immortalwrt-*.bin`；`make check` 新增 g_layout、base-pin 两门（见 §6.3）。
 > 范围：只读调研 + 本文档。未改任何源码、未推送、未在本机构建；双槽布局/刷写机制不在本轮改动范围内。
 > 约束：TEAM-NOTES.md 约束 2（本机不做全量编译，构建与端到端验证走 GitHub Actions）；真机刷写 / GitHub 推送 / 新建仓库 / 正式 Release 需用户批准。
 
@@ -283,13 +284,13 @@
 
 | 位置 | 陈旧值 | 备注 |
 | --- | --- | --- |
-| `overlay/.../image/Makefile.e2631:20-21,77` | 注释 16 MiB/`0x1400000`；`--header-at 0x1400000` | 影响 factory 打包参数（T3 修） |
-| `scripts/preflight.sh:62-66`、`overlay/.../sbin/e2631-preflight:60-64` | `0x1400000` | 预检可能误报 |
-| `seed/e2631.config:110-112`（注释） | 20 MiB、rootfs `0x1400000`、header `0x1800000` | 纯注释，误导 |
-| `host/release.mjs:7`（注释） | `0x1800000` | 纯注释 |
-| `docs/relnotes-v1.9.0.md:4` | header `0x1100000` | 文档旧值 |
-| DTS 注释（约 340–355 行、462 行） | `0x1400000` | 注释与属性值不一致 |
-| `files/.../slotpart.c:147` 默认 `hdr_delta=0x1400000` | 运行时被 DTS 覆盖 | 低风险 |
+| `overlay/.../image/Makefile.e2631:20-21,77` | 注释 16 MiB/`0x1400000`；`--header-at 0x1400000` | 影响 factory 打包参数（T3 修）→ **已修**（T3：注释 17 MiB、`--header-at 0x1500000`） |
+| `scripts/preflight.sh:62-66`、`overlay/.../sbin/e2631-preflight:60-64` | `0x1400000` | 预检可能误报 → **已修**（T4 改主机副本为具名常量 `E2631_KERNEL_AT/ROOTFS_SPAN/HEADER_AT`；设备副本由 T2 同步，g_layout 门守） |
+| `seed/e2631.config:110-112`（注释） | 20 MiB、rootfs `0x1400000`、header `0x1800000` | 纯注释，误导 → **已修**（T2） |
+| `host/release.mjs:7`（注释） | `0x1800000` | 纯注释 → **已修**（T3 改 `0x1500000`） |
+| `docs/relnotes-v1.9.0.md:4` | header `0x1100000` | 文档旧值 → **已修**（T4 改 `0x1500000`） |
+| DTS 注释（约 340–355 行、462 行） | `0x1400000` | 注释与属性值不一致 → **已修**（T3，随 VERSION 提交） |
+| `files/.../slotpart.c:147` 默认 `hdr_delta=0x1400000` | 运行时被 DTS 覆盖 | 低风险 → **已修**（T3 默认改 `0x1500000`；注释同步） |
 
 **为什么现在还能工作**：设备端 `e2631-fwslot.c` 通过 inner magic+CRC1 扫描定位版本头（`slot_scan`，约 405–430 行），不依赖固定偏移；`release.mjs` 默认值与真值一致。**风险集中在**：`Makefile.e2631` 的 factory 打包 `--header-at`、preflight 预检、文档表述。
 
@@ -395,13 +396,17 @@
 - 修正 `image/Makefile.e2631:77` 的 `--header-at` 与 §4.5 其余常量（T3 主体）；`slotpart.c:147` 默认值一并统一。
 - Release 正文模板：标注基底（iw SHA + patch tree hash）、kernel 6.18.60、未做真机验证（除非 T5 提供）。
 - **推送/Release 前需用户批准**。
+- 实施状态（2026-11-14）：品牌 `ImmortalWrt v1.10.0`、`E2631_VERSION` 同步、产物 `e2631-immortalwrt-*.bin` 已由 T3 落地；更新链默认仓库 `QC3284/zte-e2631-immortalwrt`，标签剥离后按数字比较（OpenWrt v1.9.0 → ImmortalWrt v1.10.0 可原地升级，测试见 `tests/test_upgrade.py`）。
+- **实施细节与证据**：见 [t3-packaging-release-ci.md](t3-packaging-release-ci.md)（产物/版本口径、原厂网页升级的形状限制、更新链加固与镜像白名单修复、CI `publish` 开关与 SOURCE-INFO、host 模拟 30 项与静态检查 39 项、仍需 CI/真机证明的清单）。
 
 ### 6.3 T4：文档 / 门禁 / 长期维护
 
 - 文档改写清单：`README.md:4,76-77,95`、`README.en.md:20-21,50,87,192`、`BUILD.md:35-39,137`、`docs/architecture.md:13,47`、`docs/known-issues.md:256-264`、`docs/updates.md:37-38`、`.env.example:19-21`、`seed/e2631.config:110-112`、`tests/test_upgrade.py`、`tests/test-slot-decisions.c`；`board/firstboot-openwrt.txt:4` 保留。
+  **实施状态**：以上文档已改（T4）；`.env.example` / `seed/e2631.config` 由 T2 改；测试字符串改为 `ImmortalWrt v1.10.0`，并新增「OpenWrt v1.9.0 → ImmortalWrt v1.10.0」过渡用例与「两个前缀都判 ID_OURS」用例。
 - 新增门禁：**g_layout**（跨文件一致性：verify_img / release.mjs / Makefile.e2631 / DTS / preflight 的 KERNEL_AT、ROOTFS_SPAN、HEADER_AT 必须一致）与 **base-pin**（bootstrap 的 iw SHA + tree hash 断言进入 make check，而不只在 bootstrap 里）。
-- 本文档由 T4 接手维护：基底升级流程写成 runbook（生成 patch → 更新 commits.env → 更新 tree hash → 全量门禁）。
-- 新增 `docs/` 索引/链接（若仓库有 docs 列表）。
+  **实施状态**：`scripts/layout-check.sh`、`scripts/base-pin-check.sh` 已入 `scripts/check.sh`；base-pin 在 `base/commits.env` 缺失且曾入库时会 FAIL（防静默删除），`E2631_BASE_KIND=legacy` 或尚无基底树时 SKIP 77。
+- 本文档由 T4 接手维护：基底升级流程写成 runbook（生成 patch → 更新 commits.env → 更新 tree hash → 全量门禁）→ 见 §8。
+- 新增 `docs/` 索引/链接（若仓库有 docs 列表）→ 见 `docs/README.md`。
 
 ## 7. 证据与未决问题
 
@@ -424,21 +429,21 @@
 | argon feed 版 | iw `themes/luci-theme-argon/Makefile:10,13-15` | 3.1.3 / 20261106 / provides luci-app-argon-config |
 | argon overlay 版 | `overlay/package/luci/luci-theme-argon/Makefile:11,13,14-15,18-26,28-33,35-37,39` | 3.1.0 / 20261022 / 额外 flock+coreutils |
 | homeproxy 运行时一致 | `cmp` 三处：init.d/homeproxy、homeproxy.uc、homeproxy.js | 无差异 |
-| 版本文件 | `overlay/.../base-files/etc/e2631-version:1` | `OpenWrt v1.9.0` |
-| 更新链 | `.../base-files/sbin/e2631-upgrade:28,37,42-60,127-146` | 旧仓库默认 / GitHub API / 数字比较 / 降级保护 |
-| CI | `.github/workflows/firmware.yml:12,16-18,41-43,44-51` | 150 分钟 / E2631_VERSION v1.4 / 产物复制 / SOURCE-INFO |
+| 版本文件 | `overlay/.../base-files/etc/e2631-version:1` | T1 时为 `OpenWrt v1.9.0`；现为 `ImmortalWrt v1.10.0` |
+| 更新链 | `.../base-files/sbin/e2631-upgrade:28,37,42-60,127-146` | 默认仓库 `QC3284/zte-e2631-immortalwrt` / GitHub API / 数字比较（剥标签）/ 降级保护 |
+| CI | `.github/workflows/firmware.yml:12,16-18,41-43,44-51` | 150 分钟 / E2631_VERSION `ImmortalWrt v1.10.0` / 产物 `e2631-immortalwrt-*.bin` / SOURCE-INFO 含基底 pin |
 | 几何真值 | `tools/verify_img.mjs:290`、DTS `zte,hdr-delta`、`host/release.mjs:52` | 0x400000 / 0x1100000 / 0x1500000 |
 | overlay 总量 | overlay 目录文件总数（find -type f 计数） | 229 |
 | target 合并 | 基底 55 + overlay 新增 49 | 104，覆写 4 |
 
 ### 7.2 未决问题（需 Lead / 用户决策）
 
-1. **品牌与版本号**：`/etc/e2631-version` 与 CI `E2631_VERSION` 写 OpenWrt 还是 ImmortalWrt？（影响 updater 显示、文档、测试字符串；不影响比较逻辑）
-2. **推送与 Release 授权**：T2 需推送到 QC3284 仓库以触发 Actions；T3 发布 Release。两者都需用户批准，建议 T2 开始前一次性报批。
-3. **argon/homeproxy 取舍**：是否接受使用 iw feeds 版本（推荐）？需要保留自定义壁纸/argon 品牌配置的话要另行确认。
-4. **legacy 并行周期**：T2 完成后是否保留旧基底通道一个版本周期（推荐保留）还是立即删除？
-5. **真机验证**：T5 的刷写/回退验证需用户批准并安排时间；T2/T3 不碰设备。
-6. **产物前缀**：`e2631-openwrt-*` 保持不变还是改 `e2631-immortalwrt-*`？（影响更新链资产名）
+1. **品牌与版本号**：`/etc/e2631-version` 与 CI `E2631_VERSION` 写 OpenWrt 还是 ImmortalWrt？→ **已决**：`ImmortalWrt v1.10.0`（用户决定，2026-11-14）。
+2. **推送与 Release 授权**：T2 需推送到 QC3284 仓库以触发 Actions；T3 发布 Release。→ **已决**：允许推非 main 测试分支触发 `check.yml`；正式 Release 仍需用户批准。
+3. **argon/homeproxy 取舍**：是否接受使用 iw feeds 版本（推荐）？→ **已决**：接受 iw feeds 版，overlay 自带 150 个文件已删除（提交 `819af6c`），同名的 NOTICE / notice-check / secret-allowlist 同步由 T4 完成。
+4. **legacy 并行周期**：T2 完成后是否保留旧基底通道一个版本周期（推荐保留）还是立即删除？→ **已决**：保留 `E2631_BASE_KIND=legacy` 回退开关（至少到 T5 真机验证通过）。
+5. **真机验证**：T5 的刷写/回退验证需用户批准并安排时间；T2/T3 不碰设备。→ **未决 / 待安排**：T5 先做 CI 端到端 + 设备只读取证，刷写另行批准。
+6. **产物前缀**：`e2631-openwrt-*` 保持不变还是改 `e2631-immortalwrt-*`？→ **已决**：改 `e2631-immortalwrt-*`。
 
 ### 7.3 调研边界与复现命令
 
@@ -447,6 +452,21 @@
 - raw 复现：`curl -s https://raw.githubusercontent.com/immortalwrt/immortalwrt/4765b657625ec5bbda74b44400465fe043802b30/target/linux/generic/kernel-6.18` 等（SHA 固定即可复现）。
 - 内核补丁测试：`git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/<path>?h=v6.18.60` 逐文件下载后 `patch -p1 -F3`；脚本与清单在 /tmp，未入库。
 - **本决策的证据以本文与 /tmp 采集件为准；进入 T2 后应以 CI 构建日志作为最终证据。**
+
+## 8. 基底升级 runbook（T4 维护）
+
+触发条件：ImmortalWrt 钉死点需要前移（安全更新 / kernel 小版本 / sanechips 相关上游改动）。原则不变：**本机不做全量编译，最终证据来自 CI；刷写与 Release 需用户批准。**
+
+1. **定新钉点**：确认 `immortalwrt/immortalwrt` 新 commit（`gh api repos/immortalwrt/immortalwrt/commits/master` 或 raw 固定 SHA），记下新 SHA 与 `target/linux/generic/kernel-6.18` 的 `LINUX_VERSION-6.18`。
+2. **重放 4 个补丁**：在新 SHA 的干净 checkout 上 `git am base/0001..0004-*.patch`（顺序与生成方法见 `base/README.md`）。冲突时以旧基底分支 `pr-zte-zxhn-h3600` 的对应提交为行为基准解决，然后重新 `git format-patch` 生成补丁——不要手改补丁文本。
+3. **重算钉死值**：新 SHA、`sha256sum base/000*.patch`、`git rev-parse HEAD^{tree}`（应用补丁后的树 hash）、`LINUX_VERSION-6.18`；旧基底 `PORT_*` 值保留不动。
+4. **更新 `base/commits.env`**：`E2631_IW_SHA`、`E2631_IW_TREE_SHA`、`E2631_BASE_PATCH_SHA256_0001..0004`、`E2631_BASE_KERNEL`。`scripts/env.sh` 自动读取，无需改代码。
+5. **本地门禁**：`make check`。base-pin 会重算 patch sha256 与 tree hash（这就是防手滑的核心）；g_layout 与基底无关、应保持全绿；`bash -n` / `node --check` / ash / dts 四门全绿才算过。
+6. **CI 预检**：推**非 main** 测试分支触发 `.github/workflows/check.yml`（bootstrap → make check 两阶段）。R1（通用补丁与 target 补丁顺序/上下文）只有这里能证；bootstrap 的 tree hash 断言失败即停。
+7. **全量构建**：手动 dispatch `firmware.yml`（上限 150 分钟），验证 kernel 6.18.x 编译、33 个 target 补丁全部应用、产物过 `verify_pkg` / `verify_img`。
+8. **更新证据**：本文 §0 结论表与 §7.1 的 SHA/kernel 行、`docs/relnotes-*.md` 新版本记录；`base/README.md` 的 provenance。
+9. **回滚**：`git revert` 该 commits.env 提交即可回到旧钉点（旧值在 git 历史）；运行时另有 `E2631_BASE_KIND=legacy` 通道（旧 OpenWrt sanechips 基底，kernel 6.18.55）。
+10. **合入门槛**：CI 全绿 + T5 产物验证通过后才合 main；正式 Release 仍需用户批准。
 
 ---
 

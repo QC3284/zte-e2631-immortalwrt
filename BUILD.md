@@ -10,7 +10,7 @@ that way - those scripts are the same steps, plus the workarounds for one machin
 network. If you are on Linux, use `scripts/`.
 
 ```
-base tree (pinned commit)  ->  apply.sh overlay  ->  make world  ->  collect
+ImmortalWrt base (pinned SHA + base/*.patch)  ->  apply.sh overlay  ->  make world  ->  collect
                            ->  mkfactory pack (header template ships in seed/)  ->  verify x2  ->  flash
 ```
 
@@ -26,20 +26,30 @@ base tree (pinned commit)  ->  apply.sh overlay  ->  make world  ->  collect
 | Node | **20.15 or newer** (22 LTS recommended). The packer and the screens use `zlib.crc32`, which does not exist before that. `scripts/build.sh` checks it; by hand: `node -p "typeof require('node:zlib').crc32"` must print `function` |
 | A serial console | 115200 8N1 on the board's UART. Not optional in practice: the failure modes on this SoC are silent, and `docs/known-issues.md` explains why no other channel survives them |
 
-## 2. Two inputs this repository cannot give you
+## 2. The base tree and the version-header template
 
-**The base tree.** This is an overlay, not a fork of OpenWrt. It is keyed to one
-commit of our `sanechips` branch, because `apply.sh` edits the target's config
-fragments and image Makefile by pattern:
+**The base tree.** This is an overlay, not a fork of ImmortalWrt. It is keyed to one
+commit of `immortalwrt/immortalwrt` master, and the sanechips `target/` plus the H3600
+board support travel with this repository as `base/0001..0004-*.patch`, applied with
+`git am`:
 
-    E2631_BASE_REPO   https://github.com/Zlion-Y/openwrt-sanechips-mirror
-    E2631_BASE_BRANCH pr-zte-zxhn-h3600
-    E2631_BASE_SHA    db8b8d4130457dbe46558a7cea872dd2dae539e6
+    E2631_IW_REPO     https://github.com/immortalwrt/immortalwrt
+    E2631_IW_BRANCH   master
+    E2631_IW_SHA      4765b657625ec5bbda74b44400465fe043802b30    (kernel 6.18.60)
 
-`scripts/bootstrap.sh` clones and checks it out for you. Kernel 6.18.55 comes from
-that tree; the `zte/*` patches in its `target/linux/sanechips/patches-6.18` are what
-make the SoC exist at all. If you want to build against a different commit, apply the
-overlay, then read `apply.sh`'s output: it says which commit it thinks it is editing.
+`base/commits.env` is the single pin: it also records the sha256 of each patch and the
+sha256 of the tree produced by applying them, so `scripts/bootstrap.sh` can witness the
+result and `make check` (the base-pin gate) fails a tree built from anything else.
+`apply.sh` still edits the target's config fragments and image Makefile by pattern,
+which is why the patch series and the tree hash are both pinned. Kernel 6.18.60 comes
+from that tree.
+
+The old OpenWrt sanechips base (`Zlion-Y/openwrt-sanechips-mirror`,
+`pr-zte-zxhn-h3600` @ `db8b8d4`, kernel 6.18.55) is kept as the
+`E2631_BASE_KIND=legacy` rollback; see [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)
+for the migration decision and the triple-pin rationale. If you want to build against a
+different ImmortalWrt commit, apply the overlay, then read `apply.sh` output: it says
+which tree it thinks it is editing.
 
 **The version-header template.** `tools/mkfactory.mjs pack` copies a 512-byte version
 header out of a template and rewrites only the geometry and CRC fields, so the template
@@ -95,7 +105,7 @@ overridden by an environment variable or by `.env` (untracked; copy `.env.exampl
 | `E2631_WORK` | parent of the kit | where `out/` lives; relative values in `.env` resolve against it |
 | `E2631_OUT` | `$E2631_WORK/out` | build directories, logs, packages |
 | `E2631_TREE` | `$HOME/openwrt` | the base tree being built |
-| `E2631_BASE_*` | the pinned repo/branch/SHA above | what bootstrap clones |
+| `E2631_BASE_*` | the pinned ImmortalWrt SHA + `base/` patches (old OpenWrt base when `E2631_BASE_KIND=legacy`) | what bootstrap clones and patches |
 | `E2631_TEMPLATE` | `seed/vendor-verhdr-8b8.bin` | the 532-byte version-header template; see section 2 |
 | `E2631_PROXY` | unset | http(s) proxy for the download phases |
 | `E2631_GNU_MIRROR` | unset | move a fast GNU mirror to the head of `@GNU` |
@@ -105,24 +115,36 @@ overridden by an environment variable or by `.env` (untracked; copy `.env.exampl
 
     make check            # or: bash scripts/check.sh
 
-Five gates, each reporting PASS / FAIL / SKIP with the reason:
+Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
 
 | gate | what it proves |
 |---|---|
+| `tests/test_upgrade.py` | the online updater fails safely: a bad checksum, an anti-downgrade refusal and a failed download all leave the board alone, the slot decision dispatches correctly, and the label transition `OpenWrt v1.9.0` -> `ImmortalWrt v1.10.0` upgrades in place (the label is stripped before the numeric compare) |
+| `wsl/apply-gate.sh` | `apply.sh` is idempotent, refuses the wrong base tree, and its structural assertions catch four tampered variants |
 | `bash -n` | every helper in the kit parses |
 | `node --check` | every tool parses |
 | busybox ash | the scripts that get put on the *device* parse under the device's shell, with CRLF stripped - a bashism or a `\r` here only shows up on the board |
-| slot tool | `e2631-fwslot.c` compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. This is the parser that runs on the device before anything is written to flash |
+| slot tool | `e2631-fwslot.c` compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
+| slot layout | the five copies of the slot geometry (`tools/verify_img.mjs`, `host/release.mjs`, `image/Makefile.e2631`, the board DTS and both `e2631-preflight` copies) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`, and the DTS partitions are consistent with them. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
+| base pin | `base/commits.env` exists and its four patch sha256 match the vendored files. A missing `base/commits.env` after it has been committed is a FAIL, not a SKIP. Runs on every `make check`, even before a tree exists |
+| base tree hash | the tree at `E2631_TREE` really has the pinned `HEAD^{tree}` and `LINUX_VERSION-6.18` = `6.18.60` after the four `git am` commits. SKIPs until bootstrap has made a tree, and on the `E2631_BASE_KIND=legacy` rollback base (there is no patch series to hash) |
 | board dts | `#include`s and every `&label` in the board file resolve against the base tree's patch series (needs the tree, so it SKIPs before bootstrap) |
-| `scripts/secret-scan.sh` | no credential shapes in any tracked file, and the evidence files that must stay ignored (the vendor harvest, the config export, the token helper) are not tracked. It exists because a scrub that searches for a value **literally** missed nine files that carry the tcl-escaped form of the same password |
+| first-flash preflight | the host copy of `e2631-preflight` accepts a synthesized valid package and refuses one with a single altered byte, offline (it needs the native `e2631-fwslot`) |
+| `scripts/secret-scan.sh` | no credential shapes in any tracked file, and the evidence files that must stay ignored (the vendor harvest, the config export, the token helper) are not tracked. It exists because a scrub that searched for a value **literally** missed nine files that carry the tcl-escaped form of the same password |
+| `scripts/notice-check.sh` | NOTICE and the tree agree in both directions: every path NOTICE names exists, and every third-party file that must be listed (the mesh runtime tarball, the vendor version-header template) is listed |
 
 The two gates that read a finished artifact - `host/verify_pkg.mjs` (re-derives the
 geometry independently) and `tools/verify_img.mjs` (boot readiness) - run inside the
 pack step, so they need a build first.
 
+Two more consistency checks run in `.github/workflows/check.yml` before `make check` (and can be
+run by hand): `node host/sim-upgrade.mjs` simulates the online updater end to end with stub
+`sysupgrade`/`uci`/`wget` (30 checks, no flash write), and `node tools/check-workflows.mjs`
+asserts that the CI workflows, artifact names, version string and release channel agree (39 checks).
+
 ## 5. Bootstrap, then build
 
-    make bootstrap        # clone + overlay + feeds + seed config, with witnesses
+    make bootstrap        # clone ImmortalWrt @ pin + git am base/ + overlay + feeds + seed config, with witnesses
     make build            # make world, collect, pack, verify
 
 `bootstrap` stops rather than guessing: it dies if the tree is not the base tree, if
@@ -134,7 +156,7 @@ errors you get are the useful ones: no base tree, no `.config`, overlay not appl
 device not selected, no `node`, `node` too old for `zlib.crc32`, a template path that
 does not exist (the default lives in `seed/`). It writes `$E2631_OUT/build-<timestamp>/world.log`, then collects into the
 same directory (`kernel`, `root`, `e2631.dtb`, `config-6.18`, `e2631-fwslot`) and packs
-`$E2631_OUT/e2631-openwrt-<timestamp>.bin`.
+`$E2631_OUT/e2631-immortalwrt-<timestamp>.bin`.
 
 Run it twice in a row to see the loop you will actually live in: the second pass is
 `apply.sh` + `make world` again, and `apply.sh` is idempotent by design.
@@ -157,7 +179,7 @@ vendor slot stays byte-identical, which is what makes route B possible afterward
 This needs the vendor telnet root password in `ZTE_TELNET_PW`; it is not in this
 repository and `host/stage.mjs` refuses to run without it.
 
-**Getting back.** From OpenWrt: `e2631-fwslot switch` then `reboot` re-stamps the other
+**Getting back.** From ImmortalWrt (or a legacy OpenWrt build): `e2631-fwslot switch` then `reboot` re-stamps the other
 slot's header with a higher serial and nothing else - the vendor firmware body is never
 touched. This also works from failsafe, because the tool only needs `/dev/mtd*` and the
 slot partitions from the dtb. There is no `sysupgrade` path that overwrites the vendor

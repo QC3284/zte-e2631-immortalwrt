@@ -1,9 +1,15 @@
-# ZTE ZXHN E2631 · OpenWrt
+# ZTE ZXHN E2631 · ImmortalWrt
 
-中兴巡天 AX3000（ZX279128S）的 OpenWrt 移植：overlay + 板级工具 + 打包器。
-固件与各版本变更日志见 [Releases](https://github.com/Zlion-Y/zte-e2631-openwrt/releases)；
+中兴巡天 AX3000（ZX279128S）的 ImmortalWrt 移植（版本 ImmortalWrt v1.10.0）：overlay + 板级工具 + 打包器。
+固件与各版本变更日志见 [Releases](https://github.com/QC3284/zte-e2631-immortalwrt/releases)；
 逐项实测与取舍记在 [docs/known-issues.md](docs/known-issues.md)。
 本仓库不提供、也不链接原厂固件；随仓库分发的第三方物料见 [NOTICE](NOTICE)。
+
+- **基底**：`immortalwrt/immortalwrt` master @ `4765b657`（kernel 6.18.60）；sanechips target 与
+  H3600 板级支持以 `base/0001..0004-*.patch` 钉死后 `git am` 应用，三重钉（基底 SHA + 补丁
+  sha256 + 应用后 tree hash）由 `make check` 的 base-pin 门复核。迁移决策与旧 OpenWrt 基底的
+  legacy 回退见 [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)。
+- **产物**：`e2631-immortalwrt-*.bin`（原厂 supgrade 格式），版本号见 `/etc/e2631-version`。
 
 ## 芯片与硬件状态
 
@@ -41,8 +47,8 @@
 | LED 状态灯 | ✅ | 启动红慢闪 → 联网绿常亮 / 离线红常亮 |
 | NTP / 时区 / 中文 | ✅ | Asia/Shanghai，国内 NTP 源 |
 | 内置插件 | ✅ | SmartDNS / nlbwmon / UPnP / WOL / adblock-fast 随镜像内置（中文界面） |
-| 代理栈 homeproxy | ⚠️ | sing-box 1.14.0 + LuCI，经 apk 装入 userdata 卷（Release 附件），订阅导入/中文 |
-| 槽位布局 | ✅ | rootfs 窗口 17M（为内置插件扩容，上限按原厂头位置反推），升级包 21.2 MiB |
+| 代理栈 homeproxy | ⚠️ | sing-box 1.14.0 + LuCI（改用 ImmortalWrt luci feed 版），经 apk 装入 userdata 卷（Release 附件），订阅导入/中文 |
+| 槽位布局 | ✅ | rootfs 窗口 17M（为内置插件扩容，上限按原厂头位置反推），升级包 21.2 MiB（v1.9 实测，ImmortalWrt 基底待 T5 复核）；KERNEL_AT / ROOTFS_SPAN / HEADER_AT 三常量由 g_layout 门跨文件校验 |
 | USB | ❌ | 保持禁用（未贴片，探测挂死） |
 | PPPoE 硬件转发 | ❌ | 未验证（同族 ZX279133 实测不走硬件路径） |
 
@@ -73,16 +79,20 @@ WFDMA / MCU 双核 / 私有 TXD 这一层显式重写出来，目标是让无线
 WSL（或任意 Linux）内：
 
 ```sh
-git clone --branch pr-zte-zxhn-h3600 https://github.com/Zlion-Y/openwrt-sanechips-mirror openwrt
-git -C openwrt checkout db8b8d4130457dbe46558a7cea872dd2dae539e6
-./apply.sh openwrt          # 或 make bootstrap：铺 overlay + 补丁 + 种子配置
-make check                  # 本地门禁（语法 / ash / 槽位工具 / dts 交叉引用 / 凭据扫描）
-make build                  # make world + 打包成原厂 .bin
+make bootstrap   # iw master @4765b657 + git am base/*.patch + overlay + iw feeds + 种子配置
+make check       # 本地门禁（语法 / ash / 槽位工具 / dts / 几何一致性 / base 钉死 / 凭据扫描）
+make build       # make world + 打包成原厂 .bin
 ```
 
+- 基底不再手工 clone：`scripts/bootstrap.sh` 钉死 ImmortalWrt commit，并把 4 个 sanechips 移植提交
+  以 `base/*.patch` 应用（基底 SHA + 补丁 sha256 + tree hash 三重钉，`make check` 的 base-pin 门复核）；
+  旧 OpenWrt sanechips 基底仍可用 `E2631_BASE_KIND=legacy` 回退，见
+  [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)；
 - 打包默认用随仓库的版本头切片 `seed/vendor-verhdr-8b8.bin`（与官方全包逐字节同果），
   也可用 `--template` 指向你手里的官方包；
-- 打包器独立复核几何与 CRC，`tools/verify_img.mjs` 静态筛查"起不来"类问题；
+- 打包器独立复核几何与 CRC，`tools/verify_img.mjs` 静态筛查"起不来"类问题；`scripts/check.sh`
+  的 g_layout 门保证打包器 / 镜像规则 / 板级 DTS / 预检脚本里的槽位几何常量（KERNEL_AT
+  0x400000、ROOTFS_SPAN 0x1100000、HEADER_AT 0x1500000）不再漂移；
 - 详细步骤、网络补丁与注意事项见 [BUILD.md](BUILD.md)。
 
 ## 致谢
@@ -92,7 +102,8 @@ make build                  # make world + 打包成原厂 .bin
   [构建分支](https://github.com/ghahramani/openwrt/tree/zte-zxhn-h3600)、
   [主线 RFC](https://github.com/ghahramani/linux/tree/h3600-linux-rfc)、
   [工程长文](https://ghahremani.medium.com/resurrecting-isp-e-waste-how-an-ai-breakthrough-unlocked-the-hyperoptic-zte-h3600-ported-modern-60e74c87c11e)。
-  本仓库 overlay 基线树即该分支镜像（钉在 `db8b8d4`）；其中若干公开说法在这块板子上不成立，
+  本仓库 overlay 的 sanechips 移植面来自该分支（原钉 `db8b8d4`，现以 `base/0001..0004-*.patch`
+  钉在 ImmortalWrt master `4765b657` 上）；其中若干公开说法在这块板子上不成立，
   逐条更正见 [docs/01](docs/01-情报汇总与事实核验-2026-10-13.md)。
 - **[@zwzzrl](https://github.com/zwzzrl/zte-e2631-openwrt)** —— 手动 WAN 口选择、IPv6 硬件卸载打断 TCP
   的发现与因果链、`e2631-wifi-boot` 重配网修复，以及 PPE 逆向的多项输入。

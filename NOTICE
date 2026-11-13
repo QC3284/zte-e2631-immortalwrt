@@ -1,8 +1,9 @@
 NOTICE - files in this repository that are NOT covered by LICENSE (GPL-2.0-only)
 ================================================================================
 
-This project's own code (the overlay, the kit scripts, the tools, the board
-scripts and the docs) is GPL-2.0-only, same as OpenWrt. The files below are
+This project's own code (the overlay, the base patch series, the kit scripts, the
+tools, the board scripts and the docs) is GPL-2.0-only, same as the base tree
+(ImmortalWrt, which follows OpenWrt). The files below are
 third-party material carried in-tree under their own terms; each entry must
 match a path that exists (scripts/notice-check.sh enforces both directions).
 
@@ -20,12 +21,5 @@ match a path that exists (scripts/notice-check.sh enforces both directions).
    It carries no executable code. Basis for redistribution: functional data
    slice required to interoperate with the vendor's own flash format; see the
    compliance section in README.md.
-
-3. overlay/package/luci/luci-theme-argon/
-   Source: vendored from jerrykuku/luci-theme-argon (default theme since
-   v1.0; vendored in v1.3 so apply.sh clones nothing at build time).
-   Terms: Apache-2.0 OR MIT per that project's PKG_LICENSE - not GPL-2.0;
-   its own license applies. This repository does not modify its files
-   beyond packaging (Makefile + po wiring).
 
 Everything else: GPL-2.0-only, see LICENSE.

@@ -1,10 +1,13 @@
-# OpenWrt for the ZTE ZXHN E2631 (Sanechips ZX279128S)
+# ImmortalWrt for the ZTE ZXHN E2631 (Sanechips ZX279128S)
 
 [中文](README.md) · **English**
 
 **To build this: [BUILD.md](BUILD.md).** It is the single supported path from a clone to
 a package that flashes, and it lists the two inputs this repository cannot hand you (the
-pinned base tree, the vendor version-header template) plus the failure modes.
+pinned ImmortalWrt base - reconstructed from the `base/` patch series - and the vendor
+version-header template) plus the failure modes. The migration off the old OpenWrt
+sanechips base, including the `E2631_BASE_KIND=legacy` rollback, is in
+[docs/immortalwrt-migration.md](docs/immortalwrt-migration.md).
 `make check` runs every gate. [docs/architecture.md](docs/architecture.md) maps the
 pieces; [docs/known-issues.md](docs/known-issues.md) is the machine-readable honest list,
 including what is still broken on real hardware.
@@ -13,16 +16,19 @@ This one repository holds the whole port: the overlay that turns the base tree i
 E2631 build (`overlay/`), the local build path (`wsl/`, grouped in `wsl/INDEX.md`, and the
 portable entry points in `scripts/`), the board-side scripts and the vendor-side flash
 plans (`board/`), the Windows-side tooling (`host/`), and the two working documents with
-the evidence notes (`docs/`). The build happens in WSL on this machine; `make check` is the
+the evidence notes (`docs/`). The base tree is ImmortalWrt master, pinned by
+`base/commits.env` and vendored as a four-patch series under `base/`. The build happens in WSL on this machine; `make check` is the
 local gate, `.github/workflows/check.yml` runs the same set on every push/PR, and
 `.github/workflows/firmware.yml` builds on demand.
 
-    git clone --branch pr-zte-zxhn-h3600 https://github.com/Zlion-Y/openwrt-sanechips-mirror openwrt
-    git -C openwrt checkout db8b8d4130457dbe46558a7cea872dd2dae539e6
-    ./apply.sh openwrt
+    make bootstrap
+    make check
+    make build
 
-`scripts/bootstrap.sh` does those three lines, the feeds and the seed config, and
-witnesses each one; `scripts/build.sh` then continues to a flashable package.
+`scripts/bootstrap.sh` clones ImmortalWrt at the SHA pinned in `base/commits.env`
+(`4765b657`, kernel 6.18.60), applies `base/0001..0004-*.patch` with `git am`, then lays
+the overlay, the ImmortalWrt feeds and the seed config - and witnesses each one, including
+the resulting tree hash; `scripts/build.sh` then continues to a flashable package.
 
 Packaging into the vendor upgrade format is `node host/release.mjs --dir <out/build-dir>`
 from anywhere: `out/`, the base tree and the template package resolve through
@@ -47,7 +53,7 @@ drivers, the forced command line, USB and watchdog staying disabled,
 soft-float, and the root filesystem's package list.
 
 Per-version firmware, measured status and changelog live in
-[Releases](https://github.com/Zlion-Y/zte-e2631-openwrt/releases); the per-item evidence and
+[Releases](https://github.com/QC3284/zte-e2631-immortalwrt/releases); the per-item evidence and
 trade-offs are in [docs/known-issues.md](docs/known-issues.md) and `docs/v1.*-progress.md`.
 
 ## Board facts a builder must know
@@ -188,9 +194,11 @@ the literal token never does.
   the build branch [ghahramani/openwrt, branch `zte-zxhn-h3600`](https://github.com/ghahramani/openwrt/tree/zte-zxhn-h3600),
   the 24-patch mainline RFC [ghahramani/linux, branch `h3600-linux-rfc`](https://github.com/ghahramani/linux/tree/h3600-linux-rfc),
   and the [engineering write-up](https://ghahremani.medium.com/resurrecting-isp-e-waste-how-an-ai-breakthrough-unlocked-the-hyperoptic-zte-h3600-ported-modern-60e74c87c11e).
-  The base tree this repository overlays is a mirror of that branch
-  ([`Zlion-Y/openwrt-sanechips-mirror`](https://github.com/Zlion-Y/openwrt-sanechips-mirror), pinned at `db8b8d4`) -
-  without it this port starts from an empty `target/`. Several of its published claims did not survive contact with
+  The sanechips `target/` and board support in this repository are a contribution of that
+  line, vendored as the four-patch series in `base/` and applied on top of ImmortalWrt
+  master (`4765b657`); the old OpenWrt mirror pin (`Zlion-Y/openwrt-sanechips-mirror` at
+  `db8b8d4`) remains only as the `E2631_BASE_KIND=legacy` rollback - without this port the
+  tree starts from an empty `target/`. Several of its published claims did not survive contact with
   this board (the `kernel1`/`kernel2` partition names, "erase `kernel1` to get stock back", the `TESTED.md` sha256
   and its "USB 3.0" line); each is listed with the measurement that closed it in
   [docs/01-情报汇总与事实核验-2026-10-13.md](docs/01-情报汇总与事实核验-2026-10-13.md).
@@ -220,8 +228,9 @@ the literal token never does.
   authority.
 - [The 恩山 (right.com.cn) thread on this device](https://www.right.com.cn/forum/thread-8487689-1-3.html) - the
   Chinese-language community discussion, including the vendor-side behaviour nobody had written down in English.
-- **The OpenWrt and Linux kernel projects**, and the upstream mt76 maintainers (**@nbd168** and co.). We carry exactly
-  one mt76 patch (`overlay/package/kernel/mt76/patches/002-mt7915-use-caldata-file-before-efuse.patch`) and three
+- **The ImmortalWrt, OpenWrt and Linux kernel projects**, and the upstream mt76 maintainers (**@nbd168** and co.).
+  ImmortalWrt is the base tree. We carry exactly one mt76 patch
+  (`overlay/package/kernel/mt76/patches/002-mt7915-use-caldata-file-before-efuse.patch`) and three
   target patches (`029`/`030` JFFS2-on-SPI-NAND, `031` the PCIe link-retrain gate); everything else is upstream as-is.
 
 If any of the above is wrong or incomplete, the fix belongs in `docs/01-...md` next to the evidence, not in a footnote here.

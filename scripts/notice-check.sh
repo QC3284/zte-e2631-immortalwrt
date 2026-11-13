@@ -9,7 +9,6 @@ rc=0
 MUST=(
 	overlay/package/network/zte-mesh/zte-mesh-runtime.tar.gz
 	seed/vendor-verhdr-8b8.bin
-	overlay/package/luci/luci-theme-argon/
 )
 
 # paths mentioned in NOTICE: strip the leading "N. " numbering

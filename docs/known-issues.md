@@ -255,6 +255,7 @@ points at something in the repository or at a measurement.
   verified: yes (owner decision 2026-10-29)
   workaround: from v1.8.0 on, /etc/e2631-version and E2631_VERSION use three parts (vMAJOR.MINOR.PATCH); the updater's numeric compare already handles any component count (1.8.0 > 1.7, 1.10.0 > 1.9.9)
   note: keep release tags and /etc/e2631-version in the same three-part shape from now on
+  note: the label before the number is free-form - "ImmortalWrt v1.10.0" since the base migration, "OpenWrt v1.9.0" before it - because neither the slot tool nor the updater compares it
 - id: UPGRADE-VERSION-COMPARE
   severity: major
   status: fixed
@@ -264,6 +265,7 @@ points at something in the repository or at a measurement.
   cause: "do_check compared the release tag with /etc/e2631-version by string equality; the two formats ('v1.3' vs 'OpenWrt v1.7') never match, so every release looked like an update. There was no ordering at all"
   workaround: "version numbers are normalised (strip the label, keep the dotted digits) and compared component-wise as numbers (1.10 > 1.9); do_download additionally refuses a release that is not newer unless E2631_UPGRADE_FORCE=1, so the automatic path can no longer downgrade. Deployed live on the running box as well as in the source"
   note: 7 unit cases pass (v1.3<v1.7, v1.8>v1.7, equal, 1.10>1.9, 1.9<1.10, 1.7.1>1.7, 2.0>1.99.9)
+  note: "OpenWrt v1.7" in the symptom/verified lines is the label of the old base; the compare strips it. The in-place transition OpenWrt v1.9.0 -> ImmortalWrt v1.10.0 therefore needs no updater change (covered by tests/test_upgrade.py)
 - id: WIFI-UI-DISABLED-EARLY-BOOT
   severity: minor
   status: mitigated

@@ -20,7 +20,8 @@ PLATFORM = (BASE / 'lib/upgrade/platform.sh').read_text().replace('. /lib/functi
 
 
 class UpgradeTests(unittest.TestCase):
-    def download(self, manifest, *, fetch_ok=True, package_ok=True):
+    def download(self, manifest, *, fetch_ok=True, package_ok=True,
+                 running='ImmortalWrt v1.10.0', latest_tag='v1.11.0'):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)
             (path / 'asset').write_bytes(b'firmware fixture')
@@ -35,11 +36,11 @@ class UpgradeTests(unittest.TestCase):
             # A running version makes the anti-downgrade guard active in the
             # sandbox instead of being skipped as 'unknown'.
             script = script.replace('/etc/e2631-version', tmp + '/version')
-            (path / 'version').write_text('OpenWrt v1.8.0\n')
+            (path / 'version').write_text(running + '\n')
             script += '''
 DLDIR="$TEST_DIR"
 E2631_FWSLOT="$TEST_DIR/fwslot"
-latest() { echo "v1.9 https://github.com/owner/repo/releases/download/v1.9/image.bin"; }
+latest() { echo "$LATEST_TAG https://github.com/owner/repo/releases/download/$LATEST_TAG/image.bin"; }
 fetch() {
     case "$1" in
         */SHA256SUMS) [ "$FETCH_OK" = 1 ] && cp "$TEST_DIR/manifest" "$2" ;;
@@ -50,7 +51,8 @@ do_download
 '''
             result = subprocess.run(['busybox', 'ash', '-c', script], text=True,
                                     capture_output=True, env=dict(os.environ,
-                                    TEST_DIR=tmp, FETCH_OK=str(int(fetch_ok))))
+                                    TEST_DIR=tmp, FETCH_OK=str(int(fetch_ok)),
+                                    LATEST_TAG=latest_tag))
             return result, (path / 'pending').exists(), (path / 'checked').exists()
 
     def test_exact_and_binary_entries(self):
@@ -60,6 +62,16 @@ do_download
                 result, pending, checked = self.download(digest + '  ' + name + '\n')
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(pending and checked)
+
+    def test_transition_from_openwrt_label_upgrades_in_place(self):
+        """A running legacy 'OpenWrt v1.9.0' build must accept the ImmortalWrt
+        v1.10.0 release: the label is stripped before the numeric compare."""
+        digest = hashlib.sha256(b'firmware fixture').hexdigest()
+        result, pending, checked = self.download(digest + '  image.bin\n',
+                                                 running='OpenWrt v1.9.0',
+                                                 latest_tag='v1.10.0')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(pending and checked)
 
     def test_reject_incomplete_or_ambiguous_manifest(self):
         digest = hashlib.sha256(b'firmware fixture').hexdigest()
@@ -78,7 +90,7 @@ do_download
             path = Path(tmp)
             (path / 'asset').write_bytes(b'firmware fixture')
             (path / 'manifest').write_text(digest + '  image.bin\n')
-            (path / 'version').write_text('OpenWrt v1.8.0\n')
+            (path / 'version').write_text('ImmortalWrt v1.10.0\n')
             script = 'uci() { return 1; }\n' + UPDATER
             script = script.replace('/etc/.e2631-pending-version', tmp + '/pending')
             script = script.replace('/etc/e2631-version', tmp + '/version')

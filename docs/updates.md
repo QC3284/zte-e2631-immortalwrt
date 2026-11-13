@@ -7,14 +7,14 @@
 
 1. **原厂系统永远住在「非运行槽」**——不是「永远住在槽 0」（v1.3 及更早的口径，已废）。
    槽角色由 cspboot 按「header CRC1 有效且 serial 更大（平手选槽 0）」决定，原厂与
-   OpenWrt 哪个在哪个槽都可能、且真实发生过换位（2026-10-24，known-issues
+   ImmortalWrt（旧基底时代为 OpenWrt）哪个在哪个槽都可能、且真实发生过换位（2026-10-24，known-issues
    ROOTFS-SLOT-ASSUMPTION）。因此：
    - `lib/upgrade/platform.sh` 调 `fwslot upgrade-check` + `fwslot upgrade`，
      **原地重写运行槽**，另一槽（原厂所在）从不是写目标；
    - `fwslot upgrade` 写槽前先验证「另一槽 = 完好的原厂镜像」（按内容判定，
      不是按槽号）——它是写坏时的唯一退路，验证不过就拒绝（`--no-fallback-check`
      可显式放弃该保护）；
-   - 把 OpenWrt 装进原厂所在的槽是另一条显式路径：`fwslot install
+   - 把 ImmortalWrt 装进原厂所在的槽是另一条显式路径：`fwslot install
      --replace-other-system`，写之前先把该槽头 + 前 1 MiB 备份到 userdata，
      备份失败即拒绝写入；`install` 对「原厂或无法识别」的内容默认拒绝；
    - `--allow-slot0`（v1.3：按槽号放行槽 0）已删除——按槽号判断语义本身就是错的。
@@ -34,8 +34,11 @@
 
 ## 在线更新流程（e2631-upgrade）
 
-1. `check`：GET GitHub API `releases/latest`（libustream 已入镜像），
-   比对 `/etc/e2631-version`；带文件参数时仅校验该文件；
+1. `check`：GET GitHub API `repos/QC3284/zte-e2631-immortalwrt/releases/latest`
+   （libustream 已入镜像；仓库名可用 `uci set e2631.upd.repository=...` 覆盖，
+   默认 QC3284/zte-e2631-immortalwrt 写在 `overlay/.../sbin/e2631-upgrade`），比对 `/etc/e2631-version`；带文件参数时仅校验该文件。
+   版本标签不参与比较：先剥掉标签（`OpenWrt` / `ImmortalWrt` 均可），再按数字逐段比，
+   因此 OpenWrt v1.9.0 → ImmortalWrt v1.10.0 的过渡升级不需要特殊处理；
 2. **镜像加速**：`uci set e2631.upd.mirror='https://ghproxy.example/'`
    （板卡页有输入框）——所有 `https://github.com/...` 下载 URL 前自动加该前缀，
    API 与其他源不受影响；sha256 校验覆盖加速后实际到达的文件；

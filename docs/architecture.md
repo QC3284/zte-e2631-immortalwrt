@@ -8,17 +8,19 @@ map: which piece exists, what it is responsible for, and what breaks if you move
 
 | | |
 |---|---|
-| **this one** (`zte-e2631-openwrt`) | the whole port: overlay, board scripts, packer, verifiers, evidence documents. Active |
+| **this one** (`zte-e2631-immortalwrt`) | the whole port: overlay, base patch series, board scripts, packer, verifiers, evidence documents. Active |
 | `e2631-mainline-zx279128s` | the same SoC on **pristine** upstream Linux: upstream v6.18.38 plus 6 modified files and 4 new ones. Where the "this SoC really boots mainline" evidence comes from. No U-Boot/TFTP path any more - that is tagged `v0.1.1` |
-| `openwrt-sanechips-mirror` | the base tree: OpenWrt with the `sanechips` target and the `zte/*` patch series. This kit is an overlay on one commit of it, not a fork |
+| `immortalwrt/immortalwrt` + `base/` | the base tree: ImmortalWrt master pinned at `4765b657` (kernel 6.18.60), on which this kit applies `base/0001..0004-*.patch` (the `sanechips` target and the `zte/*`/H3600 support) before the overlay. Not a fork; the old OpenWrt mirror (`openwrt-sanechips-mirror` @ `db8b8d4`, kernel 6.18.55) is only the `E2631_BASE_KIND=legacy` rollback |
 
 ## Repository map
 
     apply.sh          overlay -> base tree; idempotent; every edit is witnessed
     BUILD.md          the procedure, including the failure modes
     Makefile          check / bootstrap / build / package - wrappers over scripts/
+    base/             the base pin: commits.env (SHA + tree hash + patch sha256),
+                      0001..0004-*.patch (sanechips target + H3600 board support)
     scripts/          env.sh (paths), bootstrap.sh, build.sh, check.sh
-    overlay/          the port itself, in OpenWrt's own directory shape
+    overlay/          the port itself, in the base tree's own directory shape
       target/linux/sanechips/
         config-6.18           kernel symbols this board needs
         image/Makefile.e2631  the device definition, the slot kernel/rootfs recipe
@@ -40,11 +42,11 @@ map: which piece exists, what it is responsible for, and what breaks if you move
 
 ## From source to something that boots
 
-    base tree @ pinned SHA
+    ImmortalWrt base @ pinned SHA + git am base/*.patch
       -> apply.sh        overlay copy; image/Makefile hook; mt7915e AutoProbe removed;
                          VFP/NEON/THUMBEE off; CONFIG_CMDLINE* forced; lockup
                          detectors on (in generic too); root= counted from the DTS
-      -> make world      OpenWrt builds kernel 6.18.55 + the target + LuCI
+      -> make world      the base builds kernel 6.18.60 + the target + LuCI
       -> collect.sh      kernel / root / e2631.dtb / config-6.18 / e2631-fwslot
       -> release.mjs     mkfactory pack -> verify_pkg (independent re-derivation)
                          -> verify_img (boot readiness) -> sha256
@@ -145,6 +147,8 @@ only a power cycle returns it. So every path is built to keep an way in:
 |---|---|---|
 | `wsl/lint-kit.sh` / `wsl/sh-lint.sh` | does every script that goes on the device parse under busybox ash, with CRLF stripped | `make check` |
 | `wsl/check-kit.sh` | does the slot tool compile with `-Werror`, accept a good package, reject one altered byte | `make check` |
+| `scripts/base-pin-check.sh` | is the base really pinned: iw SHA + four `base/` patch sha256 on every run, and the applied tree hash / kernel version once a bootstrapped tree exists | `make check` |
+| `scripts/layout-check.sh` | do the five copies of the slot geometry (packer, image Makefile, DTS, both preflight scripts) still agree on `0x400000` / `0x1100000` / `0x1500000` | `make check` |
 | `tools/dts_lint.mjs` | do the board file's includes and `&labels` resolve (dtc otherwise costs a whole build to say no) | `make check` |
 | `host/verify_pkg.mjs` | is the packed file internally consistent: geometry, CRC1/CRC2, uImage, the rootfs/overlay split, keys and product against the template | inside pack |
 | `tools/verify_img.mjs` | will it boot: `root=` vs the dtb's partition order, drivers built in, forced cmdline, USB/watchdog off, soft-float, package list | inside pack |

@@ -49,6 +49,19 @@ static struct slot_state mk(enum slot_identity id, int intact, int known)
 
 /* Build a header the way classifier sees it: inner magic, version string,
  * valid CRC1 - or deliberately broken variants for ID_EMPTY. */
+static uint8_t *hdr_label(const char *ver)
+{
+	static uint8_t hdr[8][VER_HDR_SIZE];
+	static int n;
+	uint8_t *h = hdr[n++ % 8];
+
+	memset(h, 0, VER_HDR_SIZE);
+	memcpy(h + H_INNER_MAGIC, inner_magic, 16);
+	memcpy(h + H_VERSION, ver, strlen(ver));
+	wr32(h, H_CRC, crc32(h, H_CRC));
+	return h;
+}
+
 static uint8_t *hdr_for(enum slot_identity id, int break_crc)
 {
 	static uint8_t hdr[4][VER_HDR_SIZE];
@@ -59,7 +72,7 @@ static uint8_t *hdr_for(enum slot_identity id, int break_crc)
 	memcpy(h + H_INNER_MAGIC, inner_magic, 16);
 	switch (id) {
 	case ID_OURS:
-		memcpy(h + H_VERSION, "OpenWrt v1.4", 12);
+		memcpy(h + H_VERSION, "ImmortalWrt v1.10.0", 19);
 		break;
 	case ID_VENDOR:
 		memcpy(h + H_VERSION, "V1.0.0.8B8.8000", 15);
@@ -115,7 +128,13 @@ int main(void)
 
 	/* ---- header_identity: the content judgment itself ----------------- */
 	expect(header_identity(hdr_for(ID_OURS, 0)) == ID_OURS,
-		"identity: \"OpenWrt ...\" -> ours");
+		"identity: \"ImmortalWrt v1.10.0\" -> ours");
+	expect(header_identity(hdr_label("OpenWrt v1.9.0")) == ID_OURS,
+		"identity: \"OpenWrt v1.9.0\" (legacy label) -> ours too");
+	expect(header_identity(hdr_label("OpenWrt v1.4")) == ID_OURS,
+		"identity: the old \"OpenWrt v1.4\" label still -> ours");
+	expect(header_identity(hdr_label("ImmortalWrt v1.10.0")) == ID_OURS,
+		"identity: the ImmortalWrt label -> ours");
 	expect(header_identity(hdr_for(ID_VENDOR, 0)) == ID_VENDOR,
 		"identity: \"V1.0.0.*\" -> vendor");
 	expect(header_identity(hdr_for(ID_UNKNOWN, 0)) == ID_UNKNOWN,

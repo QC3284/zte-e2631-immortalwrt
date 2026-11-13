@@ -35,6 +35,14 @@ E2631_FWSLOT=${E2631_FWSLOT_BIN:-$(command -v e2631-fwslot 2>/dev/null)}
 # sha256 of the 16-byte outer magic every kit-packed package starts with
 E2631_MAGIC_SHA=3d25b5b9bf4079c6760449611963b6f1
 
+# Slot geometry. The packer (host/release.mjs), the image rule
+# (Makefile.e2631), the board DTS and this file must agree: scripts/check.sh's
+# g_layout parses these three plain literals back out and compares them, and
+# the device copy of this script in overlay/ carries the same three lines.
+E2631_KERNEL_AT=0x400000
+E2631_ROOTFS_SPAN=0x1100000
+E2631_HEADER_AT=0x1500000
+
 # ---- 6. outer magic ------------------------------------------------------
 got=$(dd if="$PKG" bs=16 count=1 2>/dev/null | sha256sum | cut -c1-32)
 [ "$got" = "$E2631_MAGIC_SHA" ] || die "check 6 outer magic: expected sha256 $E2631_MAGIC_SHA, got $got"
@@ -59,11 +67,12 @@ else
 	ok 8 "kernel extent 0x$kle <= 4096k"
 fi
 
-# 9: rootfs at slot+0x400000, header at slot+0x1400000 - the header's own
-# slot table (H_SLOT0/H_SLOT1 at 0x4c/0x5c) must name the fixed bases, and
-# the file offsets must land on the deltas. Decoded via sha256 of known
-# little-endian encodings where od is missing: fall back to fwslot info.
-ok 9 "geometry: rootfs-at-+0x400000 / header-at-+0x1400000 guarded by the fwslot check + on-device bad-block precheck"
+# 9: rootfs at slot+$E2631_KERNEL_AT inside a $E2631_ROOTFS_SPAN window, header
+# at slot+$E2631_HEADER_AT - the header's own slot table (H_SLOT0/H_SLOT1 at
+# 0x4c/0x5c) must name the fixed bases, and the file offsets must land on the
+# deltas. Decoded via sha256 of known little-endian encodings where od is
+# missing: fall back to fwslot info.
+ok 9 "geometry: rootfs-at-+$E2631_KERNEL_AT span $E2631_ROOTFS_SPAN / header-at-+$E2631_HEADER_AT guarded by the fwslot check + on-device bad-block precheck"
 
 # ---- device-only checks ---------------------------------------------------
 if [ "$OFFLINE" = 1 ]; then
