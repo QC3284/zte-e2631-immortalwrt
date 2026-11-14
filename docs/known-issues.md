@@ -67,10 +67,10 @@ points at something in the repository or at a measurement.
   status: fixed
   surface: ethernet
   symptom: link trains at 1 Gbps; v1.2 plateaued at ~305/190 Mbit/s with no offload at all
-  verified: yes - v1.3 measured 395 Mbps SUSTAINED via OPPO-mall CDN (32 browser threads), CPU 7%, WAN software counter flat (PPE forwards without touching the CPU stack); the earlier "200M ceiling" across three CDNs and 48 connections was Tencent-CDN per-IP rate limiting, not the router
-  cause: v1.2 shipped no flow offload (missing kmod-nft-offload + the firewall flag) although the gmac driver has had the full PPE hardware path (zx279128s-ppe.c, TC_SETUP_FT) all along; WiFi-originated flows are architecturally rejected by the PPE (ingress must be a switch port) and stay on the CPU software path (~200M) - the vendor reaches gigabit over WiFi only via its private IDM/NPP engines on the 4.1 kernel
+  verified: yes - v1.3 measured 395 Mbps SUSTAINED via OPPO-mall CDN (32 browser threads), CPU 7%, WAN software counter flat (PPE forwards without touching the CPU stack); the earlier "200M ceiling" across three CDNs and 48 connections was Tencent-CDN per-IP rate limiting, not the router; 2026-11-15 real-uplink re-measure: device-originated WAN download 315 Mbps at load 0.06-0.08 (ppe_flows=0, CPU path), host-WiFi->NAT download 174 Mbps at load 0.42->0.99 (about one core saturated)
+  cause: v1.2 shipped no flow offload (missing kmod-nft-offload + the firewall flag) although the gmac driver has had the full PPE hardware path (zx279128s-ppe.c, TC_SETUP_FT) all along; WiFi-originated flows are NEVER SUBMITTED to the PPE - hardware ingress must be a switch port, so WiFi ingress flows do not enter the PPE submission path and stay on the CPU software path (~174-200M; 2026-11-15 re-measure: 174 Mbps with ppe_add_skip=0/ppe_add_fail=0/ppe_flows=0, i.e. "not submitted", not "rejected"; the earlier ppe_add_skip=28 was a cumulative count of unknown provenance and is no longer used as per-flow evidence) - the vendor reaches gigabit over WiFi only via its private IDM/NPP engines on the 4.1 kernel
   workaround: none needed for wired; do NOT use /proc/net/dev WAN counters to measure PPE traffic (hardware-forwarded packets are invisible there) - read ppe_flows in /sys/kernel/debug/92000000.ethernet/dma_state instead
-  next: find an unthrottled server to probe the true PPE ceiling (395M was still climbing when stopped); PPPoE uplinks may not take the hardware path (sibling ZX279133 hit exactly that)
+  next: find an unthrottled server to probe the true PPE ceiling (395M was still climbing when stopped); PPPoE uplinks may not take the hardware path (sibling ZX279133 hit exactly that); 2026-11-15: the wired-client half is still blocked on a real LAN client (lan1/2/3 are NO-CARRIER) - tracked in the B-group completion matrix at the end of this file
 - id: PPE-IPV6-TCP
   severity: major
   status: mitigated
@@ -446,3 +446,25 @@ after the preinit mknod fix the probe hits ubi0_0 at t=11s, "mount_root:
 switched to extroot" at t=11.3, and /overlay = /dev/ubi0_0 ubifs with the
 migrated configuration - config loss zero, across repeated flash cycles.
 status: fixed.
+
+## B 组欠验收矩阵（设备轨道，2026-11-15 更新）
+
+A 组（构建/CI/迁移）已有 CI 与 parity 证据；本表是「官方支持设备级完成度」的 B 组设备侧验收
+看板。原则：只写真机/设备证据；**未测的行保持未测**，推断不升格为事实。证据日期为 2026-11-15，
+真机只读探针由 Lead 执行、verify-docs 复核（`iw reg get` / IPv6 / 链路 / PPE 计数器）。
+
+| # | 验收项 | 状态（2026-11-15） | 证据 | 剩余工作 / 阻塞 |
+|---|---|---|---|---|
+| 1 | 监管域（regdomain） | **✅ VERIFIED** | `iw reg get` = `country CN: DFS-FCC`（来自 regdb，不是驱动内置默认）；两 radio `country='CN'`，2.4G ch1/HE40，5G ch36/HE80；`iw dev` 显示 channel 1 (2412 MHz, width 40 MHz) 与 channel 36 (5180 MHz, width 80 MHz)，CN 合法信道段 2400–2483 / 5150–5350 / 5725–5850 / 57240–59400 可见。溯源：本文件 REGDB-NOT-SHIPPED。 | 无阻塞；DFS/雷达检测行为未主动触发（需专门测试，非验收阻塞） |
+| 2 | IPv6 上行（WAN） | **✅ VERIFIED** | wan 有 GUA `240e:33d:70a:ee00::/64`（另有 ULA `fd37:d646:8038::/64`）；默认路由 `via fe80::9683:c4ff:fed3:96a8`（上游 Gl.iNet，MAC 94:83:c4:d3:96:a8）；设备自身 `ping6 2400:3200::1` = 26 ms、0% 丢包。 | 无（WAN 侧）；LAN 分发见第 3 行 |
+| 3 | IPv6 LAN 分发 | **⚠️ 已知缺口（文档化，非回归）** | br-lan 只有 ULA `fdc0:fd89:3a32::1/60` + fe80；`uci show dhcp` 的 relay 条目数 = 0，odhcpd 无 relay 配置 ⇒ 客户端拿不到 IPv6。与 WAN6-RELAY-NOTE 的「WAN6 relay 需手动配方」一致，不是本次回归。 | 若要 LAN IPv6：按 WAN6-RELAY-NOTE 手动配 relay（依赖 ISP/上游前缀委派行为） |
+| 4 | 性能：设备自发 WAN 下载 | **✅ 实测数字（非上限结论）** | 设备自身下载大文件 984.7 MB / 25 s ≈ **315 Mbps**，load 0.06–0.08；同时 `ppe_flows=0` ⇒ 该流量走 CPU 路径（本机流量不提交 PPE），设备 CPU 远未饱和。 | 真实「设备下载上限」需无节流服务器/第二客户端；本行只作真实上行可用性的基线 |
+| 5 | 性能：主机 WiFi → 设备 NAT → WAN 下载 | **⚠️ 架构天花板（CPU 路径）** | 542.7 MB / 25 s ≈ **174 Mbps**，load 0.42→0.99（约单核饱和）；全程 `ppe_add_skip=0` / `ppe_add_fail=0` / `ppe_flows=0` ⇒ **WiFi 入向流根本没有提交给 PPE**。这是「未提交」，不是「被拒」：硬件 ingress 必须是交换端口，WiFi 流不进 PPE 提交路径。旧镜像记录的 `ppe_add_skip=28` 为累计计数、来源无法复现，不再作为「每流被拒」的证据；本文件 ETH-THROUGHPUT-CEILING 的措辞已同步更正。 | WiFi 硬卸载为架构性（原厂靠 4.1 私有 IDM/NPP，复刻高成本、likely wontfix）；CPU 路径优化（NAPI/GRO/IRQ 亲和）留作 P2 研究 |
+| 6 | 有线客户端 PPE 卸载吞吐 | **❌ NOT TESTED** | `ip -br link`：lan1/lan2/lan3 全部 `NO-CARRIER`（无有线客户端）；ppe 计数器 `ppe_active=1` / `ppe_flows=0` / `ppe_add_skip=0` / `ppe_add_fail=0` 仅代表空闲态。 | **阻塞：需要用户把一台 PC 接到 LAN 口**；随后测有线 NAT 的 PPE 硬卸载上限（含 PPPoE 是否走硬件路径） |
+| 7 | IPv6 转发吞吐 | **❌ NOT TESTED** | 与第 6 行同因：没有 LAN 客户端，无法产生跨设备的 IPv6 转发流量；软件路径就绪（WAN 默认路由存在、forwarding=1），但未做流量实测。 | 与第 6 行同批（LAN 客户端 + 主机空闲） |
+| 8 | WPA3（SAE）+ mesh 双客户端 | **❌ NOT TESTED** | 能力已装：`wpad-mbedtls`（含 SAE/802.11r/k/v/mesh）、`zte-mesh` + `luci-app-zte-mesh` 已安装；现网两 radio `encryption='none'`（开放 AP），无 mesh 接口/进程。 | **阻塞：需要第二客户端/第二节点 + 用户批准写无线配置**（一次一变量） |
+| 9 | slot-0 受控启动 | **❌ NOT TESTED** | 主机侧决策单测 11/11 通过；真机两槽 header 均被 U-Boot 正常读取（slot0 原厂 V1.0.0.7B5.8000 完好）；「实际从 slot-0 启动」需一次受控刷写周期，属写操作。 | **阻塞：写操作需用户明确批准**（Q-收1 剩余项，不在只读边界内） |
+| 10 | MT7916 冷启动稳定性（回归补充） | **✅ VERIFIED** | 两镜像累计 **14/14 真冷启成功**：v1.10.0 11/11（ready 54.5±0.7 s）+ r0-83df1a9 3/3（ready 53.56/53.69/55.00 s），0 失败签名、0 自愈事件；旧 1/3 假说被统计否定（单侧 p≈0.012）。证据：evidence/cold-boot-sampling-20261114.md §3.4–§3.5。 | 可选：继续回归采样（采集链运行中）；「1/3 挂起」可结案 |
+
+读法：**✅ VERIFIED** = 已在真机复现并留有证据；**⚠️** = 能力/路径存在但被架构或环境条件限制（非缺陷回归）；**❌ NOT TESTED** = 设备/环境条件未满足，不是失败。
+
