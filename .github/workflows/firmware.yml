@@ -6,6 +6,10 @@ on:
         description: 'Create a GitHub pre-release for this build (official Release still needs user approval)'
         type: boolean
         default: false
+      reproduce_v1100:
+        description: 'Rebuild the released v1.10.0 byte-for-byte: writes tree topdir version/version.date and E2631_BUILD=20261114 (parity evidence P1/P4)'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -27,6 +31,12 @@ jobs:
       # (user decision 2026-11-14). The stock web upgrade page only accepts the
       # vendor "V1.0.0.8B8.8000" shape, so these artifacts install via fwslot.
       E2631_VERSION: ImmortalWrt v1.10.0
+      # Parity run (evidence/immortalwrt-verify-20261114.md P1/P4), default off.
+      # When reproduce_v1100 is on: bootstrap writes the topdir version/version.date
+      # of the released v1.10.0 and E2631_BUILD pins the packer build field, so a
+      # rebuild can be compared byte-for-byte with the released image.
+      E2631_REPRODUCE_V1100: ${{ inputs.reproduce_v1100 }}
+      E2631_BUILD: ${{ inputs.reproduce_v1100 && '20261114' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,10 +62,10 @@ jobs:
           mapfile -t packages < <(find "$E2631_OUT" -maxdepth 1 -name 'e2631-immortalwrt-*.bin' -type f)
           test "${#packages[@]}" -eq 1
           cp "${packages[0]}" release/e2631-immortalwrt-experimental.bin
-          # The pin names come from the base/ patch series: source env.sh so
-          # SOURCE-INFO records exactly the values the build asserted, not a
-          # HEAD commit (the four git-am commits carry machine-local SHAs; the
-          # tree hash is what identifies the patched base).
+          # The pin names come from base/commits.env: source env.sh so SOURCE-INFO
+          # records exactly the values the build asserted. The tree fork tip is a
+          # branch commit whose SHA is stable; the base-port tree hash identifies
+          # the reviewed sanechips port inside that history.
           . scripts/env.sh
           {
             echo "Kit commit: $GITHUB_SHA"
@@ -63,6 +73,8 @@ jobs:
             echo "ImmortalWrt base: ${E2631_IW_REPO:-unknown} ${E2631_IW_BRANCH:-} @ ${E2631_IW_SHA:-unknown}"
             echo "ImmortalWrt tree (pristine): ${E2631_IW_TREE_SHA:-unknown}"
             echo "Port base tree (4 patches applied): ${E2631_BASE_TREE_SHA:-unknown}"
+            echo "Tree fork: ${E2631_FORK_REPO:-unknown} ${E2631_FORK_BRANCH:-} @ ${E2631_FORK_SHA:-unknown}"
+            echo "Parity reproduction: ${E2631_REPRODUCE_V1100:-false} (build stamp ${E2631_BUILD:-date-of-run})"
             echo "Port patch 0001 sha256: ${E2631_BASE_PATCH_SHA256_0001:-unknown}"
             echo "Port patch 0002 sha256: ${E2631_BASE_PATCH_SHA256_0002:-unknown}"
             echo "Port patch 0003 sha256: ${E2631_BASE_PATCH_SHA256_0003:-unknown}"

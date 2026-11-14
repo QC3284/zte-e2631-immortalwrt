@@ -50,6 +50,13 @@ if [ -f "$E2631_KIT/.env" ]; then
 		E2631_BASE_REPO) [ -n "${E2631_BASE_REPO:-}" ] || E2631_BASE_REPO=$_v ;;
 		E2631_BASE_BRANCH) [ -n "${E2631_BASE_BRANCH:-}" ] || E2631_BASE_BRANCH=$_v ;;
 		E2631_BASE_SHA) [ -n "${E2631_BASE_SHA:-}" ] || E2631_BASE_SHA=$_v ;;
+		E2631_FORK_REPO) [ -n "${E2631_FORK_REPO:-}" ] || E2631_FORK_REPO=$_v ;;
+		E2631_FORK_BRANCH) [ -n "${E2631_FORK_BRANCH:-}" ] || E2631_FORK_BRANCH=$_v ;;
+		E2631_FORK_DEPTH) [ -n "${E2631_FORK_DEPTH:-}" ] || E2631_FORK_DEPTH=$_v ;;
+		# E2631_FORK_SHA is deliberately NOT a .env key: the pin file owns it.
+		# Parity reproduction switches (P1/P4): the firmware workflow sets both in env.
+		E2631_REPRODUCE_V1100) [ -n "${E2631_REPRODUCE_V1100:-}" ] || E2631_REPRODUCE_V1100=$_v ;;
+		E2631_BUILD) [ -n "${E2631_BUILD:-}" ] || E2631_BUILD=$_v ;;
 		E2631_TEMPLATE) [ -n "${E2631_TEMPLATE:-}" ] || E2631_TEMPLATE=$_v ;;
 		E2631_PROXY) [ -n "${E2631_PROXY:-}" ] || E2631_PROXY=$_v ;;
 		esac
@@ -65,11 +72,12 @@ E2631_TREE=${E2631_TREE:-$HOME/openwrt}
 
 # ---- which base tree -------------------------------------------------------
 # Two bases are supported for one release cycle (docs/immortalwrt-migration.md
-# 5.6, the rollback): "immortalwrt" is immortalwrt/immortalwrt at a pinned
-# commit with the sanechips target port applied on top from base/*.patch (git
-# am); "legacy" is the original OpenWrt sanechips mirror checkout this kit was
-# written against. legacy is the DEFAULT until the ImmortalWrt chain passes
-# end-to-end CI - it is the one-line rollback switch.
+# 5.6, the rollback): "immortalwrt" is our tree fork (QC3284/immortalwrt,
+# branch e2631) - immortalwrt/immortalwrt at a pinned commit with the sanechips
+# port and the e2631 device support as real commits on top; "legacy" is the
+# original OpenWrt sanechips mirror checkout this kit was written against.
+# legacy is the DEFAULT until the ImmortalWrt chain passes end-to-end CI - it
+# is the one-line rollback switch.
 #
 # base/commits.env is the pin file: the ImmortalWrt commit, the sha256 of every
 # port patch, and the tree hash the series must produce. The immortalwrt branch
@@ -86,12 +94,24 @@ elif [ "$E2631_BASE_KIND" = immortalwrt ]; then
 fi
 case "$E2631_BASE_KIND" in
 immortalwrt)
-	# scripts/bootstrap.sh fetches exactly this commit and applies
-	# base/0001..0004; E2631_BASE_TREE_SHA is the tree hash the result must
-	# have, and both apply.sh and make check verify it.
-	E2631_BASE_REPO=${E2631_BASE_REPO:-$E2631_IW_REPO}
-	E2631_BASE_BRANCH=${E2631_BASE_BRANCH:-$E2631_IW_BRANCH}
-	E2631_BASE_SHA=${E2631_BASE_SHA:-$E2631_IW_SHA}
+	# Phase 2 (tree fork): the sanechips port and the e2631 device support
+	# are real commits in our ImmortalWrt fork. scripts/bootstrap.sh fetches
+	# E2631_FORK_SHA, then proves from CONTENT that the history still contains
+	# the reviewed base-port tree (E2631_BASE_TREE_SHA) on top of the upstream
+	# pin (E2631_IW_SHA); a rebase onto another base fails the gate.
+	E2631_FORK_REPO=${E2631_FORK_REPO:-https://github.com/QC3284/immortalwrt}
+	E2631_FORK_BRANCH=${E2631_FORK_BRANCH:-e2631}
+	E2631_FORK_DEPTH=${E2631_FORK_DEPTH:-32}
+	if [ -z "${E2631_FORK_SHA:-}" ]; then
+		echo "env.sh: E2631_BASE_KIND=immortalwrt needs E2631_FORK_SHA (the tree-fork tip)." >&2
+		echo "        It lives in base/commits.env; restore it, or set E2631_BASE_KIND=legacy." >&2
+		exit 1
+	fi
+	# Informational aliases: the tree this kit clones is the fork; E2631_IW_*
+	# still describes the upstream pin the fork sits on.
+	E2631_BASE_REPO=${E2631_BASE_REPO:-$E2631_FORK_REPO}
+	E2631_BASE_BRANCH=${E2631_BASE_BRANCH:-$E2631_FORK_BRANCH}
+	E2631_BASE_SHA=${E2631_BASE_SHA:-$E2631_FORK_SHA}
 	case "$E2631_BASE_REPO" in
 	*openwrt-sanechips-mirror*)
 		echo "env.sh: E2631_BASE_KIND=immortalwrt, but E2631_BASE_REPO is the legacy sanechips mirror." >&2
@@ -121,7 +141,9 @@ E2631_TEMPLATE=${E2631_TEMPLATE:-$E2631_KIT/seed/vendor-verhdr-8b8.bin}
 # no out/ yet. Failing to create it is not fatal: the read-only tools need no scratch dir.
 [ -d "$E2631_OUT" ] || mkdir -p "$E2631_OUT" 2>/dev/null || true
 export E2631_KIT E2631_WORK E2631_OUT E2631_TREE E2631_BASE_KIND E2631_PORT_DIR \
-	E2631_BASE_REPO E2631_BASE_BRANCH E2631_BASE_SHA E2631_BASE_TREE_SHA E2631_TEMPLATE
+	E2631_BASE_REPO E2631_BASE_BRANCH E2631_BASE_SHA E2631_BASE_TREE_SHA E2631_TEMPLATE \
+	E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA E2631_FORK_DEPTH \
+	E2631_REPRODUCE_V1100 E2631_BUILD
 # Pin provenance from base/commits.env, exported for CI/SOURCE-INFO consumers.
 # (export of an unset name is fine under set -u; legacy without base/ still works.)
 export E2631_IW_REPO E2631_IW_BRANCH E2631_IW_SHA E2631_IW_TREE_SHA \

@@ -107,11 +107,11 @@ g_layout() {	# one slot geometry across the packer, the rule, the DTS and the pr
 	bash "$E2631_KIT/scripts/layout-check.sh"
 }
 
-g_base_pin() {	# the vendored base patches: iw pin + patch sha256 (always), tree hash when a tree exists
+g_base_pin() {	# tree-fork pin: fork tip + iw pin + patch sha256 (always), tree content when a tree exists
 	bash "$E2631_KIT/scripts/base-pin-check.sh" static
 }
 
-g_base_tree() {	# the tree hash the four patches must produce after git am (needs a bootstrap)
+g_base_tree() {	# fork tip + base-port tree in the fetched history (needs a bootstrap)
 	bash "$E2631_KIT/scripts/base-pin-check.sh" tree
 }
 
@@ -122,8 +122,8 @@ run "javascript (node --check)" g_js
 run "device scripts (busybox ash)" g_ash
 run "slot tool (-Werror, parse, reject)" g_slot_tool
 run "slot layout constants (5 copies)" g_layout
-run "base pin (iw SHA + patch sha256)" g_base_pin
-run "base tree hash (git am result)" g_base_tree
+run "base pin (fork tip + iw SHA + patch sha256)" g_base_pin
+run "base tree (fork history + 4 commits)" g_base_tree
 g_preflight() {
 	local F="$E2631_OUT/fixture/fixture.bin"
 	command -v busybox >/dev/null 2>&1 || { echo "no busybox: the preflight script is not ash-checked"; return 77; }

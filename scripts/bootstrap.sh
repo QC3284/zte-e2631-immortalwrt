@@ -1,15 +1,23 @@
 #!/bin/bash
-# Get a clean Linux box to the point where `make world` can succeed: the base
-# tree at its pinned state, the E2631 overlay applied, the two feeds that matter
+# Get a clean Linux box to the point where `make world` can succeed: the E2631
+# ImmortalWrt tree fork at its pinned commit, the two feeds that matter
 # installed, and the seed .config in place.
 #
 #   bash scripts/bootstrap.sh          # or: make bootstrap
 #
-# Two bases are supported for one release cycle (scripts/env.sh, the rollback):
-# "immortalwrt" is immortalwrt/immortalwrt at a pinned commit with the sanechips
-# target port applied from base/*.patch; "legacy" is the original OpenWrt
-# sanechips mirror checkout. Either way the result is identified by content, not
-# by a branch: the ImmortalWrt tree must hash to E2631_BASE_TREE_SHA.
+# Phase 2 (tree-fork migration, 2026-11-14): the sanechips port and the E2631
+# device/package support are real commits in QC3284/immortalwrt, branch e2631,
+# pinned by E2631_FORK_SHA - not a patch series applied here. The BUILD tree is
+# fetched at --depth 1 (parity requirement P2, evidence/immortalwrt-verify-20261114.md:
+# rules.mk COMMITCOUNT is "git rev-list --count HEAD .", so a deeper clone changes
+# base-files PKG_RELEASE). The history assertions - base-port tree in history,
+# four sanechips commits on the upstream pin - run in a separate scratch repo
+# under $E2631_WORK, so the build tree never deepens. The vendored series under
+# base/ is kept only as provenance until T-6 deletes it.
+#
+# The legacy OpenWrt sanechips mirror stays available for one release cycle
+# (the rollback switch, E2631_BASE_KIND=legacy); it still gets the overlay
+# applied, because that base has no commits carrying it.
 #
 # Idempotent: every step checks before it acts, so re-running after a failed
 # build costs seconds. It never deletes a tree - if something looks wrong it
@@ -21,141 +29,175 @@ cd "$(dirname "$0")/.."
 say() { printf 'bootstrap: %s\n' "$*"; }
 die() { printf 'bootstrap: %s\n' "$*" >&2; exit 1; }
 
-e2631_need_cmd git "clone the base tree and the feeds" || exit 1
+e2631_need_cmd git "clone the tree fork and the feeds" || exit 1
 e2631_need_cmd make "drive the OpenWrt build" || exit 1
 e2631_need_cmd gcc "build the toolchain (build-essential)" || exit 1
 e2631_need_cmd g++ "build some host tools (build-essential)" || exit 1
 e2631_need_cmd file "identify the built payloads" || exit 1
-e2631_need_cmd sha256sum "verify the vendored port patch series" || exit 1
+e2631_need_cmd sha256sum "verify the tree contents" || exit 1
 
-say "base: kind=$E2631_BASE_KIND  $E2631_BASE_REPO#$E2631_BASE_BRANCH @ $E2631_BASE_SHA"
-[ "$E2631_BASE_KIND" = immortalwrt ] &&
-	say "      port series: $E2631_PORT_DIR/0001..0004 -> tree $E2631_BASE_TREE_SHA (kernel $E2631_BASE_KERNEL)"
+if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+	say "tree fork: $E2631_FORK_REPO#$E2631_FORK_BRANCH @ $E2631_FORK_SHA"
+	say "           base port tree pin: $E2631_BASE_TREE_SHA (kernel $E2631_BASE_KERNEL)"
+else
+	say "base: kind=$E2631_BASE_KIND  $E2631_BASE_REPO#$E2631_BASE_BRANCH @ $E2631_BASE_SHA"
+fi
 
-# ---- 1. the base tree --------------------------------------------------------
+# ---- 1. the build tree -------------------------------------------------------
+# The build tree is always a depth-1 checkout of the pinned fork tip. P2 of the
+# v1.10.0 parity evidence: rules.mk COMMITCOUNT is "git rev-list --count HEAD .",
+# so a deeper clone changes base-files PKG_RELEASE and the image stops matching
+# the released v1.10.0. All history assertions therefore run in the scratch repo
+# of section 1b, never in the build tree.
 if [ ! -d "$E2631_TREE" ]; then
 	say "creating $E2631_TREE"
-	case "$E2631_BASE_KIND" in
-	immortalwrt)
-		# One pinned commit, no history. Fetching the commit by SHA works on
-		# GitHub and keeps this clone small; trust comes from the tree hash
-		# below, not from a branch pointer that can move.
+	if [ "$E2631_BASE_KIND" = immortalwrt ]; then
 		mkdir -p "$E2631_TREE" &&
 		git -C "$E2631_TREE" init -q &&
-		git -C "$E2631_TREE" remote add origin "$E2631_BASE_REPO" &&
-		git -C "$E2631_TREE" fetch -q --depth 1 origin "$E2631_BASE_SHA" &&
-		git -C "$E2631_TREE" checkout -q FETCH_HEAD ||
-			die "clone failed - network, or $E2631_BASE_REPO does not carry $E2631_BASE_SHA.
-       Point E2631_BASE_REPO at a mirror of immortalwrt/immortalwrt, or unset it to use the pin."
-		;;
-	legacy)
-		# A full clone, not a shallow one: the base is pinned to a commit that
-		# may not be the branch head, and a shallow clone cannot check out an
-		# arbitrary SHA.
+		git -C "$E2631_TREE" remote add origin "$E2631_BASE_REPO" ||
+			die "cannot create a git checkout at $E2631_TREE"
+	else
+		# A full clone, not a shallow one: the legacy base is pinned to a commit
+		# that may not be the branch head, and a shallow clone cannot check out
+		# an arbitrary SHA.
 		git clone --branch "$E2631_BASE_BRANCH" "$E2631_BASE_REPO" "$E2631_TREE" ||
 			die "clone failed - network, or the branch moved? $E2631_BASE_REPO can be overridden in .env"
-		;;
-	esac
+	fi
 fi
 [ -d "$E2631_TREE/.git" ] ||
 	die "$E2631_TREE exists but is not a git checkout - point E2631_TREE at a fresh path (or an OpenWrt tree you own)"
 
 if [ "$E2631_BASE_KIND" = immortalwrt ]; then
-	# ---- 2a. the vendored sanechips port series -------------------------
-	at=$(git -C "$E2631_TREE" rev-parse 'HEAD^{tree}' 2>/dev/null || echo unknown)
-	if [ "$at" = "$E2631_BASE_TREE_SHA" ]; then
-		say "base tree already at the pinned port tree hash - not re-applying"
-	else
-		[ -d "$E2631_TREE/.git/rebase-apply" ] &&
-			die "git am was interrupted in $E2631_TREE.
-       Finish or abort it (git -C $E2631_TREE am --abort), then re-run."
-		head=$(git -C "$E2631_TREE" rev-parse HEAD 2>/dev/null || echo unknown)
-		if [ "$head" != "$E2631_BASE_SHA" ]; then
-			# A pre-existing checkout at another commit is common when
-			# E2631_TREE points at an ImmortalWrt tree someone already had.
-			# Move it to the pin only when the worktree is clean: anything
-			# else is that person's work and this script does not overwrite it.
-			[ -n "$(git -C "$E2631_TREE" status --porcelain)" ] &&
-				die "$E2631_TREE is at $(git -C "$E2631_TREE" rev-parse --short HEAD 2>/dev/null), not the pinned $E2631_BASE_SHA, and has uncommitted changes.
-       Look at 'git -C $E2631_TREE status' first: if those edits are yours, point E2631_TREE at a
-       fresh clone instead of overwriting them."
-			say "fetching the pinned commit $E2631_BASE_SHA"
-			git -C "$E2631_TREE" fetch -q --depth 1 origin "$E2631_BASE_SHA" &&
-			git -C "$E2631_TREE" checkout -q FETCH_HEAD ||
-				die "cannot fetch $E2631_BASE_SHA from $E2631_BASE_REPO"
-			head=$(git -C "$E2631_TREE" rev-parse HEAD)
-		fi
-		[ "$head" = "$E2631_BASE_SHA" ] ||
-			die "$E2631_TREE is at $head, not the pinned $E2631_BASE_SHA"
+	# ---- 1a. a depth-1 checkout of the pinned fork tip --------------------
+	head=$(git -C "$E2631_TREE" rev-parse HEAD 2>/dev/null || echo unknown)
+	if [ "$head" != "$E2631_FORK_SHA" ]; then
+		# Common when E2631_TREE is a leftover of the patch-series era: the
+		# overlay was applied on top of an am'd base and the worktree is dirty.
+		# Never overwrite someone's work; only move a clean checkout.
 		[ -n "$(git -C "$E2631_TREE" status --porcelain)" ] &&
-			die "$E2631_TREE is at the pinned commit but has uncommitted changes.
-       If they are only a stale copy of this overlay, run
-       'git -C $E2631_TREE reset --hard $E2631_BASE_SHA' and re-run; otherwise use a fresh tree."
-
-		# The patch bytes are part of the pin: an edited patch must not
-		# silently change the base the images are built from.
-		for i in 0001 0002 0003 0004; do
-			var=E2631_BASE_PATCH_SHA256_$i
-			want=${!var}
-			[ -n "$want" ] || die "no sha256 pinned for patch $i (base/commits.env incomplete)"
-			set -- "$E2631_KIT/$E2631_PORT_DIR/$i"-*.patch
-			[ "$#" -eq 1 ] && [ -f "$1" ] ||
-				die "expected exactly one $E2631_PORT_DIR/$i-*.patch, found $# - the vendored series is incomplete"
-			got=$(sha256sum "$1" | cut -d' ' -f1)
-			[ "$got" = "$want" ] ||
-				die "patch $i sha256 $got does not match the pin $want.
-       The vendored series was edited. If that is deliberate, update
-       base/commits.env (and E2631_BASE_TREE_SHA) as described in base/README.md."
-		done
-		say "applying the sanechips port series ($E2631_PORT_DIR/0001..0004)"
-		git -C "$E2631_TREE" -c user.name="e2631 bootstrap" -c user.email="e2631@localhost" \
-			am "$E2631_KIT/$E2631_PORT_DIR"/0001-*.patch \
-			   "$E2631_KIT/$E2631_PORT_DIR"/0002-*.patch \
-			   "$E2631_KIT/$E2631_PORT_DIR"/0003-*.patch \
-			   "$E2631_KIT/$E2631_PORT_DIR"/0004-*.patch ||
-			die "git am stopped (conflict?) - 'git -C $E2631_TREE am --abort' and inspect.
-       The series was built against $E2631_PORT_BASE_SHA; the pinned base is $E2631_IW_SHA."
-		got=$(git -C "$E2631_TREE" rev-parse 'HEAD^{tree}')
-		[ "$got" = "$E2631_BASE_TREE_SHA" ] ||
-			die "base tree hash mismatch: expected $E2631_BASE_TREE_SHA, got $got.
-       The patches applied but the result is not the tree this kit was verified against.
-       Update base/commits.env deliberately (see base/README.md), or use E2631_BASE_KIND=legacy."
-		say "base tree hash verified: $E2631_BASE_TREE_SHA"
+			die "$E2631_TREE is at $(git -C "$E2631_TREE" rev-parse --short HEAD 2>/dev/null), not the pinned fork tip $E2631_FORK_SHA, and has uncommitted changes.
+       A tree from the patch-series era carries an applied overlay; point E2631_TREE at a fresh
+       path (the bootstrap is cheap) instead of overwriting that work."
+		old_tree=$(git -C "$E2631_TREE" rev-parse 'HEAD^{tree}' 2>/dev/null || echo "")
+		[ "$old_tree" = "$E2631_BASE_TREE_SHA" ] &&
+			die "$E2631_TREE is the old patch-series base (tree $E2631_BASE_TREE_SHA); the tree fork lives at
+       $E2631_FORK_REPO#$E2631_FORK_BRANCH. Point E2631_TREE at a fresh path (e.g. ~/e2631-tree) and re-run."
+		say "fetching the pinned fork tip $E2631_FORK_SHA (depth 1 - the build tree never carries history)"
+		git -C "$E2631_TREE" remote get-url origin >/dev/null 2>&1 &&
+			git -C "$E2631_TREE" remote set-url origin "$E2631_BASE_REPO" ||
+			git -C "$E2631_TREE" remote add origin "$E2631_BASE_REPO"
+		git -C "$E2631_TREE" fetch -q --depth 1 origin "$E2631_FORK_SHA" &&
+		git -C "$E2631_TREE" checkout -q FETCH_HEAD ||
+			die "cannot fetch $E2631_FORK_SHA from $E2631_BASE_REPO"
+		head=$(git -C "$E2631_TREE" rev-parse HEAD)
 	fi
+	[ "$head" = "$E2631_FORK_SHA" ] ||
+		die "$E2631_TREE is at $head, not the pinned fork tip $E2631_FORK_SHA"
+
+	# Parity needs exactly one commit of history: a reused tree that was fetched
+	# deeper changes COMMITCOUNT, hence base-files PKG_RELEASE (P2). Refuse it.
+	[ -f "$E2631_TREE/.git/shallow" ] ||
+		die "$E2631_TREE is a full clone; the v1.10.0 parity build needs a depth-1 checkout (P2). Point E2631_TREE at a fresh path."
+	n=$(git -C "$E2631_TREE" rev-list --count HEAD 2>/dev/null || echo 0)
+	[ "$n" = 1 ] ||
+		die "$E2631_TREE carries $n commits; the v1.10.0 parity build needs exactly 1 (depth 1). Point E2631_TREE at a fresh path."
+	say "build tree: depth 1 at $E2631_FORK_SHA (COMMITCOUNT stays 1, parity P2)"
+
+	# ---- 1b. history assertions in a scratch repo (never the build tree) --
+	# A one-commit tree cannot see the port commits, the base-port tree or the
+	# upstream pin. Fetch the tip with a bigger window into a throwaway repo:
+	# deepening the build tree would change the build itself.
+	fork_check="$E2631_WORK/.e2631-fork-history"
+	say "verifying the fork history in $fork_check (depth $E2631_FORK_DEPTH)"
+	rm -rf "$fork_check"
+	mkdir -p "$fork_check" &&
+	git -C "$fork_check" init -q &&
+	git -C "$fork_check" remote add origin "$E2631_FORK_REPO" ||
+		die "cannot create the scratch history repo at $fork_check"
+	git -C "$fork_check" fetch -q --depth "$E2631_FORK_DEPTH" origin "$E2631_FORK_SHA" ||
+		die "cannot fetch $E2631_FORK_SHA from $E2631_FORK_REPO into the scratch history repo
+       (raise E2631_FORK_DEPTH if the pin is deeper than $E2631_FORK_DEPTH)"
+	ck=$(git -C "$fork_check" rev-parse FETCH_HEAD 2>/dev/null || echo unknown)
+	[ "$ck" = "$E2631_FORK_SHA" ] ||
+		die "the scratch history repo got $ck, not the pinned $E2631_FORK_SHA"
+
+	# Content identity, not the branch pointer: the fork history must contain
+	# the exact base-port tree the kit was verified against.
+	if ! git -C "$fork_check" log --format=%T FETCH_HEAD 2>/dev/null | grep -qx "$E2631_BASE_TREE_SHA"; then
+		die "the fork at $E2631_FORK_SHA has no commit with tree $E2631_BASE_TREE_SHA - it is not the
+       reviewed base-port tree. Either the pin moved without a deliberate base/commits.env update,
+       or the shallow fetch (depth $E2631_FORK_DEPTH) was too small to reach that commit."
+	fi
+	say "base port tree verified in the fork history: $E2631_BASE_TREE_SHA"
+
+	# The upstream commit the port was made against must be in the fetched window
+	# and be an ancestor; the four reviewed commits must sit directly on it.
+	if ! git -C "$fork_check" cat-file -e "$E2631_IW_SHA^{commit}" 2>/dev/null; then
+		die "the pinned ImmortalWrt commit $E2631_IW_SHA is outside the fetched history window
+       (depth $E2631_FORK_DEPTH) - raise E2631_FORK_DEPTH or check the fork pin"
+	fi
+	git -C "$fork_check" merge-base --is-ancestor "$E2631_IW_SHA" FETCH_HEAD ||
+		die "the fork tip is not descended from the pinned ImmortalWrt commit $E2631_IW_SHA"
+	say "ancestry verified: $E2631_IW_SHA is in the fork history"
+	port_head=$(git -C "$fork_check" log --format='%H %T' FETCH_HEAD 2>/dev/null |
+		awk -v t="$E2631_BASE_TREE_SHA" '$2 == t { print $1; exit }')
+	[ -n "$port_head" ] ||
+		die "cannot locate the base-port commit (tree $E2631_BASE_TREE_SHA) in the fetched history"
+	port_steps=$(git -C "$fork_check" rev-list --count "$E2631_IW_SHA..$port_head")
+	[ "$port_steps" = 4 ] ||
+		die "the port series is $port_steps commits above $E2631_IW_SHA, expected the four reviewed commits (tree $E2631_BASE_TREE_SHA)"
+	say "port series verified: 4 commits above the ImmortalWrt pin"
+
+	# Device support is committed in the fork: the files must exist in the build
+	# tree (depth 1 carries the full working tree, just not the history).
+	for p in target/linux/sanechips/base-files/etc/config/wireless \
+		 target/linux/sanechips/image/Makefile.e2631; do
+		git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- "$p" | grep -qx "$p" ||
+			die "the tree fork has no $p - the e2631 commit set is incomplete"
+	done
+	git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- package/e2631 | grep -q '/Makefile$' ||
+		die "the tree fork has no package/e2631/*/Makefile - the e2631 packages are missing"
 else
-	# ---- 2b. legacy base: one pinned OpenWrt commit, no patch series ----
+	# ---- 1c. legacy base: one pinned OpenWrt commit, no patch series ------
 	if ! git -C "$E2631_TREE" rev-parse --verify "$E2631_BASE_SHA^{commit}" >/dev/null 2>&1; then
 		say "fetching $E2631_BASE_BRANCH (the pinned commit is not in this clone yet)"
 		git -C "$E2631_TREE" fetch -q origin "$E2631_BASE_BRANCH" ||
 			die "cannot fetch $E2631_BASE_SHA - it must be reachable from $E2631_BASE_BRANCH"
 	fi
-	if [ "$(git -C "$E2631_TREE" rev-parse HEAD)" != "$E2631_BASE_SHA" ]; then
-		if [ -n "$(git -C "$E2631_TREE" status --porcelain)" ]; then
-			die "$E2631_TREE is at $(git -C "$E2631_TREE" rev-parse --short HEAD), not the pinned $E2631_BASE_SHA, and has uncommitted changes.
-       Look at 'git -C $E2631_TREE status' first: if those edits are yours, point E2631_TREE at a
-       fresh clone instead of overwriting them. If they are only a stale copy of this overlay,
-       reset the tree to the pinned commit and re-run."
-		fi
-		say "checking out the pinned commit $E2631_BASE_SHA"
-		git -C "$E2631_TREE" checkout -q "$E2631_BASE_SHA"
+	head=$(git -C "$E2631_TREE" rev-parse HEAD 2>/dev/null || echo unknown)
+	if [ "$head" != "$E2631_BASE_SHA" ]; then
+		[ -n "$(git -C "$E2631_TREE" status --porcelain)" ] &&
+			die "$E2631_TREE is at $(git -C "$E2631_TREE" rev-parse --short HEAD 2>/dev/null), not the pinned $E2631_BASE_SHA, and has uncommitted changes."
+		git -C "$E2631_TREE" checkout -q "$E2631_BASE_SHA" ||
+			die "cannot check out $E2631_BASE_SHA in $E2631_TREE"
 	fi
+	[ "$(git -C "$E2631_TREE" rev-parse HEAD)" = "$E2631_BASE_SHA" ] ||
+		die "$E2631_TREE is not at the pinned legacy base $E2631_BASE_SHA"
 fi
 
-[ -d "$E2631_TREE/target/linux/sanechips" ] ||
-	die "no sanechips target in $E2631_TREE - that is not the base tree this kit overlays
-       (set E2631_TREE, or remove the directory and re-run). For the ImmortalWrt base the
-       target comes from base/$E2631_PORT_DIR applied by this script."
-
-# ---- 3. the overlay ----------------------------------------------------------
-say "applying the E2631 overlay to $E2631_TREE"
-bash "$E2631_KIT/apply.sh" "$E2631_TREE"
-
-# The two edits apply.sh must leave behind, checked here rather than trusted:
-# both are what make the image boot on this board instead of the H3600.
+# ---- 3. the kernel pin and the overlay --------------------------------------
+# Both bases must end up with the same two properties: a forced kernel command
+# line (otherwise the vendor bootargs win) and the image/Makefile hook that
+# includes Makefile.e2631. On the tree fork they are committed; on the legacy
+# base apply.sh lays them down.
+kf="$E2631_TREE/target/linux/generic/kernel-6.18"
+[ -f "$kf" ] || die "$E2631_TREE has no $kf - not an OpenWrt/ImmortalWrt tree?"
+if [ -n "${E2631_BASE_KERNEL:-}" ]; then
+	want_kernel=${E2631_BASE_KERNEL#6.18}
+	grep -q "^LINUX_VERSION-6.18 = ${want_kernel}$" "$kf" ||
+		die "$kf: LINUX_VERSION-6.18 is not ${want_kernel} - the tree is not the pinned kernel $E2631_BASE_KERNEL"
+	say "kernel pin verified: $E2631_BASE_KERNEL"
+fi
 grep -qx 'CONFIG_CMDLINE_FORCE=y' "$E2631_TREE/target/linux/sanechips/config-6.18" ||
-	die "apply.sh left no forced kernel command line in $E2631_TREE - the vendor bootargs would win"
+	die "$E2631_TREE/target/linux/sanechips/config-6.18 has no CONFIG_CMDLINE_FORCE=y - the vendor bootargs would win"
+if [ "$E2631_BASE_KIND" = legacy ]; then
+	say "applying the E2631 overlay to $E2631_TREE"
+	bash "$E2631_KIT/apply.sh" "$E2631_TREE"
+else
+	say "overlay is committed in the tree fork - not applying it again"
+fi
 grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
-	die "apply.sh did not hook image/Makefile - the E2631 device definition would be invisible"
+	die "the tree's image/Makefile does not hook Makefile.e2631 - the E2631 device definition would be invisible"
 
 # ---- 4. feeds ---------------------------------------------------------------
 # Only packages and luci. Two traps, both hit in practice: a hand-cloned feed has
@@ -163,10 +205,10 @@ grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
 # the build still succeeds, just without LuCI, silently; and a killed half-clone
 # leaves a shallow repo whose next pull re-fetches the full history.
 #
-# The ImmortalWrt base names its own feed forks in feeds.conf.default (packages
-# and luci come from immortalwrt/*), so the URLs are read from the base tree
-# instead of being hardcoded: a future base that moves its feeds keeps working.
-# The legacy base keeps the openwrt GitHub mirrors this kit always used.
+# The base names its own feed forks in feeds.conf.default (packages and luci
+# come from immortalwrt/*), so the URLs are read from the base tree instead of
+# being hardcoded: a future base that moves its feeds keeps working. The legacy
+# base keeps the openwrt GitHub mirrors this kit always used.
 feed_url() {	# feed_url <feed> -> src-git URL in the base's feeds.conf.default
 	sed -n -E "s|^[[:blank:]]*src-git[[:blank:]]+$1[[:blank:]]+([^[:blank:]]+).*|\1|p" \
 		"$E2631_TREE/feeds.conf.default" | head -n 1
@@ -243,5 +285,35 @@ if [ -n "$missing" ]; then
 	printf 'bootstrap:          either add them to the feeds or drop them from seed/e2631.config\n' >&2
 fi
 say "seed ok: E2631 device selected, soft-float on, apk + one TLS provider, LuCI and the slot tool in the image"
+# ---- 6. parity reproduction of the released v1.10.0 (P1/P4) ----------------
+# The firmware workflow's reproduce_v1100 input (parity run, default off). The
+# released image reported REVISION r0-bde1448 and SOURCE_DATE_EPOCH 1794624080;
+# scripts/getver.sh and scripts/get_source_date_epoch.sh prefer the topdir
+# version / version.date files over git, so writing those two files reproduces
+# the release stamps on the shallow tree fork. They are untracked build inputs,
+# never committed to the fork. E2631_BUILD=20261114 (also from the workflow env
+# block) pins host/release.mjs's build field, which the image header carries.
+if [ "$E2631_BASE_KIND" = immortalwrt ]; then
+	case "${E2631_REPRODUCE_V1100:-false}" in
+	true|1)
+		printf '%s\n' 'r0-bde1448' > "$E2631_TREE/version"
+		printf '%s\n' '1794624080' > "$E2631_TREE/version.date"
+		say "parity reproduction: wrote version=r0-bde1448, version.date=1794624080 (untracked)"
+		[ "${E2631_BUILD:-}" = 20261114 ] ||
+			say "WARNING: E2631_BUILD='${E2631_BUILD:-}' - the released v1.10.0 used 20261114, so the version header will differ"
+		;;
+	*)
+		# Files from an earlier parity run would otherwise silently stamp this
+		# build with v1.10.0's REVISION / build date.
+		for f in version version.date; do
+			if [ -e "$E2631_TREE/$f" ]; then
+				rm -f "$E2631_TREE/$f"
+				say "removed leftover $f from a previous parity run"
+			fi
+		done
+		;;
+	esac
+fi
+
 
 say "done. next: bash scripts/build.sh   (about 40 minutes on 2 cores, then it packs)"
