@@ -1,6 +1,6 @@
 # ImmortalWrt 基线迁移决策（T1）
 
-> 状态：已采纳并在实施中（T1 决策稿 → T2 落地 base/ → T3 品牌/产物 → T4 门禁/文档；T5 端到端验证待跑）
+> 状态：已采纳并在实施中（T1 决策稿 → T2 落地 base/ → T3 品牌/产物 → T4 门禁/文档；T5 端到端验证已通过，证据见 evidence/immortalwrt-verify-20261114.md，合 main 待用户批准）
 > 调研日期：2026-11-14（本文所有 ImmortalWrt / 上游事实均为该日实测；数据源与复现命令见 §1.4、§7.1）
 > 调研人：iwrt-baseline（T1）；维护：verify-docs（T4）；基底升级流程见 §8
 > 仓库：QC3284/zte-e2631-immortalwrt；工作副本 /home/qc233/zte/e2631-immortalwrt；T1 时 HEAD `3e5440299c9a558f3da9f0bd9d429713573c870d`（main）
@@ -396,7 +396,7 @@
 - 修正 `image/Makefile.e2631:77` 的 `--header-at` 与 §4.5 其余常量（T3 主体）；`slotpart.c:147` 默认值一并统一。
 - Release 正文模板：标注基底（iw SHA + patch tree hash）、kernel 6.18.60、未做真机验证（除非 T5 提供）。
 - **推送/Release 前需用户批准**。
-- 实施状态（2026-11-14）：品牌 `ImmortalWrt v1.10.0`、`E2631_VERSION` 同步、产物 `e2631-immortalwrt-*.bin` 已由 T3 落地；更新链默认仓库 `QC3284/zte-e2631-immortalwrt`，标签剥离后按数字比较（OpenWrt v1.9.0 → ImmortalWrt v1.10.0 可原地升级，测试见 `tests/test_upgrade.py`）。
+- 实施状态（2026-11-14）：T5 CI 端到端构建通过（run 43547631478 @ 5d542c5，publish=false，无 Release）；产物 `e2631-immortalwrt-experimental.bin` 22,020,628 B，sha256 `66805b26…`；镜像内 libustream 为 openssl 变体（mbedtls 仅作为包构建，未入镜像）。品牌 `ImmortalWrt v1.10.0`、`E2631_VERSION` 同步、产物 `e2631-immortalwrt-*.bin` 已由 T3 落地；更新链默认仓库 `QC3284/zte-e2631-immortalwrt`，标签剥离后按数字比较（OpenWrt v1.9.0 → ImmortalWrt v1.10.0 可原地升级，测试见 `tests/test_upgrade.py`）。
 - **实施细节与证据**：见 [t3-packaging-release-ci.md](t3-packaging-release-ci.md)（产物/版本口径、原厂网页升级的形状限制、更新链加固与镜像白名单修复、CI `publish` 开关与 SOURCE-INFO、host 模拟 30 项与静态检查 39 项、仍需 CI/真机证明的清单）。
 
 ### 6.3 T4：文档 / 门禁 / 长期维护
