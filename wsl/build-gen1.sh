@@ -22,13 +22,12 @@ count_match() { # <file> <substring>
 say START ""
 bash $E2631_KIT/wsl/sync.sh >>"$LOG" 2>&1
 say SYNC "rc=$?"
-( cd $E2631_KIT && bash apply.sh "$TREE" ) >>"$LOG" 2>&1
-say APPLY "rc=$?"
 
 ls -l "$TREE/target/linux/sanechips/patches-6.18/" >>"$LOG" 2>&1
 
-# apply.sh only copies; it never deletes. Drop the 8 s timeout patch from the
-# tree so this build differs from the one on the box by exactly ONE change
+# The tree fork is a pinned depth-1 checkout; edit a fork working copy and
+# re-bootstrap to change it. Drop the 8 s timeout patch from the tree so this
+# build differs from the one on the box by exactly ONE change
 # (031), and refresh the mt76 package so the removal actually lands in build_dir.
 rm -f "$TREE/package/kernel/mt76/patches/003-mt7915-wait-longer-for-fw-state.patch"
 cd "$TREE" || exit 1

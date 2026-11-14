@@ -15,7 +15,9 @@
 set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-BASE="$HERE/../overlay/target/linux/sanechips/base-files"
+[ -f "$HERE/../scripts/env.sh" ] && . "$HERE/../scripts/env.sh"
+BASE="${E2631_TREE:-}/target/linux/sanechips/base-files"
+[ -d "$BASE" ] || { echo "SKIP: no tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh" >&2; exit 0; }
 SCRIPT="$BASE/sbin/e2631-wanport"
 [ -f "$SCRIPT" ] || { echo "找不到 $SCRIPT" >&2; exit 1; }
 
@@ -273,7 +275,7 @@ done
 pass "只剩手动路径"
 
 echo "== 12. rpcd 后端：JSON 必须是对的，且只有 status/set_port =="
-RPCD="$HERE/../overlay/package/luci/luci-app-e2631-wanport/root/usr/libexec/rpcd/e2631-wanport"
+RPCD="${E2631_TREE:-}/package/e2631/luci-app-e2631-wanport/root/usr/libexec/rpcd/e2631-wanport"
 if [ -f "$RPCD" ] && command -v python3 >/dev/null 2>&1; then
 	# 用一个只记录参数的假服务，避免自检期间真的去 reload network
 	cat >"$BIN/fake-wp" <<'EOF'

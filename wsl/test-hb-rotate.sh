@@ -5,7 +5,9 @@
 # newest lines - including the tail of the previous boot, which is the whole point.
 set -u
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-HB="$REPO/overlay/target/linux/sanechips/base-files/sbin/e2631-hb"
+. "$REPO/scripts/env.sh"
+HB="${E2631_TREE:-}/target/linux/sanechips/base-files/sbin/e2631-hb"
+[ -f "$HB" ] || { echo "SKIP: no tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh" >&2; exit 0; }
 T=/tmp/hbrotate
 rm -rf "$T"; mkdir -p "$T"
 cp "$HB" "$T/hb"; sed -i 's/\r$//' "$T/hb"

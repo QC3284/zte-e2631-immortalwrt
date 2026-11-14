@@ -408,6 +408,28 @@
 - 本文档由 T4 接手维护：基底升级流程写成 runbook（生成 patch → 更新 commits.env → 更新 tree hash → 全量门禁）→ 见 §8。
 - 新增 `docs/` 索引/链接（若仓库有 docs 列表）→ 见 `docs/README.md`。
 
+### 6.4 T-12：树 fork 迁移（2026-11-14）
+
+- **决策**：设备支持不再以 overlay + patch series 形式随套件分发，而是改为
+  [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) 的 `e2631` 分支上的真实提交
+  （4 个 sanechips 移植提交 + 3 个 E2631 提交，作者信息保留）；本仓库只做钉死、检出、构建、
+  打包、发布与在线更新验证。
+- **删除**：`overlay/`（79 文件）、`base/`（4 个 patch + `commits.env` + README）、
+  `apply.sh`、`overlay-removed.txt`、`wsl/apply-gate.sh`，以及 `Makefile` 的 `apply` 目标；
+  `legacy`（旧 OpenWrt sanechips 基底）通道一并退役。
+- **保留/新增**：`scripts/pins.env` 成为唯一钉文件；`tests/native/` 保存树 fork 中
+  host 测试要编译/运行的源码副本，`g_native_sync` 在 bootstrap 后逐字节比对并打印同步命令；
+  `layout-check.sh` / `base-pin-check.sh` 改为「套件 + 树 fork」双侧检查。
+- **新增/修复的构建可复现性项**：P5 kernel build id 由 seed 钉死；P6 make-world 步骤剥离
+  `GITHUB_REF_NAME`/`GITHUB_SHA`，构建后断言 miniupnpd banner 不再带构建 ref；P7 feed 以
+  branch checkout + `reset --hard` 到钉死 commit（修复 LuCI version.uc 的 detached 标记）；
+  P8 可选 `use_pinned_apk_key`（secret `E2631_APK_PRIVATE_KEY`，只写入构建树并 always 删除）。
+- **不变**：树 fork tip 钉仍为 `e96aed31…`（CI-only 提交不改变镜像，不 bump pin）；
+  `ImmortalWrt v1.10.0` / `e2631-immortalwrt-*` / 在线更新仓库口径不变；正式 Release 与真机
+  刷写仍需用户批准。
+- **验证**：本地 `make bootstrap` + `make check` 全绿；CI `check.yml` 在推送分支上运行
+  `host/sim-upgrade.mjs`（30 项）、`tools/check-workflows.mjs`（66 项）与 `make check`。
+
 ## 7. 证据与未决问题
 
 ### 7.1 关键证据索引
@@ -441,7 +463,7 @@
 1. **品牌与版本号**：`/etc/e2631-version` 与 CI `E2631_VERSION` 写 OpenWrt 还是 ImmortalWrt？→ **已决**：`ImmortalWrt v1.10.0`（用户决定，2026-11-14）。
 2. **推送与 Release 授权**：T2 需推送到 QC3284 仓库以触发 Actions；T3 发布 Release。→ **已决**：允许推非 main 测试分支触发 `check.yml`；正式 Release 仍需用户批准。
 3. **argon/homeproxy 取舍**：是否接受使用 iw feeds 版本（推荐）？→ **已决**：接受 iw feeds 版，overlay 自带 150 个文件已删除（提交 `819af6c`），同名的 NOTICE / notice-check / secret-allowlist 同步由 T4 完成。
-4. **legacy 并行周期**：T2 完成后是否保留旧基底通道一个版本周期（推荐保留）还是立即删除？→ **已决**：保留 `E2631_BASE_KIND=legacy` 回退开关（至少到 T5 真机验证通过）。
+4. **legacy 并行周期**：T2 完成后是否保留旧基底通道一个版本周期（推荐保留）还是立即删除？→ **已决并已退役**：先保留到 T5；T-12 树 fork 迁移时删除 `E2631_BASE_KIND=legacy` 与 `apply.sh`，旧基底只留 `scripts/pins.env` 里的 provenance 哈希。
 5. **真机验证**：T5 的刷写/回退验证需用户批准并安排时间；T2/T3 不碰设备。→ **未决 / 待安排**：T5 先做 CI 端到端 + 设备只读取证，刷写另行批准。
 6. **产物前缀**：`e2631-openwrt-*` 保持不变还是改 `e2631-immortalwrt-*`？→ **已决**：改 `e2631-immortalwrt-*`。
 
@@ -453,20 +475,34 @@
 - 内核补丁测试：`git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/<path>?h=v6.18.60` 逐文件下载后 `patch -p1 -F3`；脚本与清单在 /tmp，未入库。
 - **本决策的证据以本文与 /tmp 采集件为准；进入 T2 后应以 CI 构建日志作为最终证据。**
 
-## 8. 基底升级 runbook（T4 维护）
+## 8. 基底升级 runbook（T-12 维护）
 
-触发条件：ImmortalWrt 钉死点需要前移（安全更新 / kernel 小版本 / sanechips 相关上游改动）。原则不变：**本机不做全量编译，最终证据来自 CI；刷写与 Release 需用户批准。**
+触发条件：ImmortalWrt 钉死点需要前移（安全更新 / kernel 小版本 / sanechips 相关上游改动），
+或树 fork 需要重放到新基底。原则不变：**本机不做全量编译，最终证据来自 CI；刷写与 Release
+需用户批准。**
 
-1. **定新钉点**：确认 `immortalwrt/immortalwrt` 新 commit（`gh api repos/immortalwrt/immortalwrt/commits/master` 或 raw 固定 SHA），记下新 SHA 与 `target/linux/generic/kernel-6.18` 的 `LINUX_VERSION-6.18`。
-2. **重放 4 个补丁**：在新 SHA 的干净 checkout 上 `git am base/0001..0004-*.patch`（顺序与生成方法见 `base/README.md`）。冲突时以旧基底分支 `pr-zte-zxhn-h3600` 的对应提交为行为基准解决，然后重新 `git format-patch` 生成补丁——不要手改补丁文本。
-3. **重算钉死值**：新 SHA、`sha256sum base/000*.patch`、`git rev-parse HEAD^{tree}`（应用补丁后的树 hash）、`LINUX_VERSION-6.18`；旧基底 `PORT_*` 值保留不动。
-4. **更新 `base/commits.env`**：`E2631_IW_SHA`、`E2631_IW_TREE_SHA`、`E2631_BASE_PATCH_SHA256_0001..0004`、`E2631_BASE_KERNEL`。`scripts/env.sh` 自动读取，无需改代码。
-5. **本地门禁**：`make check`。base-pin 会重算 patch sha256 与 tree hash（这就是防手滑的核心）；g_layout 与基底无关、应保持全绿；`bash -n` / `node --check` / ash / dts 四门全绿才算过。
-6. **CI 预检**：推**非 main** 测试分支触发 `.github/workflows/check.yml`（bootstrap → make check 两阶段）。R1（通用补丁与 target 补丁顺序/上下文）只有这里能证；bootstrap 的 tree hash 断言失败即停。
-7. **全量构建**：手动 dispatch `firmware.yml`（上限 150 分钟），验证 kernel 6.18.x 编译、33 个 target 补丁全部应用、产物过 `verify_pkg` / `verify_img`。
-8. **更新证据**：本文 §0 结论表与 §7.1 的 SHA/kernel 行、`docs/relnotes-*.md` 新版本记录；`base/README.md` 的 provenance。
-9. **回滚**：`git revert` 该 commits.env 提交即可回到旧钉点（旧值在 git 历史）；运行时另有 `E2631_BASE_KIND=legacy` 通道（旧 OpenWrt sanechips 基底，kernel 6.18.55）。
-10. **合入门槛**：CI 全绿 + T5 产物验证通过后才合 main；正式 Release 仍需用户批准。
+1. **定新钉点**：确认 `immortalwrt/immortalwrt` 新 commit（`gh api repos/immortalwrt/immortalwrt/commits/master`
+   或 raw 固定 SHA），记下新 SHA 与 `target/linux/generic/kernel-6.18` 的 `LINUX_VERSION-6.18`。
+2. **在 fork 工作副本上重放**：把 `QC3284/immortalwrt` 的 `e2631` 分支重放到新上游 SHA，
+   保留 4 个 sanechips 移植提交（作者/提交信息不变）与 3 个 E2631 提交；**不要新造 patch 文件**，
+   也不要手改提交文本（历史本身就是被审查的对象）。
+3. **重算钉值**：新 `E2631_IW_SHA`、`E2631_IW_TREE_SHA`（新上游的 pristine tree）、
+   `E2631_BASE_TREE_SHA`（最后一个 sanechips 移植提交的 tree）、`E2631_BASE_KERNEL`；
+   若 fork 内容变化，新 tip 成为候选 `E2631_FORK_SHA`（只有内容变更才 bump，CI-only 提交不 bump）。
+4. **更新 `scripts/pins.env`**：唯一钉文件（原 `base/commits.env` 已随 `base/` 删除）；
+   `scripts/env.sh` 自动读取，无需改代码。
+5. **本地门禁**：`make bootstrap`（depth-1 构建树 + scratch repo 历史断言）然后 `make check`。
+   base-pin/base-tree 会复核 tip、`4f89aa7a` 在历史中、ImmortalWrt 钉的祖先关系、恰好 4 个移植
+   提交、设备文件与 feed 钉；g_layout 与基底无关、应保持全绿。
+6. **CI 预检**：推**非 main** 测试分支触发 `.github/workflows/check.yml`（bootstrap → make check
+   两阶段），确认 scratch repo 断言在实际 CI checkout 上也成立。
+7. **全量构建**：手动 dispatch `firmware.yml`（上限 150 分钟，`publish=false`），验证 kernel 编译、
+   target 补丁、产物过 `verify_pkg` / `verify_img`；需要发布时再单独走 `publish=true` 审批。
+8. **更新证据**：本文 §0 结论表、§6.4 与 §7.1 的 SHA/kernel 行、`docs/relnotes-*.md` 新版本记录，
+   以及 `scripts/pins.env` 顶部的来源注释。
+9. **回滚**：`git revert` 该 pins.env 提交即可回到旧钉点（旧值在 git 历史）。T-12 起**没有**
+   `E2631_BASE_KIND=legacy` 通道——要回到旧基底需整体 revert 树 fork 迁移。
+10. **合入门槛**：CI 全绿 + 产物验证通过后才合 main；正式 Release 仍需用户批准。
 
 ---
 

@@ -1,19 +1,15 @@
 #!/bin/bash
 . "$(dirname "$0")/../scripts/env.sh"
-# Land the efuse patch for real, and prove it before spending 10 minutes on
-# `make world`.  Two things bit us: sync.sh has no --delete (so a stale 001-
-# twin of the patch survives renames on the Windows side), and apply.sh needs the
-# tree path as $1.  Witnesses are printed after every step.
+# Land the efuse patch for real, and prove it before spending any time on
+# `make world`.  T-12: the tree fork is the source of truth - patch and commit it
+# in a fork working copy, push, and re-run scripts/bootstrap.sh so the build tree
+# picks up the new pin.  Witnesses are printed after every step.
 set -u
 TREE=$E2631_TREE
-echo "=== 1. sync with --delete, then apply.sh <tree> ==="
-rsync -a --delete --exclude .git $E2631_WORK/build/ $E2631_KIT/
-find $E2631_KIT -name '*.sh' -exec chmod +x {} +
-ls -l $E2631_KIT/overlay/package/kernel/mt76/patches/
-( cd $E2631_KIT && bash apply.sh "$TREE" > /tmp/apply.out 2>&1 ); echo "apply rc=$?"
-tail -4 /tmp/apply.out
-echo "--- tree patches now:"
-ls -l "$TREE/package/kernel/mt76/patches/"
+echo "=== 1. patches in the build tree (the fork must carry them) ==="
+ls -l "$TREE/package/kernel/mt76/patches/" 2>/dev/null | tail -6
+echo "--- target kernel patches now:"
+ls -l "$TREE/target/linux/sanechips/patches-6.18/" | tail -4
 
 echo
 echo "=== 2. clean + prepare the package, then look at the extracted source ==="

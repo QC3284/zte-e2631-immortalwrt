@@ -4,31 +4,34 @@
 
 **To build this: [BUILD.md](BUILD.md).** It is the single supported path from a clone to
 a package that flashes, and it lists the two inputs this repository cannot hand you (the
-pinned ImmortalWrt base - reconstructed from the `base/` patch series - and the vendor
+pinned ImmortalWrt tree fork, which `scripts/bootstrap.sh` fetches, and the vendor
 version-header template) plus the failure modes. The migration off the old OpenWrt
-sanechips base, including the `E2631_BASE_KIND=legacy` rollback, is in
+sanechips base - the overlay, the patch series and `apply.sh` are retired (T-12) - is in
 [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md).
 `make check` runs every gate. [docs/architecture.md](docs/architecture.md) maps the
 pieces; [docs/known-issues.md](docs/known-issues.md) is the machine-readable honest list,
 including what is still broken on real hardware.
 
-This one repository holds the whole port: the overlay that turns the base tree into an
-E2631 build (`overlay/`), the local build path (`wsl/`, grouped in `wsl/INDEX.md`, and the
-portable entry points in `scripts/`), the board-side scripts and the vendor-side flash
-plans (`board/`), the Windows-side tooling (`host/`), and the two working documents with
-the evidence notes (`docs/`). The base tree is ImmortalWrt master, pinned by
-`base/commits.env` and vendored as a four-patch series under `base/`. The build happens in WSL on this machine; `make check` is the
-local gate, `.github/workflows/check.yml` runs the same set on every push/PR, and
+This repository is the packaging/distribution kit: the local build path (`wsl/`, grouped
+in `wsl/INDEX.md`, and the portable entry points in `scripts/`), the board-side scripts and
+the vendor-side flash plans (`board/`), the Windows-side tooling (`host/`), the build seed
+(`seed/`), and the working documents with the evidence notes (`docs/`). The device support
+itself lives in the tree fork [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt)
+branch `e2631`; the kit pins its tip in `scripts/pins.env` and checks it out at depth 1 for
+a build. The build happens in WSL on this machine; `make check` is the local gate,
+`.github/workflows/check.yml` runs the same set on every push/PR, and
 `.github/workflows/firmware.yml` builds on demand.
 
     make bootstrap
     make check
     make build
 
-`scripts/bootstrap.sh` clones ImmortalWrt at the SHA pinned in `base/commits.env`
-(`4765b657`, kernel 6.18.60), applies `base/0001..0004-*.patch` with `git am`, then lays
-the overlay, the ImmortalWrt feeds and the seed config - and witnesses each one, including
-the resulting tree hash; `scripts/build.sh` then continues to a flashable package.
+`scripts/bootstrap.sh` fetches the tree fork at the tip pinned in `scripts/pins.env`
+(`e96aed31`, on top of ImmortalWrt master `4765b657`, kernel 6.18.60) as a depth-1 build
+tree, verifies the fork history in a separate scratch repo (the base-port tree
+`4f89aa7a`, the ImmortalWrt pin in its ancestry, exactly four port commits above it),
+pins the two feeds to the commits the released v1.10.0 used, and lays down the seed config
+- and witnesses each step; `scripts/build.sh` then continues to a flashable package.
 
 Packaging into the vendor upgrade format is `node host/release.mjs --dir <out/build-dir>`
 from anywhere: `out/`, the base tree and the template package resolve through
@@ -65,10 +68,10 @@ trade-offs are in [docs/known-issues.md](docs/known-issues.md) and `docs/v1.*-pr
 * no USB: the vendor kernel has no USB at all, and probing the controller on
   boards where it is not populated reboots the SoC
 * soft-float userspace: this SoC implements no VFP, so CONFIG_VFP must stay off
-* JFFS2 clean markers go in the data area, not the OOB (patches 029 and 030):
-  SPI-NAND with on-die ECC regenerates page ECC on every program, so a page
-  written twice comes back uncorrectable. Without this the overlay fails to
-  remount and the box is stuck on a read-only root.
+* JFFS2 clean markers go in the data area, not the OOB (the tree fork's target
+  patches 029 and 030): SPI-NAND with on-die ECC regenerates page ECC on every
+  program, so a page written twice comes back uncorrectable. Without this the
+  overlay fails to remount and the box is stuck on a read-only root.
 * the kernel command line is compiled in and CONFIG_CMDLINE_FORCE is on: the
   bootloader passes `root=/dev/mtdblock8 rootfstype=jffs2 init=/bin/sh`,
   which names the vendor layout and would replace PID 1 with a shell.
@@ -109,13 +112,13 @@ build selects - while the selected packages waited.
 
 `wsl/collect.sh <out-dir>` then lays the build out the way the CI artifact does
 (`kernel` / `root` / `e2631.dtb` / `config-6.18` / `e2631-fwslot`), which is
-what `node build/host/release.mjs --dir out/<dir>` packs and screens. The Windows
+what `node host/release.mjs --dir out/<dir>` packs and screens. The Windows
 drives are mounted inside the distro, so nothing has to be piped over stdio.
 `wsl/INDEX.md` groups the other scripts in there (build path / patch generators /
 witnesses / probes) so the file count does not hide which ones to run.
 
 Publishing is a manual step (the release is created from a local build):
-`node build/host/publish.mjs --tag <t> --bin out/<package>.bin --notes out/<notes>.md`
+`node host/publish.mjs --tag <t> --bin out/<package>.bin --notes out/<notes>.md`
 creates the Release, uploads the package plus a `SHA256SUMS`, and prints GitHub's own
 asset digest so the upload can be compared with the local sha256. It refuses a file whose
 first 16 bytes are not the four vendor magic words, so a half-packed package cannot be
@@ -178,7 +181,7 @@ history is the `stage1-scaffold` branch (`git log --oneline stage1-scaffold`), a
 `tools/PROBE.md` - the list of unknowns the first board file was written against - now
 lives on `main` with a status table saying which of those unknowns a flashed board closed
 and which it did not. Everything else on that branch is an older copy of what is here: its
-board DTS, `apply.sh` and seed config predate the slot geometry, the nvmem MAC wiring and
+board DTS and seed config predate the slot geometry, the nvmem MAC wiring and
 the JFFS2 patches, and its `tools/*.py` screens were rewritten as `.mjs` because this
 machine has no usable python.
 
@@ -194,11 +197,12 @@ the literal token never does.
   the build branch [ghahramani/openwrt, branch `zte-zxhn-h3600`](https://github.com/ghahramani/openwrt/tree/zte-zxhn-h3600),
   the 24-patch mainline RFC [ghahramani/linux, branch `h3600-linux-rfc`](https://github.com/ghahramani/linux/tree/h3600-linux-rfc),
   and the [engineering write-up](https://ghahremani.medium.com/resurrecting-isp-e-waste-how-an-ai-breakthrough-unlocked-the-hyperoptic-zte-h3600-ported-modern-60e74c87c11e).
-  The sanechips `target/` and board support in this repository are a contribution of that
-  line, vendored as the four-patch series in `base/` and applied on top of ImmortalWrt
-  master (`4765b657`); the old OpenWrt mirror pin (`Zlion-Y/openwrt-sanechips-mirror` at
-  `db8b8d4`) remains only as the `E2631_BASE_KIND=legacy` rollback - without this port the
-  tree starts from an empty `target/`. Several of its published claims did not survive contact with
+  The sanechips `target/` and board support in the tree fork
+  [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) branch `e2631` are a
+  contribution of that line, preserved as four commits on top of ImmortalWrt master
+  (`4765b657`); the old OpenWrt mirror pin (`Zlion-Y/openwrt-sanechips-mirror` at
+  `db8b8d4`) survives only as the provenance recorded in `scripts/pins.env` - without this
+  port the tree starts from an empty `target/`. Several of its published claims did not survive contact with
   this board (the `kernel1`/`kernel2` partition names, "erase `kernel1` to get stock back", the `TESTED.md` sha256
   and its "USB 3.0" line); each is listed with the measurement that closed it in
   [docs/01-情报汇总与事实核验-2026-10-13.md](docs/01-情报汇总与事实核验-2026-10-13.md).
@@ -211,7 +215,7 @@ the literal token never does.
   auto-switch turned the management port into WAN, whose REJECT input dropped SSH/HTTP),
   the discovery that hardware flow offload breaks IPv6 TCP (handshake in 1 ms, zero payload)
   with the `zx_update_traps()`/trap-DMAC mechanism, the wifi-boot re-provision fix, the
-  shipped wireless sections, apply.sh's overlay-removed deletion sync, the rpcd exec bits,
+  shipped wireless sections, the rpcd exec bits,
   and the PPE experiments (external hash table, vendor CLA init registers, 520 slots across
   five hash tables) plus the warning that a PPE module on AUTOLOAD hangs this board into a
   serial-only recovery - which is why the FFE control plane ships opt-in, never by default.
@@ -229,9 +233,10 @@ the literal token never does.
 - [The 恩山 (right.com.cn) thread on this device](https://www.right.com.cn/forum/thread-8487689-1-3.html) - the
   Chinese-language community discussion, including the vendor-side behaviour nobody had written down in English.
 - **The ImmortalWrt, OpenWrt and Linux kernel projects**, and the upstream mt76 maintainers (**@nbd168** and co.).
-  ImmortalWrt is the base tree. We carry exactly one mt76 patch
-  (`overlay/package/kernel/mt76/patches/002-mt7915-use-caldata-file-before-efuse.patch`) and three
-  target patches (`029`/`030` JFFS2-on-SPI-NAND, `031` the PCIe link-retrain gate); everything else is upstream as-is.
+  ImmortalWrt is the base tree. The tree fork carries exactly one mt76 patch
+  (`package/kernel/mt76/patches/002-mt7915-use-caldata-file-before-efuse.patch`) and three
+  target patches (`029`/`030` JFFS2-on-SPI-NAND, `031` the PCIe link-retrain gate);
+  everything else is upstream as-is.
 
 If any of the above is wrong or incomplete, the fix belongs in `docs/01-...md` next to the evidence, not in a footnote here.
 

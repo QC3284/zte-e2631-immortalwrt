@@ -11,8 +11,8 @@
 # failures -- but a device run that skips a device-only check is still a
 # refusal, because "probably fine" is not a flash decision.
 #
-# The same script ships in the image at /sbin/e2631-preflight (apply.sh
-# installs it into the target's base-files).
+# The same script ships in the image at /sbin/e2631-preflight; the tree fork
+# installs it into target/linux/sanechips/base-files/sbin/ (T-12).
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
 die() { echo "PREFLIGHT FAIL: $*" >&2; exit 1; }
@@ -38,7 +38,7 @@ E2631_MAGIC_SHA=3d25b5b9bf4079c6760449611963b6f1
 # Slot geometry. The packer (host/release.mjs), the image rule
 # (Makefile.e2631), the board DTS and this file must agree: scripts/check.sh's
 # g_layout parses these three plain literals back out and compares them, and
-# the device copy of this script in overlay/ carries the same three lines.
+# the device copy of this script in the tree fork carries the same three lines.
 E2631_KERNEL_AT=0x400000
 E2631_ROOTFS_SPAN=0x1100000
 E2631_HEADER_AT=0x1500000

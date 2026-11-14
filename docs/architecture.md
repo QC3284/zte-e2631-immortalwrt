@@ -8,27 +8,20 @@ map: which piece exists, what it is responsible for, and what breaks if you move
 
 | | |
 |---|---|
-| **this one** (`zte-e2631-immortalwrt`) | the whole port: overlay, base patch series, board scripts, packer, verifiers, evidence documents. Active |
+| **this one** (`zte-e2631-immortalwrt`) | the packaging/distribution kit: pin file, bootstrap/build/check scripts, board scripts, packer, verifiers, evidence documents. No device code of its own any more (T-12) |
+| [`QC3284/immortalwrt`](https://github.com/QC3284/immortalwrt) branch `e2631` | the tree fork: pristine `immortalwrt/immortalwrt` master pinned at `4765b657` (kernel 6.18.60) plus four sanechips port commits (target, H3600 board) and three E2631 commits (device packages, seed notes). The build checks it out at depth 1 at the tip pinned in `scripts/pins.env` |
 | `e2631-mainline-zx279128s` | the same SoC on **pristine** upstream Linux: upstream v6.18.38 plus 6 modified files and 4 new ones. Where the "this SoC really boots mainline" evidence comes from. No U-Boot/TFTP path any more - that is tagged `v0.1.1` |
-| `immortalwrt/immortalwrt` + `base/` | the base tree: ImmortalWrt master pinned at `4765b657` (kernel 6.18.60), on which this kit applies `base/0001..0004-*.patch` (the `sanechips` target and the `zte/*`/H3600 support) before the overlay. Not a fork; the old OpenWrt mirror (`openwrt-sanechips-mirror` @ `db8b8d4`, kernel 6.18.55) is only the `E2631_BASE_KIND=legacy` rollback |
 
 ## Repository map
 
-    apply.sh          overlay -> base tree; idempotent; every edit is witnessed
     BUILD.md          the procedure, including the failure modes
     Makefile          check / bootstrap / build / package - wrappers over scripts/
-    base/             the base pin: commits.env (SHA + tree hash + patch sha256),
-                      0001..0004-*.patch (sanechips target + H3600 board support)
-    scripts/          env.sh (paths), bootstrap.sh, build.sh, check.sh
-    overlay/          the port itself, in the base tree's own directory shape
-      target/linux/sanechips/
-        config-6.18           kernel symbols this board needs
-        image/Makefile.e2631  the device definition, the slot kernel/rootfs recipe
-        dts/zx279128s-zte-zxhn-e2631.dts   the board: PHYs, LEDs, partitions, PCIe
-        patches-6.18/         029/030/031 - JFFS2 in-data markers, gated PCIe retrain
-        base-files/           /sbin/e2631-*, etc/init.d/e2631-*, board.d/02_network
-      package/firmware/e2631-fwslot/       the A/B slot tool (C, static, soft-float)
-      package/kernel/mt76/                 the Wi-Fi patches, generated not hand-written
+    scripts/          env.sh (paths), pins.env (the single pin file), bootstrap.sh,
+                      build.sh, check.sh, layout-check.sh, base-pin-check.sh
+    seed/             e2631.config (the .config the build starts from) and the
+                      vendor version-header slice
+    tests/native/     host copies of the tree-owned sources the offline gates
+                      compile/run (kept byte-identical by g_native_sync)
     wsl/              the build path, the patch generators, the witnesses, the probes
                       (grouped in wsl/INDEX.md; named for where they used to run)
     tools/            mkfactory.mjs (packer), make_fixture.mjs, verify_img.mjs,
@@ -42,11 +35,10 @@ map: which piece exists, what it is responsible for, and what breaks if you move
 
 ## From source to something that boots
 
-    ImmortalWrt base @ pinned SHA + git am base/*.patch
-      -> apply.sh        overlay copy; image/Makefile hook; mt7915e AutoProbe removed;
-                         VFP/NEON/THUMBEE off; CONFIG_CMDLINE* forced; lockup
-                         detectors on (in generic too); root= counted from the DTS
-      -> make world      the base builds kernel 6.18.60 + the target + LuCI
+    tree fork QC3284/immortalwrt e2631 @ pin (device support as commits)
+      -> bootstrap       depth-1 checkout; scratch-repo history assertions; feeds
+                         pinned to the v1.10.0 commits; seed .config landed
+      -> make world      kernel 6.18.60 + the sanechips target + LuCI
       -> collect.sh      kernel / root / e2631.dtb / config-6.18 / e2631-fwslot
       -> release.mjs     mkfactory pack -> verify_pkg (independent re-derivation)
                          -> verify_img (boot readiness) -> sha256
@@ -94,9 +86,9 @@ touched by an upgrade, which is also why a bad image can be walked away from.
 The vendor U-Boot hands the kernel its own `bootargs` (`root=/dev/mtdblock8
 rootfstype=jffs2 init=/bin/sh ...`), which name the *vendor* partition table and would
 replace PID 1 with a shell. So the command line is compiled in with
-`CONFIG_CMDLINE_FORCE=y`, and `apply.sh` **counts** the `rootfs` label's position in the
-board DTS to derive `root=/dev/mtdblockN` - remembered numbers go stale when a partition
-row moves. `CONFIG_MTD_PARTITIONED_MASTER` being off is what makes the numbering start
+`CONFIG_CMDLINE_FORCE=y`, and the tree fork's build **counts** the `rootfs` label's
+position in the board DTS to derive `root=/dev/mtdblockN` - remembered numbers go stale
+when a partition row moves. `CONFIG_MTD_PARTITIONED_MASTER` being off is what makes the numbering start
 at mtd0 with the first child partition.
 
 Three things are hard constraints from the silicon, not preferences: no VFP (so
@@ -135,8 +127,8 @@ only a power cycle returns it. So every path is built to keep an way in:
   partitions;
 * the 600 s first-boot trial revert is **opt-in** (`touch /etc/e2631-trial-arm`), because
   auto-reverting once threw away a boot that was worth studying;
-* softlockup + hung-task detectors and serial SysRq are compiled in (`apply.sh`), so the
-  kernel can speak for itself next time;
+* softlockup + hung-task detectors and serial SysRq are compiled in (tree-fork target
+  config), so the kernel can speak for itself next time;
 * `/dev/mem` is unreachable in the shipped config (the request is dropped somewhere that
   is still unexplained - `docs/02-...md` section P), so register reads that would need it
   go through the `regprobe.ko` module instead (`wsl/build-regprobe.sh`).

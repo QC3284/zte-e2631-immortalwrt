@@ -1,13 +1,20 @@
 #!/bin/bash
 # Tests for the v1.9 userdata default-adopt gate
-# (overlay/.../etc/init.d/e2631-userdata).
+# (target/linux/sanechips/base-files/etc/init.d/e2631-userdata in the tree fork).
 #
 #   bash tests/test_userdata_gate.sh
 #
 # Layer 1: static checks (syntax, the guards that must never regress).
 # Layer 2: functional branches run against a mock sysfs/proc environment.
 set -u
-GATE="$(dirname "$0")/../overlay/target/linux/sanechips/base-files/etc/init.d/e2631-userdata"
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+[ -f "$REPO/scripts/env.sh" ] && . "$REPO/scripts/env.sh"
+BASE="${E2631_TREE:-}/target/linux/sanechips/base-files"
+if [ ! -d "$BASE" ]; then
+	echo "SKIP  no tree fork at ${E2631_TREE:-<unset>}: run scripts/bootstrap.sh first"
+	exit 0
+fi
+GATE="$BASE/etc/init.d/e2631-userdata"
 FAIL=0
 ok() { printf 'PASS %s\n' "$1"; }
 bad() { printf 'FAIL %s\n' "$1"; FAIL=1; }
@@ -33,7 +40,7 @@ grep -q 'tar -C /overlay' "$GATE" &&
 	bad "no configuration migration"
 
 # the guarded init itself keeps its own hard checks (double lock)
-INIT="$(dirname "$0")/../overlay/target/linux/sanechips/base-files/sbin/e2631-userdata-init"
+INIT="$BASE/sbin/e2631-userdata-init"
 grep -q '0x3f00000' "$INIT" && ok "init still validates the 0x3f00000 window" ||
 	bad "init lost the window check"
 grep -q 'already attached to mtd' "$INIT" && ok "init still refuses an attached UBI" ||

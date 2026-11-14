@@ -58,7 +58,7 @@ patch -p1 -i /tmp/fwtimeout.patch > /dev/null 2>&1
 echo "apply rc=$?"
 diff -q mt7915/mcu.c "$W/b/mt7915/mcu.c" && echo "APPLIED == GENERATED"
 
-OUT=$E2631_WORK/build/overlay/package/kernel/mt76/patches
+OUT=$E2631_TREE/package/kernel/mt76/patches
 mkdir -p "$OUT"
 cp /tmp/fwtimeout.patch "$OUT/003-mt7915-wait-longer-for-fw-state.patch"
 echo "written: $OUT/003-mt7915-wait-longer-for-fw-state.patch"

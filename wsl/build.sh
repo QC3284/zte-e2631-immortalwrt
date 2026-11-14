@@ -50,9 +50,9 @@ else
 fi
 cd $E2631_TREE || exit 1
 
-E2631_GNU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/gnu $E2631_KIT/apply.sh $E2631_TREE || exit 1
-grep -qx "CONFIG_CMDLINE_FORCE=y" target/linux/sanechips/config-6.18 || { echo "APPLY INCOMPLETE: no forced cmdline"; exit 1; }
-grep -q "Makefile.e2631" target/linux/sanechips/image/Makefile || { echo "APPLY INCOMPLETE: image hook"; exit 1; }
+# T-12: the tree fork already carries the port, so there is nothing to apply.
+grep -qx "CONFIG_CMDLINE_FORCE=y" target/linux/sanechips/config-6.18 || { echo "TREE INCOMPLETE: no forced cmdline"; exit 1; }
+grep -q "Makefile.e2631" target/linux/sanechips/image/Makefile || { echo "TREE INCOMPLETE: image hook"; exit 1; }
 
 for f in packages luci; do
   [ -d "feeds/$f/.git" ] || { echo "PHASE clone-$f $(date +%T)"; git clone -q --depth 1 --single-branch "https://github.com/openwrt/$f" "feeds/$f"; }

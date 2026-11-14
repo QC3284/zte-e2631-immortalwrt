@@ -26,5 +26,5 @@ grep -rn "mt76_eeprom_override\|nvmem" "$K/drivers/net/wireless/mediatek/mt76/ee
 echo
 echo "=== does the package Makefile apply patches from the target dir? ==="
 ls $E2631_TREE/target/linux/sanechips/patches-6.18/ | tail -6
-ls $E2631_KIT/overlay/../patches 2>/dev/null | head
-grep -rn "mt76" $E2631_KIT/apply.sh | head -20
+ls "$E2631_TREE/package/kernel/mt76/patches" 2>/dev/null | head
+grep -rn "mt76" "$E2631_TREE/target/linux/sanechips/patches-6.18/" | head -20

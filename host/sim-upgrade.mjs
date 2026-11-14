@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Host-side end-to-end simulation of the on-device online updater
-// (overlay/target/linux/sanechips/base-files/sbin/e2631-upgrade). No device and
+// (tests/native/target/linux/sanechips/base-files/sbin/e2631-upgrade, the host
+// copy of the tree fork's script). No device and
 // no flash: the real updater text runs with its absolute paths redirected into
 // a temp sandbox, and /sbin/sysupgrade is a stub that only records its argv.
 //
@@ -19,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash, randomFillSync } from 'node:crypto';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const UPDATER_PATH = path.join(REPO, 'overlay/target/linux/sanechips/base-files/sbin/e2631-upgrade');
+const UPDATER_PATH = path.join(REPO, 'tests/native/target/linux/sanechips/base-files/sbin/e2631-upgrade');
 const UPDATER = fs.readFileSync(UPDATER_PATH, 'utf8');
 const MAGIC = Buffer.from('999999994444444455555555aaaaaaaa', 'hex');
 const ASSET = 'e2631-immortalwrt-experimental.bin';

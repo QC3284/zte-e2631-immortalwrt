@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 rc=0
 run() {	# run <label> <gate function>
 	local label=$1 fn=$2 out code
-	printf '%-32s ' "$label"
+	printf '%-36s ' "$label"
 	out=$("$fn" 2>&1); code=$?
 	if [ $code -eq 0 ]; then
 		echo PASS
@@ -71,6 +71,34 @@ g_slot_tool() {	# compiles with -Werror, then parses a good and a bad package
 	bash "$E2631_KIT/wsl/check-kit.sh"
 }
 
+# The host-native sources (slot tool, updater/platform control flow) live in the
+# tree fork; tests/native/ carries the copies the offline gates compile/run.
+# After a bootstrap they must be byte-identical to the tree, or the gate would
+# be testing code that is not what ships.
+NATIVE_MAP="package/e2631/e2631-fwslot/src/e2631-fwslot.c
+target/linux/sanechips/base-files/sbin/e2631-upgrade
+target/linux/sanechips/base-files/lib/upgrade/platform.sh
+target/linux/sanechips/files/drivers/mtd/parsers/zx279128s-slotpart-core.c"
+g_native_sync() {
+	if [ ! -d "${E2631_TREE:-}/target/linux/sanechips" ]; then
+		echo "no tree fork at ${E2631_TREE:-<unset>} - the native copies are compared after a bootstrap"
+		return 77
+	fi
+	local rel bad=0
+	while IFS= read -r rel; do
+		[ -n "$rel" ] || continue
+		if ! cmp -s "$E2631_KIT/tests/native/$rel" "$E2631_TREE/$rel"; then
+			echo "tests/native/$rel differs from the tree fork"
+			echo "  sync it with: cp \"$E2631_TREE/$rel\" \"$E2631_KIT/tests/native/$rel\""
+			bad=1
+		fi
+	done <<EOF2
+$NATIVE_MAP
+EOF2
+	[ $bad -eq 0 ] || return 1
+	echo "host-native copies match the tree fork ($(printf '%s\n' "$NATIVE_MAP" | wc -l) files)"
+}
+
 g_secret() {
 	command -v git >/dev/null 2>&1 || { echo "no git: the tracked-file scan cannot run"; return 77; }
 	bash "$E2631_KIT/scripts/secret-scan.sh"
@@ -78,18 +106,16 @@ g_secret() {
 
 g_dts() {
 	e2631_need_cmd node "resolve the board dts includes" || return 77
-	# The board file includes zte/zx279128s.dtsi, which is not in this repo: patch
-	# 026 of the base tree creates it. Without the tree the gate can only see the
-	# board file itself, and every &label in it looks undefined.
+	# The board DTS and the sanechips patches live in the tree fork now. Without
+	# the tree the gate can only see nothing, so SKIP with the bootstrap hint.
 	if [ ! -d "$E2631_TREE/target/linux/sanechips/patches-6.18" ]; then
-		echo "no base tree at $E2631_TREE - run scripts/bootstrap.sh, then re-run this gate"
+		echo "no tree fork at $E2631_TREE - run scripts/bootstrap.sh, then re-run this gate"
 		return 77
 	fi
 	node "$E2631_KIT/tools/dts_lint.mjs" \
-		"$E2631_KIT/overlay/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts" \
+		"$E2631_TREE/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts" \
 		"$E2631_TREE/target/linux/sanechips/patches-6.18" \
-		"$E2631_TREE/target/linux/sanechips/dts" \
-		"$E2631_KIT/overlay/target/linux/sanechips/patches-6.18"
+		"$E2631_TREE/target/linux/sanechips/dts"
 }
 
 g_upgrade() {
@@ -99,15 +125,11 @@ g_upgrade() {
 		echo "test_upgrade.py failed"; return 1; }
 }
 
-g_apply() {
-	bash "$E2631_KIT/wsl/apply-gate.sh"
-}
-
 g_layout() {	# one slot geometry across the packer, the rule, the DTS and the preflight
 	bash "$E2631_KIT/scripts/layout-check.sh"
 }
 
-g_base_pin() {	# tree-fork pin: fork tip + iw pin + patch sha256 (always), tree content when a tree exists
+g_base_pin() {	# pin file + provenance + enforcement greps (always)
 	bash "$E2631_KIT/scripts/base-pin-check.sh" static
 }
 
@@ -115,21 +137,13 @@ g_base_tree() {	# fork tip + base-port tree in the fetched history (needs a boot
 	bash "$E2631_KIT/scripts/base-pin-check.sh" tree
 }
 
-run "upgrade failure paths (python)" g_upgrade
-run "apply.sh fail-fast + structural assertions" g_apply
-run "shell syntax (bash -n)" g_shell
-run "javascript (node --check)" g_js
-run "device scripts (busybox ash)" g_ash
-run "slot tool (-Werror, parse, reject)" g_slot_tool
-run "slot layout constants (5 copies)" g_layout
-run "base pin (fork tip + iw SHA + patch sha256)" g_base_pin
-run "base tree (fork history + 4 commits)" g_base_tree
 g_preflight() {
 	local F="$E2631_OUT/fixture/fixture.bin"
 	command -v busybox >/dev/null 2>&1 || { echo "no busybox: the preflight script is not ash-checked"; return 77; }
 	bash -n "$E2631_KIT/scripts/preflight.sh" || return 1
 	command -v gcc >/dev/null 2>&1 || { echo "no gcc: the package checks need e2631-fwslot compiled"; return 77; }
-	[ -x /tmp/e2631-fwslot-native ] || gcc -std=gnu11 -w -o /tmp/e2631-fwslot-native 		"$E2631_KIT/overlay/package/firmware/e2631-fwslot/src/e2631-fwslot.c"
+	[ -x /tmp/e2631-fwslot-native ] || gcc -std=gnu11 -w -o /tmp/e2631-fwslot-native \
+		"$E2631_KIT/tests/native/package/e2631/e2631-fwslot/src/e2631-fwslot.c"
 	export E2631_FWSLOT_BIN=/tmp/e2631-fwslot-native
 	[ -f "$F" ] || { echo "no $F - run node tools/make_fixture.mjs $E2631_OUT/fixture"; return 77; }
 	if ! sh "$E2631_KIT/scripts/preflight.sh" "$F" --offline >/dev/null 2>&1; then
@@ -141,12 +155,21 @@ g_preflight() {
 	echo "valid fixture passes, corrupted fixture refuses"
 }
 
-run "board dts cross-reference" g_dts
-run "first-flash preflight (fixture)" g_preflight
 g_notice() {
 	bash "$E2631_KIT/scripts/notice-check.sh"
 }
 
+run "upgrade failure paths (python)" g_upgrade
+run "shell syntax (bash -n)" g_shell
+run "javascript (node --check)" g_js
+run "device scripts (busybox ash)" g_ash
+run "slot tool (-Werror, parse, reject)" g_slot_tool
+run "host-native copies vs tree fork" g_native_sync
+run "slot layout constants (kit + tree)" g_layout
+run "base pin (pins.env + provenance)" g_base_pin
+run "base tree (fork history + 4 commits)" g_base_tree
+run "board dts cross-reference" g_dts
+run "first-flash preflight (fixture)" g_preflight
 run "no credential shapes" g_secret
 run "NOTICE vs tree (both directions)" g_notice
 

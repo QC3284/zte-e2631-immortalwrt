@@ -72,7 +72,14 @@ const _now = new Date();
 const BUILD = arg('--build', envv('E2631_BUILD')) ||
   `${_now.getFullYear()}${String(_now.getMonth() + 1).padStart(2, '0')}${String(_now.getDate()).padStart(2, '0')}`;
 const OUT = abs(arg('--out', 'out/e2631-immortalwrt-factory.bin'));
-const DTS = path.join(REPO, 'overlay/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts');
+// The board DTS ships in the tree fork now (T-12), so verify_pkg can only run
+// its offset cross-check when the build tree is at hand. release.mjs normally
+// runs right after a build, but --run (downloading an artifact) may not have it:
+// then the DTS check is skipped with a line rather than passed a missing file.
+const TREE = [envv('E2631_TREE'), abs('owrt-up'), abs('openwrt'), abs('_base/owrt')]
+  .filter(Boolean).find((t) => fs.existsSync(path.join(t, 'target/linux/generic')));
+const DTS_REL = 'target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts';
+const DTS = TREE && fs.existsSync(path.join(TREE, DTS_REL)) ? path.join(TREE, DTS_REL) : '';
 const LOCAL = arg('--dir') ? abs(arg('--dir')) : '';	// a directory already holding kernel/root
 if (!run && !LOCAL) {
   console.error('usage: release.mjs --dir <build dir> --template <official.bin> [--out f]');
@@ -182,7 +189,13 @@ execFileSync(process.execPath, [path.join(REPO, 'tools/mkfactory.mjs'), 'pack', 
 
 console.log('\n--- independent verification of the package ---');
 try {
-  execFileSync(process.execPath, [path.join(HERE, 'verify_pkg.mjs'), OUT, '--dts', DTS, '--template', TEMPLATE], { stdio: 'inherit' });
+  if (DTS) {
+    execFileSync(process.execPath, [path.join(HERE, 'verify_pkg.mjs'), OUT, '--dts', DTS, '--template', TEMPLATE], { stdio: 'inherit' });
+  } else {
+    console.log('verify_pkg: no tree fork at ' + (TREE || 'E2631_TREE') +
+      ' - the DTS offset cross-check is skipped (set E2631_TREE to enable it)');
+    execFileSync(process.execPath, [path.join(HERE, 'verify_pkg.mjs'), OUT, '--template', TEMPLATE], { stdio: 'inherit' });
+  }
 } catch {
   console.error('\nverify_pkg rejected the package - do not flash it');
   process.exit(1);
@@ -208,8 +221,6 @@ console.log('\n--- boot readiness (dtb + kernel .config + payload) ---');
 // .config in an artifact is whichever build phase wrote it last. Resolved against
 // E2631_WORK, not the current directory - running this from the kit root used to
 // silently drop the fragments witness, and INITRAMFS_SOURCE then failed the screen.
-const TREE = [envv('E2631_TREE'), abs('owrt-up'), abs('openwrt'), abs('_base/owrt')]
-  .filter(Boolean).find((t) => fs.existsSync(path.join(t, 'target/linux/generic')));
 if (TREE) console.log(`config fragments from: ${TREE}`);
 try {
   execFileSync(process.execPath, [path.join(REPO, 'tools/verify_img.mjs'), dir, ...(TREE ? ['--tree', TREE, '--target', 'sanechips'] : [])], { stdio: 'inherit' });

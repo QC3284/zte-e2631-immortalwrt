@@ -23,11 +23,11 @@ NOPACK=0
 
 # ---- preconditions, stated before the forty-minute job starts --------------
 [ -d "$E2631_TREE/target/linux/sanechips" ] ||
-	die "no base tree at $E2631_TREE - run: bash scripts/bootstrap.sh"
+	die "no build tree at $E2631_TREE - run: bash scripts/bootstrap.sh"
 [ -f "$E2631_TREE/.config" ] ||
 	die "no .config in $E2631_TREE - run: bash scripts/bootstrap.sh"
 grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
-	die "the overlay is not applied to $E2631_TREE - run: bash scripts/bootstrap.sh"
+	die "the tree fork is not checked out at $E2631_TREE - run: bash scripts/bootstrap.sh"
 grep -q '^CONFIG_TARGET_DEVICE_sanechips_generic_DEVICE_zte_zxhn-e2631=y' "$E2631_TREE/.config" ||
 	die "the E2631 device is not selected in $E2631_TREE/.config - the seed did not land"
 e2631_need_cmd make "run the build" || exit 1

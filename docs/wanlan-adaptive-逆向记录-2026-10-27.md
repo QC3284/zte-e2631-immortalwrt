@@ -132,7 +132,7 @@ switchtst -sdwan [port] [mode] [WANIDX]      ← 双 WAN：把某口绑到 WAN1/
 - DTS：`gmac_port0..3` 分别绑 `phy10..13`，`label` 依次是 `lan3 lan2 lan1 wan`，
   每口各自从 `macaddr_tag_1e` 取 MAC（LAN 用 base+0，WAN 用 base+1）。
   驱动（`zx279128s-main.c`）按 DTS `label` 建 netdev，**4 个口是 4 个独立 netdev**。
-- 板级默认：`overlay/target/linux/sanechips/base-files/etc/board.d/02_network`
+- 板级默认：树 fork `target/linux/sanechips/base-files/etc/board.d/02_network`
   ```sh
   ucidef_set_interfaces_lan_wan "lan1 lan2 lan3" "wan"
   ```

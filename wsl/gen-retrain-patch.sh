@@ -8,7 +8,7 @@ set -u
 TREE=$E2631_TREE
 LOG=/tmp/gen-retrain.out
 exec >"$LOG" 2>&1
-OUT=$E2631_WORK/build/overlay/target/linux/sanechips/patches-6.18/031-pci-gate-link-retrain-speed-lift-by-vendor-device.patch
+OUT=$E2631_TREE/target/linux/sanechips/patches-6.18/031-pci-gate-link-retrain-speed-lift-by-vendor-device.patch
 
 K=""
 for d in "$TREE"/build_dir/target-*/linux-sanechips*/linux-*/; do

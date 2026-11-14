@@ -3,6 +3,12 @@
 本文件记录 task-3 的口径与证据：换基底、换仓库名之后，「打包 → 发布 → 在线更新 → CI」
 这条链怎样保持自洽，以及哪些结论只有 CI / 真机才能证明。
 
+> **历史记录说明（T-12 后记）**：本文记录 T3 当时的实施状态。T-12 树 fork 迁移后，
+> `overlay/`、`base/`、`apply.sh` 与 `E2631_BASE_KIND` 已删除，设备支持改为
+> QC3284/immortalwrt `e2631` 分支的真实提交；当前构建与门禁见 `BUILD.md` 与
+> [immortalwrt-migration.md §6.4](immortalwrt-migration.md)。本文的产物名、版本口径、
+> 在线更新链与 CI 发布闸门结论仍然有效。
+
 ## 1. 本轮改动的提交
 
 | 提交 | 内容 |
@@ -40,7 +46,7 @@
 * 若要在原厂页做首次刷写，可临时 `unset E2631_VERSION` 用模板的厂商字符串打包
   （`host/release.mjs` 警告里已写明）。
 
-## 3. 在线更新（`overlay/.../sbin/e2631-upgrade`）
+## 3. 在线更新（`.../sbin/e2631-upgrade`）
 
 改动后仍然**不写非运行槽**：`do_apply` 只调 `/sbin/sysupgrade`，由 platform.sh 走
 `fwslot upgrade-check` + `fwslot upgrade` 原地重写运行槽（`docs/updates.md` 的不变量未动）。
@@ -68,8 +74,8 @@
 * `workflow_dispatch` 新增布尔输入 `publish`，**默认 false**；为 false 时跳过
   `gh release create`，但构建日志与 `release/` 产物仍用 upload-artifact 保留
   （测试性 `make world` 不再产生 Release）。官方 Release 仍需用户批准。
-* env 显式 `E2631_BASE_KIND: immortalwrt`（`scripts/env.sh` 在 T5 证据前默认 legacy，
-  firmware 构建必须显式选新基底）、`E2631_VERSION: ImmortalWrt v1.10.0`。
+* env 显式 `E2631_BASE_KIND: immortalwrt`（T-12 起该开关已删除；本节记录 T3 当时的状态，
+  当时 firmware 构建必须显式选新基底）、`E2631_VERSION: ImmortalWrt v1.10.0`。
 * 发布前 `source scripts/env.sh`，`SOURCE-INFO.txt` 记录构建**实际断言**的钉值而不是本地
   `git HEAD`（git-am 提交的 SHA 是机器本地的）：Kit commit、Base kind、ImmortalWrt repo/branch/SHA、
   ImmortalWrt 原始 tree hash、4 个 port patch 的 sha256、打完补丁后的 base tree hash、kernel 版本、

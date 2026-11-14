@@ -12,7 +12,7 @@
 #include <string.h>
 
 #define main fwslot_unused_main
-#include "../overlay/package/firmware/e2631-fwslot/src/e2631-fwslot.c"
+#include "../tests/native/package/e2631/e2631-fwslot/src/e2631-fwslot.c"
 #undef main
 
 static int fails;

@@ -1,13 +1,14 @@
 NOTICE - files in this repository that are NOT covered by LICENSE (GPL-2.0-only)
 ================================================================================
 
-This project's own code (the overlay, the base patch series, the kit scripts, the
+This project's own code (the tree fork at QC3284/immortalwrt, the kit scripts, the
 tools, the board scripts and the docs) is GPL-2.0-only, same as the base tree
 (ImmortalWrt, which follows OpenWrt). The files below are
 third-party material carried in-tree under their own terms; each entry must
 match a path that exists (scripts/notice-check.sh enforces both directions).
 
-1. overlay/package/network/zte-mesh/zte-mesh-runtime.tar.gz
+1. tree:package/e2631/zte-mesh/zte-mesh-runtime.tar.gz
+   Location: the tree fork branch e2631 (QC3284/immortalwrt), not this kit repo;
    Source: vendored from cnjn/zte-mesh (upstream ships the factory multiapd).
    Terms: proprietary ZTE binaries, marked nonshared in that package. Carried
    for interoperation with factory ZTE child routers; same redistribution

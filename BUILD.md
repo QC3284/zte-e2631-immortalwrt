@@ -10,8 +10,9 @@ that way - those scripts are the same steps, plus the workarounds for one machin
 network. If you are on Linux, use `scripts/`.
 
 ```
-ImmortalWrt base (pinned SHA + base/*.patch)  ->  apply.sh overlay  ->  make world  ->  collect
-                           ->  mkfactory pack (header template ships in seed/)  ->  verify x2  ->  flash
+tree fork (QC3284/immortalwrt e2631 @ pin; device support as commits)
+  ->  depth-1 checkout + feeds + seed  ->  make world  ->  collect
+  ->  mkfactory pack (header template ships in seed/)  ->  verify x2  ->  flash
 ```
 
 ## 1. What you need
@@ -28,28 +29,35 @@ ImmortalWrt base (pinned SHA + base/*.patch)  ->  apply.sh overlay  ->  make wor
 
 ## 2. The base tree and the version-header template
 
-**The base tree.** This is an overlay, not a fork of ImmortalWrt. It is keyed to one
-commit of `immortalwrt/immortalwrt` master, and the sanechips `target/` plus the H3600
-board support travel with this repository as `base/0001..0004-*.patch`, applied with
-`git am`:
+**The base tree.** The port now lives in a real tree fork:
+[QC3284/immortalwrt](https://github.com/QC3284/immortalwrt), branch `e2631`, a fork of
+`immortalwrt/immortalwrt`. The sanechips target, the H3600 board support and the E2631
+device packages are ordinary commits there, and the kit checks that fork out at a pinned
+tip - there is no vendored patch series and no `apply.sh` any more (T-12):
 
     E2631_IW_REPO     https://github.com/immortalwrt/immortalwrt
     E2631_IW_BRANCH   master
     E2631_IW_SHA      4765b657625ec5bbda74b44400465fe043802b30    (kernel 6.18.60)
+    E2631_FORK_REPO   https://github.com/QC3284/immortalwrt
+    E2631_FORK_BRANCH e2631
+    E2631_FORK_SHA    e96aed31c45442374e9a37fd84c1ac048be90613    (build content)
 
-`base/commits.env` is the single pin: it also records the sha256 of each patch and the
-sha256 of the tree produced by applying them, so `scripts/bootstrap.sh` can witness the
-result and `make check` (the base-pin gate) fails a tree built from anything else.
-`apply.sh` still edits the target's config fragments and image Makefile by pattern,
-which is why the patch series and the tree hash are both pinned. Kernel 6.18.60 comes
-from that tree.
+`scripts/pins.env` is the single pin file. It also records the tree hash of the last
+sanechips port commit (`4f89aa7a…`), the sha256 of each of the four original port
+patches (provenance only - the files are gone), and the two feed commits the released
+v1.10.0 was built with. `scripts/bootstrap.sh` fetches the fork tip at **depth 1** for
+the build tree (parity P2: `COMMITCOUNT` is `git rev-list --count HEAD .`, so a deeper
+tree changes `base-files` `PKG_RELEASE`), and verifies the history in a separate
+scratch repo: the tip, the base-port tree, the ImmortalWrt pin ancestry and the four port
+commits. `make check`'s base-pin gate repeats those assertions on the scratch repo and
+fails a tree built from anything else; a drifted feed is re-pinned or refused.
 
-The old OpenWrt sanechips base (`Zlion-Y/openwrt-sanechips-mirror`,
-`pr-zte-zxhn-h3600` @ `db8b8d4`, kernel 6.18.55) is kept as the
-`E2631_BASE_KIND=legacy` rollback; see [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)
-for the migration decision and the triple-pin rationale. If you want to build against a
-different ImmortalWrt commit, apply the overlay, then read `apply.sh` output: it says
-which tree it thinks it is editing.
+To change the port, patch and commit in a fork working copy, push, then re-bootstrap with
+the new pin - never edit the depth-1 build tree by hand. The old OpenWrt sanechips base
+(`Zlion-Y/openwrt-sanechips-mirror`, kernel 6.18.55) was the `legacy` rollback until
+T-12; it is retired together with the overlay and the patch series. See
+[docs/immortalwrt-migration.md](docs/immortalwrt-migration.md) for the migration decision
+and the triple-pin rationale.
 
 **The version-header template.** `tools/mkfactory.mjs pack` copies a 512-byte version
 header out of a template and rewrites only the geometry and CRC fields, so the template
@@ -104,8 +112,9 @@ overridden by an environment variable or by `.env` (untracked; copy `.env.exampl
 | `E2631_KIT` | found from the script's own location | this repository |
 | `E2631_WORK` | parent of the kit | where `out/` lives; relative values in `.env` resolve against it |
 | `E2631_OUT` | `$E2631_WORK/out` | build directories, logs, packages |
-| `E2631_TREE` | `$HOME/openwrt` | the base tree being built |
-| `E2631_BASE_*` | the pinned ImmortalWrt SHA + `base/` patches (old OpenWrt base when `E2631_BASE_KIND=legacy`) | what bootstrap clones and patches |
+| `E2631_TREE` | `$HOME/openwrt` | the tree-fork checkout being built (depth 1; bootstrap creates it) |
+| `E2631_FORK_REPO/BRANCH/DEPTH` | the pinned fork, `e2631`, depth 32 | what bootstrap fetches; the depth is only for the scratch history checks |
+| `E2631_BASE_*` | the pins in `scripts/pins.env` | ImmortalWrt base, expected tree, kernel version - what bootstrap asserts |
 | `E2631_TEMPLATE` | `seed/vendor-verhdr-8b8.bin` | the 532-byte version-header template; see section 2 |
 | `E2631_PROXY` | unset | http(s) proxy for the download phases |
 | `E2631_GNU_MIRROR` | unset | move a fast GNU mirror to the head of `@GNU` |
@@ -120,18 +129,18 @@ Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
 | gate | what it proves |
 |---|---|
 | `tests/test_upgrade.py` | the online updater fails safely: a bad checksum, an anti-downgrade refusal and a failed download all leave the board alone, the slot decision dispatches correctly, and the label transition `OpenWrt v1.9.0` -> `ImmortalWrt v1.10.0` upgrades in place (the label is stripped before the numeric compare) |
-| `wsl/apply-gate.sh` | `apply.sh` is idempotent, refuses the wrong base tree, and its structural assertions catch four tampered variants |
+| host-native copies | `tests/native/` holds the host copies of the tree-owned sources the offline gates compile and run (`e2631-fwslot.c`, `e2631-upgrade`, `platform.sh`, `slotpart-core.c`); after a bootstrap this gate `cmp`s each against the tree and, on a mismatch, prints the exact `cp` that syncs it. SKIPs until a tree exists, because there is nothing to compare against |
 | `bash -n` | every helper in the kit parses |
 | `node --check` | every tool parses |
 | busybox ash | the scripts that get put on the *device* parse under the device's shell, with CRLF stripped - a bashism or a `\r` here only shows up on the board |
-| slot tool | `e2631-fwslot.c` compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
-| slot layout | the five copies of the slot geometry (`tools/verify_img.mjs`, `host/release.mjs`, `image/Makefile.e2631`, the board DTS and both `e2631-preflight` copies) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`, and the DTS partitions are consistent with them. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
-| base pin | `base/commits.env` exists and its four patch sha256 match the vendored files. A missing `base/commits.env` after it has been committed is a FAIL, not a SKIP. Runs on every `make check`, even before a tree exists |
-| base tree hash | the tree at `E2631_TREE` really has the pinned `HEAD^{tree}` and `LINUX_VERSION-6.18` = `6.18.60` after the four `git am` commits. SKIPs until bootstrap has made a tree, and on the `E2631_BASE_KIND=legacy` rollback base (there is no patch series to hash) |
-| board dts | `#include`s and every `&label` in the board file resolve against the base tree's patch series (needs the tree, so it SKIPs before bootstrap) |
+| slot tool | `e2631-fwslot.c` (the host-native copy) compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
+| slot layout | the kit copies (`tools/verify_img.mjs`, `host/release.mjs`, `scripts/preflight.sh`) and, after a bootstrap, the tree copies (board DTS, `image/Makefile.e2631`, device `e2631-preflight`) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
+| base pin | `scripts/pins.env` exists, carries every pin as a plain value, and matches the fork/branch/tip, the ImmortalWrt SHA, the base-port tree hash and the feed commits; the gate also fails if the scripts stop enforcing them. Runs on every `make check`, even before a tree exists |
+| base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `4f89aa7a` base-port tree, the ImmortalWrt pin in its ancestry, exactly four port commits above it, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
+| board dts | `#include`s and every `&label` in the board file resolve against the tree fork's sanechips patch series (needs the tree, so it SKIPs before bootstrap) |
 | first-flash preflight | the host copy of `e2631-preflight` accepts a synthesized valid package and refuses one with a single altered byte, offline (it needs the native `e2631-fwslot`) |
 | `scripts/secret-scan.sh` | no credential shapes in any tracked file, and the evidence files that must stay ignored (the vendor harvest, the config export, the token helper) are not tracked. It exists because a scrub that searched for a value **literally** missed nine files that carry the tcl-escaped form of the same password |
-| `scripts/notice-check.sh` | NOTICE and the tree agree in both directions: every path NOTICE names exists, and every third-party file that must be listed (the mesh runtime tarball, the vendor version-header template) is listed |
+| `scripts/notice-check.sh` | NOTICE and the tree agree in both directions: every path NOTICE names exists (tree paths use the `tree:` prefix), and every third-party file that must be listed (the mesh runtime tarball in the tree fork, the vendor version-header template here) is listed |
 
 The two gates that read a finished artifact - `host/verify_pkg.mjs` (re-derives the
 geometry independently) and `tools/verify_img.mjs` (boot readiness) - run inside the
@@ -140,26 +149,30 @@ pack step, so they need a build first.
 Two more consistency checks run in `.github/workflows/check.yml` before `make check` (and can be
 run by hand): `node host/sim-upgrade.mjs` simulates the online updater end to end with stub
 `sysupgrade`/`uci`/`wget` (30 checks, no flash write), and `node tools/check-workflows.mjs`
-asserts that the CI workflows, artifact names, version string and release channel agree (39 checks).
+asserts that the pin file, the tree-fork content (version string and updater, fetched at the
+pinned SHA), the CI workflows, artifact names and release channel agree (66 checks; it needs
+network access and fails those fetches explicitly rather than skipping).
 
 ## 5. Bootstrap, then build
 
-    make bootstrap        # clone ImmortalWrt @ pin + git am base/ + overlay + feeds + seed config, with witnesses
+    make bootstrap        # depth-1 tree fork @ pin (history checked in a scratch repo) + feeds + seed
     make build            # make world, collect, pack, verify
 
-`bootstrap` stops rather than guessing: it dies if the tree is not the base tree, if
-the checkout is at another commit *and* has changes that might be yours, if a feed
-index is missing, or if the seed's device selection does not survive `defconfig`.
+`bootstrap` stops rather than guessing: it dies if the checkout ends up at another
+commit, if the build tree is not depth 1, if the scratch history lacks the pinned
+base-port tree or the four port commits, if a feed cannot be pinned, if an image hook
+is missing, or if the seed's device selection does not survive `defconfig`.
 
 `build` refuses to start a forty-minute job on inputs it can see are missing, so the
-errors you get are the useful ones: no base tree, no `.config`, overlay not applied,
-device not selected, no `node`, `node` too old for `zlib.crc32`, a template path that
-does not exist (the default lives in `seed/`). It writes `$E2631_OUT/build-<timestamp>/world.log`, then collects into the
-same directory (`kernel`, `root`, `e2631.dtb`, `config-6.18`, `e2631-fwslot`) and packs
+errors you get are the useful ones: no build tree, no `.config`, tree fork not checked
+out, device not selected, no `node`, `node` too old for `zlib.crc32`, a template path
+that does not exist (the default lives in `seed/`). It writes
+`$E2631_OUT/build-<timestamp>/world.log`, then collects into the same directory
+(`kernel`, `root`, `e2631.dtb`, `config-6.18`, `e2631-fwslot`) and packs
 `$E2631_OUT/e2631-immortalwrt-<timestamp>.bin`.
 
-Run it twice in a row to see the loop you will actually live in: the second pass is
-`apply.sh` + `make world` again, and `apply.sh` is idempotent by design.
+Run it again to see the loop you will actually live in: bootstrap re-fetches the pin and
+re-installs the feeds, then `make build` is a warm rebuild.
 
 ## 6. Flash it
 
@@ -225,22 +238,23 @@ collapses path pairs that differ only in case. Check files out with LF
 
 ## 8. Making your own change
 
-The overlay is the whole port: `overlay/target/linux/sanechips/` (config fragments,
-`image/Makefile.e2631`, the board DTS, `base-files/`), `overlay/package/` (the slot
-tool, the mt76 patch set), `seed/e2631.config`. Add your device or your patch there and
-`make build` again - `apply.sh` copies `overlay/` into the tree, so nothing needs to be
-edited in the tree by hand.
+The port is the tree fork: `target/linux/sanechips/` (config fragments,
+`image/Makefile.e2631`, the board DTS, `base-files/`), `package/e2631/` (the slot tool,
+the wifiap/wanport/LuCI packages, the mesh controller). Work in a full fork clone, commit,
+push, bump `E2631_FORK_SHA` in `scripts/pins.env` after review, then `make bootstrap` -
+the depth-1 build tree is disposable and must never be edited by hand. `seed/e2631.config`
+stays in the kit (it is build configuration, not device support).
 
 Four rules that exist because breaking them cost hours:
 
 * **Never hand-write a patch.** Generate it against the source the build actually uses:
   `wsl/gen-retrain-patch.sh`, `wsl/gen-efuse-patch.sh`. A hand-written patch here failed
   with "malformed patch at line 37"; the generators prove `APPLIED == GENERATED`.
-* **`apply.sh` copies, it does not sync.** A patch you delete from `overlay/` stays in
-  the tree and keeps being applied - that is how two abandoned SPI-NAND patches went on
-  building into the kernel. `apply.sh` now lists those orphans (files in the tree's patch
-  series that are in neither the base commit nor `overlay/`); remove them yourself, since
-  they may be your work rather than stale.
+* **The build tree is a pinned checkout, not a workspace.** A patch you carry in a fork
+  commit is real; a file you edit in the depth-1 checkout disappears on the next bootstrap
+  and never reaches a release. The same applied to the retired `apply.sh`: it copied, it
+  did not sync, so a patch deleted from `overlay/` kept being applied - which is why the
+  migration moved the port into commits instead.
 * **Ask for a symbol where it is actually decided.** `target/linux/generic/config-6.18`
   wins over `target/linux/sanechips/config-6.18` for symbols generic names explicitly as
   "is not set" - that is why the lockup detectors are flipped in both files. The witness

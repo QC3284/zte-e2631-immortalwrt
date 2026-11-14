@@ -36,8 +36,9 @@ REGEXES=(
 	'\b(AKIA[0-9A-Z]{16}|LTAI[A-Za-z0-9]{12,})'
 	'^(export )?[A-Z_]*(PW|PASSWD|PASSWORD|TOKEN|SECRET)[A-Z_]*=[^$]"?[^ "].*"?$'
 )
-# Ours, not the base tree's: scripts, tools, board evidence, docs, the overlay.
-PATHS=(-- 'board' 'host' 'scripts' 'tools' 'wsl' 'docs' 'overlay' 'seed' 'apply.sh' 'Makefile'
+# Ours, not the tree fork's: scripts, tools, board evidence, docs, the host-native
+# copies under tests/ (T-12 retired overlay/ and apply.sh from the kit).
+PATHS=(-- 'board' 'host' 'scripts' 'tools' 'wsl' 'docs' 'tests' 'seed' 'Makefile'
 	'README.md' 'BUILD.md' '.env.example' '.gitignore')
 
 # Allowlist (scripts/secret-allowlist.txt): one path glob per line, each with

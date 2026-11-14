@@ -1,24 +1,26 @@
 #!/bin/bash
 # Gate: the base is PINNED, not "whatever master is today" (T1 §5.1, T4 base-pin).
 #
-# Phase 2 (tree fork): the sanechips port and the e2631 device support are real
-# commits in our ImmortalWrt fork (QC3284/immortalwrt, branch e2631). The pin is
-# content, not a branch pointer:
+# The sanechips port and the e2631 device support are real commits in our
+# ImmortalWrt fork (QC3284/immortalwrt, branch e2631). The pin is content, not a
+# branch pointer:
 #   - the fork branch tip the kit clones (E2631_FORK_SHA);
 #   - the base-port tree the four sanechips commits produce
 #     (E2631_BASE_TREE_SHA) - it must still be in the fork's fetched history;
 #   - the upstream ImmortalWrt commit those four commits sit on (E2631_IW_SHA) -
 #     it must be an ancestor, and the series above it must still count four
 #     commits, so a rebase onto another base cannot pass silently.
+#   - the two feed commits (P3) the reference build used.
 #
-# scripts/bootstrap.sh checks the same three things while it builds; this gate
-# makes them part of "make check", so the pin cannot silently rot between two
+# scripts/bootstrap.sh checks the same things while it builds; this gate makes
+# them part of "make check", so the pin cannot silently rot between two
 # bootstraps (and a deleted pin file cannot turn into a SKIP).
 #
-# Pre-bootstrap (no tree yet): pin file + patch hashes + enforcement greps.
-# Post-bootstrap: the tree must be the fork tip, the port tree must be in its
-# history, the port series must be four commits, and the device files must exist
-# (the overlay is committed in the tree fork now, not laid down by apply.sh).
+# Pre-bootstrap (no tree yet): pin file + enforcement greps.
+# Post-bootstrap: the tree must be the fork tip, the build tree must be the
+# depth-1 checkout, the port tree must be in the fork history, the port series
+# must be four commits, the device files must exist, and both feeds must be on
+# their pinned commits AND still branch checkouts (P7).
 #
 #   bash scripts/base-pin-check.sh       # one of the gates in scripts/check.sh
 set -u
@@ -27,8 +29,7 @@ case "$MODE" in static|tree|all) ;; *) echo "usage: $0 [static|tree|all]" >&2; e
 cd "$(dirname "$0")/.." || exit 1
 . scripts/env.sh
 
-BASE=base
-ENVF=$BASE/commits.env
+ENVF=scripts/pins.env
 rc=0
 bad() { echo "FAIL $*"; rc=1; }
 note() { printf '  %-22s %s\n' "$1" "$2"; }
@@ -40,7 +41,7 @@ if [ ! -f "$ENVF" ]; then
 		echo "     the base is pinned by that file; restore it, do not drop the pin"
 		exit 1
 	fi
-	echo "no $ENVF yet - T2 lands base/ and this gate covers it from then on"
+	echo "no $ENVF yet - T-12 lands the pin file and this gate covers it from then on"
 	exit 77
 fi
 
@@ -63,6 +64,18 @@ for k in $req; do
 		esac ;;
 	esac
 done
+# The fork depth is a number, not an object id: bootstrap uses it for the
+# scratch history fetch only (the build tree stays depth 1).
+depth=$(get E2631_FORK_DEPTH)
+case "$depth" in
+''|*[!0-9]*) bad "$ENVF: E2631_FORK_DEPTH is not a number: ${depth:-<missing>}" ;;
+*) [ "$depth" -ge 4 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow to reach the base-port commit" ;;
+esac
+# Plain KEY=VALUE only: a ${VAR:-default} expression would be read literally by
+# bootstrap/base-pin-check and silently pin the wrong string.
+if grep -qE '^E2631_[A-Z0-9_]+=.*\$\{' "$ENVF"; then
+	bad "$ENVF contains a shell expression; the pin file must hold plain values"
+fi
 iw_sha=$(get E2631_IW_SHA)
 fork_sha=$(get E2631_FORK_SHA)
 base_tree=$(get E2631_BASE_TREE_SHA)
@@ -72,40 +85,21 @@ note "tree fork tip" "$fork_sha ($E2631_FORK_BRANCH on $E2631_FORK_REPO)"
 note "base-port tree pin" "$base_tree"
 note "feed pins" "packages $(printf '%.12s' "$(get E2631_FEED_PACKAGES_SHA)"), luci $(printf '%.12s' "$(get E2631_FEED_LUCI_SHA)") (v1.10.0 reference, P3)"
 
-# ---- 2. the four patches are the reviewed bytes ----------------------------
-# The tree fork does not re-apply them, but they stay the provenance record (and
-# the legacy rollback path) until task-12 moves the pin out of base/.
-shopt -s nullglob
-patches=("$BASE"/000[1-4]-*.patch)
-shopt -u nullglob
-if [ ${#patches[@]} -ne 4 ]; then
-	bad "$BASE: expected the four 0001..0004-*.patch files, found ${#patches[@]}"
-else
-	n=0
-	for p in "${patches[@]}"; do
-		n=$((n + 1))
-		rec=$(get "$(printf 'E2631_BASE_PATCH_SHA256_%04d' "$n")")
-		got=$(sha256sum "$p" | cut -d' ' -f1)
-		if [ -z "$rec" ]; then
-			bad "$ENVF: no E2631_BASE_PATCH_SHA256_$(printf '%04d' "$n") for $p"
-		elif [ "$got" != "$rec" ]; then
-			bad "$p: sha256 $got, the pin records $rec"
-			echo "     the patch was edited or re-generated; re-review it, then update the pin"
-		else
-			note "$(basename "$p")" "sha256 ok ($(printf '%.12s' "$got")...)"
-		fi
-	done
-fi
+# ---- 2. the vendored patch provenance is still recorded -------------------
+# The patch files were retired with the patch-series path (T-12); their hashes
+# stay as the identity of the reviewed series the fork commits were made from.
+for n in 0001 0002 0003 0004; do
+	v=$(get "E2631_BASE_PATCH_SHA256_$n")
+	[ -n "$v" ] || bad "$ENVF: E2631_BASE_PATCH_SHA256_$n (provenance) is missing"
+done
 
 # ---- 3. the pin is actually enforced where it is used ---------------------
-grep -qF 'base/commits.env' scripts/env.sh 2>/dev/null ||
-	bad "scripts/env.sh does not source base/commits.env - the pin would be decorative"
+grep -qF 'scripts/pins.env' scripts/env.sh 2>/dev/null ||
+	bad "scripts/env.sh does not source scripts/pins.env - the pin would be decorative"
 grep -qF 'E2631_FORK_SHA' scripts/env.sh 2>/dev/null ||
 	bad "scripts/env.sh does not expose E2631_FORK_SHA (the tree-fork tip)"
 grep -qF 'E2631_BASE_TREE_SHA' scripts/env.sh 2>/dev/null ||
 	bad "scripts/env.sh does not expose E2631_BASE_TREE_SHA"
-grep -qF 'E2631_BASE_KIND' scripts/env.sh 2>/dev/null ||
-	bad "scripts/env.sh does not expose E2631_BASE_KIND (legacy|immortalwrt rollback switch)"
 if [ -f scripts/bootstrap.sh ]; then
 	grep -qF 'E2631_FORK_SHA' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not pin the tree-fork tip"
@@ -116,29 +110,45 @@ if [ -f scripts/bootstrap.sh ]; then
 	grep -qF 'HEAD^{tree}' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not read HEAD^{tree} - the tree assertion is gone"
 	if grep -qF 'git am' scripts/bootstrap.sh; then
-		bad "scripts/bootstrap.sh still git-am's the vendored series - the tree fork is the base now"
+		bad "scripts/bootstrap.sh still git-am's the retired patch series - the tree fork is the base now"
 	fi
 	grep -qF 'E2631_FEED_PACKAGES_SHA' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not clone the pinned packages feed commit (P3)"
 	grep -qF 'E2631_FEED_LUCI_SHA' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not clone the pinned luci feed commit (P3)"
+	# P7: a feed reset to the pin must stay a branch checkout, otherwise LuCI's
+	# version.uc records "HEAD detached at FETCH_HEAD" and the image changes.
+	grep -qF 'reset -q --hard FETCH_HEAD' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not reset the feed branch checkout to the pin (P7)"
+	grep -qF 'symbolic-ref --short -q HEAD' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not verify the feed branch label (P7)"
+	if grep -qF 'E2631_BASE_KIND' scripts/bootstrap.sh; then
+		bad "scripts/bootstrap.sh still carries the retired E2631_BASE_KIND switch"
+	fi
+fi
+# The tree-fork migration deleted the overlay/apply.sh path; a live reference
+# outside the historical docs/evidence/board notes means a stale code path.
+# Comment-only lines are ignored (the scripts explain the retirement), and the two
+# checkers are excluded because they name the patterns they forbid.
+# test_userdata_gate matches on /overlay, which is the device mountpoint, not the
+# retired directory.
+if grep -rIn --exclude-dir=.git --exclude-dir=docs --exclude-dir=evidence --exclude-dir=board \
+	--exclude=base-pin-check.sh --exclude=test_userdata_gate.sh --exclude=check-workflows.mjs \
+	-E 'overlay/|apply\.sh|base/commits\.env|E2631_BASE_KIND' \
+	scripts host tools tests wsl seed Makefile NOTICE .env.example 2>/dev/null |
+	grep -v '^tests/native' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)' >/dev/null; then
+	bad "a live script still references the retired overlay/apply.sh path"
 fi
 
 if [ "$MODE" = static ]; then
 	[ $rc -eq 0 ] || exit 1
-	echo "base-pin: iw $iw_sha + tree fork $fork_sha + 4 patch sha256 verified (tree content checked when a tree exists)"
+	echo "base-pin: iw $iw_sha + tree fork $fork_sha + port provenance + feed pins verified (tree content checked when a tree exists)"
 	exit 0
 fi
 
 # ---- 4. the tree on this machine, when there is one ------------------------
-kind="${E2631_BASE_KIND:-legacy}"
-if [ "$kind" = legacy ]; then
-	echo "SKIP base tree pin: E2631_BASE_KIND=legacy (rollback window); the pin applies to the immortalwrt base"
-	[ $rc -eq 0 ] || exit 1
-	exit 77
-fi
 if [ ! -d "${E2631_TREE:-}/.git" ]; then
-	echo "SKIP base tree pin: no base tree at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh, then re-run this gate"
+	echo "SKIP base tree pin: no build tree at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh, then re-run this gate"
 	[ $rc -eq 0 ] || exit 1
 	exit 77
 fi
@@ -228,7 +238,7 @@ if [ -f "$kf" ] && [ -n "$kernel" ]; then
 	fi
 fi
 
-# P3: the feeds must be at the pinned commits, not the branch tip of the day.
+# P3 + P7: the feeds must be at the pinned commits, on a branch checkout.
 for f in packages luci; do
 	case "$f" in
 	packages) pin=$(get E2631_FEED_PACKAGES_SHA) ;;
@@ -241,6 +251,11 @@ for f in packages luci; do
 			note "$f feed" "pinned commit ok ($(printf '%.12s' "$pin")...)"
 		else
 			bad "$d: HEAD=${got:-<unreadable>}, the P3 pin records $pin"
+		fi
+		if [ -n "$(git -C "$d" symbolic-ref --short -q HEAD 2>/dev/null || true)" ]; then
+			note "$f branch" "$(git -C "$d" symbolic-ref --short -q HEAD) (P7 branch checkout)"
+		else
+			bad "$d: detached checkout - bootstrap must reset the feed on its branch (P7)"
 		fi
 	else
 		note "$f feed" "not cloned yet - bootstrap pins it to $(printf '%.12s' "$pin")"

@@ -153,7 +153,7 @@ points at something in the repository or at a measurement.
   surface: build
   symptom: a patch deleted from overlay/ stays in the tree and keeps being applied
   verified: yes (two abandoned Dosilicon SPI-NAND patches survived their own deletion)
-  workaround: apply.sh now lists tree patches that are in neither the base commit nor overlay/
+  workaround: the retired apply.sh listed tree patches that were in neither the base commit nor overlay/ (T-12 moved device support into tree-fork commits, so the class is gone)
 - id: GENERIC-FRAGMENT-WINS
   severity: minor
   status: fixed
@@ -196,7 +196,7 @@ points at something in the repository or at a measurement.
   symptom: "v1.6 shipped with NO wired netdevs at all (only br-lan/lo/wifi): dmesg showed 'platform 92000000.ethernet: deferred probe pending' and /sys/class/net had no lan1/lan2/lan3/wan, so there was no WAN uplink (WiFi worked, no internet)"
   verified: "yes, on the box (2026-10-28, v1.6 flashed): devices_deferred listed 92000000.ethernet with no driver bound; mdio bus and PHYs 10-13 were fine"
   cause: "the zx279128s-slotpart parser returned mtd_partition entries without of_node. The gmac driver gets its MAC addresses through of_get_mac_address() from the nvmem cell macaddr_tag_1e on the tag partition; with no of_node the nvmem-layout never registers and of_get_mac_address() returns -EPROBE_DEFER for ever -> probe deferred forever. The fixed-partitions parser it replaced had set of_node, so v1.5 was fine"
-  workaround: fixed in v1.7 - the parser now carries the borrowed DT node (out[i].of_node = parts[i].np), guarded by an apply.sh assertion that would have caught it; a WARN from zx_ffe_init's proc_create (name contained a slash) was fixed in the same pass
+  workaround: fixed in v1.7 - the parser now carries the borrowed DT node (out[i].of_node = parts[i].np), guarded by an assertion that would have caught it; a WARN from zx_ffe_init's proc_create (name contained a slash) was fixed in the same pass
   note: this is exactly the failure class a static gate cannot see - the image was BOOT-READY and every CRC passed; only the deferred-probe list on a live box showed it
 - id: WAN-SSH-UNREACHABLE
   severity: major

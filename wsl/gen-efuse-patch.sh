@@ -53,7 +53,7 @@ mkdir -p mt7915 && cp "$W/a/mt7915/eeprom.c" mt7915/eeprom.c
 patch -p1 -i /tmp/efuse.patch >/dev/null 2>&1; echo "apply rc=$?"
 diff -q mt7915/eeprom.c "$W/b/mt7915/eeprom.c" && echo "APPLIED PATCH == GENERATED FILE"
 
-OUT=$E2631_WORK/build/overlay/package/kernel/mt76/patches
+OUT=$E2631_TREE/package/kernel/mt76/patches
 mkdir -p "$OUT"
 cp /tmp/efuse.patch "$OUT/001-mt7915-use-caldata-file-before-efuse.patch"
 chmod +x "$OUT/001-mt7915-use-caldata-file-before-efuse.patch" 2>/dev/null

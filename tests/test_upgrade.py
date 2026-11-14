@@ -14,7 +14,9 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / 'overlay/target/linux/sanechips/base-files'
+# T-12: the device scripts live in the tree fork; tests/native/ carries the
+# host copy (make check's native-sync gate compares it to the tree).
+BASE = ROOT / 'tests/native/target/linux/sanechips/base-files'
 UPDATER = (BASE / 'sbin/e2631-upgrade').read_text().split('\ncase "${1:-}" in\n')[0]
 PLATFORM = (BASE / 'lib/upgrade/platform.sh').read_text().replace('. /lib/functions.sh', ':')
 

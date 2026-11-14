@@ -10,6 +10,10 @@ on:
         description: 'Rebuild the released v1.10.0 byte-for-byte: writes tree topdir version/version.date and E2631_BUILD=20261114 (parity evidence P1/P4)'
         type: boolean
         default: false
+      use_pinned_apk_key:
+        description: 'Sign the package index with the pinned APK key from the E2631_APK_PRIVATE_KEY secret instead of a random per-build key (P8); the key is deleted from the runner before uploads'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -24,9 +28,11 @@ jobs:
     env:
       E2631_TREE: ${{ github.workspace }}/../openwrt
       E2631_OUT: ${{ github.workspace }}/../out
-      # The base switch is explicit here: scripts/env.sh defaults to legacy until
-      # T5 passes, but a firmware build must use the ImmortalWrt base (T2).
-      E2631_BASE_KIND: immortalwrt
+      # T-12: there is one kind of build now - a depth-1 checkout of the pinned
+      # tree fork. The old E2631_BASE_KIND switch is retired.
+      # P8: turn the optional pinned APK signing key into a value SOURCE-INFO can
+      # record without ever printing the secret itself.
+      E2631_USE_PINNED_APK_KEY: ${{ inputs.use_pinned_apk_key }}
       # Version stamped into the vendor header and shown by /etc/e2631-version
       # (user decision 2026-11-14). The stock web upgrade page only accepts the
       # vendor "V1.0.0.8B8.8000" shape, so these artifacts install via fwslot.
@@ -38,8 +44,8 @@ jobs:
       E2631_REPRODUCE_V1100: ${{ inputs.reproduce_v1100 }}
       E2631_BUILD: ${{ inputs.reproduce_v1100 && '20261114' || '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22.16.0'
       - name: Install build dependencies
@@ -48,12 +54,51 @@ jobs:
           sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync swig unzip zlib1g-dev file wget curl busybox libelf-dev xsltproc
       - name: Check source before building
         run: make check
-      - name: Bootstrap pinned ImmortalWrt base
+      - name: Bootstrap the pinned tree fork
         run: make bootstrap
+      - name: Install the pinned APK signing key (optional)
+        # P8: a random ECDSA key every build is the default. With this input on,
+        # the same pinned key signs the index, and SOURCE-INFO records its public
+        # half so two runs can be shown to use the same key. The private key only
+        # ever exists as a runner secret and a 0600 file in the build tree.
+        if: inputs.use_pinned_apk_key
+        env:
+          E2631_APK_PRIVATE_KEY: ${{ secrets.E2631_APK_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$E2631_APK_PRIVATE_KEY" || {
+            echo '::error::use_pinned_apk_key is on but the E2631_APK_PRIVATE_KEY secret is empty'
+            exit 1
+          }
+          umask 077
+          printf '%s\n' "$E2631_APK_PRIVATE_KEY" > "$E2631_TREE/private-key.pem"
+          chmod 600 "$E2631_TREE/private-key.pem"
+          echo 'pinned APK signing key installed in the build tree (0600)'
       - name: Check board references against the base tree
         run: make check
       - name: Build, package and verify firmware
-        run: make build
+        # P6: miniupnpd's gitrev.mk embeds GITHUB_REF_NAME + GITHUB_SHA under
+        # Actions and the ref then leaks into the package content. Strip those
+        # variables from THIS step's environment only; the rest of the job keeps
+        # them so provenance stays honest.
+        run: env -u GITHUB_REF_NAME -u GITHUB_SHA -u GITHUB_REF -u GITHUB_HEAD_REF -u GITHUB_BASE_REF make build
+      - name: Assert the build ref did not leak into miniupnpd (P6)
+        run: |
+          set -euo pipefail
+          log=$(find "$E2631_OUT" -maxdepth 2 -type f -name world.log | head -1)
+          test -n "$log" || { echo '::error::no world.log to check'; exit 1; }
+          refs=$(grep -o -- '-DMINIUPNPD_GIT_REF=[^ ]*' "$log" || true)
+          if [ -n "$refs" ]; then
+            printf '%s\n' "$refs" | sort -u
+            if printf '%s\n' "$refs" | grep -q -e "${GITHUB_REF_NAME:-}" -e "${GITHUB_SHA:0:8}"; then
+              echo '::error::miniupnpd still embeds the build ref - the P6 normalization did not take effect'
+              exit 1
+            fi
+          fi
+          echo 'P6: no build ref in the miniupnpd gitref flags'
+      - name: Remove the APK signing key from the runner
+        if: always()
+        run: rm -f "$E2631_TREE/private-key.pem"
       - name: Prepare experimental release
         id: release
         run: |
@@ -62,24 +107,31 @@ jobs:
           mapfile -t packages < <(find "$E2631_OUT" -maxdepth 1 -name 'e2631-immortalwrt-*.bin' -type f)
           test "${#packages[@]}" -eq 1
           cp "${packages[0]}" release/e2631-immortalwrt-experimental.bin
-          # The pin names come from base/commits.env: source env.sh so SOURCE-INFO
+          # The pin names come from scripts/pins.env: source env.sh so SOURCE-INFO
           # records exactly the values the build asserted. The tree fork tip is a
           # branch commit whose SHA is stable; the base-port tree hash identifies
           # the reviewed sanechips port inside that history.
           . scripts/env.sh
+          apk_key="random per build (no pinned input)"
+          if [ "${E2631_USE_PINNED_APK_KEY:-false}" = true ] && [ -f "$E2631_TREE/public-key.pem" ]; then
+            apk_key="pinned input, public key sha256 $(sha256sum "$E2631_TREE/public-key.pem" | cut -d' ' -f1)"
+          elif [ -f "$E2631_TREE/public-key.pem" ]; then
+            apk_key="random per build, public key sha256 $(sha256sum "$E2631_TREE/public-key.pem" | cut -d' ' -f1)"
+          fi
           {
             echo "Kit commit: $GITHUB_SHA"
-            echo "Base kind: ${E2631_BASE_KIND:-unknown}"
             echo "ImmortalWrt base: ${E2631_IW_REPO:-unknown} ${E2631_IW_BRANCH:-} @ ${E2631_IW_SHA:-unknown}"
             echo "ImmortalWrt tree (pristine): ${E2631_IW_TREE_SHA:-unknown}"
             echo "Port base tree (4 patches applied): ${E2631_BASE_TREE_SHA:-unknown}"
             echo "Tree fork: ${E2631_FORK_REPO:-unknown} ${E2631_FORK_BRANCH:-} @ ${E2631_FORK_SHA:-unknown}"
             echo "Parity reproduction: ${E2631_REPRODUCE_V1100:-false} (build stamp ${E2631_BUILD:-date-of-run})"
+            echo "Kernel build id: e2631-build@immortalwrt-e2631 (P5, from the seed)"
             echo "Port patch 0001 sha256: ${E2631_BASE_PATCH_SHA256_0001:-unknown}"
             echo "Port patch 0002 sha256: ${E2631_BASE_PATCH_SHA256_0002:-unknown}"
             echo "Port patch 0003 sha256: ${E2631_BASE_PATCH_SHA256_0003:-unknown}"
             echo "Port patch 0004 sha256: ${E2631_BASE_PATCH_SHA256_0004:-unknown}"
             echo "Kernel: ${E2631_BASE_KERNEL:-unknown}"
+            echo "APK signing key: $apk_key"
             # Feed provenance: T2 clones whatever the base tree's
             # feeds.conf.default names (immortalwrt feeds for this base), so
             # record both the remote and the commit - the URL is the proof the

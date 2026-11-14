@@ -14,10 +14,12 @@ SRC=$E2631_WORK/build
 [ -d "$SRC" ] || { echo "sync.sh: no workspace copy at $SRC - on a plain Linux clone this step is not needed" >&2; exit 0; }
 DST=$E2631_KIT
 rsync -a --exclude .git "$SRC/" "$DST/"
-# A Windows checkout carries no exec bits, and apply.sh's own chmod list only
-# covers files it knows about, so make every script runnable here as well.
+# A Windows checkout carries no exec bits, so make every script runnable here.
 find "$DST" -type f \( -name '*.sh' -o -path '*/init.d/*' -o -path '*/hotplug.d/*' \
 	-o -path '*/board.d/*' -o -path '*/sbin/*' \) -exec chmod +x {} +
 echo "synced $(find "$DST" -type f -not -path '*/.git/*' | wc -l) files into $DST"
-grep -c 'AutoProbe,mt7915e' "$DST/apply.sh"
-ls -l "$DST/overlay/target/linux/sanechips/base-files/etc/init.d/" | tail -3
+# The device scripts themselves live in the tree fork; show them when a bootstrap
+# tree is present (T-12: this step syncs the kit, it no longer applies an overlay).
+[ -n "${E2631_TREE:-}" ] && [ -d "$E2631_TREE/target/linux/sanechips" ] &&
+	ls -l "$E2631_TREE/target/linux/sanechips/base-files/etc/init.d/" | tail -3
+exit 0

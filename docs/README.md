@@ -19,6 +19,7 @@
 |---|---|
 | [immortalwrt-migration.md](immortalwrt-migration.md) | T1 决策 + T4 门禁/文档实施状态 + §8 基底升级 runbook |
 | [t3-packaging-release-ci.md](t3-packaging-release-ci.md) | T3：产物名与版本口径、在线更新与镜像白名单修复、CI 改造、host 侧模拟证据、仍需 CI/真机证明的事项 |
+| [treefork-migration-design.md](treefork-migration-design.md) | T-12 设计：设备支持改为 QC3284/immortalwrt 树 fork 的真实提交，套件只留构建/打包/发布 |
 | [../evidence/immortalwrt-verify-20261114.md](../evidence/immortalwrt-verify-20261114.md) | T5：ImmortalWrt 适配的端到端构建与产物验证报告（本地门禁、CI run、产物 sha256、未覆盖项） |
 
 
@@ -45,7 +46,9 @@
 ## 维护约定
 
 - `board/` 下的 `ser-*.log`、`firstboot-openwrt.txt` 是采集到的设备证据，**保留原样**（含旧品牌字样）。
-- 迁移后的品牌为 `ImmortalWrt v1.10.0`、产物 `e2631-immortalwrt-*.bin`；旧基底只作为
-  `E2631_BASE_KIND=legacy` 回退通道存在，见 [immortalwrt-migration.md](immortalwrt-migration.md)。
+- 迁移后的品牌为 `ImmortalWrt v1.10.0`、产物 `e2631-immortalwrt-*.bin`。T-12 起设备支持
+  落在 [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) 的 `e2631` 分支；套件
+  不再包含 overlay / patch series / `apply.sh`，旧基底通道已退役，见
+  [immortalwrt-migration.md](immortalwrt-migration.md)。
 - 结论变更需附新证据并更新 [immortalwrt-migration.md](immortalwrt-migration.md) §7.1 与
   [known-issues.md](known-issues.md) 对应条目。
