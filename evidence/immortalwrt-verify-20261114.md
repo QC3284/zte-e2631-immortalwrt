@@ -263,9 +263,11 @@ node tools/verify_img.mjs <payload-dir> --tree <bootstrap tree> --target sanechi
 - 2026-11-14 创建：本地 / 静态门禁证据（第 2、3、6 节）已填；CI 构建与产物校验（第 4、5 节）待 Lead dispatch 后回填。
 - 2026-11-14 更新：首次 dispatch（`09e2f92`，run 43467705567）被 Lead 取消；改为在 `73ac520` 上重新 dispatch，证据 HEAD 以新 run 为准。
 - 2026-11-14 更新：`73ac520` 的 run 43468042015 在 `wsl/collect.sh` 的 sysupgrade 名匹配上失败（world 成功）；Lead 修复为 `5d542c5`，新 run 43547631478 success（1h21m07s，publish skipped，无 Release）。第 1、2、3.1、3.6、3.7、4、5、7 节已按该 run 回填；宿主机复跑证据在 5.2。
-## 10. 树 fork 载荷级对照验证（phase 2，进行中）
+- 2026-11-14 更新：树 fork parity run 43572710065（`535c0fe`）SUCCESS（1h24m45s，publish skipped，无新 Release）；对照判定 FAIL (byte-identical)，8 项意外差异全部定位为构建 provenance（runner hostname、miniupnpd GITREF、LuCI feed 检出方式、apk 每构建随机签名密钥），详见第 10 节。Lead 同日接受判定 `FAIL (byte-identical)` + `PASS-CONTENT-PARITY modulo provenance`，并解除 task-12 阻塞。
 
-> 状态：准备阶段证据（2026-11-14 下午）。实际树 fork 构建由 Lead dispatch `firmware.yml`（publish=false）后回填 10.4；本节保持未提交，待 Lead 评审。
+## 10. 树 fork 载荷级对照验证（phase 2，run 43572710065 已对照，Lead 已接受判定）
+
+> 状态：parity run 43572710065（`535c0fe`，reproduce_v1100=true、publish=false）已取回并按 10.3 工具对照；10.4 已回填实际结论与 Lead 判定。本节随证据提交。
 
 ### 10.1 参考产物指纹（v1.10.0 Release asset）
 
@@ -332,8 +334,40 @@ node compare-parity.mjs ../parity-ref/e2631-immortalwrt-experimental.bin \
   --md parity-<run>.md --json parity-<run>.json
 ```
 
-### 10.4 实际 parity run（待填）
+### 10.4 实际 parity run（2026-11-14，run 43572710065）
 
-- 阻塞：task-10（kit bootstrap 改 clone 树 fork）未完成；树仓库 `QC3284/immortalwrt` 的 e2631 分支尚未推送（API 404）。
-- Lead dispatch `firmware.yml`（publish=false）后：`gh run download <run-id>` 到 `/home/qc233/zte/e2631-t5-artifacts/parity-<run>/`，运行 10.3 命令，把判定、差异分类、sha256、run URL 回填本节，并给 Lead GREEN/异常报告。
-- 预期（若 P1–P4 满足）：`PASS-BYTE-IDENTICAL`；若仅 P4 的 build 字段未钉，`PASS-CONTENT-PARITY` 且仅 build 字段/CRC 差异。
+- 触发与配置：`firmware.yml` workflow_dispatch，ref `iwrt-adaptation` @ `535c0fef0cf3d554c7aff04891ef44487ec942ce`，`publish=false`、`reproduce_v1100=true`；run https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/43572710065 ，SUCCESS，1h24m45s（07:47:15Z → 09:12:00Z）。bootstrap pinned base、post-bootstrap `make check`、Build/package/verify 全 SUCCESS；`Publish only after all build and artifact gates pass` 为 **skipped**，`gh release list` 无新 Release（仍只有既有 v1.10.0 预发布）。
+- 取回产物：`e2631-build-43572710065`（压缩包 18,753,821 B）解到 `/home/qc233/zte/e2631-t5-artifacts/parity-43572710065/`；`release/e2631-immortalwrt-experimental.bin` 22,020,628 B，sha256 `4e31df936cec8c02fd25cff83d98efc59c10bc2e877149d7f3c411a6dd2f9e9f`；`sha256sum -c SHA256SUMS` 通过；`build-logs/world.log` 48,636,521 B。
+- SOURCE-INFO（逐键）：Kit commit `535c0fef…`；Base kind immortalwrt；ImmortalWrt base `4765b657…`@master；ImmortalWrt tree `340ae542…`；Port base tree `4f89aa7a…`；**Tree fork** `https://github.com/QC3284/immortalwrt e2631 @ e96aed31c45442374e9a37fd84c1ac048be90613`；**Parity reproduction: true（build stamp 20261114）**；四个 Port patch sha256 与参考完全一致；Kernel 6.18.60；feeds packages `decf9463…` / luci `ad75cde8…`；Run 行；Hardware tested: NO。与参考的 SOURCE-INFO 差异恰为 4 处预期 provenance：Kit commit、Run、新增 Tree fork 行、新增 Parity reproduction 行。
+- 对照结论（`node compare-parity.mjs`，报告 `parity-tools/parity-43572710065.{md,json}`）：**FAIL**（退出码 1）。预期差异 4（上述 provenance）；**意外差异 8 项**：
+
+| # | 项 | 参考（v1.10.0） | 候选（run 43572710065） | 差异量 |
+|---|---|---|---|---|
+| 1 | 工厂包整文件 sha256 | `66805b26afa4…` | `4e31df936cec…` | 整文件不同 |
+| 2 | uImage 载荷大小 | 3,490,466 B | 3,490,610 B | +144 B |
+| 3 | 内核载荷 sha256 | `1b137940cade…` | `2a3d3a9807e4…` | 不同 |
+| 4 | rootfs `etc/apk/keys/public-key.pem` | `98f9bdb6…` | `2807f25a…` | 不同 |
+| 5 | rootfs `lib/apk/db/installed` | 181,094 B | 181,094 B | 内容不同 |
+| 6 | rootfs `lib/apk/db/scripts.tar.gz` | 425 条 | 425 条 | 内容不同 |
+| 7 | rootfs `usr/sbin/miniupnpd` | apk `S:` 85138 B | apk `S:` 85135 B | 解包后 6 B 不同（banner；归档大小差 3 B 属签名） |
+| 8 | rootfs `usr/share/ucode/luci/version.uc` | branch=`LuCI Master` | branch=`LuCI (HEAD detached at FETCH_HEAD) branch` | 字符串不同 |
+
+- 一致项（重要）：工厂头 version=`ImmortalWrt v1.10.0`、product、hw、build=20261114、key1/key2、bodySize=0x1500000、slot 表全同；uImage ih_time=1794624080、name=`ARM ImmortalWrt Linux-6.18.60`；squashfs mkfs_time=1794624080、压缩/块大小、inode=1754、fragment=59 相同；`/etc/openwrt_release` revision=`r0-bde1448`；**212 个包名+版本全部相同**；rootfs 1753 条目、0 stamp-only、0 mtime-only；`host/verify_pkg.mjs` 两侧均 rc=0、0 FAIL、1 WARN（已知 `ih_hcrc` 期望差异），ALL CHECKS PASSED。
+
+**四类根因（均已定位到机制）**：
+
+1. **内核 hostname 嵌入**：两侧 uImage 是按原样存放的 zImage（comp=0）；真实 xz 流偏移 26547（26084 处是字符串 `XZ decompressor ran out` 里的伪 magic），解出 vmlinux 均 13,159,680 B；二进制仅 4,235 B 不同，`strings` 唯一差异为 UTS_VERSION 里的 `(runner@runnervm8axu0)` vs `(runner@ip-10-0-142-88)`（各出现 2 次），工具链（`arm-openwrt-linux-muslgnueabi-gcc`、OpenWrt GCC 14.4.0 toolchain-0336f60730、GNU ld 2.46.1）、`#0 SMP Sat Nov 14 02:41:20 2026`、时间戳均相同。原因：`KBUILD_BUILD_HOST` 缺省取构建机 `hostname`，GitHub runner 主机名每次不同。
+2. **miniupnpd GITREF**：`usr/sbin/miniupnpd` 仅 6 B 不同，banner `miniupnpd 2.3.11 iwrt-adaptation-5d542c57 Aug 11 2026` vs `…iwrt-adaptation-535c0fef…`。原因：上游 `gitrev.mk`（miniupnpd_2_3_11）在 GitHub Actions 环境下用 `GITHUB_REF_NAME`+`GITHUB_SHA` 前 8 位生成 `-DMINIUPNPD_GIT_REF=…`（world.log 第 173462 行可见编译参数），kit 分支/提交被编入；属 provenance，不是源码漂移。
+3. **LuCI version.uc branch**：参考 `branch = "LuCI Master"`；候选 `branch = "LuCI (HEAD detached at FETCH_HEAD) branch"`，revision 同为 `26.315.10273~ad75cde`。原因：参考用 `git clone --depth 1 --single-branch`（有分支名）取 feed；T10 改为按 SHA `git init + fetch --depth 1 + checkout FETCH_HEAD`（detached HEAD），LuCI 自版本串取自 git 分支名。
+4. **apk 每构建随机签名密钥**：`rules.mk:355-356` 指定 `BUILD_KEY_APK_SEC=$(TOPDIR)/private-key.pem`；`package/Makefile:77-78` 每次构建用 `openssl ecparam -name prime256v1 -genkey` 生成随机 P-256 私钥，:80-81 导出公钥；种子 `.config` 里 `CONFIG_SIGNED_PACKAGES=y`（185 行）、`CONFIG_SIGN_EACH_PACKAGE=y`（189 行），打包用 `--sign $(BUILD_KEY_APK_SEC)`。树内 patch 0012（openssl 确定性 ECDSA）只保证“同一密钥下签名可复现”，**密钥本身每构建随机**，于是：`public-key.pem` 不同；apk `installed` 的 `S:`（包归档字节数）177/212 个包差 ±1–3 B（DER 编码的 ECDSA 签名长度随随机密钥波动）；`C:`（包校验）对 10 个内容确有变化的包不同：base-files、e2631-fwslot、luci-app-e2631、luci-app-e2631-wanport、luci-app-zte-mesh、luci-base、luci-i18n-e2631-wanport-zh-cn、luci-i18n-zte-mesh-zh-cn、miniupnpd-nftables、zte-mesh；`scripts.tar.gz` 的 425 条文件名嵌 `X<40-hex>` 哈希随包变化，但**脚本文件内容逐字节相同**（抽样 base-files、e2631-fwslot、luci-app-e2631、luci-app-e2631-wanport、luci-app-zte-mesh、zte-mesh、miniupnpd-nftables、luci-base、adblock-fast 的 post-upgrade/pre-deinstall sha256 全同）。
+
+**结构性结论**：v1.10.0 Release 构建的随机 apk ECDSA 私钥未随发布保留（Release 里只有公钥），因此**事后无法重现其字节**；即使再钉 hostname、GITREF、feed 检出方式，apk key/db 仍不可能一致。故 `PASS-BYTE-IDENTICAL` 本次判定**未达成，且不可回溯达成**。8 项差异全部为构建 provenance（主机名、kit 分支/提交、feed 检出方式、随机签名密钥），无源码/功能漂移。
+
+**判定（Lead 2026-11-14 接受，解除 task-12 阻塞）**：记为 `FAIL (byte-identical)` + `PASS-CONTENT-PARITY modulo provenance`（差异表、机制与不可消除原因如上）；迁移目的（载荷不变）已由本对照证明。
+
+**明确结论：v1.10.0 的字节级复现是不可能的（impossible by construction）** —— 其 apk 随机签名私钥未随发布保留（Release 只有公钥），apk key/db 字节无法重建；因此不做重跑。**未来“可复现”的定义改为自洽（self-consistency）**：两次树 fork 构建彼此字节一致，而不是与旧 Release 相等。该判定解除 task-12（`E2631_BASE_KIND` 默认翻转为 immortalwrt + kit 瘦身）的阻塞。
+
+为未来自洽可复现，需在构建前钉住（P5–P8 交 task-12 “future-build reproducibility”）：P5 `KBUILD_BUILD_HOST`（及 `KBUILD_BUILD_USER`）；P6 归一化 `GITHUB_*` 或显式 `MINIUPNPD_GIT_REF`；P7 feed 按分支 clone 后 `reset --hard <pin>`（保住分支名）；P8 apk 签名密钥——Lead 决定：默认仍**每构建随机**，task-12 增加可选 workflow 输入以注入固定密钥，**私钥不提交入库**。
+
+- 数据位置：`/tmp/parity-analyse/`（carve 的 `ref.uimg/kernel/vmlinux`、`cand.uimg/kernel/vmlinux`、`ref-root/`、`cand-root/`、`ref-scripts/`、`cand-scripts/`）、`parity-tools/parity-43572710065.{md,json}`。
+- 本小节未提交，待 Lead 评审；本轮无 push、无 Release、无真机操作。
