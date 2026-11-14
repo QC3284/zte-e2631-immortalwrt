@@ -38,5 +38,5 @@ fi
 
 echo
 echo "=== seed config: pcie-related symbols ==="
-grep -iE 'PCIE|DWC' $E2631_KIT/seed/e2631.config 2>/dev/null | head -20
-ls $E2631_KIT/seed/ 2>/dev/null
+grep -iE 'PCIE|DWC' $E2631_TREE/seed/e2631.config 2>/dev/null | head -20
+ls $E2631_TREE/seed/ 2>/dev/null

@@ -24,7 +24,6 @@ const RELEASE = read('host/release.mjs');
 const STAGE = read('host/stage.mjs');
 const PUBLISH = read('host/publish.mjs');
 const BOOTSTRAP = read('scripts/bootstrap.sh');
-const SEED = read('seed/e2631.config');
 
 // ---- the pin file ---------------------------------------------------------
 const PIN_TEXT = read('scripts/pins.env');
@@ -49,6 +48,7 @@ const TREE_CI_URL = 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TRE
 const RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + pins.E2631_FORK_SHA + '/' + p;
 const VERSION_URL = RAW('target/linux/sanechips/base-files/etc/e2631-version');
 const UPDATER_URL = RAW('target/linux/sanechips/base-files/sbin/e2631-upgrade');
+const TREE_SEED_URL = RAW('seed/e2631.config');
 async function fetchText(url) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
@@ -57,8 +57,8 @@ async function fetchText(url) {
     return '';
   }
 }
-const [TREE_CI, VERSION_RAW, UPDATER_RAW] = await Promise.all(
-  [TREE_CI_URL, VERSION_URL, UPDATER_URL].map(fetchText));
+const [TREE_CI, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW] = await Promise.all(
+  [TREE_CI_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL].map(fetchText));
 const VERSION = VERSION_RAW.trim();
 const UPDATER = UPDATER_RAW;
 
@@ -143,9 +143,25 @@ ok('firmware.yml SOURCE-INFO no longer records a base kind', !has(WF.firmware, '
 ok('firmware.yml hashes the release assets',
   has(WF.firmware, 'sha256sum e2631-immortalwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS'));
 
-// 6. P5: kernel build identity comes from the seed, not the runner.
-ok('the seed pins CONFIG_KERNEL_BUILD_USER', has(SEED, 'CONFIG_KERNEL_BUILD_USER="e2631-build"'));
-ok('the seed pins CONFIG_KERNEL_BUILD_DOMAIN', has(SEED, 'CONFIG_KERNEL_BUILD_DOMAIN="immortalwrt-e2631"'));
+// 6. Seed single-source: the build input is the TREE fork seed at the pinned
+// SHA; the kit keeps only the P5 kernel build-identity lines and must not
+// shadow the tree seed (the kit copy drifted once and dropped DEVMEM).
+ok('the kit no longer ships a seed that could shadow the tree fork seed',
+  !exists('seed/e2631.config'), exists('seed/e2631.config') ? 'seed/e2631.config still present' : '');
+ok('the pinned tree fork seed carries CONFIG_KERNEL_DEVMEM=y',
+  has(TREE_SEED_RAW, 'CONFIG_KERNEL_DEVMEM=y'),
+  TREE_SEED_RAW ? '' : 'fetch failed: ' + TREE_SEED_URL);
+ok('bootstrap seeds from the tree fork seed, never from a kit copy',
+  has(BOOTSTRAP, 'SEED="$E2631_TREE/seed/e2631.config"') &&
+  has(BOOTSTRAP, 'cp "$SEED" "$E2631_TREE/.config"') &&
+  !has(BOOTSTRAP, '$E2631_KIT/seed/e2631.config'));
+// P5: kernel build identity comes from the seed, not the runner.
+ok('the kit adds CONFIG_KERNEL_BUILD_USER on top of the tree seed',
+  has(BOOTSTRAP, 'CONFIG_KERNEL_BUILD_USER="e2631-build"'));
+ok('the kit adds CONFIG_KERNEL_BUILD_DOMAIN on top of the tree seed',
+  has(BOOTSTRAP, 'CONFIG_KERNEL_BUILD_DOMAIN="immortalwrt-e2631"'));
+ok('a post-build step proves CONFIG_DEVMEM=y reached the kernel build config',
+  has(WF.firmware, 'build_dir') && has(WF.firmware, 'CONFIG_DEVMEM=y'));
 ok('firmware.yml records the kernel build id in SOURCE-INFO',
   has(WF.firmware, 'Kernel build id: e2631-build@immortalwrt-e2631'));
 ok('firmware.yml does not try to override KBUILD_BUILD_* through the environment',
@@ -219,7 +235,7 @@ ok('the kit no longer carries overlay/, base/ or apply.sh',
     }
   };
   for (const d of ['scripts', 'host', 'tools', 'wsl', 'tests']) walk(d);
-  scan.push('Makefile', 'NOTICE', '.env.example', 'seed/e2631.config',
+  scan.push('Makefile', 'NOTICE', '.env.example',
     '.github/workflows/check.yml', '.github/workflows/firmware.yml');
   const skip = new Set(['tools/check-workflows.mjs', 'scripts/base-pin-check.sh', 'tests/test_userdata_gate.sh']);
   const pattern = /overlay\/|apply\.sh|base\/commits\.env|E2631_BASE_KIND/;

@@ -242,8 +242,9 @@ The port is the tree fork: `target/linux/sanechips/` (config fragments,
 `image/Makefile.e2631`, the board DTS, `base-files/`), `package/e2631/` (the slot tool,
 the wifiap/wanport/LuCI packages, the mesh controller). Work in a full fork clone, commit,
 push, bump `E2631_FORK_SHA` in `scripts/pins.env` after review, then `make bootstrap` -
-the depth-1 build tree is disposable and must never be edited by hand. `seed/e2631.config`
-stays in the kit (it is build configuration, not device support).
+the depth-1 build tree is disposable and must never be edited by hand. The build seed is
+`seed/e2631.config` **inside the tree fork** - the kit no longer carries a copy (single-source
+seed rule, T-20); `scripts/bootstrap.sh` appends only the P5 kernel build-identity lines.
 
 Four rules that exist because breaking them cost hours:
 

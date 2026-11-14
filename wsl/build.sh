@@ -62,14 +62,23 @@ echo "PHASE feeds-install $(date +%T)"
 ./scripts/feeds install -a 2>&1 | grep -E "Ignoring|Installing" | tail -8
 
 echo "PHASE seed-config $(date +%T)"
-cp $E2631_KIT/seed/e2631.config .config
+# Single-source seed: the device seed lives in the tree fork at the pinned SHA.
+# The kit adds only the P5 kernel build-identity lines (same as bootstrap.sh).
+[ -f "$E2631_TREE/seed/e2631.config" ] || { echo "no tree fork seed at $E2631_TREE/seed/e2631.config"; exit 1; }
+cp "$E2631_TREE/seed/e2631.config" .config
+cat >> .config <<'P5EOF'
+
+# P5 (reproducible kernel): pinned kernel build identity; see scripts/bootstrap.sh.
+CONFIG_KERNEL_BUILD_USER="e2631-build"
+CONFIG_KERNEL_BUILD_DOMAIN="immortalwrt-e2631"
+P5EOF
 make defconfig > /dev/null 2>&1
 # include/download.mk does `export DOWNLOAD_TOOL_CUSTOM:=$(CONFIG_DOWNLOAD_TOOL_CUSTOM)`,
 # so the environment variable on its own is clobbered back to empty; the symbol
 # has to arrive as a make variable. `scripts/config --set-str` is not enough:
 # the running make's syncconfig rewrites .config and dropped it again. A
 # command-line assignment wins over the .config include and reaches sub-makes.
-# Not in seed/e2631.config: the path is this machine's, and CI has no such tool.
+# Not in the tree seed: the path is this machine's, and CI has no such tool.
 MAKEVAR=
 if [ -x "$E2631_KIT/wsl/segdl.sh" ]; then
 	MAKEVAR="CONFIG_DOWNLOAD_TOOL_CUSTOM=$E2631_KIT/wsl/segdl.sh"

@@ -30,7 +30,8 @@ map: which piece exists, what it is responsible for, and what breaks if you move
                       verify_pkg.mjs, publish.mjs, telnet/stage tooling
     board/            board-side scripts and the vendor evidence we do publish
                       (ser-*.log serial captures); dumps and harvests stay ignored
-    seed/e2631.config the .config the build starts from
+    seed/             only the vendor-verhdr-8b8.bin template; the build seed
+                      lives in the tree fork at seed/e2631.config
     docs/             01 facts, 02 the working log, refs-local/ the earlier notes
 
 ## From source to something that boots

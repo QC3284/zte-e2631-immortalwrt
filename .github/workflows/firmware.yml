@@ -82,6 +82,21 @@ jobs:
         # variables from THIS step's environment only; the rest of the job keeps
         # them so provenance stays honest.
         run: env -u GITHUB_REF_NAME -u GITHUB_SHA -u GITHUB_REF -u GITHUB_HEAD_REF -u GITHUB_BASE_REF make build
+      - name: Assert DEVMEM survived into the kernel build config
+        # Seed single-source: CONFIG_KERNEL_DEVMEM=y must reach the REAL kernel
+        # config. include/kernel-defaults.mk appends every CONFIG_KERNEL_* line
+        # at the end of the merged config (last-wins), so the target config
+        # alone would be silently overridden - this asserts the image effect.
+        run: |
+          set -euo pipefail
+          cfg=$(find "$E2631_TREE/build_dir" -maxdepth 4 -type f -name .config -path '*/linux-*/linux-*/*' | head -1)
+          test -n "$cfg" || { echo '::error::no kernel build-dir .config found'; exit 1; }
+          echo "kernel config: $cfg"
+          grep -qx 'CONFIG_DEVMEM=y' "$cfg" || {
+            echo '::error::CONFIG_DEVMEM=y missing from the kernel build config (seed not applied?)'
+            exit 1
+          }
+          echo 'DEVMEM: present in the kernel build config'
       - name: Assert the build ref did not leak into miniupnpd (P6)
         run: |
           set -euo pipefail

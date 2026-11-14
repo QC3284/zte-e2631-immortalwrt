@@ -1,7 +1,8 @@
 #!/bin/bash
 # Get a clean Linux box to the point where `make world` can succeed: the E2631
 # ImmortalWrt tree fork at its pinned commit, the two feeds that matter
-# installed at their pinned commits, and the seed .config in place.
+# installed at their pinned commits, and the tree fork seed .config in place
+# (the kit adds only the P5 kernel build identity on top of it).
 #
 #   bash scripts/bootstrap.sh          # or: make bootstrap
 #
@@ -224,8 +225,27 @@ say "installing feed packages"
 [ -d "$E2631_TREE/package/feeds/packages" ] || die "feed install produced no package/feeds/packages"
 
 # ---- 5. the seed config -----------------------------------------------------
-say "seeding .config from seed/e2631.config"
-cp "$E2631_KIT/seed/e2631.config" "$E2631_TREE/.config"
+# Single source: the device seed lives in the TREE fork at the pinned SHA, so
+# the build input is whatever the reviewed tree fork carries. The kit adds
+# exactly one thing on top of it: the P5 kernel build-identity lines below.
+# (The kit used to carry its own seed copy, which drifted from the tree and
+# silently dropped CONFIG_KERNEL_DEVMEM=y from the image - T-20 seed fix.)
+SEED="$E2631_TREE/seed/e2631.config"
+[ -f "$SEED" ] || die "the tree fork at $E2631_TREE has no seed/e2631.config (the pinned tip must carry the device seed)"
+say "seeding .config from the tree fork seed at the pinned tip"
+cp "$SEED" "$E2631_TREE/.config"
+# P5 (reproducible kernel): the kernel stamps the build identity into
+# /proc/version, so a CI runner hostname would otherwise leak into the payload
+# and make two builds of the same source differ. Pin both names here - the
+# kernel makefile reads these CONFIG symbols, not the environment - and the same
+# values are asserted by tools/check-workflows.mjs and recorded in SOURCE-INFO.
+# This block is the kit's ONLY seed contribution.
+cat >> "$E2631_TREE/.config" <<'P5EOF'
+
+# P5 (reproducible kernel): pinned kernel build identity; see scripts/bootstrap.sh.
+CONFIG_KERNEL_BUILD_USER="e2631-build"
+CONFIG_KERNEL_BUILD_DOMAIN="immortalwrt-e2631"
+P5EOF
 ( cd "$E2631_TREE" && make defconfig >/dev/null 2>&1 )
 # The first expansion can demote seed =y lines to =m: kconfig resolves the
 # bare fragment's dependency edges against defaults on that pass (measured
@@ -240,7 +260,7 @@ awk -F= '
 		if (a[1] in want) line = want[a[1]]
 		print line
 	}
-' "$E2631_KIT/seed/e2631.config" "$E2631_TREE/.config" > "$E2631_TREE/.config.reseed"
+' "$SEED" "$E2631_TREE/.config" > "$E2631_TREE/.config.reseed"
 mv "$E2631_TREE/.config.reseed" "$E2631_TREE/.config"
 ( cd "$E2631_TREE" && make defconfig >/dev/null 2>&1 )
 for want in CONFIG_TARGET_DEVICE_sanechips_generic_DEVICE_zte_zxhn-e2631= \
@@ -266,12 +286,12 @@ grep -qx '# CONFIG_PACKAGE_wpad-basic-mbedtls is not set' "$E2631_TREE/.config" 
 # dependency) is silently dropped by defconfig. That used to be invisible; on a
 # new base it is the migration's canary, so report it loudly and keep going so
 # the report can be read in one pass.
-missing=$(awk -F= '/^CONFIG_PACKAGE_[A-Za-z0-9_-]+=/ { print $1 }' "$E2631_KIT/seed/e2631.config" |
+missing=$(awk -F= '/^CONFIG_PACKAGE_[A-Za-z0-9_-]+=/ { print $1 }' "$SEED" |
 	while read -r k; do grep -q "^$k=" "$E2631_TREE/.config" || echo "$k"; done || true)
 if [ -n "$missing" ]; then
 	printf 'bootstrap: WARNING seed packages not present in the expanded .config:\n' >&2
 	printf '%s\n' "$missing" | sed 's/^/  /' >&2
-	printf 'bootstrap:          either add them to the feeds or drop them from seed/e2631.config\n' >&2
+	printf 'bootstrap:          either add them to the feeds or drop them from the tree seed (tree fork seed/e2631.config)\n' >&2
 fi
 say "seed ok: E2631 device selected, soft-float on, apk + one TLS provider, LuCI and the slot tool in the image"
 # ---- 6. parity reproduction of the released v1.10.0 (P1/P4) ----------------
