@@ -1,6 +1,6 @@
 # T-20 树 fork 重钉 + 构建自洽性验证（2026-11-14）
 
-状态：进行中 —— seed 单一来源修复已落地；两次 CI 构建待重跑后补齐第 5 节。
+状态：已完成（2026-11-15 01:10 收口）—— seed 单一来源修复已落地，两次 CI 重建产物逐字节一致（RUN1 == RUN2）。
 
 ## 1. 背景与钉值
 
@@ -56,19 +56,50 @@
   CONFIG_KERNEL_DEVMEM=y（341 行）；tree seed 存在、kit seed 已删除。
 - 演练树上的后置 make check：全部 PASS 或带原因 SKIP，MAKE_RC=0。演练目录已删除（约 460 MB）。
 
-## 5. 重新构建与自洽性（待完成）
+## 5. 重新构建与自洽性（已完成）
 
-- 在修复 commit 上重新串行 dispatch 两次：
-  gh workflow run firmware.yml --ref iwrt-adaptation -f publish=false
-    -f use_pinned_apk_key=true
-  不设置 reproduce_v1100（本次是修复后的重建，revision 自带）；两次之间不改代码；
-  两次都使用仓库 secret E2631_APK_PRIVATE_KEY 的同一把 pinned APK 签名 key。
-- 记录项：两次 run id/URL、各自 bin sha256、A==B 逐字节一致、SHA256SUMS、SOURCE-INFO
-  （除 Kit commit / Run 外一致）、APK signing key 公钥 sha256、publish 步骤跳过、
-  无新 Release/tag、artifact 上传、P8 install/delete、P6 miniupnpd 断言、DEVMEM 断言通过。
-- 与基线 run 43572710065（pin e96aed3）的差异仅允许：Q-修1..4 内容、P5 kernel build id、
-  P6 banner、P7 LuCI branch 标签、P8 apk key/db、SOURCE-INFO 字段变化、版本/revision 串
-  （本次不设 reproduce_v1100，属预期差异）。
+### 5.1 方法与构建
+
+- 在修复 commit c6885dd 上串行 dispatch 两次，参数一致：publish=false、
+  use_pinned_apk_key=true，不设 reproduce_v1100；两次之间代码不变；两次都用仓库
+  secret E2631_APK_PRIVATE_KEY 的同一把 pinned APK 签名 key。
+- RUN1 43603782716：head c6885dd，2026-11-14T14:13:58Z → 15:38:23Z（1h24m25s），SUCCESS。
+- RUN2 43611384642：head c6885dd，2026-11-14T15:39:55Z → 17:01:42Z（1h21m47s），SUCCESS。
+- artifact zip：e2631-build-43603782716（18,766,177 B）、e2631-build-43611384642
+  （18,769,997 B），均未过期。
+- 两次运行的关键步骤都是 success：Assert DEVMEM survived into the kernel build config；
+  Assert the build ref did not leak into miniupnpd (P6)；Install/Remove the pinned APK
+  signing key；“Publish only after all build and artifact gates pass” 两次都 skipped
+  （inputs.publish=false）。
+
+### 5.2 产物与自洽性
+
+- 两次产物 e2631-immortalwrt-experimental.bin 均 22,020,628 B，sha256 均
+  b9844c3a814e4a085a6e41b6e502e18a74906acf1a104f0ba0ba8b3a7f15b959；逐字节 cmp 相同
+  （IDENTICAL）。两次 SHA256SUMS 均校验通过（bin + SOURCE-INFO）。
+- SOURCE-INFO 只有 Run: 行不同（run id），其余完全一致：Kit commit c6885dd、Tree fork
+  QC3284/immortalwrt e2631 @ 83df1a9、Kernel 6.18.60、Port patches 0001-0004、feeds
+  decf9463/ad75cde8、APK signing key 公钥 sha256
+  9edb11a9d0879b6626e6980f7d182c7b20541adccae59a14acade68b9a62c1f8、Kernel build id
+  e2631-build@immortalwrt-e2631 (P5)。
+- 独立校验（解包 RUN1 产物的 rootfs）：/etc/e2631-version = “ImmortalWrt v1.10.0”；
+  /etc/apk/keys/public-key.pem sha256 = 9edb11a9…（与 SOURCE-INFO 一致，P8 生效）；
+  usr/sbin/miniupnpd 版本串为 “miniupnpd 2.3.11 - Aug 11 2026”，无
+  iwrt-adaptation-<sha> 泄漏（P6 生效）；luci version.uc branch = “LuCI Master”
+  （P7 生效）；DISTRIB_REVISION/BUILD_ID = r0-83df1a9（未开 reproduce_v1100，预期）。
+- 与基线 run 43572710065（pin e96aed3、sha256 4e31df93…）比较：
+  PASS-REVIEWED-DIFFS，expected 20、unexpected 0、stamp-only-files 4（P5 kernel build
+  id、P6 banner、P7 LuCI branch 标签、P8 apk key/db 等已分类差异）。
+- 报告：/home/qc233/zte/e2631-t5-artifacts/parity-43603782716-vs-43611384642.md(+.json)、
+  baseline-vs-43603782716-reviewed.md；Lead 用干净 /tmp 重跑 verify-task20.sh 得
+  [verify-task20] OK。
+- publish/Release：两次 publish 步骤均 skipped；Releases 仍只有 v1.10.0 pre-release
+  （2026-11-14T04:10:53Z，早于 T-20），无新增 Release/draft；origin 无 e2631-exp-* tag。
+
+### 5.3 结论
+
+同一 commit、同一把 pinned key 的两次 CI 构建产物逐字节相同 => P5/P6/P7/P8 修复后的
+构建可复现（自洽性达成），T-20 收口。
 
 ## 6. 约束
 
