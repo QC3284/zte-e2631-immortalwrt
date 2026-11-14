@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
 # Online updater for the E2631 port: check the GitHub releases of
 # QC3284/zte-e2631-immortalwrt, download the factory package, verify it, and run
 # sysupgrade against it. The update rewrites the RUNNING slot in place and

@@ -111,12 +111,12 @@ static const uint32_t slot_span = 0x01C00000;
 static const char *slot_label[2] = { "slot0", "slot1" };
 
 static const uint8_t outer_magic[16] = {
-	0x99,0x99,0x99,0x99, 0x44,0x44,0x44,0x44,
-	0x55,0x55,0x55,0x55, 0xaa,0xaa,0xaa,0xaa,
+	0x99, 0x99, 0x99, 0x99, 0x44, 0x44, 0x44, 0x44,
+	0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa,
 };
 static const uint8_t inner_magic[16] = {
-	0x33,0x33,0x33,0x33, 0x66,0x66,0x66,0x66,
-	0x99,0x99,0x99,0x99, 0xcc,0xcc,0xcc,0xcc,
+	0x33, 0x33, 0x33, 0x33, 0x66, 0x66, 0x66, 0x66,
+	0x99, 0x99, 0x99, 0x99, 0xcc, 0xcc, 0xcc, 0xcc,
 };
 
 static uint32_t crc_table[256];
@@ -125,6 +125,7 @@ static void crc_init(void)
 {
 	for (uint32_t i = 0; i < 256; i++) {
 		uint32_t c = i;
+
 		for (int k = 0; k < 8; k++)
 			c = (c & 1) ? 0xedb88320u ^ (c >> 1) : c >> 1;
 		crc_table[i] = c;
@@ -160,7 +161,8 @@ static void wr32(uint8_t *p, size_t ofs, uint32_t v)
 /* noreturn is load-bearing for the compiler, not just documentation: the
  * bounded-path checks in backup_slot_head rely on the compiler seeing that
  * the over-length branch terminates, so every snprintf fit after it is
- * provable (-Werror=format-truncation is on in the target build). */
+ * provable (-Werror=format-truncation is on in the target build).
+ */
 static void __attribute__((__noreturn__)) die(const char *msg)
 {
 	fprintf(stderr, "e2631-fwslot: %s: %s\n", msg, strerror(errno));
@@ -840,7 +842,8 @@ static enum slot_identity header_identity(const uint8_t *hdr)
 		return ID_EMPTY;
 	/* Both brand strings are ours: v1.10 rebranded the version string to
 	 * "ImmortalWrt ...", and an in-place upgrade from an "OpenWrt ..." build
-	 * must still see the running slot as ID_OURS.  Factory stays V1.0.0.. */
+	 * must still see the running slot as ID_OURS.  Factory stays V1.0.0..
+	 */
 	if (!strncmp((const char *)hdr + H_VERSION, "OpenWrt", 7) ||
 	    !strncmp((const char *)hdr + H_VERSION, "ImmortalWrt", 11))
 		return ID_OURS;
@@ -1364,7 +1367,8 @@ int main(int argc, char **argv)
 		return cmd_upgrade_check();
 	if (argc >= 3 && !strcmp(argv[1], "upgrade")) {
 		/* in-place on the running slot; the other slot must hold the
-		 * intact vendor fallback unless --no-fallback-check says no. */
+		 * intact vendor fallback unless --no-fallback-check says no.
+		 */
 		bool nofb = false;
 
 		for (int i = 3; i < argc; i++) {

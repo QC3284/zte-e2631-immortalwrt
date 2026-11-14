@@ -40,7 +40,7 @@ tip - there is no vendored patch series and no `apply.sh` any more (T-12):
     E2631_IW_SHA      4765b657625ec5bbda74b44400465fe043802b30    (kernel 6.18.60)
     E2631_FORK_REPO   https://github.com/QC3284/immortalwrt
     E2631_FORK_BRANCH e2631
-    E2631_FORK_SHA    e96aed31c45442374e9a37fd84c1ac048be90613    (build content)
+    E2631_FORK_SHA    83df1a90a71863c2f54d6e399e8b0ee86405083a    (build content; 5 fix commits 2026-11-14)
 
 `scripts/pins.env` is the single pin file. It also records the tree hash of the last
 sanechips port commit (`4f89aa7a…`), the sha256 of each of the four original port

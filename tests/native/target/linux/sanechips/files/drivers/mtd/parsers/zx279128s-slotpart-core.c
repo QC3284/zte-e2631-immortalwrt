@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * zx279128s-slotpart decision core - pure logic, no kernel headers, so the
  * host unit tests (tests/test-slotpart-decisions.c) compile the exact code
@@ -62,10 +62,10 @@ struct zx_slotpart_out {
  * final xor) - the same value e2631-fwslot's crc32() computes and cspboot
  * checks as CRC1.
  */
-static uint32_t zx_sp_crc32(const uint8_t *buf, unsigned len)
+static uint32_t zx_sp_crc32(const uint8_t *buf, unsigned int len)
 {
 	uint32_t table[256], c, r = 0xffffffffu;
-	unsigned i, k;
+	unsigned int i, k;
 
 	for (i = 0; i < 256; i++) {
 		c = i;
@@ -80,14 +80,15 @@ static uint32_t zx_sp_crc32(const uint8_t *buf, unsigned len)
 	return r ^ 0xffffffffu;
 }
 
-static uint32_t zx_sp_rd32(const uint8_t *p, unsigned ofs)
+static uint32_t zx_sp_rd32(const uint8_t *p, unsigned int ofs)
 {
 	return (uint32_t)p[ofs] | (uint32_t)p[ofs + 1] << 8 |
 	       (uint32_t)p[ofs + 2] << 16 | (uint32_t)p[ofs + 3] << 24;
 }
 
 /* Is this slot's header one cspboot would accept?  Inner magic, then CRC1 -
- * exactly the two checks slot_scan() in e2631-fwslot makes. */
+ * exactly the two checks slot_scan() in e2631-fwslot makes.
+ */
 static int zx_sp_header_valid(const uint8_t *hdr)
 {
 	if (memcmp(hdr + ZX_SP_MAGIC_OFS, zx_sp_inner_magic, 16))

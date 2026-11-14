@@ -65,11 +65,13 @@ for k in $req; do
 	esac
 done
 # The fork depth is a number, not an object id: bootstrap uses it for the
-# scratch history fetch only (the build tree stays depth 1).
+# scratch history fetch only (the build tree stays depth 1). The 2026-11-14
+# fix series put the base-port commit 12 levels below the tip, so anything
+# under 12 would silently drop the tree-hash assertion.
 depth=$(get E2631_FORK_DEPTH)
 case "$depth" in
 ''|*[!0-9]*) bad "$ENVF: E2631_FORK_DEPTH is not a number: ${depth:-<missing>}" ;;
-*) [ "$depth" -ge 4 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow to reach the base-port commit" ;;
+*) [ "$depth" -ge 12 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the base-port commit is 12 levels below the pinned tip" ;;
 esac
 # Plain KEY=VALUE only: a ${VAR:-default} expression would be read literally by
 # bootstrap/base-pin-check and silently pin the wrong string.

@@ -424,7 +424,8 @@
   `GITHUB_REF_NAME`/`GITHUB_SHA`，构建后断言 miniupnpd banner 不再带构建 ref；P7 feed 以
   branch checkout + `reset --hard` 到钉死 commit（修复 LuCI version.uc 的 detached 标记）；
   P8 可选 `use_pinned_apk_key`（secret `E2631_APK_PRIVATE_KEY`，只写入构建树并 always 删除）。
-- **不变**：树 fork tip 钉仍为 `e96aed31…`（CI-only 提交不改变镜像，不 bump pin）；
+- **钉值演进**：T-12 时树 fork tip 钉为 `e96aed31…`（CI-only 提交不改变镜像，不 bump pin）；
+  T-20（2026-11-14 主线质量修复系列）落地后重新钉到 `83df1a9…`，见后续 T-20 记录；
   `ImmortalWrt v1.10.0` / `e2631-immortalwrt-*` / 在线更新仓库口径不变；正式 Release 与真机
   刷写仍需用户批准。
 - **验证**：本地 `make bootstrap` + `make check` 全绿；CI `check.yml` 在推送分支上运行

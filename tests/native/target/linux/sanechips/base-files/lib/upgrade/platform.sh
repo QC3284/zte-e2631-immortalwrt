@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
 # sysupgrade platform glue for the E2631 slot image.
 #
 # Accepts the FACTORY-format package (the same .bin the vendor suprade.html
@@ -43,7 +44,8 @@ E2631_MAGIC_SHA=3d25b5b9bf4079c6760449611963b6f1
 platform_check_image() {
 	case "$1" in
 	*.bin)
-		if [ "$(dd if="$1" bs=16 count=1 2>/dev/null | sha256sum | cut -c1-32)" != "$E2631_MAGIC_SHA" ]; then
+		magic=$(dd if="$1" bs=16 count=1 2>/dev/null | sha256sum | cut -c1-32)
+		if [ "$magic" != "$E2631_MAGIC_SHA" ]; then
 			echo "Invalid image: no E2631 factory magic"
 			return 1
 		fi
