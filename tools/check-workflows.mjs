@@ -20,6 +20,25 @@ const RELEASE = read('host/release.mjs');
 const STAGE = read('host/stage.mjs');
 const PUBLISH = read('host/publish.mjs');
 
+// The e2631 source tree is a separate fork (QC3284/immortalwrt, branch e2631).
+// These two checks read its static gate straight from the pinned branch, so the
+// kit cannot claim a tree CI that does not exist or that stopped citing the
+// base/commits.env pin.
+const TREE_REPO = 'QC3284/immortalwrt';
+const TREE_BRANCH = 'e2631';
+const TREE_CI_URL = 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_BRANCH + '/.github/workflows/check.yml';
+const TREE_PIN_BASE_SHA = '4765b657625ec5bbda74b44400465fe043802b30';
+const TREE_PIN_TREE_SHA = '4f89aa7ad0a5132dc047a27a9073b43916f0f957';
+async function readTreeCi() {
+  try {
+    const res = await fetch(TREE_CI_URL, { signal: AbortSignal.timeout(20000) });
+    return res.ok ? await res.text() : '';
+  } catch {
+    return '';
+  }
+}
+const TREE_CI = await readTreeCi();
+
 let fails = 0;
 function ok(name, cond, detail) {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (detail ? '  (' + detail + ')' : ''));
@@ -104,6 +123,12 @@ ok('firmware.yml releases are prereleases only',
 ok('check.yml runs the updater simulation', has(WF.check, 'node host/sim-upgrade.mjs'));
 ok('check.yml runs these workflow checks', has(WF.check, 'node tools/check-workflows.mjs'));
 ok('check.yml still runs make check', /run: make check/.test(WF.check));
+
+// 8. the tree fork publishes the static gate, and that gate cites the triple pin.
+ok('the tree fork publishes .github/workflows/check.yml on ' + TREE_BRANCH,
+  TREE_CI.length > 0, TREE_CI ? TREE_CI_URL : 'fetch failed');
+ok('the tree CI references the pinned ImmortalWrt base and the port tree hash',
+  has(TREE_CI, TREE_PIN_BASE_SHA) && has(TREE_CI, TREE_PIN_TREE_SHA));
 
 console.log('');
 console.log(fails === 0 ? 'check-workflows: OK - CI, artifact names, version and release channel agree'
