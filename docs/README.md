@@ -21,6 +21,7 @@
 | [t3-packaging-release-ci.md](t3-packaging-release-ci.md) | T3：产物名与版本口径、在线更新与镜像白名单修复、CI 改造、host 侧模拟证据、仍需 CI/真机证明的事项 |
 | [treefork-migration-design.md](treefork-migration-design.md) | T-12 设计：设备支持改为 QC3284/immortalwrt 树 fork 的真实提交，套件只留构建/打包/发布 |
 | [../evidence/immortalwrt-verify-20261114.md](../evidence/immortalwrt-verify-20261114.md) | T5：ImmortalWrt 适配的端到端构建与产物验证报告（本地门禁、CI run、产物 sha256、未覆盖项） |
+| [../evidence/t20-verification-20261114.md](../evidence/t20-verification-20261114.md) | T-20：树 fork 重钉重建对的独立验证（RUN1/RUN2 产物哈希、两层门禁、APK 钉值、A==B 逐字节一致、与基线差异复核） |
 
 
 | 文件 | 内容 |
