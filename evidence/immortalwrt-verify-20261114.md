@@ -264,6 +264,7 @@ node tools/verify_img.mjs <payload-dir> --tree <bootstrap tree> --target sanechi
 - 2026-11-14 更新：首次 dispatch（`09e2f92`，run 43467705567）被 Lead 取消；改为在 `73ac520` 上重新 dispatch，证据 HEAD 以新 run 为准。
 - 2026-11-14 更新：`73ac520` 的 run 43468042015 在 `wsl/collect.sh` 的 sysupgrade 名匹配上失败（world 成功）；Lead 修复为 `5d542c5`，新 run 43547631478 success（1h21m07s，publish skipped，无 Release）。第 1、2、3.1、3.6、3.7、4、5、7 节已按该 run 回填；宿主机复跑证据在 5.2。
 - 2026-11-14 更新：树 fork parity run 43572710065（`535c0fe`）SUCCESS（1h24m45s，publish skipped，无新 Release）；对照判定 FAIL (byte-identical)，8 项意外差异全部定位为构建 provenance（runner hostname、miniupnpd GITREF、LuCI feed 检出方式、apk 每构建随机签名密钥），详见第 10 节。Lead 同日接受判定 `FAIL (byte-identical)` + `PASS-CONTENT-PARITY modulo provenance`，并解除 task-12 阻塞。
+- 2026-11-14 更新：§10.4 parity 结论与证据提交为 `449c16c`（iwrt-adaptation）；check.yml run 43580730657 = success。
 
 ## 10. 树 fork 载荷级对照验证（phase 2，run 43572710065 已对照，Lead 已接受判定）
 
@@ -370,4 +371,4 @@ node compare-parity.mjs ../parity-ref/e2631-immortalwrt-experimental.bin \
 为未来自洽可复现，需在构建前钉住（P5–P8 交 task-12 “future-build reproducibility”）：P5 `KBUILD_BUILD_HOST`（及 `KBUILD_BUILD_USER`）；P6 归一化 `GITHUB_*` 或显式 `MINIUPNPD_GIT_REF`；P7 feed 按分支 clone 后 `reset --hard <pin>`（保住分支名）；P8 apk 签名密钥——Lead 决定：默认仍**每构建随机**，task-12 增加可选 workflow 输入以注入固定密钥，**私钥不提交入库**。
 
 - 数据位置：`/tmp/parity-analyse/`（carve 的 `ref.uimg/kernel/vmlinux`、`cand.uimg/kernel/vmlinux`、`ref-root/`、`cand-root/`、`ref-scripts/`、`cand-scripts/`）、`parity-tools/parity-43572710065.{md,json}`。
-- 本小节未提交，待 Lead 评审；本轮无 push、无 Release、无真机操作。
+- 本小节已提交（`449c16c`，iwrt-adaptation）；check.yml run 43580730657 为 success；本轮无 Release、无真机操作。
