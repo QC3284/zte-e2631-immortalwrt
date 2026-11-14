@@ -15,6 +15,7 @@ const WF = { check: read('.github/workflows/check.yml'), firmware: read('.github
 const VERSION = read('overlay/target/linux/sanechips/base-files/etc/e2631-version').trim();
 const UPDATER = read('overlay/target/linux/sanechips/base-files/sbin/e2631-upgrade');
 const BUILD_SH = read('scripts/build.sh');
+const COLLECT = read('wsl/collect.sh');
 const RELEASE = read('host/release.mjs');
 const STAGE = read('host/stage.mjs');
 const PUBLISH = read('host/publish.mjs');
@@ -49,6 +50,8 @@ ok('host/stage.mjs uploads out/e2631-immortalwrt-factory.bin',
   has(STAGE, "'out/e2631-immortalwrt-factory.bin'"));
 ok('host/publish.mjs example uses the new prefix', has(PUBLISH, 'out/e2631-immortalwrt-v1.0.bin'));
 ok('host/publish.mjs release title says ImmortalWrt', has(PUBLISH, 'E2631 ImmortalWrt'));
+ok('collect.sh accepts both openwrt-* and immortalwrt-* sysupgrade images',
+  has(COLLECT, 'openwrt-*-sysupgrade*.bin') && has(COLLECT, 'immortalwrt-*-sysupgrade*.bin'));
 
 // 3. no exec-time file still names the old artifact prefix (docs keep history).
 {

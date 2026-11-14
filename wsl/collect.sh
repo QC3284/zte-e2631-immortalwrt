@@ -38,8 +38,10 @@ fi
 
 # The sysupgrade file is a tar with the two payloads under a per-device
 # directory; unpacking here gives the stable names kernel/root.
-SX=$(ls "$B"/openwrt-*-sysupgrade*.bin | head -1)
-test -n "$SX" || { echo "no sysupgrade image to unpack" >&2; exit 1; }
+# OpenWrt names the image openwrt-*-sysupgrade.bin, ImmortalWrt names it
+# immortalwrt-*-sysupgrade.bin; collect both so either base kind works.
+SX=$(ls "$B"/openwrt-*-sysupgrade*.bin "$B"/immortalwrt-*-sysupgrade*.bin 2>/dev/null | head -1)
+test -n "$SX" || { echo "no sysupgrade image to unpack (looked for openwrt-* and immortalwrt-* under $B)" >&2; exit 1; }
 tar -xf "$SX" -C "$OUTD/payload"
 find "$OUTD/payload" -maxdepth 3 -type f -printf '  %s\t%p\n'
 
