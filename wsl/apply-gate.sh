@@ -24,17 +24,25 @@ fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-E2631_APPLY_REPORT="$tmp/real-1.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
-	{ echo "FAIL: apply.sh refuses the real tree" >&2; exit 1; }
-r1=$(cat "$tmp/real-1.txt")
-d1=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
-E2631_APPLY_REPORT="$tmp/real-2.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
-	{ echo "FAIL: apply.sh re-run failed" >&2; exit 1; }
-r2=$(cat "$tmp/real-2.txt")
-d2=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
-[ "$r1" = "$r2" ] || { echo "FAIL: apply-report.txt differs between identical runs" >&2; exit 1; }
-[ "$d1" = "$d2" ] || { echo "FAIL: tree dirty-path count changed between identical runs ($d1 -> $d2)" >&2; exit 1; }
-echo "PASS: apply.sh is idempotent on the real tree ($d1 dirty paths, report stable)"
+# The tree fork is not an apply.sh target: phase 2 commits the overlay instead
+# of laying it down. apply.sh survives only for the legacy rollback path (T-12
+# retires it), so its real-tree assertions run on a legacy base only; the
+# skeleton and tamper runs below stay kind-independent.
+if [ "${E2631_BASE_KIND:-legacy}" = immortalwrt ]; then
+	echo "SKIP real-tree idempotency: E2631_BASE_KIND=immortalwrt (overlay is committed in the tree fork; apply.sh is legacy-only)"
+else
+	E2631_APPLY_REPORT="$tmp/real-1.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
+		{ echo "FAIL: apply.sh refuses the real tree" >&2; exit 1; }
+	r1=$(cat "$tmp/real-1.txt")
+	d1=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
+	E2631_APPLY_REPORT="$tmp/real-2.txt" bash "$REPO/apply.sh" "$REAL" >/dev/null 2>&1 ||
+		{ echo "FAIL: apply.sh re-run failed" >&2; exit 1; }
+	r2=$(cat "$tmp/real-2.txt")
+	d2=$(git -C "$REAL" status --short 2>/dev/null | wc -l)
+	[ "$r1" = "$r2" ] || { echo "FAIL: apply-report.txt differs between identical runs" >&2; exit 1; }
+	[ "$d1" = "$d2" ] || { echo "FAIL: tree dirty-path count changed between identical runs ($d1 -> $d2)" >&2; exit 1; }
+	echo "PASS: apply.sh is idempotent on the real tree ($d1 dirty paths, report stable)"
+fi
 
 
 mk_fake() {	# a minimal tree with every piece apply.sh's assertions read

@@ -263,3 +263,77 @@ node tools/verify_img.mjs <payload-dir> --tree <bootstrap tree> --target sanechi
 - 2026-11-14 创建：本地 / 静态门禁证据（第 2、3、6 节）已填；CI 构建与产物校验（第 4、5 节）待 Lead dispatch 后回填。
 - 2026-11-14 更新：首次 dispatch（`09e2f92`，run 43467705567）被 Lead 取消；改为在 `73ac520` 上重新 dispatch，证据 HEAD 以新 run 为准。
 - 2026-11-14 更新：`73ac520` 的 run 43468042015 在 `wsl/collect.sh` 的 sysupgrade 名匹配上失败（world 成功）；Lead 修复为 `5d542c5`，新 run 43547631478 success（1h21m07s，publish skipped，无 Release）。第 1、2、3.1、3.6、3.7、4、5、7 节已按该 run 回填；宿主机复跑证据在 5.2。
+## 10. 树 fork 载荷级对照验证（phase 2，进行中）
+
+> 状态：准备阶段证据（2026-11-14 下午）。实际树 fork 构建由 Lead dispatch `firmware.yml`（publish=false）后回填 10.4；本节保持未提交，待 Lead 评审。
+
+### 10.1 参考产物指纹（v1.10.0 Release asset）
+
+- 文件：`/home/qc233/zte/e2631-t5-artifacts/parity-ref/e2631-immortalwrt-experimental.bin`，22,020,628 B，sha256 `66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d`；与 T5 run 43547631478 产物逐字节相同（Release 资产 = T5 证据产物）。
+- 工厂头：version=`ImmortalWrt v1.10.0`，product=`ZXHN E2631 V1.0.0`，hw=`V1.1.1`，build=`20261114`，key=0x1351/0x5211，bodySize=0x1500000，slotA=0x700000+0x1c00000，slotB=0x2300000+0x1c00000。
+- 内核：槽 marker 32 B + uImage（file 0x234），ih_size=0x3542a2（3,490,466 B），ih_time=1794624080，name=`ARM ImmortalWrt Linux-6.18.60`；声明 kSize=0x3fffe0（4 MiB 区），rootfs 位于 file 0x400214（slot+0x400000）。
+- rootfs：squashfs（xz，块 262144，bytes_used=12,869,767），mkfs_time=1794624080，声明 rSize=0xc60000；`lib/apk/db/installed` 恰 212 个包。
+- 版本串：`/etc/openwrt_release` DISTRIB_REVISION=`r0-bde1448`，`/etc/os-release` BUILD_ID=`r0-bde1448`、OPENWRT_BUILD_DATE=1794624080；`/etc/apk/world` 含 `base-files=1~bde1448`；`/etc/e2631-version`=`ImmortalWrt v1.10.0`。
+- SOURCE-INFO：Kit commit `5d542c5…`，ImmortalWrt base master @ `4765b657…`（kernel 6.18.60），tree 340ae542…，port tree 4f89aa7a…，feed packages `decf94639ffd6ddd26591c190b547c6b7eea150b`、luci `ad75cde88e694b511100576bfbe0a280e5efe6ef`。
+
+### 10.2 构建确定性前提（不满足则不可能字节一致）
+
+树 fork 的 HEAD 是固定提交、且历史完整，而 v1.10.0 是在 bootstrap 现场 `git am` 出的 5 提交浅树里构建的。差异会经 OpenWrt 的版本机制进入产物：
+
+1. `include/toplevel.mk:13-21`：MAKELEVEL=0 时**总是**执行 `REVISION=$(scripts/getver.sh)` 与 `SOURCE_DATE_EPOCH=$(scripts/get_source_date_epoch.sh)`，只有递归 make 且两变量已在环境里才跳过。因此 workflow 里 export `REVISION`/`SOURCE_DATE_EPOCH` 对顶层 make 无效。
+2. `scripts/getver.sh`：优先读顶层 `version` 文件（内容即 REV）；否则 `git`：REBOOT=`ee53a240ac902dc83209008a2671e7fdcf55957a`，REV=`r<REBOOT 之后提交数>-<短哈希>`。v1.10.0 的浅树缺 REBOOT 提交，故得 `r0-bde1448`（bde1448 = bootstrap am 提交的短哈希）。
+3. `scripts/get_source_date_epoch.sh`：优先读顶层 `version.date`；否则 `git log -1 --format=%ct`。v1.10.0 的 1794624080 = 2026-11-14T02:41:20Z = bootstrap am 提交时间。
+4. `rules.mk:595-625` 的 `COMMITCOUNT`（`git rev-list --count HEAD .`）决定 base-files 的 `PKG_RELEASE`；浅树里每个目录计数为 1，完整历史会是成百上千。
+
+已做微实验（2026-11-14）：在临时目录放 `version`=`r0-bde1448`、`version.date`=`1794624080` 后，两份脚本分别原样输出这两个值；浅克隆（depth 1）子目录 `git rev-list --count HEAD .` = 1，完整克隆（3 提交）= 3。
+
+**直接后果**：若树 fork 正常构建，REVISION 变 `r<N>-<tip>`、SOURCE_DATE_EPOCH 变 tip 提交时间，则 `/etc/openwrt_release`、`/etc/os-release` BUILD_ID、base-files 包版本、apk world/db、rootfs mtime、uImage ih_time、squashfs mkfs_time 全部改变——即使源码完全相同，载荷 sha256 也必然不同。
+
+因此 parity 构建需要显式钉住（**这属于 Task 10/Task 3 的临时 kit 改动，不是验证方的改动**）：
+
+| 编号 | 前提 | 做法（建议） |
+|---|---|---|
+| P1 | REVISION/SOURCE_DATE_EPOCH 与 v1.10.0 一致 | 在树 checkout 写顶层 `version`=`r0-bde1448`、`version.date`=`1794624080`（OpenWrt 官方 release 机制，`try_version` 优先；bootstrap 或 workflow 步骤加两行即可，不改 build.sh）；备选：给 `make world` 传命令行变量 `REVISION=… SOURCE_DATE_EPOCH=…`（需改 build.sh 的 MAKEVAR 槽）。 |
+| P2 | 树 fork 必须按浅克隆构建 | `fetch --depth 1` 取 e2631 tip（与现有 immortalwrt 基底的 clone 方式一致）；完整克隆会让 COMMITCOUNT 变大、base-files 版本不同。 |
+| P3 | feeds 钉在与 v1.10.0 相同的提交 | 记录值 packages=`decf9463…`、luci=`ad75cde8…`；2026-11-14 14:0x 复核两个 feed 的 master tip 仍等于记录值，但 parity 构建时应显式 checkout 或在 dispatch 前复核。 |
+| P4 | 同一 seed / E2631_VERSION / 打包器 | seed/e2631.config、E2631_VERSION=`ImmortalWrt v1.10.0` 不变；工厂头 `build` 字段由 `--build`/`E2631_BUILD` 决定，否则取当天日期（v1.10.0 为 20261114）；要**工厂包逐字节一致**还需 `E2631_BUILD=20261114`，否则 build 字段与 CRC1/CRC2 属预期差异。 |
+
+若 P1/P2/P3 任一无法满足，验收应降级为“载荷内容一致 + 差异已解释”（见 10.3 的 CLEAR 判定），而不是字节一致。
+
+**2026-11-14 Lead 决策（parity 验收目标 = `PASS-BYTE-IDENTICAL`，P1–P4 全部确认）**：
+
+- P1：parity bootstrap 时把 `version`=`r0-bde1448`、`version.date`=`1794624080` 写进树顶层；**不提交进 fork 仓库**，也不加 Makefile 的 MAKEVAR 覆盖。
+- P2：构建树仍按 depth 1 浅取；历史断言（4 个 sanechips commit 在历史中、`4f89aa7a…` 树存在、`4765b657…` 是祖先）必须在**独立 scratch 仓库**里做（如 `git init` + `fetch --depth 32`），不得加深构建树（会改 `git rev-list --count` → base-files PKG_RELEASE）。
+- P3：feed pin 以 `base/commits.env` 里的记录为准（packages `decf9463…`、luci `ad75cde8…`），parity run 在 dispatch 时复核两 feed tip 仍等于 pin。
+- P4：parity run 设 `E2631_BUILD=20261114`；`firmware.yml` 增加 additive 的 `workflow_dispatch` 输入（如 `reproduce_v1100`，默认 false），由 task-10 实现，打开时才写 version 文件并传 E2631_BUILD。
+- 若全部 pin 后仍有差异：保留 `PASS-CONTENT-PARITY` 作为文档化降级，报告必须写明具体哪个 stamp/字段不同及原因。
+- 注意：`SOURCE-INFO.txt`/`SHA256SUMS` 属发布旁路文件，树 fork 阶段其 provenance 键（Kit commit、base 描述、port patch 哈希等）**会合理变化**；字节一致的目标只针对工厂 `.bin`，对照工具把 provenance 键变化归为预期，不据此判 FAIL。
+
+### 10.3 对照工具与自检（未入库，位于工作区外）
+
+- 工具：`/home/qc233/zte/e2631-t5-artifacts/parity-tools/compare-parity.mjs`（自包含 Node，仅依赖 `unsquashfs`）；按工厂头偏移自行解析，不信任 mkfactory。
+- 检查层次：①工厂包 sha256/字节一致；②内核区（marker+uImage+pad）与 uImage 头字段、uImage data sha256；③rootfs 区 sha256、squashfs 超级块（mkfs_time/block/compression）；④rootfs 内容清单（路径/类型/权限/uid/gid/文件 sha256/symlink 目标，mtime 单独统计）；⑤版本文件与 `lib/apk/db/installed` 包名+版本；⑥SOURCE-INFO 逐键；⑦可选 `host/verify_pkg.mjs` 独立复验。
+- 判定：`PASS-BYTE-IDENTICAL`（整文件一致）；`PASS-CONTENT-PARITY`（载荷内容一致，仅版本/时间戳/build 字段等已解释差异）；`FAIL`（存在无法解释差异，退出码 1）。版本串差异（`r0-…` 与包版本后缀）按 token 归一化后比较，时间戳按 epoch 归一化。
+- 自检 1（同物对照）：parity-ref 对 T5 产物 → `PASS-BYTE-IDENTICAL`，0 预期差异、0 意外差异；rootfs 1753 条目、0 内容差异。报告：`parity-tools/dryrun-identical.{md,json}`。
+- 自检 2（仅工厂 build 字段改 20261115 并重算 CRC）→ `PASS-CONTENT-PARITY`，1 条预期差异（build stamp），载荷一致。
+- 自检 3（合成“仅版本/时间戳变化”镜像：改 `r0-bde1448`→`r0-abcdef1`、epoch 1794626000，重打 squashfs/工厂包）→ 6 个文件归为 stamp-only、1746 条 mtime-only 归为预期、内容差异 0；唯一 FAIL 来自宿主 mksquashfs 重压后 `rSize` 变化（合成噪声，真实同源构建不会出现）。
+- 自检 4（合成真实内容变化：只改 `/etc/e2631-version`）→ 正确报 `rootfs content changed: etc/e2631-version` 并以 FAIL 退出。
+- `verify_pkg.mjs` 与 `verify_img.mjs` 的旧疑问已澄清：`host/verify_pkg.mjs` 确实存在（check.sh:156 指的是它）；`tools/verify_img.mjs` 是另一层启动就绪检查，需要 payload 目录与构建树里的 dtb/config，parity 阶段不重跑，包清单以 rootfs 的 apk 数据库为准（212 个包）。
+
+实际运行命令（拿到 candidate 后）：
+
+```
+cd /home/qc233/zte/e2631-t5-artifacts/parity-tools
+node compare-parity.mjs ../parity-ref/e2631-immortalwrt-experimental.bin \
+  ../parity-<run>/e2631-build-<run>/release/e2631-immortalwrt-experimental.bin \
+  --ref-info ../parity-ref/SOURCE-INFO.txt \
+  --cand-info ../parity-<run>/e2631-build-<run>/release/SOURCE-INFO.txt \
+  --verify-pkg /home/qc233/zte/e2631-immortalwrt/host/verify_pkg.mjs \
+  --md parity-<run>.md --json parity-<run>.json
+```
+
+### 10.4 实际 parity run（待填）
+
+- 阻塞：task-10（kit bootstrap 改 clone 树 fork）未完成；树仓库 `QC3284/immortalwrt` 的 e2631 分支尚未推送（API 404）。
+- Lead dispatch `firmware.yml`（publish=false）后：`gh run download <run-id>` 到 `/home/qc233/zte/e2631-t5-artifacts/parity-<run>/`，运行 10.3 命令，把判定、差异分类、sha256、run URL 回填本节，并给 Lead GREEN/异常报告。
+- 预期（若 P1–P4 满足）：`PASS-BYTE-IDENTICAL`；若仅 P4 的 build 字段未钉，`PASS-CONTENT-PARITY` 且仅 build 字段/CRC 差异。

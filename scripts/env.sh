@@ -85,6 +85,13 @@ E2631_TREE=${E2631_TREE:-$HOME/openwrt}
 # deliberate edit of that file, never a silent one.
 E2631_BASE_KIND=${E2631_BASE_KIND:-legacy}
 E2631_PORT_DIR=${E2631_PORT_DIR:-base}
+# base/commits.env holds plain KEY=VALUE lines (scripts/base-pin-check.sh reads
+# it literally), so its fork REPO/BRANCH/DEPTH pins overwrite an explicit
+# environment or .env value. Keep such a value across the source: it is the
+# local-rehearsal override that points the kit at a local fork copy.
+_e2631_keep_fork_repo=${E2631_FORK_REPO:-}
+_e2631_keep_fork_branch=${E2631_FORK_BRANCH:-}
+_e2631_keep_fork_depth=${E2631_FORK_DEPTH:-}
 if [ -f "$E2631_KIT/base/commits.env" ]; then
 	. "$E2631_KIT/base/commits.env"
 elif [ "$E2631_BASE_KIND" = immortalwrt ]; then
@@ -92,6 +99,9 @@ elif [ "$E2631_BASE_KIND" = immortalwrt ]; then
 	echo "        Restore it (git checkout -- base/), or set E2631_BASE_KIND=legacy." >&2
 	exit 1
 fi
+if [ -n "$_e2631_keep_fork_repo" ]; then E2631_FORK_REPO=$_e2631_keep_fork_repo; fi
+if [ -n "$_e2631_keep_fork_branch" ]; then E2631_FORK_BRANCH=$_e2631_keep_fork_branch; fi
+if [ -n "$_e2631_keep_fork_depth" ]; then E2631_FORK_DEPTH=$_e2631_keep_fork_depth; fi
 case "$E2631_BASE_KIND" in
 immortalwrt)
 	# Phase 2 (tree fork): the sanechips port and the e2631 device support
@@ -143,6 +153,7 @@ E2631_TEMPLATE=${E2631_TEMPLATE:-$E2631_KIT/seed/vendor-verhdr-8b8.bin}
 export E2631_KIT E2631_WORK E2631_OUT E2631_TREE E2631_BASE_KIND E2631_PORT_DIR \
 	E2631_BASE_REPO E2631_BASE_BRANCH E2631_BASE_SHA E2631_BASE_TREE_SHA E2631_TEMPLATE \
 	E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA E2631_FORK_DEPTH \
+	E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA \
 	E2631_REPRODUCE_V1100 E2631_BUILD
 # Pin provenance from base/commits.env, exported for CI/SOURCE-INFO consumers.
 # (export of an unset name is fine under set -u; legacy without base/ still works.)

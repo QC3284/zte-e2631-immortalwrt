@@ -209,6 +209,12 @@ grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
 # come from immortalwrt/*), so the URLs are read from the base tree instead of
 # being hardcoded: a future base that moves its feeds keeps working. The legacy
 # base keeps the openwrt GitHub mirrors this kit always used.
+#
+# Parity P3: the immortalwrt kind pins each feed to the commit the v1.10.0
+# reference build used (base/commits.env, evidence/immortalwrt-verify-20261114.md)
+# instead of taking the branch tip of the day. A feed that was cloned earlier
+# at another commit is re-cloned, and the index is rebuilt with "feeds update -i"
+# so that command cannot pull the checkout off the pin.
 feed_url() {	# feed_url <feed> -> src-git URL in the base's feeds.conf.default
 	sed -n -E "s|^[[:blank:]]*src-git[[:blank:]]+$1[[:blank:]]+([^[:blank:]]+).*|\1|p" \
 		"$E2631_TREE/feeds.conf.default" | head -n 1
@@ -220,15 +226,52 @@ for f in packages luci; do
 	esac
 	[ -n "$url" ] ||
 		die "the base's feeds.conf.default names no '$f' feed - refusing to install a partial build"
-	[ -d "$E2631_TREE/feeds/$f/.git" ] || {
-		say "cloning feed $f from $url"
-		git clone -q --depth 1 --single-branch "$url" "$E2631_TREE/feeds/$f" ||
-			die "cloning the $f feed failed - network?"
-	}
-	[ -f "$E2631_TREE/feeds/$f.index" ] || {
-		say "indexing feed $f"
-		( cd "$E2631_TREE" && ./scripts/feeds update "$f" 2>&1 | tail -3 )
-	}
+	case "$E2631_BASE_KIND" in
+	immortalwrt)
+		# P3: pin the feed to the v1.10.0 reference commit, never the branch tip.
+		case "$f" in
+		packages) feed_pin=${E2631_FEED_PACKAGES_SHA:-} ;;
+		luci) feed_pin=${E2631_FEED_LUCI_SHA:-} ;;
+		esac
+		[ -n "$feed_pin" ] ||
+			die "base/commits.env records no $f feed commit (P3) - the parity pin is incomplete"
+		feed_short=$(printf '%.12s' "$feed_pin")
+		if [ -d "$E2631_TREE/feeds/$f/.git" ] &&
+			[ "$(git -C "$E2631_TREE/feeds/$f" rev-parse HEAD 2>/dev/null)" != "$feed_pin" ]; then
+			say "re-pinning feed $f to $feed_short"
+			rm -rf "$E2631_TREE/feeds/$f"
+		fi
+		[ -d "$E2631_TREE/feeds/$f/.git" ] || {
+			say "cloning feed $f from $url at $feed_short (P3 pin)"
+			rm -rf "$E2631_TREE/feeds/$f"
+			mkdir -p "$E2631_TREE/feeds/$f"
+			( cd "$E2631_TREE/feeds/$f" &&
+				git init -q &&
+				git remote add origin "$url" &&
+				git fetch -q --depth 1 origin "$feed_pin" &&
+				git -c advice.detachedHead=false checkout -q FETCH_HEAD ) ||
+				die "cloning the $f feed at $feed_short failed - network?"
+		}
+		got=$(git -C "$E2631_TREE/feeds/$f" rev-parse HEAD 2>/dev/null) || got=""
+		[ "$got" = "$feed_pin" ] ||
+			die "the $f feed is at ${got:-<unreadable>}, the pin records $feed_pin"
+		if [ ! -f "$E2631_TREE/feeds/$f.index" ]; then
+			say "indexing feed $f (index only - the checkout stays pinned)"
+			( cd "$E2631_TREE" && ./scripts/feeds update -i "$f" 2>&1 | tail -3 )
+		fi
+		;;
+	legacy)
+		[ -d "$E2631_TREE/feeds/$f/.git" ] || {
+			say "cloning feed $f from $url"
+			git clone -q --depth 1 --single-branch "$url" "$E2631_TREE/feeds/$f" ||
+				die "cloning the $f feed failed - network?"
+		}
+		[ -f "$E2631_TREE/feeds/$f.index" ] || {
+			say "indexing feed $f"
+			( cd "$E2631_TREE" && ./scripts/feeds update "$f" 2>&1 | tail -3 )
+		}
+		;;
+	esac
 done
 say "installing feed packages"
 ( cd "$E2631_TREE" && ./scripts/feeds install -a 2>&1 | grep -E "Ignoring|Installing" | tail -8 )

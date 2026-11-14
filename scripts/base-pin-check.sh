@@ -47,7 +47,8 @@ fi
 # ---- 1. the recorded pin is complete and well-formed -----------------------
 req="E2631_IW_REPO E2631_IW_BRANCH E2631_IW_SHA E2631_IW_TREE_SHA E2631_BASE_KERNEL
      E2631_PORT_REPO E2631_PORT_BRANCH E2631_PORT_SHA E2631_PORT_BASE_SHA
-     E2631_BASE_TREE_SHA E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA"
+     E2631_BASE_TREE_SHA E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA
+     E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA"
 for k in $req; do
 	v=$(get "$k")
 	if [ -z "$v" ]; then
@@ -67,8 +68,9 @@ fork_sha=$(get E2631_FORK_SHA)
 base_tree=$(get E2631_BASE_TREE_SHA)
 kernel=$(get E2631_BASE_KERNEL)
 note "immortalwrt pin" "$iw_sha ($(get E2631_IW_BRANCH), kernel $kernel)"
-note "tree fork tip" "$fork_sha ($(get E2631_FORK_BRANCH) on $(get E2631_FORK_REPO))"
+note "tree fork tip" "$fork_sha ($E2631_FORK_BRANCH on $E2631_FORK_REPO)"
 note "base-port tree pin" "$base_tree"
+note "feed pins" "packages $(printf '%.12s' "$(get E2631_FEED_PACKAGES_SHA)"), luci $(printf '%.12s' "$(get E2631_FEED_LUCI_SHA)") (v1.10.0 reference, P3)"
 
 # ---- 2. the four patches are the reviewed bytes ----------------------------
 # The tree fork does not re-apply them, but they stay the provenance record (and
@@ -116,6 +118,10 @@ if [ -f scripts/bootstrap.sh ]; then
 	if grep -qF 'git am' scripts/bootstrap.sh; then
 		bad "scripts/bootstrap.sh still git-am's the vendored series - the tree fork is the base now"
 	fi
+	grep -qF 'E2631_FEED_PACKAGES_SHA' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not clone the pinned packages feed commit (P3)"
+	grep -qF 'E2631_FEED_LUCI_SHA' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not clone the pinned luci feed commit (P3)"
 fi
 
 if [ "$MODE" = static ]; then
@@ -145,26 +151,57 @@ elif [ "$got_head" != "$fork_sha" ]; then
 else
 	note "tree fork tip" "HEAD ok ($(printf '%.12s' "$got_head")...)"
 fi
+# The build tree is a depth-1 checkout on purpose (parity P2): COMMITCOUNT is
+# git rev-list --count HEAD ., so a deeper build tree changes base-files
+# PKG_RELEASE and the image stops matching the released v1.10.0.
+if [ -n "$got_head" ]; then
+	if [ -f "$E2631_TREE/.git/shallow" ] &&
+		[ "$(git -C "$E2631_TREE" rev-list --count HEAD 2>/dev/null)" = 1 ]; then
+		note "build tree depth" "1 commit (COMMITCOUNT stays 1, parity P2)"
+	else
+		bad "$E2631_TREE: the build tree is not a depth-1 checkout - the parity build needs exactly one commit (P2)"
+	fi
+fi
+
+# The history assertions run in a scratch repo, NEVER in the depth-1 build
+# tree: deepening the build tree would change the build itself.
+hist=""
+if [ -n "${E2631_WORK:-}" ] && [ -d "$E2631_WORK/.e2631-fork-history/.git" ] &&
+	[ "$(git -C "$E2631_WORK/.e2631-fork-history" rev-parse FETCH_HEAD 2>/dev/null)" = "$fork_sha" ]; then
+	hist="$E2631_WORK/.e2631-fork-history"
+	note "fork history" "reusing $hist (depth $E2631_FORK_DEPTH)"
+else
+	hist=$(mktemp -d)
+	trap 'rm -rf "$hist"' EXIT
+	git -C "$hist" init -q &&
+		git -C "$hist" remote add origin "$E2631_FORK_REPO" &&
+		git -C "$hist" fetch -q --depth "$E2631_FORK_DEPTH" origin "$fork_sha" ||
+		bad "cannot fetch $fork_sha from $E2631_FORK_REPO into a scratch history repo"
+	if [ "$(git -C "$hist" rev-parse FETCH_HEAD 2>/dev/null)" != "$fork_sha" ]; then
+		bad "scratch history repo did not get the pinned fork tip $fork_sha"
+	fi
+	note "fork history" "fetched into $hist (depth $E2631_FORK_DEPTH)"
+fi
 # The base-port tree must still be in the fork history: a rebase keeps the
 # commits but not necessarily the tree, so this is the content identity.
-if [ -n "$got_head" ] && git -C "$E2631_TREE" log --format=%T 2>/dev/null | grep -qx "$base_tree"; then
+if [ -n "$hist" ] && git -C "$hist" log --format=%T FETCH_HEAD 2>/dev/null | grep -qx "$base_tree"; then
 	note "base-port tree" "in the fork history"
 else
-	bad "$E2631_TREE: no commit with tree $base_tree in the fetched history - not the reviewed base-port tree"
+	bad "no commit with tree $base_tree in the fetched fork history - not the reviewed base-port tree"
 fi
-if git -C "$E2631_TREE" cat-file -e "$iw_sha^{commit}" 2>/dev/null; then
-	if git -C "$E2631_TREE" merge-base --is-ancestor "$iw_sha" HEAD; then
-		port_head=$(git -C "$E2631_TREE" log --format='%H %T' 2>/dev/null |
+if [ -n "$hist" ] && git -C "$hist" cat-file -e "$iw_sha^{commit}" 2>/dev/null; then
+	if git -C "$hist" merge-base --is-ancestor "$iw_sha" FETCH_HEAD; then
+		port_head=$(git -C "$hist" log --format='%H %T' FETCH_HEAD 2>/dev/null |
 			awk -v t="$base_tree" '$2 == t { print $1; exit }')
-		port_steps=$(git -C "$E2631_TREE" rev-list --count "$iw_sha..$port_head" 2>/dev/null) ||
+		port_steps=$(git -C "$hist" rev-list --count "$iw_sha..$port_head" 2>/dev/null) ||
 			port_steps=unknown
 		if [ "$port_steps" = 4 ]; then
 			note "port series" "4 commits above the upstream pin"
 		else
-			bad "$E2631_TREE: the port series is $port_steps commits above $iw_sha, expected the four reviewed commits"
+			bad "the port series is $port_steps commits above $iw_sha, expected the four reviewed commits"
 		fi
 	else
-		bad "$E2631_TREE is not descended from the pinned ImmortalWrt commit $iw_sha"
+		bad "the fork tip is not descended from the pinned ImmortalWrt commit $iw_sha"
 	fi
 else
 	bad "$iw_sha is outside the fetched history window - raise E2631_FORK_DEPTH (currently ${E2631_FORK_DEPTH:-unset}) and re-bootstrap"
@@ -191,5 +228,24 @@ if [ -f "$kf" ] && [ -n "$kernel" ]; then
 	fi
 fi
 
-[ $rc -eq 0 ] && echo "base-pin: iw $iw_sha + tree fork $fork_sha + base-port tree $base_tree + 4 commits verified"
+# P3: the feeds must be at the pinned commits, not the branch tip of the day.
+for f in packages luci; do
+	case "$f" in
+	packages) pin=$(get E2631_FEED_PACKAGES_SHA) ;;
+	luci) pin=$(get E2631_FEED_LUCI_SHA) ;;
+	esac
+	d="$E2631_TREE/feeds/$f"
+	if [ -d "$d/.git" ]; then
+		got=$(git -C "$d" rev-parse HEAD 2>/dev/null) || got=""
+		if [ "$got" = "$pin" ]; then
+			note "$f feed" "pinned commit ok ($(printf '%.12s' "$pin")...)"
+		else
+			bad "$d: HEAD=${got:-<unreadable>}, the P3 pin records $pin"
+		fi
+	else
+		note "$f feed" "not cloned yet - bootstrap pins it to $(printf '%.12s' "$pin")"
+	fi
+done
+
+[ $rc -eq 0 ] && echo "base-pin: iw $iw_sha + tree fork $fork_sha + base-port tree $base_tree + 4 commits + feed pins verified"
 exit $rc
