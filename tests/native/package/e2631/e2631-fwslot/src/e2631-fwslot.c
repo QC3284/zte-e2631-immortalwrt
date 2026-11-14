@@ -736,8 +736,7 @@ static int retitle_slot(int slot, uint32_t serial)
 		return 1;
 	if (m.base != 0) {
 		fprintf(stderr,
-			"e2631-fwslot: this system has no slot%d partition, so its header cannot be "
-			"located reliably; switch slots from OpenWrt instead\n", slot);
+			"e2631-fwslot: this system has no slot%d partition, so its header cannot be located reliably; switch slots from OpenWrt instead\n", slot);
 		close(m.fd);
 		return 1;
 	}
@@ -798,11 +797,9 @@ static int retitle_slot(int slot, uint32_t serial)
 			if (mtd_erase(&m, hpos) == 0 &&
 			    lseek(m.fd, slot_ofs(&m, hpos), SEEK_SET) >= 0 &&
 			    write(m.fd, blk, m.info.erasesize) == (ssize_t)m.info.erasesize)
-				fprintf(stderr, "e2631-fwslot: original header restored, "
-					"slot %d left as it was\n", slot);
+				fprintf(stderr, "e2631-fwslot: original header restored, slot %d left as it was\n", slot);
 			else
-				fprintf(stderr, "e2631-fwslot: RESTORE FAILED - slot %d needs "
-					"its header rebuilt by hand\n", slot);
+				fprintf(stderr, "e2631-fwslot: RESTORE FAILED - slot %d needs its header rebuilt by hand\n", slot);
 			free(blk);
 			close(m.fd);
 			return 1;
@@ -908,8 +905,7 @@ static const char *install_guard(const struct slot_state *target, bool replace)
 	case ID_VENDOR:
 	case ID_UNKNOWN:
 		if (!replace)
-			return "target slot holds another system; pass --replace-other-system "
-			       "to overwrite it (the slot head is backed up first)";
+			return "target slot holds another system; pass --replace-other-system to overwrite it (the slot head is backed up first)";
 		return NULL;
 	}
 	return NULL;
@@ -924,14 +920,11 @@ static const char *upgrade_guard(const struct slot_state *other, bool no_check)
 	if (no_check)
 		return NULL;
 	if (!other->known)
-		return "the other slot cannot be read at all, and it is the only fallback "
-		       "if this write fails; pass --no-fallback-check to accept that";
+		return "the other slot cannot be read at all, and it is the only fallback if this write fails; pass --no-fallback-check to accept that";
 	if (other->identity != ID_VENDOR)
-		return "the other slot does not hold a vendor image, and it is the only "
-		       "fallback if this write fails; pass --no-fallback-check to accept that";
+		return "the other slot does not hold a vendor image, and it is the only fallback if this write fails; pass --no-fallback-check to accept that";
 	if (!other->intact)
-		return "the other slot holds a vendor header but its body does not verify, "
-		       "and it is the only fallback if this write fails; "
+		return "the other slot holds a vendor header but its body does not verify, and it is the only fallback if this write fails; "
 		       "pass --no-fallback-check to accept that";
 	return NULL;
 }
@@ -963,9 +956,7 @@ static void backup_slot_head(struct mtd *m, int slot, uint32_t serial)
 			fclose(f);
 		}
 		if (!mp[0])
-			die("userdata is not mounted, so the other system cannot be "
-			    "backed up before it is replaced; initialize userdata first "
-			    "(or set E2631_BACKUP_DIR)");
+			die("userdata is not mounted, so the other system cannot be backed up before it is replaced; initialize userdata first (or set E2631_BACKUP_DIR)");
 		dir = mp;
 	}
 	/* A bounded copy with PROVABLE fits for -Werror=format-truncation:
@@ -1039,9 +1030,7 @@ static int cmd_write(const char *path, bool inplace, int want_slot,
 	running = slot_index(running_slot_offset());
 	if (inplace) {
 		if (running < 0)
-			errno = ENODEV, die("upgrade rewrites the running slot, but "
-				"cannot tell which slot is running, from /proc/cmdline or "
-				"from the rootfs partition");
+			errno = ENODEV, die("upgrade rewrites the running slot, but cannot tell which slot is running, from /proc/cmdline or from the rootfs partition");
 		target_slot = running;
 		other_slot = running ^ 1;
 	} else {
@@ -1055,8 +1044,7 @@ static int cmd_write(const char *path, bool inplace, int want_slot,
 		target_slot = want_slot >= 0 ? want_slot : (running < 0 ? -1 : running ^ 1);
 		other_slot = target_slot >= 0 ? target_slot ^ 1 : -1;
 		if (target_slot < 0)
-			errno = ENODEV, die("cannot tell which slot is running, from "
-				"/proc/cmdline or from the rootfs partition");
+			errno = ENODEV, die("cannot tell which slot is running, from /proc/cmdline or from the rootfs partition");
 	}
 
 	/*
@@ -1094,8 +1082,7 @@ static int cmd_write(const char *path, bool inplace, int want_slot,
 	for (uint64_t o = 0, need = (p.body_len + bs) / bs * bs; o < need; o += bs)
 		if (mtd_bad(&m, o)) {
 			fprintf(stderr,
-				"e2631-fwslot: slot %d has a bad erase block at %#llx, inside the "
-				"area the fixed partition offsets rely on; refusing to write\n",
+				"e2631-fwslot: slot %d has a bad erase block at %#llx, inside the area the fixed partition offsets rely on; refusing to write\n",
 				target_slot, (unsigned long long)o);
 			return 1;
 		}
@@ -1176,8 +1163,7 @@ static int cmd_write(const char *path, bool inplace, int want_slot,
 		if (hpos >= 0)
 			mtd_erase(&m, hpos);
 		fprintf(stderr,
-			"e2631-fwslot: slot %d does not read back (%s); its header is "
-			"erased, so the boot stays on slot %d\n",
+			"e2631-fwslot: slot %d does not read back (%s); its header is erased, so the boot stays on slot %d\n",
 			target_slot, why, other_slot);
 		exit(1);
 	}
@@ -1203,8 +1189,7 @@ static int cmd_upgrade_check(void)
 
 	running = slot_index(running_slot_offset());
 	if (running < 0)
-		die("upgrade-check: cannot tell which slot is running, from "
-		    "/proc/cmdline or from the rootfs partition; refusing to update");
+		die("upgrade-check: cannot tell which slot is running, from /proc/cmdline or from the rootfs partition; refusing to update");
 	slot_state_read(running ^ 1, &states[running ^ 1]);
 	why = upgrade_guard(&states[running ^ 1], false);
 	if (why) {
@@ -1394,9 +1379,7 @@ int main(int argc, char **argv)
 			if (!strcmp(argv[i], "--replace-other-system"))
 				replace = true;
 			else if (!strcmp(argv[i], "--allow-slot0"))
-				die("--allow-slot0 is gone: slot roles are not fixed on this "
-				    "board; pass --replace-other-system to overwrite whatever "
-				    "the target slot holds");
+				die("--allow-slot0 is gone: slot roles are not fixed on this board; pass --replace-other-system to overwrite whatever the target slot holds");
 			else if (!strcmp(argv[i], "--slot") && i + 1 < argc)
 				want = atoi(argv[++i]);
 			else

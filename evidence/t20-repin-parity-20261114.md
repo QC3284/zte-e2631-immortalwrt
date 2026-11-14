@@ -2,6 +2,9 @@
 
 状态：已完成（2026-11-15 01:10 收口）—— seed 单一来源修复已落地，两次 CI 重建产物逐字节一致（RUN1 == RUN2）。
 
+注：2026-11-15 的批次 2 已把树 fork pin 前移到 `cd14ffa…`（见
+evidence/t20b-repin-batch2-20261115.md）；本文记录的是 pin 为 83df1a9 当时的构建证据。
+
 ## 1. 背景与钉值
 
 - 树 fork：QC3284/immortalwrt 分支 e2631，tip 83df1a90a71863c2f54d6e399e8b0ee86405083a
