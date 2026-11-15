@@ -231,3 +231,21 @@ setsid nohup ./capture-supervisor.sh     >>/tmp/e2631-capture-supervisor.out 2>&
 setsid nohup node ./serial-bootwatch.mjs >>/tmp/e2631-bootwatch.out 2>&1 </dev/null &
 setsid nohup ./capture-stallwatch.sh     >>/tmp/e2631-capture-stallwatch.out 2>&1 </dev/null &
 ```
+
+## 3.6 批3(r0-cd14ffa,batch-2 修复镜像,2026-11-15 08:26-08:33)
+
+用户 3 次拔插头,bootwatch sessions 19/20/21:
+
+| 会话 | 上电 (CST) | MT7916 ready |
+|---|---|---|
+| S19 | 08:26:55 | 53.431 s |
+| S20 | 08:31:16 | 53.511 s |
+| S21 | 08:32:48 | 53.899 s |
+
+全部 SUCCESS,0 失败签名。断电签名核验:serial log 行 8998/9460/9922 三次
+'Boot SPI NAND' 之间无 'reboot: Restarting system' → 真断电。均值
+53.61 ± 0.25 s。
+
+**累计**:v1.10.0 11/11 + r0-83df1a9 3/3 + r0-cd14ffa 3/3 = **17/17**;
+失败率 95% 置信上界 ≈ 16%。现役修复镜像无 MT7916 冷启动挂起,旧 1/3
+挂为上游 v1.3 时代行为,与本项目镜像无关。
