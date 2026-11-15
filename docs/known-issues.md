@@ -330,6 +330,18 @@ image - it fails with `no /dev/mem`. `wsl/build-regprobe.sh` builds a module aga
 exactly the kernel this kit ships, and that module is the replacement: it reads the same
 register from inside the kernel, where the address space is available.
 
+Resolution (2026-11-15, tree fork `6b609d7`): the mechanism is
+`include/kernel-defaults.mk` - the top-level `CONFIG_KERNEL_*` symbols are
+de-prefixed and appended at the END of the generated config, and kconfig is
+last-wins, so `generic/config-6.18`'s explicit `# CONFIG_DEVMEM is not set`
+was overriding the target fragment's `=y`.  Fix: `CONFIG_KERNEL_DEVMEM=y`
+in the e2631 seed (top-level, last-wins in our favour), asserted by both tree
+CI and the kit firmware workflow ("Assert DEVMEM survived into the kernel
+build config").  Verified on device (r0-cd14ffa): `/dev/mem` exists,
+`e2631-fwstate` reports `FW_STATE=0` (200 samples).
+Evidence: `evidence/qshou1-batch2-flash-20261115.md` §5.
+status: fixed + device-verified.
+
 ## PACK-NEEDS-VENDOR-TEMPLATE
 
 The packer copies the version header from a real package and rewrites the geometry and CRC
@@ -377,6 +389,20 @@ v1.8 manual flow (`/sbin/e2631-userdata-init --apply` by hand, internal
 jffs2 overlay stays in charge).  Recorded as a behaviour change, not a bug:
 v1.8 deliberately disabled this ("booting can never format anything"), and
 the opt-out is the escape hatch for anyone who relied on it.
+
+2026-11-15 hardening (tree fork `f3776b3` + `4b610dc`, image r0-cd14ffa):
+the gate is now snapshot-versioned - it writes
+`/etc/e2631-userdata-version` (the image identity) into the volume when it
+provisions one, verifies it in preinit before mount_root, and **refuses to
+take over a formatted volume without a marker, with a stale marker, or with
+an empty snapshot id** (previously an empty id produced a 1-byte marker and a
+volume that could never be recognised again).  Opt-out
+(`autoadopt=0`) is now honoured on ALREADY-FORMATTED volumes too (v1.10.0
+would silently re-enable the extroot entry at every boot).  Device-verified
+on a real stale volume: the gate logged "refusing the userdata extroot ...
+provisioned by an older image", left the volume untouched and stayed on the
+internal jffs2 overlay, idempotently, across boots.
+Evidence: `evidence/qshou1-batch2-flash-20261115.md` §4.
 
 ## CALDATA-HOOK-MOUNT-RETRY
 
@@ -464,7 +490,7 @@ A 组（构建/CI/迁移）已有 CI 与 parity 证据；本表是「官方支�
 | 7 | IPv6 转发吞吐 | **❌ NOT TESTED** | 与第 6 行同因：没有 LAN 客户端，无法产生跨设备的 IPv6 转发流量；软件路径就绪（WAN 默认路由存在、forwarding=1），但未做流量实测。 | 与第 6 行同批（LAN 客户端 + 主机空闲） |
 | 8 | WPA3（SAE）+ mesh 双客户端 | **❌ NOT TESTED** | 能力已装：`wpad-mbedtls`（含 SAE/802.11r/k/v/mesh）、`zte-mesh` + `luci-app-zte-mesh` 已安装；现网两 radio `encryption='none'`（开放 AP），无 mesh 接口/进程。 | **阻塞：需要第二客户端/第二节点 + 用户批准写无线配置**（一次一变量） |
 | 9 | slot-0 受控启动 | **❌ NOT TESTED** | 主机侧决策单测 11/11 通过；真机两槽 header 均被 U-Boot 正常读取（slot0 原厂 V1.0.0.7B5.8000 完好）；「实际从 slot-0 启动」需一次受控刷写周期，属写操作。 | **阻塞：写操作需用户明确批准**（Q-收1 剩余项，不在只读边界内） |
-| 10 | MT7916 冷启动稳定性（回归补充） | **✅ VERIFIED** | 两镜像累计 **14/14 真冷启成功**：v1.10.0 11/11（ready 54.5±0.7 s）+ r0-83df1a9 3/3（ready 53.56/53.69/55.00 s），0 失败签名、0 自愈事件；旧 1/3 假说被统计否定（单侧 p≈0.012）。证据：evidence/cold-boot-sampling-20261114.md §3.4–§3.5。 | 可选：继续回归采样（采集链运行中）；「1/3 挂起」可结案 |
+| 10 | MT7916 冷启动稳定性（回归补充） | **✅ VERIFIED** | 三镜像累计 **17/17 真冷启成功**：v1.10.0 11/11（ready 54.5±0.7 s）+ r0-83df1a9 3/3（53.56/53.69/55.00 s）+ r0-cd14ffa 3/3（53.43/53.51/53.90 s），0 失败签名、0 自愈事件；每次上电均有断电签名复核（无 'Restarting system' 前置行）；旧 1/3 假说被统计否定（单侧 p≈0.012；17/17 下失败率 95% 置信上界 ≈ 16%）。证据：evidence/cold-boot-sampling-20261114.md §3.4–§3.6。 | 「1/3 挂起」已结案（上游 v1.3 时代行为，与现役镜像无关） |
 
 读法：**✅ VERIFIED** = 已在真机复现并留有证据；**⚠️** = 能力/路径存在但被架构或环境条件限制（非缺陷回归）；**❌ NOT TESTED** = 设备/环境条件未满足，不是失败。
 

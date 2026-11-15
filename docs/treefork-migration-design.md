@@ -90,6 +90,16 @@ QC3284/zte-e2631-immortalwrt（保留，改为 kit）
   归一+miniupnpd 横幅断言）/P8（可选钉定 apk 密钥，私钥不入库不归档）；
   actions v5；check-workflows 66 项。真机无需重刷（parity 已证载荷一致）。
 - **遗留门禁（不变）**：kit main 合入、正式 Release、真机操作均待用户批准。
+- **质量整改批次（树 fork，2026-11-15）**：批1 = CI 提交重写补 SOB + extroot
+  gate 快照标记（f3776b3）+ 删 WAN 放行（76dcaee）+ fstools 204 去 jffs2 噪音
+  （72eff3b）+ 种子 CONFIG_KERNEL_DEVMEM=y（6b609d7）+ 风格清扫（b2e15d4），
+  tip 83df1a9，树 CI 绿；批2 = marker 硬化（4b610dc）+ 5 脚本 SPDX（235fe12）+
+  fwslot.c 字符串重构（cd14ffa，ASM_IDENTICAL），tip cd14ffa，树 CI 绿。每次
+  重钉后 kit 以 RUN 验证：RUN1/RUN2 @ 83df1a9 逐字节自一致（A==B），RUN3 @
+  cd14ffa 对基线 PASS-REVIEWED-DIFFS（内核差异实锤为 KBUILD_BUILD_TIMESTAMP
+  构建戳），真机刷入 r0-cd14ffa，七项复验全过（marker 拒绝坏卷实测、DEVMEM、
+  噪音清零、无 WAN 放行），冷启动累计 17/17。详见 evidence/qshou1-batch2-flash-
+  20261115.md 与 t20b-repin-batch2-20261115.md。
 
 ## 8. 方向定调 (2026-11-14, 用户)
 用户对「开发版/发布版」三选项的答复是第四条路: **按「合并到 immortalwrt 主线」的方向做**。即树 fork 保持 master 基底与 snapshot 身份(诚实), 修复队列与 4 个内核补丁以主线可合并质量为标准落入树 fork, 定期 rebase 跟踪 iw master; PR 动作维持「不主动」边界, 质量达标后由用户决定。
