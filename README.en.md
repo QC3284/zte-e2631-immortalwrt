@@ -27,7 +27,8 @@ a build. The build happens in WSL on this machine; `make check` is the local gat
     make build
 
 `scripts/bootstrap.sh` fetches the tree fork at the tip pinned in `scripts/pins.env`
-(`cd14ffa`, the 2026-11-15 batch-2 fix-series tip on top of ImmortalWrt master
+(`3ac18fb9`, the 2026-11-15 merge of ImmortalWrt master `a4ba8240` into the
+batch-2 fix series; the ancestry anchor below the port commits stays
 `4765b657`, kernel 6.18.60) as a depth-1 build
 tree, verifies the fork history in a separate scratch repo (the base-port tree
 `4f89aa7a`, the ImmortalWrt pin in its ancestry, exactly four port commits above it),

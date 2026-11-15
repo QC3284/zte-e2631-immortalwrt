@@ -81,7 +81,7 @@ ok('the pin file has plain values (no shell ${VAR:-default} expressions)',
 ok('the fork pin is the reviewed tip on the tree-fork branch',
   pins.E2631_FORK_REPO === 'https://github.com/' + TREE_REPO &&
   pins.E2631_FORK_BRANCH === TREE_BRANCH &&
-  pins.E2631_FORK_SHA === 'cd14ffa091f63116859ae8bd6d262f08778629a8',
+  pins.E2631_FORK_SHA === '3ac18fb9a6032a16f9f0aad5417f843832aa2c6d',
   pins.E2631_FORK_REPO + ' ' + pins.E2631_FORK_BRANCH + ' @ ' + pins.E2631_FORK_SHA);
 ok('the ImmortalWrt pin and the base-port tree pin are unchanged',
   pins.E2631_IW_SHA === TREE_PIN_BASE_SHA && pins.E2631_BASE_TREE_SHA === TREE_PIN_TREE_SHA);
@@ -91,8 +91,8 @@ ok('all commit pins are full 40-hex SHAs',
     .every(hex40) &&
   /^[0-9a-f]{64}$/.test(pins.E2631_BASE_PATCH_SHA256_0001));
 ok('the scratch history depth is deep enough to reach the base-port commit (P2)',
-  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 15,
-  pins.E2631_FORK_DEPTH + ' levels; the base-port commit is 15 below the tip');
+  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 16,
+  pins.E2631_FORK_DEPTH + ' levels; the base-port commit is 16 below the tip');
 
 // 2. The tree-fork content is what the kit claims to ship.
 ok('the tree fork at the pinned SHA serves /etc/e2631-version', VERSION.length > 0,
