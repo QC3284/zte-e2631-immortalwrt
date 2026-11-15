@@ -10,6 +10,7 @@
 | [architecture.md](architecture.md) | 地图：仓库结构、从源码到可启动镜像的链路、槽位几何、验证栈 |
 | [immortalwrt-migration.md](immortalwrt-migration.md) | ImmortalWrt 基线迁移的决策、证据与风险；基底升级 runbook 在 §8 |
 | [known-issues.md](known-issues.md) | 机器可读的诚实清单：每个已修/未修问题、证据与规避方式 |
+| [救砖手册-2026-11-15.md](救砖手册-2026-11-15.md) | 救砖手册：串口 / U-Boot 控制台 / TFTP RAM 引导 / failsafe / 回原厂槽位路径 / 危险区与禁止事项 |
 | [updates.md](updates.md) | 在线更新机制：原地升级不变量、e2631-upgrade 流程、槽位适配 |
 | `../BUILD.md`、`../README.md` | 构建步骤 / 状态与取舍（仓库根目录） |
 
