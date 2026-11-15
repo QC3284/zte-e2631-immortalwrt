@@ -49,7 +49,7 @@ fi
 req="E2631_IW_REPO E2631_IW_BRANCH E2631_IW_SHA E2631_IW_TREE_SHA E2631_BASE_KERNEL
      E2631_PORT_REPO E2631_PORT_BRANCH E2631_PORT_SHA E2631_PORT_BASE_SHA
      E2631_BASE_TREE_SHA E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA
-     E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA"
+     E2631_MERGED_MASTER_SHA E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA"
 for k in $req; do
 	v=$(get "$k")
 	if [ -z "$v" ]; then
@@ -64,6 +64,14 @@ for k in $req; do
 		esac ;;
 	esac
 done
+# The merged upstream commit is provenance for SOURCE-INFO; it carries a
+# YYYY-MM-DD date next to it, so keep both well-formed.
+merge_date=$(get E2631_MERGED_MASTER_DATE)
+case "$merge_date" in
+'') bad "$ENVF: E2631_MERGED_MASTER_DATE is missing" ;;
+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+*) bad "$ENVF: E2631_MERGED_MASTER_DATE is not YYYY-MM-DD: $merge_date" ;;
+esac
 # The fork depth is a number, not an object id: bootstrap uses it for the
 # scratch history fetch only (the build tree stays depth 1). The 2026-11-14
 # fix series, the 2026-11-15 batch 2 and the a4ba8240 merge put the base-port

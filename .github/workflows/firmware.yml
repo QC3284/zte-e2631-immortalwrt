@@ -139,6 +139,7 @@ jobs:
             echo "ImmortalWrt tree (pristine): ${E2631_IW_TREE_SHA:-unknown}"
             echo "Port base tree (4 patches applied): ${E2631_BASE_TREE_SHA:-unknown}"
             echo "Tree fork: ${E2631_FORK_REPO:-unknown} ${E2631_FORK_BRANCH:-} @ ${E2631_FORK_SHA:-unknown}"
+            echo "Merged ImmortalWrt master: @ ${E2631_MERGED_MASTER_SHA:-unknown} (${E2631_MERGED_MASTER_DATE:-unknown})"
             echo "Parity reproduction: ${E2631_REPRODUCE_V1100:-false} (build stamp ${E2631_BUILD:-date-of-run})"
             echo "Kernel build id: e2631-build@immortalwrt-e2631 (P5, from the seed)"
             echo "Port patch 0001 sha256: ${E2631_BASE_PATCH_SHA256_0001:-unknown}"

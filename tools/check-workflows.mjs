@@ -140,6 +140,16 @@ for (const key of ['Kit commit:', 'ImmortalWrt base:', 'ImmortalWrt tree (pristi
   ok('firmware.yml SOURCE-INFO records ' + key.replace(':', ''), has(WF.firmware, key));
 }
 ok('firmware.yml SOURCE-INFO no longer records a base kind', !has(WF.firmware, 'Base kind:'));
+// The fork merged ImmortalWrt master a4ba8240; the build tree is depth 1 so the
+// merge parent cannot be derived at build time - pins.env owns it and the
+// shipped provenance record has to name it (Lead decision 2026-11-15).
+ok('pins.env names the upstream commit the fork merged',
+  hex40(pins.E2631_MERGED_MASTER_SHA) &&
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(pins.E2631_MERGED_MASTER_DATE || ''),
+  (pins.E2631_MERGED_MASTER_SHA || 'missing') + ' (' + (pins.E2631_MERGED_MASTER_DATE || 'missing') + ')');
+ok('firmware.yml SOURCE-INFO cites the merged upstream commit',
+  has(WF.firmware, 'Merged ImmortalWrt master:') &&
+  has(WF.firmware, 'E2631_MERGED_MASTER_SHA') && has(WF.firmware, 'E2631_MERGED_MASTER_DATE'));
 ok('firmware.yml hashes the release assets',
   has(WF.firmware, 'sha256sum e2631-immortalwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS'));
 

@@ -1,6 +1,7 @@
 # R 系列：kit 重钉到 merge 树尖 3ac18fb9（2026-11-15）
 
-状态：pin 已更新、本地真实排练全绿；本任务不 dispatch 构建，后续构建 run 由 Lead 决定（见 §5）。
+状态：pin 已更新、本地真实排练全绿；SOURCE-INFO 的 merge 行已按 Lead 决定跟补（§7）；
+本任务不 dispatch 构建，后续构建 run 由 Lead 决定（见 §5）。
 
 ## 1. 背景与钉值
 
@@ -66,9 +67,11 @@
 - 若跑 RUN4：与基线 43572710065 / RUN3 43623162108 的差异会新增"上游 master a4ba8240
   合并"这一大类（内核与大量包版本变化），需要 verify-docs 扩展 reviewed-diff 策略
   （expected classes）后才能给 verdict。
-- `SOURCE-INFO` 仍记录 `ImmortalWrt base: … @ 4765b657`（port 之下的锚点）；merge 后该行
-  不再代表镜像全部上游内容，建议 Lead 决定是否在 firmware.yml 的 SOURCE-INFO 增加 merge
-  行（属 CI 适配，本次未改 firmware.yml）。
+- `SOURCE-INFO` 的 merge 行：Lead 2026-11-15 决定加入，firmware.yml 现在多一行
+  `Merged ImmortalWrt master: @ a4ba8240… (2026-11-14)`；钉值
+  `E2631_MERGED_MASTER_SHA`/`E2631_MERGED_MASTER_DATE` 记在 scripts/pins.env（构建树
+  depth 1 取不到 merge 父提交，所以钉在 pin 文件），checker 随之增加 2 项断言（70 -> 72）。
+  详见 §7。
 - 未推 kit main、未 dispatch、未发 Release、未碰真机；APK 私钥未动。
 
 ## 6. 复现
@@ -80,3 +83,15 @@ node tools/check-workflows.mjs
 node host/sim-upgrade.mjs
 python3 tests/test_upgrade.py
 ```
+
+## 7. 跟补：SOURCE-INFO 增加 merge 行（2026-11-15）
+
+- Lead 决定：merge 实质改变了镜像中的上游内容（122 commits），SOURCE-INFO 是随 Release
+  资产发布的来源记录（只进 `release/`，不进 rootfs，不改变镜像字节），因此必须写明。
+- 改动：`scripts/pins.env` 新增 `E2631_MERGED_MASTER_SHA=a4ba8240…` 与
+  `E2631_MERGED_MASTER_DATE=2026-11-14`（构建树 depth 1 无法从 merge 父提交推出，故钉在
+  pin 文件）；`scripts/env.sh` 导出；`firmware.yml` SOURCE-INFO 增加一行
+  `Merged ImmortalWrt master: @ … (日期)`；`base-pin-check` 静态校验 40-hex 与
+  YYYY-MM-DD；`tools/check-workflows.mjs` 增加 2 项断言（70 -> 72）；
+  `BUILD.md`/`docs/immortalwrt-migration.md` 同步。
+- 验证：与 §4 同款门禁重跑（bootstrap 与构建行为未变，只改来源记录文本）。

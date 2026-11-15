@@ -429,7 +429,8 @@
   marker 加固 + SPDX + fwslot 字符串拼接）再钉到 `cd14ffa…`，见 T-20 与批次 2 记录；
   R 系列（2026-11-15 把 ImmortalWrt master `a4ba8240` merge 进 e2631）后钉到 `3ac18fb9…`，
   树内容从此同时包含合并进来的上游 master 侧提交；`E2631_IW_SHA=4765b657…` 保留为
-  port 系列之下的祖先锚点（不再代表镜像的唯一上游内容）；
+  port 系列之下的祖先锚点（不再代表镜像的唯一上游内容）；SOURCE-INFO 随之增加一行
+  `Merged ImmortalWrt master: @ a4ba8240… (2026-11-14)`（钉值记在 `scripts/pins.env`）；
   `ImmortalWrt v1.10.0` / `e2631-immortalwrt-*` / 在线更新仓库口径不变；正式 Release 与真机
   刷写仍需用户批准。
 - **验证**：本地 `make bootstrap` + `make check` 全绿；CI `check.yml` 在推送分支上运行

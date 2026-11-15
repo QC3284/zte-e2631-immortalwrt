@@ -41,11 +41,14 @@ tip - there is no vendored patch series and no `apply.sh` any more (T-12):
     E2631_FORK_REPO   https://github.com/QC3284/immortalwrt
     E2631_FORK_BRANCH e2631
     E2631_FORK_SHA    3ac18fb9a6032a16f9f0aad5417f843832aa2c6d    (build content; 8 fix commits + merged ImmortalWrt master a4ba8240, 2026-11-15)
+    E2631_MERGED_MASTER_SHA a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5 (upstream master commit merged into e2631, 2026-11-14; SOURCE-INFO provenance)
 
 `scripts/pins.env` is the single pin file. It also records the tree hash of the last
 sanechips port commit (`4f89aa7a…`), the sha256 of each of the four original port
-patches (provenance only - the files are gone), and the two feed commits the released
-v1.10.0 was built with. `scripts/bootstrap.sh` fetches the fork tip at **depth 1** for
+patches (provenance only - the files are gone), the two feed commits the released
+v1.10.0 was built with, and the upstream ImmortalWrt master commit the fork merged
+(`a4ba8240…`; the depth-1 build tree cannot show its merge parents, so SOURCE-INFO
+takes that line from the pin file). `scripts/bootstrap.sh` fetches the fork tip at **depth 1** for
 the build tree (parity P2: `COMMITCOUNT` is `git rev-list --count HEAD .`, so a deeper
 tree changes `base-files` `PKG_RELEASE`), and verifies the history in a separate
 scratch repo: the tip, the base-port tree, the ImmortalWrt pin ancestry and the four port
