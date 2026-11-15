@@ -1,6 +1,6 @@
 # T-20 批次 2：树 fork re-pin 到 cd14ffa（2026-11-15）
 
-状态：pin 已更新、本地验证全绿；单次 RUN3 构建由 Lead 触发（结果待补第 5 节）。
+状态：pin 已更新、本地验证全绿；RUN3 构建 SUCCESS，parity 复核 PASS-REVIEWED-DIFFS（见 §6）。
 
 ## 1. 背景与钉值
 
@@ -63,9 +63,41 @@
   base-files revision 由 r0-83df1a9 变为 r0-cd14ffa）、fwslot 二进制中的字符串
   行号/布局变化、e2631-userdata 与 preinit 的 marker 加固内容、目标脚本 SPDX 注释
   带来的字节变化。unexpected diffs 必须为 0。
-- RUN3 的 run id、产物 sha256、SOURCE-INFO 与复核结论待补入本节。
+- RUN3 的 run id、产物 sha256、SOURCE-INFO 与复核结论见 §6。
 
 ## 5. 约束
 
 - 未发布 Release、未推 kit main、未碰真机 192.168.1.1；APK 私钥只存在于 GitHub
   secret 与 runner 临时 0600 文件，仓库与日志不落私钥。
+
+## 6. RUN3 构建结果与复核（2026-11-15，Lead 复核）
+
+- Run 43623162108 @ iwrt-adaptation（检出 kit commit 8d87bfa，SOURCES-INFO 记录；
+  dispatch 之后仅 8d87bfa/4776138 两个 docs-only 提交，不影响构建内容），
+  publish=false、use_pinned_apk_key=true、reproduce_v1100 未设。SUCCESS，
+  17:49:13Z → 20:01:39Z（约 2h12m；慢于前两次 81–86 分钟，runner 差异，非内容变化）。
+- 产物 e2631-build-43623162108 / e2631-immortalwrt-experimental.bin：
+  22,020,628 B，sha256
+  3d7825c9fdb9a15992ab72393014ce6c13211d76757f162bbe8b3b8cf8dbb13d；
+  SHA256SUMS 校验通过。SOURCE-INFO 关键行：tree fork e2631 @
+  cd14ffa091f63116859ae8bd6d262f08778629a8、kernel 6.18.60、APK 公钥 sha256
+  9edb11a9…（钉定密钥）、feeds decf9463/ad75cde8、Parity reproduction: false。
+- 内核载荷差异根因（新增于预期类别之外）：world.log 中两跑 Kbuild 命令逐字节对比，
+  唯一输入差 = KBUILD_BUILD_TIMESTAMP（树提交日期：RUN1 1794656911 / RUN3
+  1794677928）；内核包版本哈希 106ff47d01ccbcbd01e3661d209d54cd 在 RUN1 与 RUN3
+  中相同（配置未变）；payload 为 zImage，时间戳字符串进入 UTS 版本串后 gzip 流
+  整体重排 → RUN1→RUN3 +816 B、约 245k 处散点字节差异。属已文档化的「构建戳」
+  类，非内容变化。
+- parity 复核（compare-parity.mjs + t20b-policy.json，对基线 43572710065）：
+  **PASS-REVIEWED-DIFFS** —— expected 20 + 政策接受 63 + unexpected 0；
+  comparator 内嵌 verify_pkg：ALL CHECKS PASSED（预期 ih_hcrc WARN 1）。
+  政策新增条目：5 个 SPDX 脚本（02_network/11-mt76-caldata/05-fix-wifi-mac/
+  lights_toggle/00-h3600-ledblink）、3 个 marker 加固文件（e2631-snapshot.sh/
+  79_e2631_userdata/e2631-userdata-init）、libcrypto 时间戳 1794677928、
+  修订串 r0-cd14ffa 家族。**fwslot 二进制逐字节未变**（ASM_IDENTICAL 实证，
+  未出现在 diff 列表）——比 §4 预期更好。
+- CI 侧门禁（job log 132533109582）：verify_pkg 'ALL CHECKS PASSED
+  (warnings: 1)'；verify_img 'BOOT-READY: no static blocker found'；APK 私钥
+  构建前写入 0600、打包后 rm 移除；publish 步骤跳过，releases API 仍仅
+  v1.10.0 prerelease 一条。
+- 结论：batch-2 构建验收通过。真机刷写（Q-收1 收口）待用户批准。
