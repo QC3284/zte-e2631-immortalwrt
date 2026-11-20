@@ -74,13 +74,14 @@ case "$merge_date" in
 esac
 # The fork depth is a number, not an object id: bootstrap uses it for the
 # scratch history fetch only (the build tree stays depth 1). The 2026-11-14
-# fix series, the 2026-11-15 batch 2 and the a4ba8240 merge put the base-port
-# commit 16 levels below the tip (15 commits between them plus itself), so
-# anything under 16 would silently drop the tree-hash/series assertions.
+# fix series, the 2026-11-15 batch 2, the a4ba8240 merge and the 2026-11-20
+# firewall4 re-anchor put the base-port commit 17 levels below the tip (16
+# commits between them plus itself), so anything under 17 would silently drop
+# the tree-hash/series assertions.
 depth=$(get E2631_FORK_DEPTH)
 case "$depth" in
 ''|*[!0-9]*) bad "$ENVF: E2631_FORK_DEPTH is not a number: ${depth:-<missing>}" ;;
-*) [ "$depth" -ge 16 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the base-port commit is 16 levels below the pinned tip" ;;
+*) [ "$depth" -ge 17 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the base-port commit is 17 levels below the pinned tip" ;;
 esac
 # Plain KEY=VALUE only: a ${VAR:-default} expression would be read literally by
 # bootstrap/base-pin-check and silently pin the wrong string.
