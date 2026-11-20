@@ -445,14 +445,14 @@
   `target/linux/sanechips` → `target/linux/zx279128`，提交前缀改为 `zx279128:` / `mt76:`，
   产物名 `immortalwrt-zx279128-generic-*`；DTS 文件名 / compatible / 设备名
   `zte_zxhn-e2631` / `package/e2631/` / `CONFIG_TARGET_DEVICE_*` 符号不变。
-- **提交结构**：新 tip `d74ec77a…` = 4 个复核过的移植提交（作者/日期保留）+ 11 个 fork 提交（含重建后 1 个 stale `@TARGET_sanechips` 依赖修复）
+- **提交结构**：新 tip `f85cbea…` = 4 个复核过的移植提交（作者/日期保留）+ 11 个 fork 提交（含重建后 1 个 stale `@TARGET_sanechips` 依赖修复；该提交由 `d74ec77a` 原地 amend 为 `f85cbea`，仅补作者/SOB，内容树 `c438794e` 不变）
   （E2631 设备支持、主线质量修复系列、firewall4 终态、stale `@TARGET_sanechips` 依赖修复），共 15 个提交；旧历史保留在
   `e2631-legacy` 分支（`5202d4ca…`）。`image/Makefile.e2631` 合并进
   `target/linux/zx279128/image/Makefile`（D5），seed 增加
   `CONFIG_TARGET_ROOTFS_INITRAMFS=y`（task-30，D6），要求 kernel config hash 保持
   `106ff47d…` 不变。
 - **钉值更新**（`scripts/pins.env`）：`E2631_IW_SHA=a4ba8240…`、
-  `E2631_IW_TREE_SHA=b905483c…`、`E2631_FORK_SHA=d74ec77a…`、
+  `E2631_IW_TREE_SHA=b905483c…`、`E2631_FORK_SHA=f85cbea…`、
   `E2631_BASE_TREE_SHA=6136bd92…`（最后一个 port 提交 `4ca29c65…` 的 tree）、
   `E2631_FORK_DEPTH` 实测下限 16（保持 32）。删除 `E2631_MERGED_MASTER_SHA/DATE`
   （rebase 后不再有 merge 提交）与 `E2631_BASE_PATCH_SHA256_0001..0004`（旧 patch 系列的

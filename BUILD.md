@@ -42,7 +42,8 @@ vendored patch series and no `apply.sh` any more (T-12):
     E2631_IW_TREE_SHA    b905483c80a3a705825ff7aa9c77d1f3db4a01c3    (pristine upstream tree)
     E2631_FORK_REPO      https://github.com/QC3284/immortalwrt
     E2631_FORK_BRANCH    e2631
-    E2631_FORK_SHA       d74ec77aff719a74c6643e540af74ae5a2f85925    (plan-C rebuild: 15 commits on the base, target renamed zx279128)
+    E2631_FORK_SHA       f85cbea06d98da2a5d0b5139a395d722426211ce    (plan-C rebuild: 15 commits on the base, target renamed zx279128;
+                                                                   SOB amend of d74ec77a, same content tree)
     E2631_BASE_TREE_SHA  6136bd92d5259dbaf22f6bca02c675f05abdf86b    (tree of the last zx279128 port commit)
     E2631_FORK_DEPTH     32                                          (scratch-history window; measured floor 16)
 

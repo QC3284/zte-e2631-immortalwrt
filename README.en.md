@@ -27,7 +27,7 @@ a build. The build happens in WSL on this machine; `make check` is the local gat
     make build
 
 `scripts/bootstrap.sh` fetches the tree fork at the tip pinned in `scripts/pins.env`
-(`d74ec77a`, the plan-C rebuild of 2026-11-21: the four reviewed port commits
+(`f85cbea`, the plan-C rebuild of 2026-11-21: the four reviewed port commits
 plus the E2631 support and fix series, rebased onto ImmortalWrt master
 `a4ba8240` and with the target renamed sanechips -> zx279128 so the tree
 follows mainline conventions; kernel 6.18.60) as a depth-1 build
