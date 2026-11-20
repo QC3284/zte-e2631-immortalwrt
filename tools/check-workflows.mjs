@@ -17,7 +17,10 @@
 // scripts/check-e2631-checkpatch.sh and the single source of its exemptions is
 // docs/checkpatch-exemptions.md. Those files are newer than the kit pin, so
 // they are read from the tree-fork branch head (CI-only content); everything
-// the image ships is still read at the pinned SHA.
+// the image ships is still read at the pinned SHA. A second tree gate,
+// scripts/check-e2631-image-expansion.sh, parses the zx279128 image context
+// and pins the two non-empty check-size invocations (RUN6 v2 shipped an empty
+// kernel limit); it is CI-only content too, so it is read from the head.
 //
 //   node tools/check-workflows.mjs
 import fs from 'node:fs';
@@ -60,6 +63,7 @@ const TREE_HEAD_RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + 
 const TREE_CI_URL = TREE_HEAD_RAW('.github/workflows/check.yml');
 const TREE_CHECKPATCH_URL = TREE_HEAD_RAW('scripts/check-e2631-checkpatch.sh');
 const TREE_EXEMPTIONS_URL = TREE_HEAD_RAW('docs/checkpatch-exemptions.md');
+const TREE_IMAGE_EXPANSION_URL = TREE_HEAD_RAW('scripts/check-e2631-image-expansion.sh');
 const RETIRED_FORK_TIP = 'd74ec77a' + 'ff719a74c6643e540af74ae5a2f85925';
 const SELF = read('tools/check-workflows.mjs');
 const RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + pins.E2631_FORK_SHA + '/' + p;
@@ -75,8 +79,8 @@ async function fetchText(url) {
     return '';
   }
 }
-const [TREE_CI, TREE_CHECKPATCH, TREE_EXEMPTIONS, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW, TREE_IMAGE_MAKEFILE] = await Promise.all(
-  [TREE_CI_URL, TREE_CHECKPATCH_URL, TREE_EXEMPTIONS_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL, TREE_IMAGE_MAKEFILE_URL].map(fetchText));
+const [TREE_CI, TREE_CHECKPATCH, TREE_EXEMPTIONS, TREE_IMAGE_EXPANSION, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW, TREE_IMAGE_MAKEFILE] = await Promise.all(
+  [TREE_CI_URL, TREE_CHECKPATCH_URL, TREE_EXEMPTIONS_URL, TREE_IMAGE_EXPANSION_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL, TREE_IMAGE_MAKEFILE_URL].map(fetchText));
 const VERSION = VERSION_RAW.trim();
 const UPDATER = UPDATER_RAW;
 
@@ -314,6 +318,20 @@ ok('the checkpatch gate reads the machine-readable exemption table',
 ok('the exemption table documents E1-E4 and carries no stale commit exemption',
   ['E1', 'E2', 'E3', 'E4'].every((id) => has(TREE_EXEMPTIONS, '| ' + id + ' |')) &&
   !has(TREE_EXEMPTIONS, '| E5 |') && !/commit:[0-9a-f]{40}/.test(TREE_EXEMPTIONS));
+ok('the tree CI gates the image pipeline expansion',
+  TREE_CI.length > 0 && has(TREE_CI, 'Image pipeline expansion check') &&
+  has(TREE_CI, 'bash scripts/check-e2631-image-expansion.sh') &&
+  TREE_IMAGE_EXPANSION.length > 0,
+  TREE_IMAGE_EXPANSION ? TREE_CI_URL : 'fetch failed: ' + TREE_IMAGE_EXPANSION_URL);
+ok('the image-pipeline gate pins both non-empty check-size invocations',
+  has(TREE_IMAGE_EXPANSION, '-C target/linux/zx279128/image -pn') &&
+  has(TREE_IMAGE_EXPANSION, 'check-size 4096k') &&
+  has(TREE_IMAGE_EXPANSION, '$$(call concat_cmd,$$(KERNEL))') &&
+  has(TREE_IMAGE_EXPANSION, '$$(call Build/check-size,$$(KERNEL_SIZE))') &&
+  has(TREE_IMAGE_EXPANSION, '$$(KDIR_KERNEL_IMAGE):') &&
+  has(TREE_IMAGE_EXPANSION, 'empty argument') &&
+  has(TREE_IMAGE_EXPANSION, 'could not parse the image context'),
+  TREE_IMAGE_EXPANSION_URL);
 ok('the tree static job guards against stale sanechips target references',
   has(TREE_CI, '@TARGET_sanechips') && has(TREE_CI, 'CONFIG_TARGET_sanechips'));
 ok('the tree static job installs the feeds so the seed luci apps resolve',
