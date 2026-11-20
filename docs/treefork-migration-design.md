@@ -101,5 +101,11 @@ QC3284/zte-e2631-immortalwrt（保留，改为 kit）
   噪音清零、无 WAN 放行），冷启动累计 17/17。详见 evidence/qshou1-batch2-flash-
   20261115.md 与 t20b-repin-batch2-20261115.md。
 
+- **方案 C 全量对齐主线 (2026-11-21, 用户 m06864 批准, 完成)**: 结构见
+  docs/mainline-alignment-design.md —— target 改名 zx279128、e2631-legacy 保点、
+  系列重建 checkpatch 0E/0W、kernel hash 106ff47d 不变、RUN6 v3 parity
+  PASS-REVIEWED-DIFFS、真机 r0-86cddb7 运行中 (slot1 serial 12, 七项复验过)。
+  本设计文档的 sanechips 结构描述自该日期起为历史 (D1/D3 为准)。
+
 ## 8. 方向定调 (2026-11-14, 用户)
 用户对「开发版/发布版」三选项的答复是第四条路: **按「合并到 immortalwrt 主线」的方向做**。即树 fork 保持 master 基底与 snapshot 身份(诚实), 修复队列与 4 个内核补丁以主线可合并质量为标准落入树 fork, 定期 rebase 跟踪 iw master; PR 动作维持「不主动」边界, 质量达标后由用户决定。

@@ -9,7 +9,7 @@ map: which piece exists, what it is responsible for, and what breaks if you move
 | | |
 |---|---|
 | **this one** (`zte-e2631-immortalwrt`) | the packaging/distribution kit: pin file, bootstrap/build/check scripts, board scripts, packer, verifiers, evidence documents. No device code of its own any more (T-12) |
-| [`QC3284/immortalwrt`](https://github.com/QC3284/immortalwrt) branch `e2631` | the tree fork: pristine `immortalwrt/immortalwrt` master pinned at `4765b657` (kernel 6.18.60) plus four sanechips port commits (target, H3600 board) and three E2631 commits (device packages, seed notes). The build checks it out at depth 1 at the tip pinned in `scripts/pins.env` |
+| [`QC3284/immortalwrt`](https://github.com/QC3284/immortalwrt) branch `e2631` | the tree fork: pristine `immortalwrt/immortalwrt` master at `a4ba8240` (kernel 6.18.60) plus the four zx279128 port commits (target, H3600 board) and the E2631 series (board, device packages, seed, quality fixes, firewall4 re-anchor) — all checkpatch-clean, mainline-shaped. The build checks it out at depth 1 at the tip pinned in `scripts/pins.env` (content tip `86cddb79`) |
 | `e2631-mainline-zx279128s` | the same SoC on **pristine** upstream Linux: upstream v6.18.38 plus 6 modified files and 4 new ones. Where the "this SoC really boots mainline" evidence comes from. No U-Boot/TFTP path any more - that is tagged `v0.1.1` |
 
 ## Repository map
@@ -39,7 +39,7 @@ map: which piece exists, what it is responsible for, and what breaks if you move
     tree fork QC3284/immortalwrt e2631 @ pin (device support as commits)
       -> bootstrap       depth-1 checkout; scratch-repo history assertions; feeds
                          pinned to the v1.10.0 commits; seed .config landed
-      -> make world      kernel 6.18.60 + the sanechips target + LuCI
+      -> make world      kernel 6.18.60 + the zx279128 target + LuCI
       -> collect.sh      kernel / root / e2631.dtb / config-6.18 / e2631-fwslot
       -> release.mjs     mkfactory pack -> verify_pkg (independent re-derivation)
                          -> verify_img (boot readiness) -> sha256

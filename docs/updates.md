@@ -37,8 +37,8 @@
 1. `check`：GET GitHub API `repos/QC3284/zte-e2631-immortalwrt/releases/latest`
    （libustream 已入镜像；仓库名可用 `uci set e2631.upd.repository=...` 覆盖，
    默认 QC3284/zte-e2631-immortalwrt 写在树 fork 的
-   `target/linux/sanechips/base-files/sbin/e2631-upgrade`，套件内副本在
-   `tests/native/target/linux/sanechips/base-files/sbin/e2631-upgrade`），比对
+   `target/linux/zx279128/base-files/sbin/e2631-upgrade`，套件内副本在
+   `tests/native/target/linux/zx279128/base-files/sbin/e2631-upgrade`），比对
    `/etc/e2631-version`；带文件参数时仅校验该文件。
    版本标签不参与比较：先剥掉标签（`OpenWrt` / `ImmortalWrt` 均可），再按数字逐段比，
    因此 OpenWrt v1.9.0 → ImmortalWrt v1.10.0 的过渡升级不需要特殊处理；

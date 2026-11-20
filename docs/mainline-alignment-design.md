@@ -124,3 +124,23 @@
 4. 真机 = RUN6 固件运行，七项复验通过，冷启动 ≥5 连续成功。
 5. docs 无残留 sanechips 误引用（evidence 历史文档除外，以迁移说明覆盖）。
 6. 旧分支 e2631-legacy 与全部旧钉点可引用。
+
+
+## 6. 进展记录 (2026-11-21)
+
+- S1–S5 全部完成: task-34..38 completed。RUN6 v3 = run 44815428424 @ kit 38fce86,
+  SUCCESS 1h24m40s, publish=false + use_pinned_apk_key=true; parity RUN5-vs-RUN6 =
+  PASS-REVIEWED-DIFFS (expected 23 / allowed 13 / unexpected 0), kernel-deep
+  STAMP-ONLY, apk 密钥 = 钉定公钥 9edb11a9…。中途一次失败: RUN6 v2 因 image/Makefile
+  合并时 check-size 丢失 $ 转义而删除 kernel.bin, 树修复 86cddb79 + 新门禁
+  g_image_parse/树 CI image-pipeline-expansion check(4b09208b)。
+- S6 真机刷写完成 (2026-11-21 06:34, 自批授权 m06872): e2631-upgrade apply 原地
+  重写运行槽, slot1 serial 11→12, slot0 原厂 V1.0.0.7B5.8000 serial=7 未动。
+  复验: revision r0-86cddb7 / DISTRIB_TARGET='zx279128/generic' / fwstate 正常
+  (DEVMEM 修复生效, FW_STATE=0) / /overlay=jffs2 (extroot 未接管) / 0 panic/oops /
+  双频 AP "E2631" 正常 / apk 公钥=钉定钥 / zte-mesh+luci-app-zte-mesh 在镜像。
+  遗留: mount_root 'failed to sync jffs2 overlay' 仍出现 1 次 (fstools 204 未完全
+  消除, 化妆级, 入修复队列); 冷启动采样待用户配合 (见验收 4)。
+- 验收标准: 1 ✓ 2 ✓ 3 ✓ 4 部分(七项复验过, 冷启动待采) 5 ✓(docs/architecture.md
+  /updates.md 已改 zx279128; 历史文档按豁免) 6 ✓。
+
