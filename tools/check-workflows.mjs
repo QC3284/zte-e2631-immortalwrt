@@ -13,6 +13,12 @@
 // fails those checks explicitly instead of skipping them, because a gate that
 // cannot see the fork must not look green.
 //
+// C-CI1 added a per-commit checkpatch gate to the tree: the enforcer is
+// scripts/check-e2631-checkpatch.sh and the single source of its exemptions is
+// docs/checkpatch-exemptions.md. Those files are newer than the kit pin, so
+// they are read from the tree-fork branch head (CI-only content); everything
+// the image ships is still read at the pinned SHA.
+//
 //   node tools/check-workflows.mjs
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,8 +53,12 @@ const TREE_BRANCH = 'e2631';
 const TREE_PIN_BASE_SHA = 'a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5';
 const TREE_PIN_IW_TREE_SHA = 'b905483c80a3a705825ff7aa9c77d1f3db4a01c3';
 const TREE_PIN_TREE_SHA = '6136bd92d5259dbaf22f6bca02c675f05abdf86b';
-const TREE_PIN_FORK_SHA = 'd74ec77aff719a74c6643e540af74ae5a2f85925';
-const TREE_CI_URL = 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_BRANCH + '/.github/workflows/check.yml';
+const TREE_HEAD_RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_BRANCH + '/' + p;
+const TREE_CI_URL = TREE_HEAD_RAW('.github/workflows/check.yml');
+const TREE_CHECKPATCH_URL = TREE_HEAD_RAW('scripts/check-e2631-checkpatch.sh');
+const TREE_EXEMPTIONS_URL = TREE_HEAD_RAW('docs/checkpatch-exemptions.md');
+const RETIRED_FORK_TIP = 'd74ec77a' + 'ff719a74c6643e540af74ae5a2f85925';
+const SELF = read('tools/check-workflows.mjs');
 const RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + pins.E2631_FORK_SHA + '/' + p;
 const VERSION_URL = RAW('target/linux/zx279128/base-files/etc/e2631-version');
 const UPDATER_URL = RAW('target/linux/zx279128/base-files/sbin/e2631-upgrade');
@@ -61,8 +71,8 @@ async function fetchText(url) {
     return '';
   }
 }
-const [TREE_CI, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW] = await Promise.all(
-  [TREE_CI_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL].map(fetchText));
+const [TREE_CI, TREE_CHECKPATCH, TREE_EXEMPTIONS, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW] = await Promise.all(
+  [TREE_CI_URL, TREE_CHECKPATCH_URL, TREE_EXEMPTIONS_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL].map(fetchText));
 const VERSION = VERSION_RAW.trim();
 const UPDATER = UPDATER_RAW;
 
@@ -82,11 +92,16 @@ ok('scripts/pins.env exists and carries every pin', PIN_KEYS.every((k) => typeof
   PIN_KEYS.filter((k) => !pins[k]).join(', '));
 ok('the pin file has plain values (no shell ${VAR:-default} expressions)',
   !PIN_TEXT.split('\n').some((l) => l && !l.startsWith('#') && l.includes('${')));
-ok('the fork pin is the reviewed plan-C tip on the tree-fork branch',
+ok('the fork pin is on the reviewed tree-fork branch',
   pins.E2631_FORK_REPO === 'https://github.com/' + TREE_REPO &&
-  pins.E2631_FORK_BRANCH === TREE_BRANCH &&
-  pins.E2631_FORK_SHA === TREE_PIN_FORK_SHA,
+  pins.E2631_FORK_BRANCH === TREE_BRANCH && hex40(pins.E2631_FORK_SHA),
   pins.E2631_FORK_REPO + ' ' + pins.E2631_FORK_BRANCH + ' @ ' + pins.E2631_FORK_SHA);
+// The tip must come from scripts/pins.env, never from a constant: a hardcoded
+// tip silently keeps checking the old build after a re-pin (d74ec77a lesson).
+ok('the fork tip is read from scripts/pins.env and no tip SHA is hardcoded here',
+  !has(SELF, RETIRED_FORK_TIP) &&
+  [VERSION_URL, UPDATER_URL, TREE_SEED_URL].every((u) => has(u, '/' + pins.E2631_FORK_SHA + '/')),
+  pins.E2631_FORK_SHA);
 ok('the ImmortalWrt base, its pristine tree and the base-port tree pin are the plan-C values',
   pins.E2631_IW_SHA === TREE_PIN_BASE_SHA &&
   pins.E2631_IW_TREE_SHA === TREE_PIN_IW_TREE_SHA &&
@@ -256,6 +271,38 @@ ok('the tree CI names the renamed zx279128 target and the reviewed port commit s
   has(TREE_CI, 'zx279128: add support for ZTE ZXHN H3600'));
 ok('the tree CI forbids the retired image/Makefile.e2631',
   has(TREE_CI, 'Makefile.e2631 must not exist'));
+// C-CI1: the tree gate must enforce the checkpatch baseline, not just assert
+// that files exist. The enforcer and its exemption table are newer than the kit
+// pin, so they are read from the branch head (CI-only content).
+ok('the tree CI publishes the per-commit checkpatch gate',
+  TREE_CI.length > 0 && has(TREE_CI, 'Per-commit checkpatch gate') &&
+  has(TREE_CI, 'bash scripts/check-e2631-checkpatch.sh') && has(TREE_CI, 'fetch-depth: 0'),
+  TREE_CI ? TREE_CI_URL : 'fetch failed: ' + TREE_CI_URL);
+ok('the checkpatch gate script is published on ' + TREE_BRANCH,
+  TREE_CHECKPATCH.length > 0,
+  TREE_CHECKPATCH ? TREE_CHECKPATCH_URL : 'fetch failed: ' + TREE_CHECKPATCH_URL);
+ok('the checkpatch gate pins the base and proves it is an ancestor',
+  has(TREE_CHECKPATCH, 'E2631_IW_SHA') && has(TREE_CHECKPATCH, 'merge-base --is-ancestor'));
+ok('the checkpatch gate checks every non-merge commit with the default report format',
+  has(TREE_CHECKPATCH, 'git rev-list --no-merges') && has(TREE_CHECKPATCH, '--no-tree') &&
+  has(TREE_CHECKPATCH, '--show-types') && has(TREE_CHECKPATCH, '-g "$sha"') &&
+  !/perl .*--ignore/.test(TREE_CHECKPATCH));
+ok('the checkpatch gate enforces the plan-C scope and commit-message findings',
+  has(TREE_CHECKPATCH, 'target/linux/zx279128') && has(TREE_CHECKPATCH, 'package/e2631') &&
+  has(TREE_CHECKPATCH, '<commit-message>'));
+ok('the checkpatch gate reads the machine-readable exemption table',
+  has(TREE_CHECKPATCH, 'docs/checkpatch-exemptions.md') &&
+  has(TREE_EXEMPTIONS, '<!-- checkpatch-exemptions:begin -->') &&
+  has(TREE_EXEMPTIONS, '<!-- checkpatch-exemptions:end -->'),
+  TREE_EXEMPTIONS ? '' : 'fetch failed: ' + TREE_EXEMPTIONS_URL);
+ok('the exemption table documents E1-E4 and a scoped commit exemption',
+  ['E1', 'E2', 'E3', 'E4'].every((id) => has(TREE_EXEMPTIONS, '| ' + id + ' |')) &&
+  has(TREE_EXEMPTIONS, '| E5 |') && has(TREE_EXEMPTIONS, 'commit:d74ec77a'));
+ok('the tree static job guards against stale sanechips target references',
+  has(TREE_CI, '@TARGET_sanechips') && has(TREE_CI, 'CONFIG_TARGET_sanechips'));
+ok('the tree static job installs the feeds so the seed luci apps resolve',
+  has(TREE_CI, './scripts/feeds update packages luci') &&
+  has(TREE_CI, 'CONFIG_PACKAGE_luci-app-zte-mesh=y'));
 
 // 12. the legacy tree is gone and no live file pretends otherwise.
 ok('the kit no longer carries overlay/, base/ or apply.sh',
