@@ -20,11 +20,14 @@
 // the image ships is still read at the pinned SHA. A second tree gate,
 // scripts/check-e2631-image-expansion.sh, parses the zx279128 image context
 // and pins the two non-empty check-size invocations (RUN6 v2 shipped an empty
-// kernel limit); it is CI-only content too, so it is read from the head.
+// kernel limit); it is CI-only content too, so it is read at the branch head
+// (resolved with git ls-remote and fetched by SHA, never through the branch
+// alias, whose raw copy is CDN-cached for minutes).
 //
 //   node tools/check-workflows.mjs
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const read = (p) => fs.readFileSync(path.join(REPO, p), 'utf8');
@@ -56,10 +59,27 @@ const TREE_BRANCH = 'e2631';
 const TREE_PIN_BASE_SHA = 'a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5';
 const TREE_PIN_IW_TREE_SHA = 'b905483c80a3a705825ff7aa9c77d1f3db4a01c3';
 const TREE_PIN_TREE_SHA = '6136bd92d5259dbaf22f6bca02c675f05abdf86b';
-// refs/heads/ is deliberate: the short branch URL is CDN-cached for minutes, and
-// a stale doc would make the CI-only assertions disagree with the tree it just
-// accepted. The long ref path serves the current head.
-const TREE_HEAD_RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/refs/heads/' + TREE_BRANCH + '/' + p;
+// Resolve the branch head with git ls-remote and fetch the CI-only files by
+// commit SHA. raw.githubusercontent.com caches branch aliases for minutes, and
+// a stale copy made the kit checker disagree with a tree CI commit it had just
+// accepted (2026-11-21: the tree run 44815481592 was green while two local
+// checker runs still fetched the previous check.yml). A by-SHA fetch is
+// content-addressed, so whatever the CDN cached for that SHA is the right text;
+// if ls-remote fails the branch URL is kept as the fallback so the checks still
+// fail explicitly instead of vanishing.
+const TREE_HEAD_SHA = (() => {
+  try {
+    const out = execFileSync('git', ['ls-remote', 'https://github.com/' + TREE_REPO + '.git',
+      'refs/heads/' + TREE_BRANCH], { encoding: 'utf8', timeout: 30000 });
+    const sha = out.trim().split(/\s+/)[0] || '';
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : '';
+  } catch {
+    return '';
+  }
+})();
+const TREE_HEAD_RAW = (p) => TREE_HEAD_SHA
+  ? 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_HEAD_SHA + '/' + p
+  : 'https://raw.githubusercontent.com/' + TREE_REPO + '/refs/heads/' + TREE_BRANCH + '/' + p;
 const TREE_CI_URL = TREE_HEAD_RAW('.github/workflows/check.yml');
 const TREE_CHECKPATCH_URL = TREE_HEAD_RAW('scripts/check-e2631-checkpatch.sh');
 const TREE_EXEMPTIONS_URL = TREE_HEAD_RAW('docs/checkpatch-exemptions.md');
