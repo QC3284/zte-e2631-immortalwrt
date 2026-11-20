@@ -6,13 +6,14 @@
 #
 #   bash scripts/bootstrap.sh          # or: make bootstrap
 #
-# The sanechips port and the E2631 device/package support are real commits in
+# The zx279128 port and the E2631 device/package support are real commits in
 # QC3284/immortalwrt, branch e2631, pinned by E2631_FORK_SHA (scripts/pins.env)
-# - not a patch series applied here. The BUILD tree is fetched at --depth 1
+# - not a patch series applied here. Plan C (2026-11-21) rebuilt the series on
+# ImmortalWrt a4ba8240 and renamed the target sanechips -> zx279128. The BUILD tree is fetched at --depth 1
 # (parity requirement P2, evidence/immortalwrt-verify-20261114.md: rules.mk
 # COMMITCOUNT is "git rev-list --count HEAD .", so a deeper clone changes
 # base-files PKG_RELEASE). The history assertions - base-port tree in history,
-# the four sanechips commits on the upstream pin - run in a separate scratch
+# the four port commits on the upstream pin - run in a separate scratch
 # repo under $E2631_WORK, so the build tree never deepens.
 #
 # Feeds are pinned too (P3): each feed is cloned on its branch and then reset to
@@ -137,8 +138,9 @@ say "port series verified: 4 commits above the ImmortalWrt pin"
 
 # Device support is committed in the fork: the files must exist in the build
 # tree (depth 1 carries the full working tree, just not the history).
-for p in target/linux/sanechips/base-files/etc/config/wireless \
-	 target/linux/sanechips/image/Makefile.e2631; do
+for p in target/linux/zx279128/base-files/etc/config/wireless \
+	 target/linux/zx279128/image/Makefile \
+	 target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts; do
 	git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- "$p" | grep -qx "$p" ||
 		die "the tree fork has no $p - the e2631 commit set is incomplete"
 done
@@ -147,8 +149,10 @@ git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- package/e2631 | grep -q '/Ma
 
 # ---- 3. the committed kernel pin and image hook ----------------------------
 # On the tree fork both properties are committed: a forced kernel command line
-# (otherwise the vendor bootargs win) and the image/Makefile hook that includes
-# Makefile.e2631. The kit asserts them; it never applies the port itself.
+# (otherwise the vendor bootargs win) and the E2631 image definition in the
+# target's image/Makefile. The kit asserts them; it never applies the port
+# itself. Plan C merged the old image/Makefile.e2631 into image/Makefile (D5),
+# so a tree that still carries the include is stale.
 kf="$E2631_TREE/target/linux/generic/kernel-6.18"
 [ -f "$kf" ] || die "$E2631_TREE has no $kf - not an OpenWrt/ImmortalWrt tree?"
 if [ -n "${E2631_BASE_KERNEL:-}" ]; then
@@ -157,11 +161,13 @@ if [ -n "${E2631_BASE_KERNEL:-}" ]; then
 		die "$kf: LINUX_VERSION-6.18 is not ${want_kernel} - the tree is not the pinned kernel $E2631_BASE_KERNEL"
 	say "kernel pin verified: $E2631_BASE_KERNEL"
 fi
-grep -qx 'CONFIG_CMDLINE_FORCE=y' "$E2631_TREE/target/linux/sanechips/config-6.18" ||
-	die "$E2631_TREE/target/linux/sanechips/config-6.18 has no CONFIG_CMDLINE_FORCE=y - the vendor bootargs would win"
+grep -qx 'CONFIG_CMDLINE_FORCE=y' "$E2631_TREE/target/linux/zx279128/config-6.18" ||
+	die "$E2631_TREE/target/linux/zx279128/config-6.18 has no CONFIG_CMDLINE_FORCE=y - the vendor bootargs would win"
 say "overlay is committed in the tree fork - not applying it again"
-grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
-	die "the tree's image/Makefile does not hook Makefile.e2631 - the E2631 device definition would be invisible"
+grep -q 'Device/zte_zxhn-e2631' "$E2631_TREE/target/linux/zx279128/image/Makefile" ||
+	die "the tree's image/Makefile has no Device/zte_zxhn-e2631 - the E2631 image definition would be invisible"
+[ ! -e "$E2631_TREE/target/linux/zx279128/image/Makefile.e2631" ] ||
+	die "the tree still carries image/Makefile.e2631 - plan C merged it into image/Makefile (D5)"
 
 # ---- 4. feeds ---------------------------------------------------------------
 # Only packages and luci. Two traps, both hit in practice: a hand-cloned feed has
@@ -263,7 +269,8 @@ awk -F= '
 ' "$SEED" "$E2631_TREE/.config" > "$E2631_TREE/.config.reseed"
 mv "$E2631_TREE/.config.reseed" "$E2631_TREE/.config"
 ( cd "$E2631_TREE" && make defconfig >/dev/null 2>&1 )
-for want in CONFIG_TARGET_DEVICE_sanechips_generic_DEVICE_zte_zxhn-e2631= \
+for want in CONFIG_TARGET_DEVICE_zx279128_generic_DEVICE_zte_zxhn-e2631= \
+	CONFIG_TARGET_ROOTFS_INITRAMFS= \
 	CONFIG_SOFT_FLOAT= CONFIG_PACKAGE_luci= CONFIG_PACKAGE_e2631-fwslot=; do
 	grep -q "^$want" "$E2631_TREE/.config" || die "seed check: $want missing after defconfig"
 done
@@ -280,7 +287,7 @@ n=$(grep -cE '^CONFIG_PACKAGE_libustream-(openssl|mbedtls|wolfssl)=y$' "$E2631_T
        (libustream-* CONFLICT with each other; the seed follows the base's TLS choice)"
 grep -qx '# CONFIG_PACKAGE_wpad-basic-mbedtls is not set' "$E2631_TREE/.config" ||
 	die "seed check: wpad-basic-mbedtls is still selected - it CONFLICTS with wpad-mbedtls
-       (the seed disables it because the sanechips target adds it to DEFAULT_PACKAGES)"
+       (the seed disables it because the zx279128 target adds it to DEFAULT_PACKAGES)"
 
 # A package name in the seed that does not exist in the feeds (or lost its
 # dependency) is silently dropped by defconfig. That used to be invisible; on a

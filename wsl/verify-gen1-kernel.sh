@@ -16,7 +16,7 @@ pgrep -a -f 'make ' || echo none
 
 TREE=$E2631_TREE
 K=""
-for d in "$TREE"/build_dir/target-*/linux-sanechips*/linux-*/; do
+for d in "$TREE"/build_dir/target-*/linux-zx279128*/linux-*/; do
   [ -f "$d/vmlinux" ] && { K=$d; break; }
 done
 echo "K=$K"
@@ -47,5 +47,5 @@ done < /tmp/gen1.fn.asm
 echo "note: the info string lives in .rodata, count here=$m"
 
 echo "== the two images we ship"
-ls -l --time-style=+%H:%M:%S "$TREE/bin/targets/sanechips/generic/" | while IFS= read -r l; do echo "  $l"; done
+ls -l --time-style=+%H:%M:%S "$TREE/bin/targets/zx279128/generic/" | while IFS= read -r l; do echo "  $l"; done
 echo GEN1-VERIFY-DONE

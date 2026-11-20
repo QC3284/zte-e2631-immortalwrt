@@ -6,9 +6,12 @@
 //
 // T-12 moved the port into the tree fork (QC3284/immortalwrt branch e2631), so
 // the version string and the updater are read from that fork at the pinned SHA
-// over HTTPS. check.yml runs this with network access; a local offline run
-// fails those two checks explicitly instead of skipping them, because a gate
-// that cannot see the fork must not look green.
+// over HTTPS. Plan C (2026-11-21, mainline alignment) rebased the series onto
+// ImmortalWrt a4ba8240 and renamed the target sanechips -> zx279128, so the
+// live paths below are zx279128 ones and the provenance block no longer names
+// a merge commit. check.yml runs this with network access; a local offline run
+// fails those checks explicitly instead of skipping them, because a gate that
+// cannot see the fork must not look green.
 //
 //   node tools/check-workflows.mjs
 import fs from 'node:fs';
@@ -36,18 +39,19 @@ for (const line of PIN_TEXT.split('\n')) {
 const PIN_KEYS = ['E2631_IW_REPO', 'E2631_IW_BRANCH', 'E2631_IW_SHA', 'E2631_IW_TREE_SHA',
   'E2631_BASE_KERNEL', 'E2631_FORK_REPO', 'E2631_FORK_BRANCH', 'E2631_FORK_SHA',
   'E2631_FORK_DEPTH', 'E2631_BASE_TREE_SHA', 'E2631_PORT_REPO', 'E2631_PORT_BRANCH',
-  'E2631_PORT_SHA', 'E2631_PORT_BASE_SHA', 'E2631_BASE_PATCH_SHA256_0001',
-  'E2631_BASE_PATCH_SHA256_0002', 'E2631_BASE_PATCH_SHA256_0003',
-  'E2631_BASE_PATCH_SHA256_0004', 'E2631_FEED_PACKAGES_SHA', 'E2631_FEED_LUCI_SHA'];
+  'E2631_PORT_SHA', 'E2631_PORT_BASE_SHA',
+  'E2631_FEED_PACKAGES_SHA', 'E2631_FEED_LUCI_SHA'];
 const hex40 = (v) => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v);
 const TREE_REPO = 'QC3284/immortalwrt';
 const TREE_BRANCH = 'e2631';
-const TREE_PIN_BASE_SHA = '4765b657625ec5bbda74b44400465fe043802b30';
-const TREE_PIN_TREE_SHA = '4f89aa7ad0a5132dc047a27a9073b43916f0f957';
+const TREE_PIN_BASE_SHA = 'a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5';
+const TREE_PIN_IW_TREE_SHA = 'b905483c80a3a705825ff7aa9c77d1f3db4a01c3';
+const TREE_PIN_TREE_SHA = '6136bd92d5259dbaf22f6bca02c675f05abdf86b';
+const TREE_PIN_FORK_SHA = 'd74ec77aff719a74c6643e540af74ae5a2f85925';
 const TREE_CI_URL = 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_BRANCH + '/.github/workflows/check.yml';
 const RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + pins.E2631_FORK_SHA + '/' + p;
-const VERSION_URL = RAW('target/linux/sanechips/base-files/etc/e2631-version');
-const UPDATER_URL = RAW('target/linux/sanechips/base-files/sbin/e2631-upgrade');
+const VERSION_URL = RAW('target/linux/zx279128/base-files/etc/e2631-version');
+const UPDATER_URL = RAW('target/linux/zx279128/base-files/sbin/e2631-upgrade');
 const TREE_SEED_URL = RAW('seed/e2631.config');
 async function fetchText(url) {
   try {
@@ -78,21 +82,26 @@ ok('scripts/pins.env exists and carries every pin', PIN_KEYS.every((k) => typeof
   PIN_KEYS.filter((k) => !pins[k]).join(', '));
 ok('the pin file has plain values (no shell ${VAR:-default} expressions)',
   !PIN_TEXT.split('\n').some((l) => l && !l.startsWith('#') && l.includes('${')));
-ok('the fork pin is the reviewed tip on the tree-fork branch',
+ok('the fork pin is the reviewed plan-C tip on the tree-fork branch',
   pins.E2631_FORK_REPO === 'https://github.com/' + TREE_REPO &&
   pins.E2631_FORK_BRANCH === TREE_BRANCH &&
-  pins.E2631_FORK_SHA === '5202d4cadca831c5394b4ceca32df22c123d46a7',
+  pins.E2631_FORK_SHA === TREE_PIN_FORK_SHA,
   pins.E2631_FORK_REPO + ' ' + pins.E2631_FORK_BRANCH + ' @ ' + pins.E2631_FORK_SHA);
-ok('the ImmortalWrt pin and the base-port tree pin are unchanged',
-  pins.E2631_IW_SHA === TREE_PIN_BASE_SHA && pins.E2631_BASE_TREE_SHA === TREE_PIN_TREE_SHA);
+ok('the ImmortalWrt base, its pristine tree and the base-port tree pin are the plan-C values',
+  pins.E2631_IW_SHA === TREE_PIN_BASE_SHA &&
+  pins.E2631_IW_TREE_SHA === TREE_PIN_IW_TREE_SHA &&
+  pins.E2631_BASE_TREE_SHA === TREE_PIN_TREE_SHA,
+  pins.E2631_IW_SHA + ' / ' + pins.E2631_BASE_TREE_SHA);
 ok('all commit pins are full 40-hex SHAs',
   [pins.E2631_IW_SHA, pins.E2631_IW_TREE_SHA, pins.E2631_FORK_SHA, pins.E2631_PORT_SHA,
     pins.E2631_PORT_BASE_SHA, pins.E2631_FEED_PACKAGES_SHA, pins.E2631_FEED_LUCI_SHA]
-    .every(hex40) &&
-  /^[0-9a-f]{64}$/.test(pins.E2631_BASE_PATCH_SHA256_0001));
-ok('the scratch history depth is deep enough to reach the base-port commit (P2)',
-  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 17,
-  pins.E2631_FORK_DEPTH + ' levels; the base-port commit is 17 below the tip');
+    .every(hex40));
+ok('the retired merge-commit and patch-series pins are gone',
+  !has(PIN_TEXT, 'E2631_MERGED_MASTER_SHA=') && !has(PIN_TEXT, 'E2631_MERGED_MASTER_DATE=') &&
+  !has(PIN_TEXT, 'E2631_BASE_PATCH_SHA256_0001='));
+ok('the scratch history depth is deep enough to reach the upstream pin (P2)',
+  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 16,
+  pins.E2631_FORK_DEPTH + ' levels; the upstream pin is 16 below the tip');
 
 // 2. The tree-fork content is what the kit claims to ship.
 ok('the tree fork at the pinned SHA serves /etc/e2631-version', VERSION.length > 0,
@@ -125,6 +134,11 @@ ok('host/publish.mjs example uses the new prefix', has(PUBLISH, 'out/e2631-immor
 ok('host/publish.mjs release title says ImmortalWrt', has(PUBLISH, 'E2631 ImmortalWrt'));
 ok('collect.sh accepts both openwrt-* and immortalwrt-* sysupgrade images',
   has(COLLECT, 'openwrt-*-sysupgrade*.bin') && has(COLLECT, 'immortalwrt-*-sysupgrade*.bin'));
+ok('host/release.mjs reads the board DTS from the zx279128 target',
+  has(RELEASE, 'target/linux/zx279128/dts/') && has(RELEASE, "'--target', 'zx279128'"));
+ok('the native test copies live under target/linux/zx279128',
+  exists('tests/native/target/linux/zx279128/base-files/sbin/e2631-upgrade') &&
+  !exists('tests/native/target/linux/sanechips'));
 {
   const stale = Object.entries({ '.github/workflows/check.yml': WF.check, '.github/workflows/firmware.yml': WF.firmware,
     'scripts/build.sh': BUILD_SH, 'host/release.mjs': RELEASE, 'host/stage.mjs': STAGE, 'host/publish.mjs': PUBLISH })
@@ -134,22 +148,21 @@ ok('collect.sh accepts both openwrt-* and immortalwrt-* sysupgrade images',
 
 // 5. SOURCE-INFO keeps the provenance the report promises (T-12 fields).
 for (const key of ['Kit commit:', 'ImmortalWrt base:', 'ImmortalWrt tree (pristine):',
-  'Port base tree (4 patches applied):', 'Tree fork:', 'Parity reproduction:', 'Kernel build id:',
+  'Port base tree (4 commits applied):', 'Tree fork:', 'Parity reproduction:', 'Kernel build id:',
   'Kernel:', 'Packages feed:', 'Packages commit:', 'LuCI feed:', 'LuCI commit:',
   'APK signing key:', 'Hardware tested: NO']) {
   ok('firmware.yml SOURCE-INFO records ' + key.replace(':', ''), has(WF.firmware, key));
 }
 ok('firmware.yml SOURCE-INFO no longer records a base kind', !has(WF.firmware, 'Base kind:'));
-// The fork merged ImmortalWrt master a4ba8240; the build tree is depth 1 so the
-// merge parent cannot be derived at build time - pins.env owns it and the
-// shipped provenance record has to name it (Lead decision 2026-11-15).
-ok('pins.env names the upstream commit the fork merged',
-  hex40(pins.E2631_MERGED_MASTER_SHA) &&
-  /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(pins.E2631_MERGED_MASTER_DATE || ''),
-  (pins.E2631_MERGED_MASTER_SHA || 'missing') + ' (' + (pins.E2631_MERGED_MASTER_DATE || 'missing') + ')');
-ok('firmware.yml SOURCE-INFO cites the merged upstream commit',
-  has(WF.firmware, 'Merged ImmortalWrt master:') &&
-  has(WF.firmware, 'E2631_MERGED_MASTER_SHA') && has(WF.firmware, 'E2631_MERGED_MASTER_DATE'));
+// Plan C rebased the series onto a4ba8240, so there is no merge commit to name:
+// SOURCE-INFO states the base commit and its tree directly, and the retired
+// merge/patch lines must not come back (a stale line would misdescribe the image).
+ok('firmware.yml SOURCE-INFO cites the ImmortalWrt base commit and its tree',
+  has(WF.firmware, 'ImmortalWrt base:') && has(WF.firmware, 'E2631_IW_SHA') &&
+  has(WF.firmware, 'E2631_IW_TREE_SHA'));
+ok('firmware.yml SOURCE-INFO no longer carries the retired merge or patch-series lines',
+  !has(WF.firmware, 'Merged ImmortalWrt master:') && !has(WF.firmware, 'E2631_MERGED_MASTER') &&
+  !has(WF.firmware, 'Port patch 0001:'));
 ok('firmware.yml hashes the release assets',
   has(WF.firmware, 'sha256sum e2631-immortalwrt-experimental.bin SOURCE-INFO.txt > SHA256SUMS'));
 
@@ -161,6 +174,14 @@ ok('the kit no longer ships a seed that could shadow the tree fork seed',
 ok('the pinned tree fork seed carries CONFIG_KERNEL_DEVMEM=y',
   has(TREE_SEED_RAW, 'CONFIG_KERNEL_DEVMEM=y'),
   TREE_SEED_RAW ? '' : 'fetch failed: ' + TREE_SEED_URL);
+ok('the pinned tree fork seed carries CONFIG_TARGET_ROOTFS_INITRAMFS=y (D6)',
+  has(TREE_SEED_RAW, 'CONFIG_TARGET_ROOTFS_INITRAMFS=y'),
+  TREE_SEED_RAW ? '' : 'fetch failed: ' + TREE_SEED_URL);
+ok('the pinned tree fork seed names the renamed zx279128 target',
+  has(TREE_SEED_RAW, 'CONFIG_TARGET_zx279128=y') &&
+  has(TREE_SEED_RAW, 'CONFIG_TARGET_zx279128_generic=y'));
+ok('bootstrap asserts the initramfs build mode from the seed',
+  has(BOOTSTRAP, 'CONFIG_TARGET_ROOTFS_INITRAMFS='));
 ok('bootstrap seeds from the tree fork seed, never from a kit copy',
   has(BOOTSTRAP, 'SEED="$E2631_TREE/seed/e2631.config"') &&
   has(BOOTSTRAP, 'cp "$SEED" "$E2631_TREE/.config"') &&
@@ -230,6 +251,11 @@ ok('the tree fork publishes .github/workflows/check.yml on ' + TREE_BRANCH,
   TREE_CI.length > 0, TREE_CI ? TREE_CI_URL : 'fetch failed');
 ok('the tree CI references the pinned ImmortalWrt base and the port tree hash',
   has(TREE_CI, TREE_PIN_BASE_SHA) && has(TREE_CI, TREE_PIN_TREE_SHA));
+ok('the tree CI names the renamed zx279128 target and the reviewed port commit subject',
+  has(TREE_CI, 'target/linux/zx279128/') &&
+  has(TREE_CI, 'zx279128: add support for ZTE ZXHN H3600'));
+ok('the tree CI forbids the retired image/Makefile.e2631',
+  has(TREE_CI, 'Makefile.e2631 must not exist'));
 
 // 12. the legacy tree is gone and no live file pretends otherwise.
 ok('the kit no longer carries overlay/, base/ or apply.sh',
@@ -248,7 +274,7 @@ ok('the kit no longer carries overlay/, base/ or apply.sh',
   scan.push('Makefile', 'NOTICE', '.env.example',
     '.github/workflows/check.yml', '.github/workflows/firmware.yml');
   const skip = new Set(['tools/check-workflows.mjs', 'scripts/base-pin-check.sh', 'tests/test_userdata_gate.sh']);
-  const pattern = /overlay\/|apply\.sh|base\/commits\.env|E2631_BASE_KIND/;
+  const pattern = /overlay\/|apply\.sh|base\/commits\.env|E2631_BASE_KIND|target\/linux\/sanechips|CONFIG_TARGET_DEVICE_sanechips|immortalwrt-sanechips-generic/;
   const hits = scan.filter((f) => !skip.has(f) && pattern.test(read(f).split('\n')
     .filter((l) => !/^\s*(#|\/\/)/.test(l)).join('\n')));
   ok('no live file references the retired overlay/apply.sh path', hits.length === 0, hits.join(', '));

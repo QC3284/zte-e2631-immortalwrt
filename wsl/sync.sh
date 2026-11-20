@@ -20,6 +20,6 @@ find "$DST" -type f \( -name '*.sh' -o -path '*/init.d/*' -o -path '*/hotplug.d/
 echo "synced $(find "$DST" -type f -not -path '*/.git/*' | wc -l) files into $DST"
 # The device scripts themselves live in the tree fork; show them when a bootstrap
 # tree is present (T-12: this step syncs the kit, it no longer applies an overlay).
-[ -n "${E2631_TREE:-}" ] && [ -d "$E2631_TREE/target/linux/sanechips" ] &&
-	ls -l "$E2631_TREE/target/linux/sanechips/base-files/etc/init.d/" | tail -3
+[ -n "${E2631_TREE:-}" ] && [ -d "$E2631_TREE/target/linux/zx279128" ] &&
+	ls -l "$E2631_TREE/target/linux/zx279128/base-files/etc/init.d/" | tail -3
 exit 0

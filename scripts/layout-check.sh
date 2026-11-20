@@ -17,11 +17,12 @@
 #   HEADER_AT    0x1500000  the 512-byte vendor version header block starts
 #                           right after the window, outside the overlay.
 #
-# T-12: the port moved into the tree fork (QC3284/immortalwrt branch e2631).
-# The kit still owns the image content test (tools/verify_img.mjs), the packer
-# defaults (host/release.mjs) and the host first-flash preflight
-# (scripts/preflight.sh); the tree owns the board DTS, the image rule
-# (Makefile.e2631) and the device preflight copy. Pre-bootstrap only the kit
+# Plan C: the port lives in the tree fork (QC3284/immortalwrt branch e2631),
+# target renamed sanechips -> zx279128 and the old image/Makefile.e2631 merged
+# into the target's image/Makefile (D5). The kit still owns the image content
+# test (tools/verify_img.mjs), the packer defaults (host/release.mjs) and the
+# host first-flash preflight (scripts/preflight.sh); the tree owns the board
+# DTS, the image rule and the device preflight copy. Pre-bootstrap only the kit
 # copies exist and are checked; post-bootstrap the tree copies are checked too,
 # so drift between the two repos cannot pass silently. Comments and prose are
 # not parsed: only the values the code actually uses are.
@@ -86,7 +87,7 @@ check_preflight() {	# check_preflight <path> <label>
 check_preflight scripts/preflight.sh scripts/preflight.sh
 
 # ---- tree copies (post-bootstrap) -----------------------------------------
-TREE_DIR="${E2631_TREE:-}/target/linux/sanechips"
+TREE_DIR="${E2631_TREE:-}/target/linux/zx279128"
 if [ ! -d "$TREE_DIR" ]; then
 	echo "SKIP tree geometry copies: no tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh, then re-run this gate"
 	[ $rc -eq 0 ] && echo "layout-check: kit copies agree on $(hx "$WANT_KERNEL") / $(hx "$WANT_SPAN") / $(hx "$WANT_HEADER") (tree copies checked after a bootstrap)"
@@ -149,8 +150,12 @@ dts_h=$((h_addr - s1_base))
 	bad "$DTS: slot1-header block is $(hx "$h_size"), expected 0x20000 (one erase block)"
 note "board DTS" "slot1@$(hx "$s1_base")+$(hx "$s1_span") rootfs@+$(hx "$dts_k")[$(hx "$r_size")] header@+$(hx "$dts_h")[$(hx "$h_size")]"
 
-# The image rule that calls the packer (tree Makefile.e2631).
-MK="$TREE_DIR/image/Makefile.e2631"
+# The image rule that calls the packer (tree target image/Makefile; plan C
+# merged the old Makefile.e2631 in, so the include must be gone).
+MK="$TREE_DIR/image/Makefile"
+if [ -e "$TREE_DIR/image/Makefile.e2631" ]; then
+	bad "$TREE_DIR/image/Makefile.e2631 still exists - plan C merged it into image/Makefile (D5)"
+fi
 read -r mk_r mk_h <<EOF2
 $(sed -n 's/.*--rootfs-at \(0x[0-9a-fA-F]*\) --header-at \(0x[0-9a-fA-F]*\).*/\1 \2/p' "$MK" | head -1)
 EOF2
@@ -159,7 +164,7 @@ if [ -z "${mk_r:-}" ] || [ -z "${mk_h:-}" ]; then
 else
 	[ "$((mk_r))" -eq "$WANT_KERNEL" ] || bad "$MK: packer --rootfs-at $mk_r, expected $(hx "$WANT_KERNEL")"
 	[ "$((mk_h))" -eq "$WANT_HEADER" ] || bad "$MK: packer --header-at $mk_h, expected $(hx "$WANT_HEADER")"
-	note "Makefile.e2631" "--rootfs-at=$(hx "$((mk_r))") --header-at=$(hx "$((mk_h))")"
+	note "image/Makefile" "--rootfs-at=$(hx "$((mk_r))") --header-at=$(hx "$((mk_h))")"
 fi
 
 # The device first-flash preflight copy in the tree.

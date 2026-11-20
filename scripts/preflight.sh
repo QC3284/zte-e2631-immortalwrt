@@ -12,7 +12,7 @@
 # refusal, because "probably fine" is not a flash decision.
 #
 # The same script ships in the image at /sbin/e2631-preflight; the tree fork
-# installs it into target/linux/sanechips/base-files/sbin/ (T-12).
+# installs it into target/linux/zx279128/base-files/sbin/ (plan C rename).
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 
 die() { echo "PREFLIGHT FAIL: $*" >&2; exit 1; }
@@ -35,8 +35,9 @@ E2631_FWSLOT=${E2631_FWSLOT_BIN:-$(command -v e2631-fwslot 2>/dev/null)}
 # sha256 of the 16-byte outer magic every kit-packed package starts with
 E2631_MAGIC_SHA=3d25b5b9bf4079c6760449611963b6f1
 
-# Slot geometry. The packer (host/release.mjs), the image rule
-# (Makefile.e2631), the board DTS and this file must agree: scripts/check.sh's
+# Slot geometry. The packer (host/release.mjs), the tree's image rule
+# (target/linux/zx279128/image/Makefile), the board DTS and this file must agree:
+# scripts/check.sh's
 # g_layout parses these three plain literals back out and compares them, and
 # the device copy of this script in the tree fork carries the same three lines.
 E2631_KERNEL_AT=0x400000

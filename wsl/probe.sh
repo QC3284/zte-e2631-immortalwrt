@@ -21,5 +21,5 @@ echo "-- errors:"
 # as a failure on every successful build.
 grep -nE '^make.*(\*\*\*|Error [0-9])|^ +ERROR: .* failed to build\.' "$L" 2>/dev/null | tail -4
 echo "-- tail:"; tail -3 "$L" 2>/dev/null | cut -c1-140
-echo "-- images:"; ls -l $E2631_TREE/bin/targets/sanechips/generic/*.bin 2>/dev/null | awk '{print "     "$5"  "$9}'
+echo "-- images:"; ls -l $E2631_TREE/bin/targets/zx279128/generic/*.bin 2>/dev/null | awk '{print "     "$5"  "$9}'
 exit 0

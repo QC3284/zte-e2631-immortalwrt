@@ -23,7 +23,7 @@ echo "=== designware core: where is the appinit/link up sequence ==="
 grep -nE "GEN2_CTRL|PORT_LINK_CTRL|LINK_WIDTH_SPEED|start_link_up|dw_pcie_link_up" "$D/pcie-designware.c" "$D/pcie-designware.h" | head -24
 echo
 echo "=== the PR patch that added the ZTE host: does it mention speed? ==="
-grep -nE "GEN2_CTRL|link_gen|max-link-speed|PORT_LINK_CTRL|speed" $E2631_TREE/target/linux/sanechips/patches-6.18/016-PCI-dwc-Add-ZTE-ZX279128S-host-controller-driver.patch | head -20
+grep -nE "GEN2_CTRL|link_gen|max-link-speed|PORT_LINK_CTRL|speed" $E2631_TREE/target/linux/zx279128/patches-6.18/016-PCI-dwc-Add-ZTE-ZX279128S-host-controller-driver.patch | head -20
 echo
 echo "=== our board DTS pcie nodes as shipped ==="
-grep -n -B3 -A12 "pcie@f000000\|pcie@f1000000\|&pcie0\|&pcie1" $E2631_TREE/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts | head -40
+grep -n -B3 -A12 "pcie@f000000\|pcie@f1000000\|&pcie0\|&pcie1" $E2631_TREE/target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts | head -40

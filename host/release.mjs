@@ -78,7 +78,7 @@ const OUT = abs(arg('--out', 'out/e2631-immortalwrt-factory.bin'));
 // then the DTS check is skipped with a line rather than passed a missing file.
 const TREE = [envv('E2631_TREE'), abs('owrt-up'), abs('openwrt'), abs('_base/owrt')]
   .filter(Boolean).find((t) => fs.existsSync(path.join(t, 'target/linux/generic')));
-const DTS_REL = 'target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts';
+const DTS_REL = 'target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts';
 const DTS = TREE && fs.existsSync(path.join(TREE, DTS_REL)) ? path.join(TREE, DTS_REL) : '';
 const LOCAL = arg('--dir') ? abs(arg('--dir')) : '';	// a directory already holding kernel/root
 if (!run && !LOCAL) {
@@ -223,7 +223,7 @@ console.log('\n--- boot readiness (dtb + kernel .config + payload) ---');
 // silently drop the fragments witness, and INITRAMFS_SOURCE then failed the screen.
 if (TREE) console.log(`config fragments from: ${TREE}`);
 try {
-  execFileSync(process.execPath, [path.join(REPO, 'tools/verify_img.mjs'), dir, ...(TREE ? ['--tree', TREE, '--target', 'sanechips'] : [])], { stdio: 'inherit' });
+  execFileSync(process.execPath, [path.join(REPO, 'tools/verify_img.mjs'), dir, ...(TREE ? ['--tree', TREE, '--target', 'zx279128'] : [])], { stdio: 'inherit' });
 } catch {
   console.error('\nverify_img found something that can stop the boot - do not flash it');
   process.exit(1);

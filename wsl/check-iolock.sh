@@ -19,12 +19,12 @@ echo "=== our kernel .config ==="
 grep -nE "CACHE_L2X0|IO_LOCK|PL310|L2C0" "$K/.config" 2>/dev/null
 echo
 echo "=== same question against the fragments (merge order) ==="
-for f in $E2631_TREE/target/linux/generic/config-6.18 $E2631_TREE/target/linux/sanechips/config-6.18; do
+for f in $E2631_TREE/target/linux/generic/config-6.18 $E2631_TREE/target/linux/zx279128/config-6.18; do
 	echo "--- $f"; grep -nE "L2X0|IO_LOCK|PL310" "$f" 2>/dev/null || echo "  (not mentioned)"
 done
 echo
 echo "=== mt76_readl as built: locked or plain? ==="
-M=$(ls -d $E2631_TREE/build_dir/target-*/linux-sanechips_generic/mt76-*/ | head -1)
+M=$(ls -d $E2631_TREE/build_dir/target-*/linux-zx279128_generic/mt76-*/ | head -1)
 grep -rn -A 12 "mt76_readl" "$M"/*.h "$M"/*.c 2>/dev/null | head -30
 echo
 echo "=== vendor kernel: did they enable the equivalent? ==="

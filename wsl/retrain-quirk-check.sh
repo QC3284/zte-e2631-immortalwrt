@@ -10,7 +10,7 @@ LOG=/tmp/retrain.out
 exec >"$LOG" 2>&1
 
 K=""
-for d in "$TREE"/build_dir/target-*/linux-sanechips*/linux-*/; do
+for d in "$TREE"/build_dir/target-*/linux-zx279128*/linux-*/; do
   [ -f "$d/drivers/pci/quirks.c" ] && { K=$d; break; }
 done
 [ -n "$K" ] || { echo "no kernel build dir"; exit 1; }
@@ -31,7 +31,7 @@ while IFS= read -r l; do
 done < "$K/drivers/pci/quirks.c"
 
 echo '== does any target/local patch touch retrain or LNKCTL2?'
-for p in "$TREE"/target/linux/sanechips/patches-*/ "$TREE"/target/linux/generic/backport-*/ "$TREE"/target/linux/generic/pending-*/; do
+for p in "$TREE"/target/linux/zx279128/patches-*/ "$TREE"/target/linux/generic/backport-*/ "$TREE"/target/linux/generic/pending-*/; do
   [ -d "$p" ] || continue
   for f in "$p"*.patch; do
     [ -f "$f" ] || continue

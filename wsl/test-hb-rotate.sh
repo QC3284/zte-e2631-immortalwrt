@@ -6,7 +6,7 @@
 set -u
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 . "$REPO/scripts/env.sh"
-HB="${E2631_TREE:-}/target/linux/sanechips/base-files/sbin/e2631-hb"
+HB="${E2631_TREE:-}/target/linux/zx279128/base-files/sbin/e2631-hb"
 [ -f "$HB" ] || { echo "SKIP: no tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh" >&2; exit 0; }
 T=/tmp/hbrotate
 rm -rf "$T"; mkdir -p "$T"

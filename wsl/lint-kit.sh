@@ -4,7 +4,7 @@
 # parses under busybox ash.  Without this, a Windows-authored CRLF shows up on
 # the device as a baffling "unexpected newline (expecting ")")".
 #
-# T-12: the device scripts ship in the tree fork (target/linux/sanechips/
+# T-12: the device scripts ship in the tree fork (target/linux/zx279128/
 # base-files); the kit keeps only the board/ helpers. Kit files may be
 # CRLF-normalized in place (tracked, we own them); tree files are never
 # modified - they are copied to /tmp first, because the bootstrap tree must
@@ -33,10 +33,10 @@ for f in board/*.sh; do
 done
 
 # The device scripts that ship in the tree fork, when a bootstrap tree exists.
-if [ -d "${E2631_TREE:-}/target/linux/sanechips/base-files" ]; then
+if [ -d "${E2631_TREE:-}/target/linux/zx279128/base-files" ]; then
 	while IFS= read -r f; do
 		lint_ash "$f" "${f#"$E2631_TREE"/}"
-	done < <(find "$E2631_TREE/target/linux/sanechips/base-files" -type f \
+	done < <(find "$E2631_TREE/target/linux/zx279128/base-files" -type f \
 		\( -path '*/sbin/e2631-*' -o -path '*/etc/init.d/e2631-*' \) | sort)
 else
 	echo "SKIP  device tree scripts: no tree fork at ${E2631_TREE:-<unset>} (bootstrap first)"

@@ -16,7 +16,7 @@ set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 [ -f "$HERE/../scripts/env.sh" ] && . "$HERE/../scripts/env.sh"
-BASE="${E2631_TREE:-}/target/linux/sanechips/base-files"
+BASE="${E2631_TREE:-}/target/linux/zx279128/base-files"
 [ -d "$BASE" ] || { echo "SKIP: no tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh" >&2; exit 0; }
 SCRIPT="$BASE/sbin/e2631-wanport"
 [ -f "$SCRIPT" ] || { echo "找不到 $SCRIPT" >&2; exit 1; }

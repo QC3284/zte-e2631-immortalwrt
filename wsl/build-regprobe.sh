@@ -9,7 +9,7 @@ LOG=/tmp/regprobe-build.out
 exec >"$LOG" 2>&1
 
 K=""
-for d in "$TREE"/build_dir/target-*/linux-sanechips*/linux-*/; do
+for d in "$TREE"/build_dir/target-*/linux-zx279128*/linux-*/; do
   [ -f "$d/Makefile" ] && [ -f "$d/Module.symvers" ] && { K=$d; break; }
 done
 [ -n "$K" ] || { echo "no prepared kernel with Module.symvers"; exit 1; }

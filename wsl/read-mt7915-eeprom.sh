@@ -25,6 +25,6 @@ echo "=== is there already a firmware-first path (nvmem) in mt76 core? ==="
 grep -rn "mt76_eeprom_override\|nvmem" "$K/drivers/net/wireless/mediatek/mt76/eeprom.c" | head -20
 echo
 echo "=== does the package Makefile apply patches from the target dir? ==="
-ls $E2631_TREE/target/linux/sanechips/patches-6.18/ | tail -6
+ls $E2631_TREE/target/linux/zx279128/patches-6.18/ | tail -6
 ls "$E2631_TREE/package/kernel/mt76/patches" 2>/dev/null | head
-grep -rn "mt76" "$E2631_TREE/target/linux/sanechips/patches-6.18/" | head -20
+grep -rn "mt76" "$E2631_TREE/target/linux/zx279128/patches-6.18/" | head -20

@@ -9,7 +9,7 @@ TREE=$E2631_TREE
 echo "=== 1. patches in the build tree (the fork must carry them) ==="
 ls -l "$TREE/package/kernel/mt76/patches/" 2>/dev/null | tail -6
 echo "--- target kernel patches now:"
-ls -l "$TREE/target/linux/sanechips/patches-6.18/" | tail -4
+ls -l "$TREE/target/linux/zx279128/patches-6.18/" | tail -4
 
 echo
 echo "=== 2. clean + prepare the package, then look at the extracted source ==="
@@ -17,7 +17,7 @@ cd "$TREE" || exit 1
 make package/kernel/mt76/clean >/tmp/mt76clean.out 2>&1; echo "clean rc=$?"
 make package/kernel/mt76/{download,prepare} >/tmp/mt76prep.out 2>&1; echo "prepare rc=$?"
 tail -6 /tmp/mt76prep.out
-M=$(ls -d build_dir/target-*/linux-sanechips_generic/mt76-*/ 2>/dev/null | head -1)
+M=$(ls -d build_dir/target-*/linux-zx279128_generic/mt76-*/ 2>/dev/null | head -1)
 echo "M=$M"
 if [ -n "$M" ]; then
 	echo "WITNESS patch-in-source=$(grep -c 'Try the file first' "$M/mt7915/eeprom.c" 2>/dev/null)"

@@ -22,13 +22,13 @@ NOPACK=0
 [ "${1:-}" = "--no-pack" ] && NOPACK=1
 
 # ---- preconditions, stated before the forty-minute job starts --------------
-[ -d "$E2631_TREE/target/linux/sanechips" ] ||
+[ -d "$E2631_TREE/target/linux/zx279128" ] ||
 	die "no build tree at $E2631_TREE - run: bash scripts/bootstrap.sh"
 [ -f "$E2631_TREE/.config" ] ||
 	die "no .config in $E2631_TREE - run: bash scripts/bootstrap.sh"
-grep -q 'Makefile.e2631' "$E2631_TREE/target/linux/sanechips/image/Makefile" ||
+grep -q 'Device/zte_zxhn-e2631' "$E2631_TREE/target/linux/zx279128/image/Makefile" ||
 	die "the tree fork is not checked out at $E2631_TREE - run: bash scripts/bootstrap.sh"
-grep -q '^CONFIG_TARGET_DEVICE_sanechips_generic_DEVICE_zte_zxhn-e2631=y' "$E2631_TREE/.config" ||
+grep -q '^CONFIG_TARGET_DEVICE_zx279128_generic_DEVICE_zte_zxhn-e2631=y' "$E2631_TREE/.config" ||
 	die "the E2631 device is not selected in $E2631_TREE/.config - the seed did not land"
 e2631_need_cmd make "run the build" || exit 1
 

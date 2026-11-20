@@ -123,9 +123,10 @@ jobs:
           test "${#packages[@]}" -eq 1
           cp "${packages[0]}" release/e2631-immortalwrt-experimental.bin
           # The pin names come from scripts/pins.env: source env.sh so SOURCE-INFO
-          # records exactly the values the build asserted. The tree fork tip is a
-          # branch commit whose SHA is stable; the base-port tree hash identifies
-          # the reviewed sanechips port inside that history.
+          # records exactly the values the build asserted. Plan C rebased the
+          # series onto E2631_IW_SHA and renamed the target sanechips -> zx279128,
+          # so the base-port tree hash identifies the reviewed zx279128 port
+          # commits; there is no merge commit to name (that line is retired).
           . scripts/env.sh
           apk_key="random per build (no pinned input)"
           if [ "${E2631_USE_PINNED_APK_KEY:-false}" = true ] && [ -f "$E2631_TREE/public-key.pem" ]; then
@@ -137,15 +138,11 @@ jobs:
             echo "Kit commit: $GITHUB_SHA"
             echo "ImmortalWrt base: ${E2631_IW_REPO:-unknown} ${E2631_IW_BRANCH:-} @ ${E2631_IW_SHA:-unknown}"
             echo "ImmortalWrt tree (pristine): ${E2631_IW_TREE_SHA:-unknown}"
-            echo "Port base tree (4 patches applied): ${E2631_BASE_TREE_SHA:-unknown}"
+            echo "Port base tree (4 commits applied): ${E2631_BASE_TREE_SHA:-unknown}"
+            echo "Port provenance: ${E2631_PORT_REPO:-unknown} ${E2631_PORT_BRANCH:-unknown} @ ${E2631_PORT_SHA:-unknown}"
             echo "Tree fork: ${E2631_FORK_REPO:-unknown} ${E2631_FORK_BRANCH:-} @ ${E2631_FORK_SHA:-unknown}"
-            echo "Merged ImmortalWrt master: @ ${E2631_MERGED_MASTER_SHA:-unknown} (${E2631_MERGED_MASTER_DATE:-unknown})"
             echo "Parity reproduction: ${E2631_REPRODUCE_V1100:-false} (build stamp ${E2631_BUILD:-date-of-run})"
             echo "Kernel build id: e2631-build@immortalwrt-e2631 (P5, from the seed)"
-            echo "Port patch 0001 sha256: ${E2631_BASE_PATCH_SHA256_0001:-unknown}"
-            echo "Port patch 0002 sha256: ${E2631_BASE_PATCH_SHA256_0002:-unknown}"
-            echo "Port patch 0003 sha256: ${E2631_BASE_PATCH_SHA256_0003:-unknown}"
-            echo "Port patch 0004 sha256: ${E2631_BASE_PATCH_SHA256_0004:-unknown}"
             echo "Kernel: ${E2631_BASE_KERNEL:-unknown}"
             echo "APK signing key: $apk_key"
             # Feed provenance: T2 clones whatever the base tree's

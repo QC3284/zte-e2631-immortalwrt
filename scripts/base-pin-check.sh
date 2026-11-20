@@ -1,15 +1,16 @@
 #!/bin/bash
 # Gate: the base is PINNED, not "whatever master is today" (T1 §5.1, T4 base-pin).
 #
-# The sanechips port and the e2631 device support are real commits in our
-# ImmortalWrt fork (QC3284/immortalwrt, branch e2631). The pin is content, not a
-# branch pointer:
+# The zx279128 port (renamed from sanechips in plan C) and the e2631 device
+# support are real commits in our ImmortalWrt fork (QC3284/immortalwrt, branch
+# e2631). The pin is content, not a branch pointer:
 #   - the fork branch tip the kit clones (E2631_FORK_SHA);
-#   - the base-port tree the four sanechips commits produce
+#   - the base-port tree the four port commits produce
 #     (E2631_BASE_TREE_SHA) - it must still be in the fork's fetched history;
 #   - the upstream ImmortalWrt commit those four commits sit on (E2631_IW_SHA) -
-#     it must be an ancestor, and the series above it must still count four
-#     commits, so a rebase onto another base cannot pass silently.
+#     it must be an ancestor, its tree must match E2631_IW_TREE_SHA, and the
+#     series above it must still count four commits, so a rebase onto another
+#     base cannot pass silently.
 #   - the two feed commits (P3) the reference build used.
 #
 # scripts/bootstrap.sh checks the same things while it builds; this gate makes
@@ -49,7 +50,7 @@ fi
 req="E2631_IW_REPO E2631_IW_BRANCH E2631_IW_SHA E2631_IW_TREE_SHA E2631_BASE_KERNEL
      E2631_PORT_REPO E2631_PORT_BRANCH E2631_PORT_SHA E2631_PORT_BASE_SHA
      E2631_BASE_TREE_SHA E2631_FORK_REPO E2631_FORK_BRANCH E2631_FORK_SHA
-     E2631_MERGED_MASTER_SHA E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA"
+     E2631_FEED_PACKAGES_SHA E2631_FEED_LUCI_SHA"
 for k in $req; do
 	v=$(get "$k")
 	if [ -z "$v" ]; then
@@ -64,24 +65,26 @@ for k in $req; do
 		esac ;;
 	esac
 done
-# The merged upstream commit is provenance for SOURCE-INFO; it carries a
-# YYYY-MM-DD date next to it, so keep both well-formed.
-merge_date=$(get E2631_MERGED_MASTER_DATE)
-case "$merge_date" in
-'') bad "$ENVF: E2631_MERGED_MASTER_DATE is missing" ;;
-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
-*) bad "$ENVF: E2631_MERGED_MASTER_DATE is not YYYY-MM-DD: $merge_date" ;;
-esac
+# The pin file must not carry the retired merge/patch-series pin blocks: plan C
+# rebased onto a4ba8240 (so there is no merge commit to name) and dropped the
+# vendored patch hashes (their content lives as four port commits). A leftover
+# key would be read by nobody and mislead the next pin update.
+for gone in E2631_MERGED_MASTER_SHA E2631_MERGED_MASTER_DATE \
+	E2631_BASE_PATCH_SHA256_0001 E2631_BASE_PATCH_SHA256_0002 \
+	E2631_BASE_PATCH_SHA256_0003 E2631_BASE_PATCH_SHA256_0004; do
+	if grep -q "^$gone=" "$ENVF"; then
+		bad "$ENVF still records the retired $gone - plan C removed that provenance block"
+	fi
+done
 # The fork depth is a number, not an object id: bootstrap uses it for the
-# scratch history fetch only (the build tree stays depth 1). The 2026-11-14
-# fix series, the 2026-11-15 batch 2, the a4ba8240 merge and the 2026-11-20
-# firewall4 re-anchor put the base-port commit 17 levels below the tip (16
-# commits between them plus itself), so anything under 17 would silently drop
-# the tree-hash/series assertions.
+# scratch history fetch only (the build tree stays depth 1). Measured on the
+# plan-C tip: the base-port commit 4ca29c6550 is 11 levels below, the upstream
+# pin a4ba8240 is 16 levels below, so anything under 16 would silently drop the
+# tree-hash/series assertions.
 depth=$(get E2631_FORK_DEPTH)
 case "$depth" in
 ''|*[!0-9]*) bad "$ENVF: E2631_FORK_DEPTH is not a number: ${depth:-<missing>}" ;;
-*) [ "$depth" -ge 17 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the base-port commit is 17 levels below the pinned tip" ;;
+*) [ "$depth" -ge 16 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the upstream pin is 16 levels below the pinned tip" ;;
 esac
 # Plain KEY=VALUE only: a ${VAR:-default} expression would be read literally by
 # bootstrap/base-pin-check and silently pin the wrong string.
@@ -97,14 +100,6 @@ note "tree fork tip" "$fork_sha ($E2631_FORK_BRANCH on $E2631_FORK_REPO)"
 note "base-port tree pin" "$base_tree"
 note "feed pins" "packages $(printf '%.12s' "$(get E2631_FEED_PACKAGES_SHA)"), luci $(printf '%.12s' "$(get E2631_FEED_LUCI_SHA)") (v1.10.0 reference, P3)"
 
-# ---- 2. the vendored patch provenance is still recorded -------------------
-# The patch files were retired with the patch-series path (T-12); their hashes
-# stay as the identity of the reviewed series the fork commits were made from.
-for n in 0001 0002 0003 0004; do
-	v=$(get "E2631_BASE_PATCH_SHA256_$n")
-	[ -n "$v" ] || bad "$ENVF: E2631_BASE_PATCH_SHA256_$n (provenance) is missing"
-done
-
 # ---- 3. the pin is actually enforced where it is used ---------------------
 grep -qF 'scripts/pins.env' scripts/env.sh 2>/dev/null ||
 	bad "scripts/env.sh does not source scripts/pins.env - the pin would be decorative"
@@ -119,6 +114,10 @@ if [ -f scripts/bootstrap.sh ]; then
 		bad "scripts/bootstrap.sh does not assert the base-port tree pin"
 	grep -qF 'E2631_IW_SHA' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not check the upstream pin ancestry"
+	grep -qF 'target/linux/zx279128' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not look at the zx279128 target (plan C rename)"
+	grep -qF 'CONFIG_TARGET_DEVICE_zx279128' scripts/bootstrap.sh ||
+		bad "scripts/bootstrap.sh does not assert the renamed device seed symbol"
 	grep -qF 'HEAD^{tree}' scripts/bootstrap.sh ||
 		bad "scripts/bootstrap.sh does not read HEAD^{tree} - the tree assertion is gone"
 	if grep -qF 'git am' scripts/bootstrap.sh; then
@@ -146,7 +145,7 @@ fi
 # retired directory.
 if grep -rIn --exclude-dir=.git --exclude-dir=docs --exclude-dir=evidence --exclude-dir=board \
 	--exclude=base-pin-check.sh --exclude=test_userdata_gate.sh --exclude=check-workflows.mjs \
-	-E 'overlay/|apply\.sh|base/commits\.env|E2631_BASE_KIND' \
+	-E 'overlay/|apply\.sh|base/commits\.env|E2631_BASE_KIND|target/linux/sanechips|CONFIG_TARGET_DEVICE_sanechips|immortalwrt-sanechips-generic' \
 	scripts host tools tests wsl seed Makefile NOTICE .env.example 2>/dev/null |
 	grep -v '^tests/native' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)' >/dev/null; then
 	bad "a live script still references the retired overlay/apply.sh path"
@@ -219,8 +218,41 @@ if [ -n "$hist" ] && git -C "$hist" cat-file -e "$iw_sha^{commit}" 2>/dev/null; 
 			port_steps=unknown
 		if [ "$port_steps" = 4 ]; then
 			note "port series" "4 commits above the upstream pin"
+			missing_subj=""
+			while IFS= read -r s; do
+				git -C "$hist" log --format=%s FETCH_HEAD | grep -qxF "$s" ||
+					missing_subj="$missing_subj\n  $s"
+			done <<'SUBJEOF'
+zx279128: add generic DWC3 platform glue driver
+mt76: serialize device reads with outer cache maintenance
+zx279128: add ZX279128S target
+zx279128: add support for ZTE ZXHN H3600
+SUBJEOF
+			if [ -n "$missing_subj" ]; then
+				bad "the fork history is missing a reviewed port commit:$missing_subj"
+			else
+				note "port subjects" "4 reviewed zx279128/mt76 commits found"
+			fi
 		else
 			bad "the port series is $port_steps commits above $iw_sha, expected the four reviewed commits"
+		fi
+		iw_tree=$(get E2631_IW_TREE_SHA)
+		got_iw_tree=$(git -C "$hist" rev-parse "$iw_sha^{tree}" 2>/dev/null) || got_iw_tree=unknown
+		if [ "$got_iw_tree" = "$iw_tree" ]; then
+			note "iw base tree" "matches $iw_tree"
+		else
+			bad "the tree of $iw_sha is $got_iw_tree, the pin records $iw_tree"
+		fi
+		series=$(git -C "$hist" rev-list --count "$iw_sha..FETCH_HEAD" 2>/dev/null) || series=unknown
+		if [ "$series" = 15 ]; then
+			note "fork series" "15 commits above the upstream pin (plan C)"
+		else
+			bad "the fork carries $series commits above $iw_sha, the plan-C pin records 15"
+		fi
+		if git -C "$hist" log --format=%s FETCH_HEAD | grep -qxF 'zx279128: fix stale TARGET_sanechips dependencies'; then
+			note "tree fix" "stale @TARGET_sanechips dependencies fixed"
+		else
+			bad "the fork history is missing the stale-dependency fix commit"
 		fi
 	else
 		bad "the fork tip is not descended from the pinned ImmortalWrt commit $iw_sha"
@@ -229,16 +261,43 @@ else
 	bad "$iw_sha is outside the fetched history window - raise E2631_FORK_DEPTH (currently ${E2631_FORK_DEPTH:-unset}) and re-bootstrap"
 fi
 # Device support is committed now: the files must be in the tree, not implied.
-for p in target/linux/sanechips/base-files/etc/config/wireless \
-	 target/linux/sanechips/image/Makefile.e2631; do
+# Plan C renamed the target directory and merged image/Makefile.e2631 into
+# image/Makefile (D5), so the old include must be gone.
+for p in target/linux/zx279128/base-files/etc/config/wireless \
+	 target/linux/zx279128/image/Makefile \
+	 target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts; do
 	if git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- "$p" | grep -qx "$p"; then
 		note "$(basename "$p")" "present in the tree"
 	else
 		bad "$E2631_TREE: $p is missing - the e2631 commit set is incomplete"
 	fi
 done
+if git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- target/linux/zx279128/image/Makefile.e2631 | grep -qx 'target/linux/zx279128/image/Makefile.e2631'; then
+	bad "$E2631_TREE still carries image/Makefile.e2631 - plan C merged it into image/Makefile (D5)"
+fi
+# The rename also renamed the Kconfig target symbol. A stale @TARGET_sanechips
+# dependency does not fail the build: it silently hides the package from
+# defconfig (zte-mesh did exactly that at the first plan-C tip).
+if git -C "$E2631_TREE" grep -q '@TARGET_sanechips' HEAD 2>/dev/null; then
+	bad "$E2631_TREE still references @TARGET_sanechips - the target symbol is TARGET_zx279128"
+fi
+grep -q 'Device/zte_zxhn-e2631' "$E2631_TREE/target/linux/zx279128/image/Makefile" 2>/dev/null ||
+	bad "$E2631_TREE: image/Makefile has no Device/zte_zxhn-e2631 - the E2631 image definition is missing"
 git -C "$E2631_TREE" ls-tree -r --name-only HEAD -- package/e2631 | grep -q '/Makefile$' ||
 	bad "$E2631_TREE: package/e2631/*/Makefile is missing - the e2631 packages are missing"
+# The tree seed is the build input: it must name the renamed target and carry
+# the initramfs build mode (task-30, D6) without touching the kernel config.
+seedf="$E2631_TREE/seed/e2631.config"
+if [ -f "$seedf" ]; then
+	for want in CONFIG_TARGET_zx279128=y CONFIG_TARGET_zx279128_generic=y \
+		CONFIG_TARGET_ROOTFS_INITRAMFS=y; do
+		grep -qx "$want" "$seedf" ||
+			bad "$seedf: $want is missing - the tree seed is not the plan-C seed"
+	done
+	note "tree seed" "zx279128 target + initramfs build mode present"
+else
+	bad "$E2631_TREE: no seed/e2631.config - the tree fork seed is missing"
+fi
 # The kernel line is the other half of the pin: 6.18.60, not "some 6.18".
 kf="$E2631_TREE/target/linux/generic/kernel-6.18"
 if [ -f "$kf" ] && [ -n "$kernel" ]; then

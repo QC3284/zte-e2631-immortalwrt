@@ -23,7 +23,7 @@ strip_tree() { printf '%s' "${1#tree:}"; }
 while IFS= read -r p; do
 	if is_tree_path "$p"; then
 		rel=$(strip_tree "$p")
-		if [ -d "${E2631_TREE:-}/target/linux/sanechips" ]; then
+		if [ -d "${E2631_TREE:-}/target/linux/zx279128" ]; then
 			[ -e "$E2631_TREE/$rel" ] ||
 				{ echo "HIT  NOTICE mentions '$p' which is missing from $E2631_TREE"; rc=1; }
 		fi
@@ -36,7 +36,7 @@ done < <(sed -n 's/^[0-9]\+\. \([^ ].*\)$/\1/p' NOTICE)
 for f in "${MUST[@]}"; do
 	rel=$(strip_tree "$f")
 	if is_tree_path "$f"; then
-		if [ -d "${E2631_TREE:-}/target/linux/sanechips" ] && [ ! -e "$E2631_TREE/$rel" ]; then
+		if [ -d "${E2631_TREE:-}/target/linux/zx279128" ] && [ ! -e "$E2631_TREE/$rel" ]; then
 			echo "HIT  $f must be listed in NOTICE but is missing from the tree"
 			rc=1
 		fi

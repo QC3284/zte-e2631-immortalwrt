@@ -5,7 +5,7 @@
 set -u
 LOG=$E2631_WORK/out/mt7915-readl-gap.log
 exec >"$LOG" 2>&1
-M=$(ls -d $E2631_TREE/build_dir/target-*/linux-sanechips_generic/mt76-*/ | head -1)
+M=$(ls -d $E2631_TREE/build_dir/target-*/linux-zx279128_generic/mt76-*/ | head -1)
 echo "M=$M"
 echo "=== WITNESS lines from the build log ==="
 grep -h "WITNESS" $HOME/build.log 2>/dev/null | tail -8

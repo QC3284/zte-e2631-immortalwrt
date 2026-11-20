@@ -31,29 +31,33 @@ tree fork (QC3284/immortalwrt e2631 @ pin; device support as commits)
 
 **The base tree.** The port now lives in a real tree fork:
 [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt), branch `e2631`, a fork of
-`immortalwrt/immortalwrt`. The sanechips target, the H3600 board support and the E2631
-device packages are ordinary commits there, and the kit checks that fork out at a pinned
-tip - there is no vendored patch series and no `apply.sh` any more (T-12):
+`immortalwrt/immortalwrt`. The zx279128 target (renamed from sanechips in plan C,
+2026-11-21), the H3600 board support and the E2631 device packages are ordinary
+commits there, and the kit checks that fork out at a pinned tip - there is no
+vendored patch series and no `apply.sh` any more (T-12):
 
-    E2631_IW_REPO     https://github.com/immortalwrt/immortalwrt
-    E2631_IW_BRANCH   master
-    E2631_IW_SHA      4765b657625ec5bbda74b44400465fe043802b30    (kernel 6.18.60)
-    E2631_FORK_REPO   https://github.com/QC3284/immortalwrt
-    E2631_FORK_BRANCH e2631
-    E2631_FORK_SHA    5202d4cadca831c5394b4ceca32df22c123d46a7    (build content; 8 fix commits + merged ImmortalWrt master a4ba8240, 2026-11-15; task-31 firewall4 fullcone patch re-anchored 2026-11-20)
-    E2631_MERGED_MASTER_SHA a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5 (upstream master commit merged into e2631, 2026-11-14; SOURCE-INFO provenance)
+    E2631_IW_REPO        https://github.com/immortalwrt/immortalwrt
+    E2631_IW_BRANCH      master
+    E2631_IW_SHA         a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5    (kernel 6.18.60)
+    E2631_IW_TREE_SHA    b905483c80a3a705825ff7aa9c77d1f3db4a01c3    (pristine upstream tree)
+    E2631_FORK_REPO      https://github.com/QC3284/immortalwrt
+    E2631_FORK_BRANCH    e2631
+    E2631_FORK_SHA       d74ec77aff719a74c6643e540af74ae5a2f85925    (plan-C rebuild: 15 commits on the base, target renamed zx279128)
+    E2631_BASE_TREE_SHA  6136bd92d5259dbaf22f6bca02c675f05abdf86b    (tree of the last zx279128 port commit)
+    E2631_FORK_DEPTH     32                                          (scratch-history window; measured floor 16)
 
-`scripts/pins.env` is the single pin file. It also records the tree hash of the last
-sanechips port commit (`4f89aa7a…`), the sha256 of each of the four original port
-patches (provenance only - the files are gone), the two feed commits the released
-v1.10.0 was built with, and the upstream ImmortalWrt master commit the fork merged
-(`a4ba8240…`; the depth-1 build tree cannot show its merge parents, so SOURCE-INFO
-takes that line from the pin file). `scripts/bootstrap.sh` fetches the fork tip at **depth 1** for
-the build tree (parity P2: `COMMITCOUNT` is `git rev-list --count HEAD .`, so a deeper
-tree changes `base-files` `PKG_RELEASE`), and verifies the history in a separate
-scratch repo: the tip, the base-port tree, the ImmortalWrt pin ancestry and the four port
-commits. `make check`'s base-pin gate repeats those assertions on the scratch repo and
-fails a tree built from anything else; a drifted feed is re-pinned or refused.
+`scripts/pins.env` is the single pin file. It also records the four reviewed port
+commit SHAs (provenance; the old vendored patch files and their sha256 lines are
+gone), the two feed commits the released v1.10.0 was built with, and the port
+provenance from the original sanechips mirror. Plan C rebased the series onto
+`a4ba8240`, so there is no merge commit to name in SOURCE-INFO. `scripts/bootstrap.sh`
+fetches the fork tip at **depth 1** for the build tree (parity P2: `COMMITCOUNT` is
+`git rev-list --count HEAD .`, so a deeper tree changes `base-files` `PKG_RELEASE`),
+and verifies the history in a separate scratch repo: the tip, the base-port tree
+(`6136bd92…`), the ImmortalWrt pin ancestry, the four port commit subjects and the
+14-commit plan-C series. `make check`'s base-pin gate repeats those assertions on the
+scratch repo and fails a tree built from anything else; a drifted feed is re-pinned or
+refused.
 
 To change the port, patch and commit in a fork working copy, push, then re-bootstrap with
 the new pin - never edit the depth-1 build tree by hand. The old OpenWrt sanechips base
@@ -137,10 +141,10 @@ Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
 | `node --check` | every tool parses |
 | busybox ash | the scripts that get put on the *device* parse under the device's shell, with CRLF stripped - a bashism or a `\r` here only shows up on the board |
 | slot tool | `e2631-fwslot.c` (the host-native copy) compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
-| slot layout | the kit copies (`tools/verify_img.mjs`, `host/release.mjs`, `scripts/preflight.sh`) and, after a bootstrap, the tree copies (board DTS, `image/Makefile.e2631`, device `e2631-preflight`) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
+| slot layout | the kit copies (`tools/verify_img.mjs`, `host/release.mjs`, `scripts/preflight.sh`) and, after a bootstrap, the tree copies (board DTS, `target/linux/zx279128/image/Makefile`, device `e2631-preflight`) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`; the retired `image/Makefile.e2631` must be gone. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
 | base pin | `scripts/pins.env` exists, carries every pin as a plain value, and matches the fork/branch/tip, the ImmortalWrt SHA, the base-port tree hash and the feed commits; the gate also fails if the scripts stop enforcing them. Runs on every `make check`, even before a tree exists |
-| base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `4f89aa7a` base-port tree, the ImmortalWrt pin in its ancestry, exactly four port commits above it, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
-| board dts | `#include`s and every `&label` in the board file resolve against the tree fork's sanechips patch series (needs the tree, so it SKIPs before bootstrap) |
+| base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `6136bd92` base-port tree, the ImmortalWrt pin `a4ba8240` in its ancestry with its tree at `b905483c`, exactly four reviewed port commits above it, the 14-commit plan-C series, the renamed zx279128 paths and seed, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
+| board dts | `#include`s and every `&label` in the board file resolve against the tree fork's zx279128 patch series (needs the tree, so it SKIPs before bootstrap) |
 | first-flash preflight | the host copy of `e2631-preflight` accepts a synthesized valid package and refuses one with a single altered byte, offline (it needs the native `e2631-fwslot`) |
 | `scripts/secret-scan.sh` | no credential shapes in any tracked file, and the evidence files that must stay ignored (the vendor harvest, the config export, the token helper) are not tracked. It exists because a scrub that searched for a value **literally** missed nine files that carry the tcl-escaped form of the same password |
 | `scripts/notice-check.sh` | NOTICE and the tree agree in both directions: every path NOTICE names exists (tree paths use the `tree:` prefix), and every third-party file that must be listed (the mesh runtime tarball in the tree fork, the vendor version-header template here) is listed |
@@ -153,8 +157,9 @@ Two more consistency checks run in `.github/workflows/check.yml` before `make ch
 run by hand): `node host/sim-upgrade.mjs` simulates the online updater end to end with stub
 `sysupgrade`/`uci`/`wget` (30 checks, no flash write), and `node tools/check-workflows.mjs`
 asserts that the pin file, the tree-fork content (version string and updater, fetched at the
-pinned SHA), the CI workflows, artifact names and release channel agree (66 checks; it needs
-network access and fails those fetches explicitly rather than skipping).
+pinned SHA), the CI workflows, artifact names and release channel agree
+(80 checks; it needs network access and fails those fetches explicitly rather than
+skipping).
 
 ## 5. Bootstrap, then build
 
@@ -241,8 +246,9 @@ collapses path pairs that differ only in case. Check files out with LF
 
 ## 8. Making your own change
 
-The port is the tree fork: `target/linux/sanechips/` (config fragments,
-`image/Makefile.e2631`, the board DTS, `base-files/`), `package/e2631/` (the slot tool,
+The port is the tree fork: `target/linux/zx279128/` (config fragments,
+`image/Makefile` with the merged E2631 image recipe, the board DTS, `base-files/`),
+`package/e2631/` (the slot tool,
 the wifiap/wanport/LuCI packages, the mesh controller). Work in a full fork clone, commit,
 push, bump `E2631_FORK_SHA` in `scripts/pins.env` after review, then `make bootstrap` -
 the depth-1 build tree is disposable and must never be edited by hand. The build seed is
@@ -260,7 +266,7 @@ Four rules that exist because breaking them cost hours:
   did not sync, so a patch deleted from `overlay/` kept being applied - which is why the
   migration moved the port into commits instead.
 * **Ask for a symbol where it is actually decided.** `target/linux/generic/config-6.18`
-  wins over `target/linux/sanechips/config-6.18` for symbols generic names explicitly as
+  wins over `target/linux/zx279128/config-6.18` for symbols generic names explicitly as
   "is not set" - that is why the lockup detectors are flipped in both files. The witness
   is the built kernel's own `.config` (`$E2631_OUT/build-*/config-6.18`), never a fragment.
 * **A screen is not a boot.** Passing the bootloader's CRC gates only means the bytes are

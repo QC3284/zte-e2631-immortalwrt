@@ -29,10 +29,10 @@ if [ -n "$K" ]; then
   grep -n 'PCI_EXP_DEVCTL_PAYLOAD\|PCI_EXP_DEVCTL_READRQ\|PCI_EXP_DEVCAP_PAYLOAD' "$K/include/uapi/linux/pci_regs.h"
   echo "--- does the DWC controller write DevCtl anywhere? ---"
   grep -rn 'PCI_EXP_DEVCTL\|pcie_set_mps\|pcie_get_mps' "$K/drivers/pci/controller/dwc/" | head -20
-  echo "--- sanechips patches touching pci ---"
-  ls $E2631_TREE/target/linux/sanechips/patches-6.18/ | grep -iE 'pci|dwc'
+  echo "--- zx279128 patches touching pci ---"
+  ls $E2631_TREE/target/linux/zx279128/patches-6.18/ | grep -iE 'pci|dwc'
   echo "--- bootargs / cmdline in tree for our board ---"
-  grep -rn 'bootargs\|append-rootarg\|CONFIG_CMDLINE' $E2631_TREE/target/linux/sanechips/ 2>/dev/null | head -20
+  grep -rn 'bootargs\|append-rootarg\|CONFIG_CMDLINE' $E2631_TREE/target/linux/zx279128/ 2>/dev/null | head -20
   grep -n 'CONFIG_CMDLINE' "$K/.config" 2>/dev/null | head
 fi
 

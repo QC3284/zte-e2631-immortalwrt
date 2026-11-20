@@ -11,7 +11,7 @@ LOG=$E2631_WORK/out/gen-efuse-patch.log
 exec >"$LOG" 2>&1
 set -x
 
-SRC=$(ls -d $E2631_TREE/build_dir/target-*/linux-sanechips_generic/mt76-*/ 2>/dev/null | head -1)
+SRC=$(ls -d $E2631_TREE/build_dir/target-*/linux-zx279128_generic/mt76-*/ 2>/dev/null | head -1)
 echo "SRC=$SRC"
 [ -f "$SRC/mt7915/eeprom.c" ] || { echo "no feed source"; exit 1; }
 

@@ -27,12 +27,13 @@ a build. The build happens in WSL on this machine; `make check` is the local gat
     make build
 
 `scripts/bootstrap.sh` fetches the tree fork at the tip pinned in `scripts/pins.env`
-(`5202d4ca`, the 2026-11-20 tip: the 2026-11-15 merge of ImmortalWrt master
-`a4ba8240` into the batch-2 fix series plus the firewall4 fullcone patch
-re-anchored against upstream 3722eadc; the ancestry anchor below the port
-commits stays `4765b657`, kernel 6.18.60) as a depth-1 build
+(`d74ec77a`, the plan-C rebuild of 2026-11-21: the four reviewed port commits
+plus the E2631 support and fix series, rebased onto ImmortalWrt master
+`a4ba8240` and with the target renamed sanechips -> zx279128 so the tree
+follows mainline conventions; kernel 6.18.60) as a depth-1 build
 tree, verifies the fork history in a separate scratch repo (the base-port tree
-`4f89aa7a`, the ImmortalWrt pin in its ancestry, exactly four port commits above it),
+`6136bd92`, the ImmortalWrt base in its ancestry, exactly four port commits above it,
+and the 14-commit plan-C series),
 pins the two feeds to the commits the released v1.10.0 used, and lays down the seed config
 - and witnesses each step; `scripts/build.sh` then continues to a flashable package.
 
@@ -200,10 +201,10 @@ the literal token never does.
   the build branch [ghahramani/openwrt, branch `zte-zxhn-h3600`](https://github.com/ghahramani/openwrt/tree/zte-zxhn-h3600),
   the 24-patch mainline RFC [ghahramani/linux, branch `h3600-linux-rfc`](https://github.com/ghahramani/linux/tree/h3600-linux-rfc),
   and the [engineering write-up](https://ghahremani.medium.com/resurrecting-isp-e-waste-how-an-ai-breakthrough-unlocked-the-hyperoptic-zte-h3600-ported-modern-60e74c87c11e).
-  The sanechips `target/` and board support in the tree fork
-  [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) branch `e2631` are a
-  contribution of that line, preserved as four commits on top of ImmortalWrt master
-  (`4765b657`); the old OpenWrt mirror pin (`Zlion-Y/openwrt-sanechips-mirror` at
+  The zx279128 `target/` (renamed from sanechips in plan C) and board support in the
+  tree fork [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) branch `e2631`
+  are a contribution of that line, preserved as four commits, rebased in plan C onto
+  ImmortalWrt master (`a4ba8240`); the old OpenWrt mirror pin (`Zlion-Y/openwrt-sanechips-mirror` at
   `db8b8d4`) survives only as the provenance recorded in `scripts/pins.env` - without this
   port the tree starts from an empty `target/`. Several of its published claims did not survive contact with
   this board (the `kernel1`/`kernel2` partition names, "erase `kernel1` to get stock back", the `TESTED.md` sha256

@@ -18,7 +18,7 @@ exec >>"$LOG" 2>&1
 NEW=${NEW:-8000}
 OLD=${OLD:-1000}
 SRC=""
-for d in $E2631_TREE/build_dir/target-*/linux-sanechips*/mt76-*/; do
+for d in $E2631_TREE/build_dir/target-*/linux-zx279128*/mt76-*/; do
   [ -f "$d/mt7915/mcu.c" ] && { SRC=$d; break; }
 done
 echo "SRC=$SRC  NEW=$NEW"

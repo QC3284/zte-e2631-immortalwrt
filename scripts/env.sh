@@ -75,7 +75,7 @@ E2631_TREE=${E2631_TREE:-$HOME/openwrt}
 
 # ---- the pin file ----------------------------------------------------------
 # scripts/pins.env is the single source of pins: the upstream ImmortalWrt
-# commit, the reviewed sanechips port tree, the tree-fork tip the build checks
+# commit, the reviewed zx279128 port tree, the tree-fork tip the build checks
 # out, and the two feed commits. bootstrap/base-pin-check read these numbers;
 # they are never repeated here. The values are PLAIN KEY=VALUE lines (no
 # ${VAR:-default}) because base-pin-check.sh reads the file literally.
@@ -114,10 +114,7 @@ export E2631_KIT E2631_WORK E2631_OUT E2631_TREE E2631_TEMPLATE E2631_PIN_FILE \
 # Pin provenance from scripts/pins.env, exported for CI/SOURCE-INFO consumers.
 export E2631_IW_REPO E2631_IW_BRANCH E2631_IW_SHA E2631_IW_TREE_SHA \
 	E2631_BASE_KERNEL E2631_BASE_TREE_SHA \
-	E2631_PORT_REPO E2631_PORT_BRANCH E2631_PORT_SHA E2631_PORT_BASE_SHA \
-	E2631_BASE_PATCH_SHA256_0001 E2631_BASE_PATCH_SHA256_0002 \
-	E2631_BASE_PATCH_SHA256_0003 E2631_BASE_PATCH_SHA256_0004 \
-	E2631_MERGED_MASTER_SHA E2631_MERGED_MASTER_DATE
+	E2631_PORT_REPO E2631_PORT_BRANCH E2631_PORT_SHA E2631_PORT_BASE_SHA
 
 e2631_need_cmd() {	# e2631_need_cmd <command> <what it is needed for>
 	command -v "$1" >/dev/null 2>&1 && return 0

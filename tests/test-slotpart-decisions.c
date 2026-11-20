@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../tests/native/target/linux/sanechips/files/drivers/mtd/parsers/zx279128s-slotpart-core.c"
+#include "../tests/native/target/linux/zx279128/files/drivers/mtd/parsers/zx279128s-slotpart-core.c"
 
 static int fails;
 

@@ -5,10 +5,11 @@
 逐项实测与取舍记在 [docs/known-issues.md](docs/known-issues.md)。
 本仓库不提供、也不链接原厂固件；随仓库分发的第三方物料见 [NOTICE](NOTICE)。
 
-- **基底**：`immortalwrt/immortalwrt` master @ `4765b657`（kernel 6.18.60）；设备支持以真实提交
+- **基底**：`immortalwrt/immortalwrt` master @ `a4ba8240`（kernel 6.18.60）；设备支持以真实提交
   落在树 fork [QC3284/immortalwrt](https://github.com/QC3284/immortalwrt) 的 `e2631` 分支上，
   本套件按 `scripts/pins.env` 里的 tip 以 depth-1 检出构建；基底 SHA + 移植后 tree hash
-  (`4f89aa7a…`) + 两个 feed commit 的钉死由 `make check` 的 base-pin / base-tree 门复核。
+  (`6136bd92…`) + 两个 feed commit 的钉死由 `make check` 的 base-pin / base-tree 门复核。
+  方案 C（2026-11-21）按主线惯例把 target 改名为 `zx279128` 并把整个系列 rebase 到 `a4ba8240`，
   T-12 起不再有 overlay / patch series / `apply.sh`，旧 OpenWrt sanechips 基底一并退役；
   迁移决策见 [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)。
 - **产物**：`e2631-immortalwrt-*.bin`（原厂 supgrade 格式），版本号见 `/etc/e2631-version`。
@@ -88,7 +89,7 @@ make build       # make world + 打包成原厂 .bin
 
 - 基底不再手工 clone，也不再 `git am`：`scripts/bootstrap.sh` 检出
   `QC3284/immortalwrt` 的 `e2631` 分支（构建树 depth-1，保证 `COMMITCOUNT` 与 v1.10.0 参考构建一致），
-  另建 scratch repo 校验 tip = 钉、`4f89aa7a` 移植 tree 在历史中、ImmortalWrt 钉是祖先、其上恰好 4 个
+  另建 scratch repo 校验 tip = 钉、`6136bd92` 移植 tree 在历史中、ImmortalWrt 钉是祖先、其上恰好 4 个
   移植提交；两个 feed 按钉死 commit 检出（只更新索引，不拉分支 tip）。钉值都在 `scripts/pins.env`，见
   [docs/immortalwrt-migration.md](docs/immortalwrt-migration.md)；
 - 打包默认用随仓库的版本头切片 `seed/vendor-verhdr-8b8.bin`（与官方全包逐字节同果），
@@ -105,8 +106,8 @@ make build       # make world + 打包成原厂 .bin
   [构建分支](https://github.com/ghahramani/openwrt/tree/zte-zxhn-h3600)、
   [主线 RFC](https://github.com/ghahramani/linux/tree/h3600-linux-rfc)、
   [工程长文](https://ghahremani.medium.com/resurrecting-isp-e-waste-how-an-ai-breakthrough-unlocked-the-hyperoptic-zte-h3600-ported-modern-60e74c87c11e)。
-  树 fork 的 sanechips 移植面来自该分支（原钉 `db8b8d4`，现以提交形式承袭并钉在
-  ImmortalWrt master `4765b657` 上）；其中若干公开说法在这块板子上不成立，
+  树 fork 的 zx279128 移植面来自该分支（原钉 `db8b8d4`，现以提交形式承袭；方案 C 把它整体
+  rebase 到 ImmortalWrt master `a4ba8240` 上）；其中若干公开说法在这块板子上不成立，
   逐条更正见 [docs/01](docs/01-情报汇总与事实核验-2026-10-13.md)。
 - **[@zwzzrl](https://github.com/zwzzrl/zte-e2631-openwrt)** —— 手动 WAN 口选择、IPv6 硬件卸载打断 TCP
   的发现与因果链、`e2631-wifi-boot` 重配网修复，以及 PPE 逆向的多项输入。

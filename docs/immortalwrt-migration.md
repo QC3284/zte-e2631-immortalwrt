@@ -437,6 +437,35 @@
 - **验证**：本地 `make bootstrap` + `make check` 全绿；CI `check.yml` 在推送分支上运行
   `host/sim-upgrade.mjs`（30 项）、`tools/check-workflows.mjs`（66 项）与 `make check`。
 
+### 6.5 方案 C：主线对齐重建（2026-11-21）
+
+- **决策**：为符合主线惯例、消除 merge 提交并让 target 命名与 SoC 一致，`e2631` 分支按
+  [`docs/mainline-alignment-design.md`](mainline-alignment-design.md) 重建：以 ImmortalWrt
+  master `a4ba8240`（2026-11-14，kernel 6.18.60）为基底 rebase，目标目录
+  `target/linux/sanechips` → `target/linux/zx279128`，提交前缀改为 `zx279128:` / `mt76:`，
+  产物名 `immortalwrt-zx279128-generic-*`；DTS 文件名 / compatible / 设备名
+  `zte_zxhn-e2631` / `package/e2631/` / `CONFIG_TARGET_DEVICE_*` 符号不变。
+- **提交结构**：新 tip `d74ec77a…` = 4 个复核过的移植提交（作者/日期保留）+ 11 个 fork 提交（含重建后 1 个 stale `@TARGET_sanechips` 依赖修复）
+  （E2631 设备支持、主线质量修复系列、firewall4 终态、stale `@TARGET_sanechips` 依赖修复），共 15 个提交；旧历史保留在
+  `e2631-legacy` 分支（`5202d4ca…`）。`image/Makefile.e2631` 合并进
+  `target/linux/zx279128/image/Makefile`（D5），seed 增加
+  `CONFIG_TARGET_ROOTFS_INITRAMFS=y`（task-30，D6），要求 kernel config hash 保持
+  `106ff47d…` 不变。
+- **钉值更新**（`scripts/pins.env`）：`E2631_IW_SHA=a4ba8240…`、
+  `E2631_IW_TREE_SHA=b905483c…`、`E2631_FORK_SHA=d74ec77a…`、
+  `E2631_BASE_TREE_SHA=6136bd92…`（最后一个 port 提交 `4ca29c65…` 的 tree）、
+  `E2631_FORK_DEPTH` 实测下限 16（保持 32）。删除 `E2631_MERGED_MASTER_SHA/DATE`
+  （rebase 后不再有 merge 提交）与 `E2631_BASE_PATCH_SHA256_0001..0004`（旧 patch 系列的
+  身份已由四个真实提交取代；`E2631_PORT_REPO/BRANCH/SHA` 保留为最终 provenance）。
+- **SOURCE-INFO**：不再输出 `Merged ImmortalWrt master` 行；`Port base tree` 行改为
+  `(4 commits applied)`，并新增 `Port provenance` 行；`ImmortalWrt base` /
+  `ImmortalWrt tree (pristine)` / `Tree fork` 行继续记录钉值。SOURCE-INFO 只随 Release
+  资产发布，不进 rootfs，不影响镜像字节。
+- **验证**：本地 `make bootstrap` 排练 EXIT=0（depth-1 构建树、scratch 历史四项断言）、
+  `make check` 13/13、`host/sim-upgrade.mjs` 30 项、`tools/check-workflows.mjs` 80 项；
+  树侧 CI 在 `e2631` 分支上另行检查静态树断言（task-36 增加 checkpatch job）。RUN6
+  与 RUN5 的产物对由 S5（verify-docs）执行。
+
 ## 7. 证据与未决问题
 
 ### 7.1 关键证据索引

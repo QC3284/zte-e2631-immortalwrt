@@ -11,7 +11,7 @@ W=/tmp/fsroot; rm -rf $W; mkdir -p $W
 "$U" -no-xattrs -d $W "$P/root" >/dev/null 2>&1
 
 echo "=== board DTS buttons (which physical key can trigger failsafe) ==="
-grep -n -B2 -A8 "keys\|button\|gpio-keys" $E2631_TREE/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts 2>/dev/null | head -40
+grep -n -B2 -A8 "keys\|button\|gpio-keys" $E2631_TREE/target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts 2>/dev/null | head -40
 echo
 echo "=== /etc/preinit failsafe logic in the shipped image ==="
 grep -n -A6 "failsafe\|fail_wait\|boot_failcount" "$W/etc/preinit" 2>/dev/null | head -40

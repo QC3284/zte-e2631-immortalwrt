@@ -17,7 +17,7 @@ grep -rIn "ARM_CPU_WATCHDOG\|SBSA_WATCHDOG\|CADENCE_WATCHDOG\|ARM_SP805" "$K/dri
 grep -n "^config" "$K/drivers/watchdog/Kconfig" | grep -iE "arm|versatile|sp805|twd" | head -10
 echo
 echo "=== our shipped board DTS: watchdog / pl310 / twd nodes ==="
-D=$E2631_TREE/target/linux/sanechips/dts/zx279128s-zte-zxhn-e2631.dts
+D=$E2631_TREE/target/linux/zx279128/dts/zx279128s-zte-zxhn-e2631.dts
 grep -n -iE "watchdog|twd|pl310|cache|sys-ctrl|crm" "$D" 2>/dev/null | head -14
 echo
 echo "=== the SoC dtsi the vendor used (from the vendor DTB we carved) ==="

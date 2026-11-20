@@ -479,7 +479,7 @@ warn('cpu enable-method matches the string the compiled platsmp registers',
     ];
     for (const [p, why] of need) {
       // libustream-<tls><ABI>: the ABI suffix follows the base tree's mbedtls
-      // (20201210 on the sanechips mirror; ImmortalWrt may ship another one).
+      // (20201210 on the v1.10.0 reference tree; ImmortalWrt may ship another one).
       const hit = p === 'libustream-mbedtls20201210'
         ? [...pkgs].some((n) => /^libustream-(mbedtls|openssl)\d+$/.test(n))
         : pkgs.has(p);

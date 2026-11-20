@@ -23,7 +23,7 @@ say START ""
 bash $E2631_KIT/wsl/sync.sh >>"$LOG" 2>&1
 say SYNC "rc=$?"
 
-ls -l "$TREE/target/linux/sanechips/patches-6.18/" >>"$LOG" 2>&1
+ls -l "$TREE/target/linux/zx279128/patches-6.18/" >>"$LOG" 2>&1
 
 # The tree fork is a pinned depth-1 checkout; edit a fork working copy and
 # re-bootstrap to change it. Drop the 8 s timeout patch from the tree so this
@@ -38,7 +38,7 @@ say MT76_CLEAN "rc=$?"
 make package/kernel/mt76/{download,prepare} >>"$LOG" 2>&1
 say MT76_PREPARE "rc=$?"
 S=""
-for d in build_dir/target-*/linux-sanechips*/mt76-*/; do
+for d in build_dir/target-*/linux-zx279128*/mt76-*/; do
   [ -f "$d/mt7915/mcu.c" ] && { S=$d; break; }
 done
 n=0
@@ -68,7 +68,7 @@ make target/linux/prepare V=sc >>"$LOG" 2>&1
 say KERNEL_PREPARE "rc=$?"
 
 K=""
-for d in build_dir/target-*/linux-sanechips*/linux-*/; do
+for d in build_dir/target-*/linux-zx279128*/linux-*/; do
   [ -f "$d/drivers/pci/quirks.c" ] && { K=$d; break; }
 done
 say KERNEL_SRC "$K"

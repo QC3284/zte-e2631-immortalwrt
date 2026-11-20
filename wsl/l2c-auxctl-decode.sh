@@ -5,7 +5,7 @@
 # properties our tree turns on. Run: bash build/wsl/l2c-auxctl-decode.sh
 set -u
 K=""
-for d in $E2631_KIT/openwrt/build_dir/target-*/linux-sanechips*/linux-*/; do
+for d in $E2631_KIT/openwrt/build_dir/target-*/linux-zx279128*/linux-*/; do
   [ -d "$d" ] && { K=$d; break; }
 done
 [ -n "$K" ] || { echo "no kernel build dir"; exit 1; }

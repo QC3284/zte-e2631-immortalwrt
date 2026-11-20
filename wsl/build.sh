@@ -51,8 +51,8 @@ fi
 cd $E2631_TREE || exit 1
 
 # T-12: the tree fork already carries the port, so there is nothing to apply.
-grep -qx "CONFIG_CMDLINE_FORCE=y" target/linux/sanechips/config-6.18 || { echo "TREE INCOMPLETE: no forced cmdline"; exit 1; }
-grep -q "Makefile.e2631" target/linux/sanechips/image/Makefile || { echo "TREE INCOMPLETE: image hook"; exit 1; }
+grep -qx "CONFIG_CMDLINE_FORCE=y" target/linux/zx279128/config-6.18 || { echo "TREE INCOMPLETE: no forced cmdline"; exit 1; }
+grep -q "Device/zte_zxhn-e2631" target/linux/zx279128/image/Makefile || { echo "TREE INCOMPLETE: e2631 image definition"; exit 1; }
 
 for f in packages luci; do
   [ -d "feeds/$f/.git" ] || { echo "PHASE clone-$f $(date +%T)"; git clone -q --depth 1 --single-branch "https://github.com/openwrt/$f" "feeds/$f"; }
@@ -85,7 +85,7 @@ if [ -x "$E2631_KIT/wsl/segdl.sh" ]; then
 	echo "PHASE segdl $MAKEVAR"
 fi
 grep -cE '^CONFIG_PACKAGE_luci' .config
-grep -E '^CONFIG_TARGET_DEVICE_sanechips_generic_DEVICE_zte_zxhn-e2631=|^CONFIG_SOFT_FLOAT=|^CONFIG_PACKAGE_luci=|^CONFIG_PACKAGE_luci-proto-ppp=|^CONFIG_PACKAGE_ttyd=|^CONFIG_PACKAGE_luci-app-ttyd=|^CONFIG_PACKAGE_uhttpd=' .config || echo "SEED CHECK FAILED"
+grep -E '^CONFIG_TARGET_DEVICE_zx279128_generic_DEVICE_zte_zxhn-e2631=|^CONFIG_SOFT_FLOAT=|^CONFIG_PACKAGE_luci=|^CONFIG_PACKAGE_luci-proto-ppp=|^CONFIG_PACKAGE_ttyd=|^CONFIG_PACKAGE_luci-app-ttyd=|^CONFIG_PACKAGE_uhttpd=' .config || echo "SEED CHECK FAILED"
 
 echo "PHASE build $(date +%T)"
 make -j"$(nproc)" world V=s $MAKEVAR > "$HOME/world.log" 2>&1

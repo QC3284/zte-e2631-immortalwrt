@@ -9,7 +9,7 @@
 set -e
 SRC="$E2631_TREE"
 OUTD="${1:?usage: collect.sh <out-dir>}"
-B="$SRC/bin/targets/sanechips/generic"
+B="$SRC/bin/targets/zx279128/generic"
 
 ls "$B"/*.bin >/dev/null 2>&1 || { echo "no images in $B yet" >&2; exit 1; }
 mkdir -p "$OUTD/payload"
@@ -26,7 +26,7 @@ cp "$DTB" "$OUTD/e2631.dtb"
 # The kernel's merged .config. bin/targets carries no config-* in this tree and
 # the top-level .config hides the symbols only the target config file sets -
 # which is precisely what the boot-readiness screen needs to see.
-KV=$(sed -n 's/^KERNEL_PATCHVER:=\([0-9][0-9.]*\).*/\1/p' "$SRC/target/linux/sanechips/Makefile")
+KV=$(sed -n 's/^KERNEL_PATCHVER:=\([0-9][0-9.]*\).*/\1/p' "$SRC/target/linux/zx279128/Makefile")
 KCFG=$(find "$SRC/build_dir" -maxdepth 5 -name .config 2>/dev/null |
 	grep -E '/linux-[^/]+/linux-[^/]+/\.config$' | head -1)
 if [ -n "$KCFG" ] && [ -n "$KV" ]; then

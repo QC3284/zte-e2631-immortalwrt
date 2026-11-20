@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tests for the v1.9 userdata default-adopt gate
-# (target/linux/sanechips/base-files/etc/init.d/e2631-userdata in the tree fork).
+# (target/linux/zx279128/base-files/etc/init.d/e2631-userdata in the tree fork).
 #
 #   bash tests/test_userdata_gate.sh
 #
@@ -9,7 +9,7 @@
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 [ -f "$REPO/scripts/env.sh" ] && . "$REPO/scripts/env.sh"
-BASE="${E2631_TREE:-}/target/linux/sanechips/base-files"
+BASE="${E2631_TREE:-}/target/linux/zx279128/base-files"
 if [ ! -d "$BASE" ]; then
 	echo "SKIP  no tree fork at ${E2631_TREE:-<unset>}: run scripts/bootstrap.sh first"
 	exit 0
