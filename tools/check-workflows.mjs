@@ -53,7 +53,10 @@ const TREE_BRANCH = 'e2631';
 const TREE_PIN_BASE_SHA = 'a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5';
 const TREE_PIN_IW_TREE_SHA = 'b905483c80a3a705825ff7aa9c77d1f3db4a01c3';
 const TREE_PIN_TREE_SHA = '6136bd92d5259dbaf22f6bca02c675f05abdf86b';
-const TREE_HEAD_RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + TREE_BRANCH + '/' + p;
+// refs/heads/ is deliberate: the short branch URL is CDN-cached for minutes, and
+// a stale doc would make the CI-only assertions disagree with the tree it just
+// accepted. The long ref path serves the current head.
+const TREE_HEAD_RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/refs/heads/' + TREE_BRANCH + '/' + p;
 const TREE_CI_URL = TREE_HEAD_RAW('.github/workflows/check.yml');
 const TREE_CHECKPATCH_URL = TREE_HEAD_RAW('scripts/check-e2631-checkpatch.sh');
 const TREE_EXEMPTIONS_URL = TREE_HEAD_RAW('docs/checkpatch-exemptions.md');
@@ -295,9 +298,9 @@ ok('the checkpatch gate reads the machine-readable exemption table',
   has(TREE_EXEMPTIONS, '<!-- checkpatch-exemptions:begin -->') &&
   has(TREE_EXEMPTIONS, '<!-- checkpatch-exemptions:end -->'),
   TREE_EXEMPTIONS ? '' : 'fetch failed: ' + TREE_EXEMPTIONS_URL);
-ok('the exemption table documents E1-E4 and a scoped commit exemption',
+ok('the exemption table documents E1-E4 and carries no stale commit exemption',
   ['E1', 'E2', 'E3', 'E4'].every((id) => has(TREE_EXEMPTIONS, '| ' + id + ' |')) &&
-  has(TREE_EXEMPTIONS, '| E5 |') && has(TREE_EXEMPTIONS, 'commit:d74ec77a'));
+  !has(TREE_EXEMPTIONS, '| E5 |') && !/commit:[0-9a-f]{40}/.test(TREE_EXEMPTIONS));
 ok('the tree static job guards against stale sanechips target references',
   has(TREE_CI, '@TARGET_sanechips') && has(TREE_CI, 'CONFIG_TARGET_sanechips'));
 ok('the tree static job installs the feeds so the seed luci apps resolve',
