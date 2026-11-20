@@ -461,8 +461,9 @@
   `ImmortalWrt tree (pristine)` / `Tree fork` 行继续记录钉值。SOURCE-INFO 只随 Release
   资产发布，不进 rootfs，不影响镜像字节。
 - **验证**：本地 `make bootstrap` 排练 EXIT=0（depth-1 构建树、scratch 历史四项断言）、
-  `make check` 13/13、`host/sim-upgrade.mjs` 30 项、`tools/check-workflows.mjs` 92 项；
-  树侧 CI 在 `e2631` 分支上另行检查静态树断言（task-36 增加 checkpatch job）。RUN6
+  `make check` 13/13、`host/sim-upgrade.mjs` 30 项、`tools/check-workflows.mjs` 94 项；
+  树侧 CI 在 `e2631` 分支上另行检查静态树断言（task-36 增加 checkpatch job，随后
+  增加镜像流水线展开门禁 `check-e2631-image-expansion.sh`）。RUN6
   与 RUN5 的产物对由 S5（verify-docs）执行。
 
 ## 7. 证据与未决问题

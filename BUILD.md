@@ -159,8 +159,9 @@ run by hand): `node host/sim-upgrade.mjs` simulates the online updater end to en
 `sysupgrade`/`uci`/`wget` (30 checks, no flash write), and `node tools/check-workflows.mjs`
 asserts that the pin file, the tree-fork content (version string and updater, fetched at the
 pinned SHA), the CI workflows, artifact names and release channel agree
-(92 checks; it needs network access and fails those fetches explicitly rather than
-skipping).
+(94 checks; the two newest assert the tree's image-pipeline expansion gate - the
+parse-only dump that keeps `check-size 4096k` non-empty. It needs network access and
+fails those fetches explicitly rather than skipping).
 
 ## 5. Bootstrap, then build
 
