@@ -27,13 +27,13 @@ a build. The build happens in WSL on this machine; `make check` is the local gat
     make build
 
 `scripts/bootstrap.sh` fetches the tree fork at the tip pinned in `scripts/pins.env`
-(`f85cbea`, the plan-C rebuild of 2026-11-21: the four reviewed port commits
+(`86cddb79`, the plan-C rebuild of 2026-11-21: the four reviewed port commits
 plus the E2631 support and fix series, rebased onto ImmortalWrt master
 `a4ba8240` and with the target renamed sanechips -> zx279128 so the tree
 follows mainline conventions; kernel 6.18.60) as a depth-1 build
 tree, verifies the fork history in a separate scratch repo (the base-port tree
 `6136bd92`, the ImmortalWrt base in its ancestry, exactly four port commits above it,
-and the 14-commit plan-C series),
+and the 18-commit plan-C series, including the check-size escaping fix),
 pins the two feeds to the commits the released v1.10.0 used, and lays down the seed config
 - and witnesses each step; `scripts/build.sh` then continues to a flashable package.
 

@@ -79,12 +79,12 @@ done
 # The fork depth is a number, not an object id: bootstrap uses it for the
 # scratch history fetch only (the build tree stays depth 1). Measured on the
 # plan-C tip: the base-port commit 4ca29c6550 is 11 levels below, the upstream
-# pin a4ba8240 is 16 levels below, so anything under 16 would silently drop the
+# pin a4ba8240 is 19 levels below, so anything under 19 would silently drop the
 # tree-hash/series assertions.
 depth=$(get E2631_FORK_DEPTH)
 case "$depth" in
 ''|*[!0-9]*) bad "$ENVF: E2631_FORK_DEPTH is not a number: ${depth:-<missing>}" ;;
-*) [ "$depth" -ge 16 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the upstream pin is 16 levels below the pinned tip" ;;
+*) [ "$depth" -ge 19 ] || bad "$ENVF: E2631_FORK_DEPTH=$depth is too shallow: the upstream pin is 19 levels below the pinned tip" ;;
 esac
 # Plain KEY=VALUE only: a ${VAR:-default} expression would be read literally by
 # bootstrap/base-pin-check and silently pin the wrong string.
@@ -244,15 +244,20 @@ SUBJEOF
 			bad "the tree of $iw_sha is $got_iw_tree, the pin records $iw_tree"
 		fi
 		series=$(git -C "$hist" rev-list --count "$iw_sha..FETCH_HEAD" 2>/dev/null) || series=unknown
-		if [ "$series" = 15 ]; then
-			note "fork series" "15 commits above the upstream pin (plan C)"
+		if [ "$series" = 18 ]; then
+			note "fork series" "18 commits above the upstream pin (plan C)"
 		else
-			bad "the fork carries $series commits above $iw_sha, the plan-C pin records 15"
+			bad "the fork carries $series commits above $iw_sha, the plan-C pin records 18"
 		fi
 		if git -C "$hist" log --format=%s FETCH_HEAD | grep -qxF 'zx279128: fix stale TARGET_sanechips dependencies'; then
 			note "tree fix" "stale @TARGET_sanechips dependencies fixed"
 		else
 			bad "the fork history is missing the stale-dependency fix commit"
+		fi
+		if git -C "$hist" log --format=%s FETCH_HEAD | grep -qxF 'zx279128: fix check-size escaping in the e2631 image pipeline'; then
+			note "image fix" "check-size escaping fixed"
+		else
+			bad "the fork history is missing the check-size escaping fix commit"
 		fi
 	else
 		bad "the fork tip is not descended from the pinned ImmortalWrt commit $iw_sha"
@@ -278,7 +283,7 @@ fi
 # The rename also renamed the Kconfig target symbol. A stale @TARGET_sanechips
 # dependency does not fail the build: it silently hides the package from
 # defconfig (zte-mesh did exactly that at the first plan-C tip).
-if git -C "$E2631_TREE" grep -q '@TARGET_sanechips' HEAD 2>/dev/null; then
+if git -C "$E2631_TREE" grep -q '@TARGET_sanechips' HEAD -- package target/linux 2>/dev/null; then
 	bad "$E2631_TREE still references @TARGET_sanechips - the target symbol is TARGET_zx279128"
 fi
 grep -q 'Device/zte_zxhn-e2631' "$E2631_TREE/target/linux/zx279128/image/Makefile" 2>/dev/null ||

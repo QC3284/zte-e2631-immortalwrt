@@ -42,10 +42,10 @@ vendored patch series and no `apply.sh` any more (T-12):
     E2631_IW_TREE_SHA    b905483c80a3a705825ff7aa9c77d1f3db4a01c3    (pristine upstream tree)
     E2631_FORK_REPO      https://github.com/QC3284/immortalwrt
     E2631_FORK_BRANCH    e2631
-    E2631_FORK_SHA       f85cbea06d98da2a5d0b5139a395d722426211ce    (plan-C rebuild: 15 commits on the base, target renamed zx279128;
-                                                                   SOB amend of d74ec77a, same content tree)
+    E2631_FORK_SHA       86cddb79802bb2223db21f7364613505174968d8    (plan-C rebuild: 18 commits on the base, target renamed zx279128,
+                                                                   including the check-size escaping fix)
     E2631_BASE_TREE_SHA  6136bd92d5259dbaf22f6bca02c675f05abdf86b    (tree of the last zx279128 port commit)
-    E2631_FORK_DEPTH     32                                          (scratch-history window; measured floor 16)
+    E2631_FORK_DEPTH     32                                          (scratch-history window; measured floor 19)
 
 `scripts/pins.env` is the single pin file. It also records the four reviewed port
 commit SHAs (provenance; the old vendored patch files and their sha256 lines are
@@ -56,7 +56,7 @@ fetches the fork tip at **depth 1** for the build tree (parity P2: `COMMITCOUNT`
 `git rev-list --count HEAD .`, so a deeper tree changes `base-files` `PKG_RELEASE`),
 and verifies the history in a separate scratch repo: the tip, the base-port tree
 (`6136bd92…`), the ImmortalWrt pin ancestry, the four port commit subjects and the
-14-commit plan-C series. `make check`'s base-pin gate repeats those assertions on the
+18-commit plan-C series. `make check`'s base-pin gate repeats those assertions on the
 scratch repo and fails a tree built from anything else; a drifted feed is re-pinned or
 refused.
 
@@ -144,7 +144,7 @@ Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
 | slot tool | `e2631-fwslot.c` (the host-native copy) compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
 | slot layout | the kit copies (`tools/verify_img.mjs`, `host/release.mjs`, `scripts/preflight.sh`) and, after a bootstrap, the tree copies (board DTS, `target/linux/zx279128/image/Makefile`, device `e2631-preflight`) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`; the retired `image/Makefile.e2631` must be gone. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
 | base pin | `scripts/pins.env` exists, carries every pin as a plain value, and matches the fork/branch/tip, the ImmortalWrt SHA, the base-port tree hash and the feed commits; the gate also fails if the scripts stop enforcing them. Runs on every `make check`, even before a tree exists |
-| base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `6136bd92` base-port tree, the ImmortalWrt pin `a4ba8240` in its ancestry with its tree at `b905483c`, exactly four reviewed port commits above it, the 14-commit plan-C series, the renamed zx279128 paths and seed, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
+| base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `6136bd92` base-port tree, the ImmortalWrt pin `a4ba8240` in its ancestry with its tree at `b905483c`, exactly four reviewed port commits above it, the 18-commit plan-C series (including the check-size fix), the renamed zx279128 paths and seed, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
 | board dts | `#include`s and every `&label` in the board file resolve against the tree fork's zx279128 patch series (needs the tree, so it SKIPs before bootstrap) |
 | first-flash preflight | the host copy of `e2631-preflight` accepts a synthesized valid package and refuses one with a single altered byte, offline (it needs the native `e2631-fwslot`) |
 | `scripts/secret-scan.sh` | no credential shapes in any tracked file, and the evidence files that must stay ignored (the vendor harvest, the config export, the token helper) are not tracked. It exists because a scrub that searched for a value **literally** missed nine files that carry the tcl-escaped form of the same password |
@@ -159,7 +159,7 @@ run by hand): `node host/sim-upgrade.mjs` simulates the online updater end to en
 `sysupgrade`/`uci`/`wget` (30 checks, no flash write), and `node tools/check-workflows.mjs`
 asserts that the pin file, the tree-fork content (version string and updater, fetched at the
 pinned SHA), the CI workflows, artifact names and release channel agree
-(80 checks; it needs network access and fails those fetches explicitly rather than
+(92 checks; it needs network access and fails those fetches explicitly rather than
 skipping).
 
 ## 5. Bootstrap, then build

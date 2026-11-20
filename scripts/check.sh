@@ -99,6 +99,34 @@ EOF2
 	echo "host-native copies match the tree fork ($(printf '%s\n' "$NATIVE_MAP" | wc -l) files)"
 }
 
+# RUN6 (44787949071) caught an image-pipeline bug that every static gate missed:
+# the plan-C merge of image/Makefile.e2631 unescaped $$(KERNEL_SIZE) inside the
+# device define, so check-size got an empty limit (0) and deleted kernel.bin.
+# This gate parses the image makefile exactly like the build does and looks at
+# the expanded global KERNEL line.
+g_image_parse() {
+	if [ ! -f "${E2631_TREE:-}/.config" ]; then
+		echo "no configured tree fork at ${E2631_TREE:-<unset>} - run scripts/bootstrap.sh first"
+		return 77
+	fi
+	e2631_need_cmd make "parse the image pipeline" || return 77
+	local img="$E2631_TREE/target/linux/zx279128/image" dump line
+	dump=$(TOPDIR="$E2631_TREE" make -C "$img" -pn SUBTARGET=generic DUMP=1 2>/dev/null) || {
+		echo "make -pn failed for $img"; return 1; }
+	line=$(printf '%s\n' "$dump" | grep -m1 -E '^KERNEL (:?=) ')
+	if [ -z "$line" ]; then
+		echo "the image dump has no global KERNEL line"; return 1
+	fi
+	case "$line" in
+	*"check-size 4096k"*) ;;
+	*) echo "KERNEL does not carry 'check-size 4096k': $line"; return 1 ;;
+	esac
+	if printf '%s' "$line" | grep -Eq 'check-size[[:space:]]*(\||$)'; then
+		echo "KERNEL carries an empty check-size limit (the RUN6 kernel.bin bug): $line"; return 1
+	fi
+	echo "image pipeline dump: KERNEL carries check-size 4096k"
+}
+
 g_secret() {
 	command -v git >/dev/null 2>&1 || { echo "no git: the tracked-file scan cannot run"; return 77; }
 	bash "$E2631_KIT/scripts/secret-scan.sh"
@@ -165,6 +193,7 @@ run "javascript (node --check)" g_js
 run "device scripts (busybox ash)" g_ash
 run "slot tool (-Werror, parse, reject)" g_slot_tool
 run "host-native copies vs tree fork" g_native_sync
+run "image pipeline parse (check-size)" g_image_parse
 run "slot layout constants (kit + tree)" g_layout
 run "base pin (pins.env + provenance)" g_base_pin
 run "base tree (fork history + 4 commits)" g_base_tree

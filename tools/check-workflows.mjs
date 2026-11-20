@@ -66,6 +66,7 @@ const RAW = (p) => 'https://raw.githubusercontent.com/' + TREE_REPO + '/' + pins
 const VERSION_URL = RAW('target/linux/zx279128/base-files/etc/e2631-version');
 const UPDATER_URL = RAW('target/linux/zx279128/base-files/sbin/e2631-upgrade');
 const TREE_SEED_URL = RAW('seed/e2631.config');
+const TREE_IMAGE_MAKEFILE_URL = RAW('target/linux/zx279128/image/Makefile');
 async function fetchText(url) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
@@ -74,8 +75,8 @@ async function fetchText(url) {
     return '';
   }
 }
-const [TREE_CI, TREE_CHECKPATCH, TREE_EXEMPTIONS, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW] = await Promise.all(
-  [TREE_CI_URL, TREE_CHECKPATCH_URL, TREE_EXEMPTIONS_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL].map(fetchText));
+const [TREE_CI, TREE_CHECKPATCH, TREE_EXEMPTIONS, VERSION_RAW, UPDATER_RAW, TREE_SEED_RAW, TREE_IMAGE_MAKEFILE] = await Promise.all(
+  [TREE_CI_URL, TREE_CHECKPATCH_URL, TREE_EXEMPTIONS_URL, VERSION_URL, UPDATER_URL, TREE_SEED_URL, TREE_IMAGE_MAKEFILE_URL].map(fetchText));
 const VERSION = VERSION_RAW.trim();
 const UPDATER = UPDATER_RAW;
 
@@ -118,8 +119,8 @@ ok('the retired merge-commit and patch-series pins are gone',
   !has(PIN_TEXT, 'E2631_MERGED_MASTER_SHA=') && !has(PIN_TEXT, 'E2631_MERGED_MASTER_DATE=') &&
   !has(PIN_TEXT, 'E2631_BASE_PATCH_SHA256_0001='));
 ok('the scratch history depth is deep enough to reach the upstream pin (P2)',
-  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 16,
-  pins.E2631_FORK_DEPTH + ' levels; the upstream pin is 16 below the tip');
+  /^[0-9]+$/.test(pins.E2631_FORK_DEPTH) && Number(pins.E2631_FORK_DEPTH) >= 19,
+  pins.E2631_FORK_DEPTH + ' levels; the upstream pin is 19 below the tip');
 
 // 2. The tree-fork content is what the kit claims to ship.
 ok('the tree fork at the pinned SHA serves /etc/e2631-version', VERSION.length > 0,
@@ -205,6 +206,18 @@ ok('bootstrap seeds from the tree fork seed, never from a kit copy',
   has(BOOTSTRAP, 'cp "$SEED" "$E2631_TREE/.config"') &&
   !has(BOOTSTRAP, '$E2631_KIT/seed/e2631.config'));
 // P5: kernel build identity comes from the seed, not the runner.
+// RUN6 v2 (44787949071) failed because the image/Makefile merge unescaped
+// $$(KERNEL_SIZE): check-size saw an empty limit, removed kernel.bin and killed
+// the build. The pinned makefile must keep the double-dollar form, and the kit
+// check.sh must carry the parse-only dump gate that catches it locally.
+ok('the pinned image pipeline keeps the check-size limit escaped',
+  has(TREE_IMAGE_MAKEFILE, 'check-size $$(KERNEL_SIZE)') &&
+  !has(TREE_IMAGE_MAKEFILE, 'check-size $(KERNEL_SIZE)'),
+  TREE_IMAGE_MAKEFILE_URL);
+ok('check.sh carries the image-pipeline parse gate',
+  has(read('scripts/check.sh'), 'g_image_parse') &&
+  has(read('scripts/check.sh'), 'check-size 4096k') &&
+  has(read('scripts/check.sh'), '-pn SUBTARGET=generic DUMP=1'));
 ok('the kit adds CONFIG_KERNEL_BUILD_USER on top of the tree seed',
   has(BOOTSTRAP, 'CONFIG_KERNEL_BUILD_USER="e2631-build"'));
 ok('the kit adds CONFIG_KERNEL_BUILD_DOMAIN on top of the tree seed',
