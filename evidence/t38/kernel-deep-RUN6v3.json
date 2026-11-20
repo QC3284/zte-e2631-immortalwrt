@@ -1,0 +1,133 @@
+{
+  "ref": {
+    "file": "/home/qc233/zte/e2631-t5-artifacts/parity-44766496013/e2631-build-44766496013/release/e2631-immortalwrt-experimental.bin",
+    "bin": {
+      "bytes": 22020628,
+      "sha256": "3a5914edac7dd973c4a86c2c97de5854ed348466701204d5d0903b1972439050"
+    },
+    "uimage": {
+      "ihSize": 3491546,
+      "ihTime": 1795188482,
+      "xzAt": 26547
+    }
+  },
+  "cand": {
+    "file": "/home/qc233/zte/e2631-t5-artifacts/parity-44815428424/e2631-build-44815428424/release/e2631-immortalwrt-experimental.bin",
+    "bin": {
+      "bytes": 22020628,
+      "sha256": "6aa2c3b56b455fa80e08f597ec0536be41b0502606a52f81bc0f662714cccafb"
+    },
+    "uimage": {
+      "ihSize": 3491050,
+      "ihTime": 1795207582,
+      "xzAt": 26547
+    }
+  },
+  "kernel": {
+    "compressed_data_same": false,
+    "decompressed_bytes": {
+      "ref": 13159680,
+      "cand": 13159680,
+      "same_size": true
+    },
+    "decompressed_sha256": {
+      "ref": "59a20c32d5850b1a8e1bc3b175e23b575e041a97c64712b061ae957d1aa6f58f",
+      "cand": "db5a5b38ff30a90e276a1ecac2e29f91a4a6da1ecb8986d79dcf4f40f182b561"
+    },
+    "decompressed_identical": false,
+    "diff_bytes": 62,
+    "diff_ranges": 11,
+    "ranges": [
+      {
+        "start": 10543423,
+        "end": 10543424,
+        "bytes": 2,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": "GNU ld (GNU Binutils) 2.46.1) #0 SMP Fri Nov 20 15:28:02 2026\n...................l..�...�4..�....�"
+      },
+      {
+        "start": 10543426,
+        "end": 10543427,
+        "bytes": 2,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": " ld (GNU Binutils) 2.46.1) #0 SMP Fri Nov 20 15:28:02 2026\n...................l..�...�4..�....�..�"
+      },
+      {
+        "start": 10543429,
+        "end": 10543429,
+        "bytes": 1,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": " (GNU Binutils) 2.46.1) #0 SMP Fri Nov 20 15:28:02 2026\n...................l..�...�4..�....�..��."
+      },
+      {
+        "start": 10547716,
+        "end": 10547735,
+        "bytes": 20,
+        "qualified": true,
+        "kind": "build-id",
+        "context": "............�u�.........e...................GNU.N�*1�7��\n�:&�ⷸ�.�............Linux...................Linux...<..."
+      },
+      {
+        "start": 10831576,
+        "end": 10831595,
+        "bytes": 20,
+        "qualified": true,
+        "kind": "build-id",
+        "context": ".P��$.�.����PY��....�O���.�.����............GNU.p�[�./��9j�#\r�'jH���............Linux...................Linux......."
+      },
+      {
+        "start": 11785266,
+        "end": 11785269,
+        "bytes": 4,
+        "qualified": true,
+        "kind": "build-epoch",
+        "context": "0701000002D1000041ED0000000000000000000000026B006702000000000000000300000001000000000000000000000004"
+      },
+      {
+        "start": 11785382,
+        "end": 11785385,
+        "bytes": 4,
+        "qualified": true,
+        "kind": "build-epoch",
+        "context": "0701000002D2000021800000000000000000000000016B00670200000000000000030000000100000005000000010000000C"
+      },
+      {
+        "start": 11785506,
+        "end": 11785509,
+        "bytes": 4,
+        "qualified": true,
+        "kind": "build-epoch",
+        "context": "0701000002D3000041C00000000000000000000000026B006702000000000000000300000001000000000000000000000005"
+      },
+      {
+        "start": 13153085,
+        "end": 13153086,
+        "bytes": 2,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": "..............................#0 SMP Fri Nov 20 15:28:02 2026..................................arm"
+      },
+      {
+        "start": 13153088,
+        "end": 13153089,
+        "bytes": 2,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": "...........................#0 SMP Fri Nov 20 15:28:02 2026..................................arm..."
+      },
+      {
+        "start": 13153091,
+        "end": 13153091,
+        "bytes": 1,
+        "qualified": true,
+        "kind": "uts-version",
+        "context": "........................#0 SMP Fri Nov 20 15:28:02 2026..................................arm....."
+      }
+    ]
+  },
+  "verdict": "STAMP-ONLY",
+  "stampOnly": true
+}

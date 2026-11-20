@@ -1,0 +1,16 @@
+Kit commit: 38fce86caf9010006898320fd840aa1dbb208f00
+ImmortalWrt base: https://github.com/immortalwrt/immortalwrt master @ a4ba8240d8a1aaef7e8c6f2d65e841a9bfd2b8c5
+ImmortalWrt tree (pristine): b905483c80a3a705825ff7aa9c77d1f3db4a01c3
+Port base tree (4 commits applied): 6136bd92d5259dbaf22f6bca02c675f05abdf86b
+Port provenance: https://github.com/Zlion-Y/openwrt-sanechips-mirror pr-zte-zxhn-h3600 @ db8b8d4130457dbe46558a7cea872dd2dae539e6
+Tree fork: https://github.com/QC3284/immortalwrt e2631 @ 86cddb79802bb2223db21f7364613505174968d8
+Parity reproduction: false (build stamp date-of-run)
+Kernel build id: e2631-build@immortalwrt-e2631 (P5, from the seed)
+Kernel: 6.18.60
+APK signing key: pinned input, public key sha256 9edb11a9d0879b6626e6980f7d182c7b20541adccae59a14acade68b9a62c1f8
+Packages feed: https://github.com/immortalwrt/packages.git
+Packages commit: decf94639ffd6ddd26591c190b547c6b7eea150b
+LuCI feed: https://github.com/immortalwrt/luci.git
+LuCI commit: ad75cde88e694b511100576bfbe0a280e5efe6ef
+Run: https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/44815428424
+Hardware tested: NO

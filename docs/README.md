@@ -24,6 +24,9 @@
 | [../evidence/immortalwrt-verify-20261114.md](../evidence/immortalwrt-verify-20261114.md) | T5：ImmortalWrt 适配的端到端构建与产物验证报告（本地门禁、CI run、产物 sha256、未覆盖项） |
 | [../evidence/t20-verification-20261114.md](../evidence/t20-verification-20261114.md) | T-20：树 fork 重钉重建对的独立验证（RUN1/RUN2 产物哈希、两层门禁、APK 钉值、A==B 逐字节一致、与基线差异复核） |
 | [../evidence/cold-boot-sampling-20261114.md](../evidence/cold-boot-sampling-20261114.md) | T-19 与回归：MT7916 冷启动采样（v1.10.0 11/11 + r0-83df1a9 3/3，累计 14/14，0 失败签名）与完成度只读核查 |
+| [../evidence/r-verify4-parity-20261115.md](../evidence/r-verify4-parity-20261115.md) | R-验4：RUN5 merge 候选 parity（PASS-REVIEWED-DIFFS、kernel merge-class 归因、RUN4 失败记录） |
+| [../evidence/c-plan-parity-20261121.md](../evidence/c-plan-parity-20261121.md) | C-验1：RUN6（方案 C，target 改名 zx279128）对 RUN5 的 parity 验收（RUN6 v3 PASS-REVIEWED-DIFFS，expected 23 / allowed 13 / unexpected 0，kernel STAMP-ONLY，含首轮 5 条归因与负对照） |
+| [../evidence/t38/](../evidence/t38/) | task-38 验收附件：verify-task38.sh、终稿策略、端到端日志、比较器/kernel-deep/verify_img 报告、负对照 |
 
 
 | 文件 | 内容 |

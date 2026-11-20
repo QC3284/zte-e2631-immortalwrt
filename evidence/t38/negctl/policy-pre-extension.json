@@ -1,0 +1,15 @@
+{
+  "label": "T-38 RUN5-44766496013 vs Plan C RUN6 v3 (tree fork rebuilt on immortalwrt a4ba8240, target renamed sanechips -> zx279128, tree tip 86cddb79 after the check-size escaping fix)",
+  "kernelPayload": {
+    "reason": "Plan C leaves every kernel input unchanged: the kernel config hash 6.18.60~106ff47d01ccbcbd01e3661d209d54cd-r1 is asserted unchanged, target/linux/generic/config-6.18 and the zx279128 patches are byte-identical to RUN5 (the target directory was renamed, not edited), and the seed CONFIG_KERNEL_* lines are unchanged. The compressed uImage payload is therefore re-rolled by the build timestamp; kernel-deep-compare must report STAMP-ONLY."
+  },
+  "rootfsExact": {
+    "etc/openwrt_release": "Plan C target rename: DISTRIB_TARGET sanechips/generic -> zx279128/generic. The DISTRIB_REVISION r0-5202d4c -> r0-f85cbea line is normalised by the comparator as a stamp.",
+    "usr/lib/os-release": "Plan C target rename: OPENWRT_BOARD sanechips/generic -> zx279128/generic. Revision/build strings are stamp-normalised.",
+    "etc/apk/repositories.d/distfeeds.list": "Plan C target rename: the snapshot feed URL path targets/sanechips/generic -> targets/zx279128/generic (feed pins unchanged: packages decf9463, luci ad75cde8).",
+    "etc/board.d/01_leds": "Plan C checkpatch class: target/linux/zx279128/base-files/etc/board.d/01_leds gains only the SPDX license identifier comment (evidence/c-plan-tree-rebuild-audit-20261121.md section 3.2 class II); the shell logic is byte-identical, so the only rootfs effect is the added comment line."
+  },
+  "versionFiles": {},
+  "infoKeys": {},
+  "note": "Allowed buckets are the Plan C audit classes only: target rename strings, checkpatch SPDX, and provenance/stamp shifts. RUN6 v2 (44787949071) failed before producing an image because of a tree image/Makefile check-size escaping bug; that is a tree-content bug, fixed at 86cddb79, and does not change the RUN5-vs-RUN6 parity buckets. Any other rootfs or package difference is FAIL and must be reported, not absorbed. v3 verification added five attributed entries after the first v3 run: two derived apk DB files (base-files revision/rename + libopenssl3 libcrypto built-on stamp), the OpenSSL built-on stamp itself, the etc/os-release symlink read, and the new Port provenance SOURCE-INFO line."
+}
