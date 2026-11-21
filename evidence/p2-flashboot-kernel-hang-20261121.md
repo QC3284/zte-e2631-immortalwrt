@@ -256,7 +256,7 @@ ACTLR? (c1,c0,1)  —— 只读；若在 QEMU/真机上读不到就跳过
 
 ### 8.4 后续（Lead 2026-11-21 决定）
 - 修复补丁（uboot-port patch 0011）按本报告改为 **CP15-only**：去掉 PL310/SCU 写，只做主线口径的 CP15/缓存/MMU 归一；e2631soc 命令 = 同一归一系列 + 入口寄存器回报（SCTLR/TTBR0/CLIDR/VBAR）。
-- 可选后续实验（不阻塞今晚的 green）：在 U-Boot 入口与 bootm 前各抓一次 SCTLR/TTBR0/CLIDR/VBAR，分别跑闪存链与 RAM 链，实测确认“secondboot 交棒时 D-cache/MMU 是否为开”。与 verify-docs 的 session-A 探针对齐：md 只能读内存，CP15 需要寄存器回报命令；RAM 链对照需再走一次 vendor xmodem + go。
+- 可选后续实验（不阻塞今晚的 green；2026-11-21 与 verify-docs 对齐的采集契约）：决定性证据是 SCTLR 的 M(bit0)/C(bit2)/I(bit12) 前后值。e2631soc 当前只报 SCTLR + PL310 + SCU；TTBR0/VBAR 为 nice-to-have（两行打印），CLIDR/CCSIDR/ACTLR 不要求。Session A 采法：闪存链旧 U-Boot（010379fd，cleanup 为 stub，不改 SCTLR）提示符 -> md 读 PL310 ctrl/aux 与 SCU ctrl -> loadx 新 u-boot.bin -> go -> e2631soc 前后值 -> e2631boot（hand-off 前再打印一次）。判定：before 的 M=1 或 C=1 -> 假设确认，after 应读 M=0,C=0,I=0（同时验证 cleanup 实现）；before 全 0 -> 假设弱化，转查 §7 的 C3/C4。RAM 链 vendor 对照默认不做（vendor 会话有 env 漂移风险，且归一顺序已实测、无判定价值）；md 只能读内存，CP15 只能靠 e2631soc 回报。
 - 记录口径：本报告的“排除项”基于当时的 vendor 载荷 sha256 a4c640ad… 与 C1b 镜像 010379fd…；若后续重建导致哈希变化需重跑 §10 的比对。
 
 ## 9. 低置信与未决
