@@ -1,8 +1,8 @@
 # E2631 自定义 U-Boot：A1 最小 RAM 链移植（kit 侧交付物）
 
-本目录是 task-43/task-44 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为 A1 移植，0003 为首个
-CI 构建暴露的链接修复）、pin 文件，
-以及供 task-44（CI 构建）和后续真机 A1 会话使用的说明。**只含代码与文档；A1 阶段不写 flash。**
+本目录是 task-43/task-44/task-47 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为 A1 移植，0003 为
+首个 CI 构建暴露的链接修复，0004 为 A1 串口修复）、pin 文件，
+以及供 task-44/task-48（CI 构建）和后续真机 A1 会话使用的说明。**只含代码与文档；A1 阶段不写 flash。**
 
 依据：[evidence/p2-uboot-research-20261121.md](../evidence/p2-uboot-research-20261121.md) §2（路径 A 分阶段）、
 [evidence/uboot-re-20261115.md](../evidence/uboot-re-20261115.md)（mtd0 布局/偏移）、
@@ -10,7 +10,7 @@ CI 构建暴露的链接修复）、pin 文件，
 
 ## 0. 阶段与范围
 
-- **A1（本次交付）**：纯 RAM 链 POC。PL011 控制台 + Cortex-A9 global timer + DRAM；由厂商 U-Boot
+- **A1（本次交付）**：纯 RAM 链 POC。ZTE 变体 PL011 控制台（0004 起）+ Cortex-A9 global timer + DRAM；由厂商 U-Boot
   控制台用 `tftp` 把镜像装到 RAM，`go` 跳转运行。断电即恢复，**零砖风险**。
 - **不做**：SPI 控制器、SPI-NAND、env、mtd、网络、bootm、CPU1/SMP 交接（secondboot 已完成停车）、
   DDR/时钟初始化（secondboot 已完成）。这些都留给 A2/A3。
@@ -34,7 +34,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0002 sha256 | `71fdce39af5700bd440f87fbe1d50ce7fe97a1c2ab15a44e009d47af09250003` |
 | patch 0003 | `uboot-port/patches/0003-board-zte-fix-the-A1-link.patch`（首个真实构建的链接修复） |
 | patch 0003 sha256 | `d16e7b563adc8693ea59e23900870b07a168f44136218d740c3ba49e44c7b395` |
-| am 之后 tree | `abab1858bfee030bfdbc18bc227189a6e8ba5d83`（与机器无关） |
+| patch 0004 | `uboot-port/patches/0004-serial-pl01x-add-the-ZTE-ZX279128S-UART-map.patch`（ZTE 变体 UART 偏移） |
+| patch 0004 sha256 | `ce6a01ef5b0c1c47f213a79a30bc3bb13f0b8cdeec10ebb4395ce988b5e746ca` |
+| am 之后 tree | `418ae89f09b34238daf37d0db78b4485001ffc2c`（与机器无关） |
 | TEXT_BASE | `0x43000000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -50,7 +52,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = abab1858bfee030bfdbc18bc227189a6e8ba5d83
+test "$(git rev-parse HEAD^{tree})" = 418ae89f09b34238daf37d0db78b4485001ffc2c
 ```
 
 ## 2. 新增/修改的文件（12 个，209 行）
@@ -75,6 +77,13 @@ test "$(git rev-parse HEAD^{tree})" = abab1858bfee030bfdbc18bc227189a6e8ba5d83
 也没有板级 chip select），板级文件补 `reset_cpu()` 占位实现（A1 无复位控制器，打印提示后返回）。
 它不改基线、不改 TEXT_BASE，也不改载荷上限。
 
+补丁 0004（2026-11-21，task-47 真机 A1 验收阻塞修复）：A1 的 UART0 是 **ZTE 变体 PL011**，寄存器偏移与
+ARM 标准不同（DR 0x04、FR 0x14、LCRH 0x30、CR 0x34；无 error clear 寄存器，TXFF/RXFE 位不变）。
+它给 `drivers/serial/serial_pl01x.c` 增加 `TYPE_PL011_ZTE` 与 `zte,zx29-uart` compatible（按变体选偏移），
+DT 的 uart0 从 `arm,pl011` 切到该 compatible；不改基线、TEXT_BASE、载荷上限与 defconfig
+（`CONFIG_PL01X_SERIAL=y` 仍然编译该驱动）。此前 probe 往标准 CR 偏移写使能位，而 ZTE 真正的 CR(0x34)
+从未被写，镜像能执行但串口全程静默（见 [evidence/a1-ramchain-poc-20261121.md](../evidence/a1-ramchain-poc-20261121.md) §7/§9）。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
@@ -82,7 +91,7 @@ test "$(git rev-parse HEAD^{tree})" = abab1858bfee030bfdbc18bc227189a6e8ba5d83
 | `TEXT_BASE` | `0x43000000` | **只用于 A1 RAM 链**：厂商 U-Boot `tftp 0x43000000` + `go 0x43000000`。产品/A2/A3 仍由 secondboot 装到 `0x47F00000`，那时改 TEXT_BASE 后重编 |
 | 初始栈 | `CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000` | 256 MiB DRAM 中段，远离镜像与重定位目标（重定位在 DRAM 顶部附近） |
 | DRAM | `0x40000000` + 256 MiB | secondboot 完成 DDR 初始化；板级只知道大小，不做 DDR init |
-| UART0 | PL011 @ `0x94404000`，115200 8N1 | `CFG_PL011_CLOCK=0`：输入时钟未知，**跳过 IBRD/FBRD 设置**，沿用 secondboot 的 115200；DT 里故意不写 `clock` 属性 |
+| UART0 | ZTE 变体 PL011 @ `0x94404000`，115200 8N1 | compatible `zte,zx29-uart` 选择 ZTE 偏移表（DR 0x04 / FR 0x14 / LCRH 0x30 / CR 0x34；IBRD/FBRD 0x24/0x28 与标准相同）。`CFG_PL011_CLOCK=0`：输入时钟未知，**跳过 IBRD/FBRD 设置**，沿用 secondboot 的 115200；DT 里故意不写 `clock` 属性 |
 | Timer | A9 global timer @ `0x800200` | DT `fixed-clock` a9_periph = 500 MHz（CPU 1 GHz / 2）；`CFG_SYS_HZ_CLOCK` 作为 DT 查询失败的回退 |
 | Cache/MMU | 全关 | `SYS_ICACHE_OFF`/`SYS_DCACHE_OFF`/`SYS_L2CACHE_OFF`：secondboot→vendor U-Boot→`go` 的交接状态（MMU/cache/CPU 模式）未知，A1 用最保守配置 |
 | env | `ENV_IS_NOWHERE` | A1 不读写 env；A2 再加 MTD env（0xC0000，格式与厂商逐字节兼容） |
@@ -116,7 +125,7 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `abab1858bfee030bfdbc18bc227189a6e8ba5d83`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `418ae89f09b34238daf37d0db78b4485001ffc2c`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x43000000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
@@ -127,6 +136,8 @@ make O=build -j"$(nproc)"
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
    `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 4 reviewed warnings**。
+7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
+   （OF_EMBED 把 DTB 打进镜像）。少了这条，构建会通过但 A1 串口仍然静默，正是 task-45 的故障模式。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -144,15 +155,17 @@ A1 会话只允许 `tftp`/`go`/`md`/`mtest`/`reset` 一类命令；**禁止任�
 6. 记录完整串口日志（含 tftp 大小、banner、bdinfo、md、mtest 结果）作为 A1 验收证据，落盘到
    evidence/ 并汇报 Lead。
 
-失败定位顺序：无任何输出 → 串口/PL011（时钟未知，先确认 115200）；banner 后异常 → cache/MMU 交接或
+失败定位顺序：无任何输出 → 先确认镜像是 0004 之后（compatible `zte,zx29-uart` 选中 ZTE 偏移表），
+再确认 115200 与接线；banner 后异常 → cache/MMU 交接或
 timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是否完整传输。
 
 ## 6. 已知限制与风险
 
 - **交接状态未知**（MMU/cache/CPU 模式）：A1 全关 cache/MMU、`SKIP_LOWLEVEL_INIT`，从最保守状态开始；
   若真机异常，优先怀疑这里。
-- **PL011 输入时钟未知**：暂用 `CFG_PL011_CLOCK=0` 跳过波特率设置；若串口乱码，下一步从 lsp0crpm/实测反推
-  （25 MHz / 100 MHz 候选）再改 DT 或头文件。
+- **UART 是 ZTE 变体**（0004 起按 `zte,zx29-uart` 选 ZTE 偏移表）：若串口仍无输出，先核对 DT compatible
+  与 patch 是否齐全，再查接线/波特率；输入时钟仍未知，暂用 `CFG_PL011_CLOCK=0` 跳过波特率设置，若乱码，
+  下一步从 lsp0crpm/实测反推（25 MHz / 100 MHz 候选）再改 DT 或头文件。
 - **timer 500 MHz 是假设**（a9_periph = CPU/2，A9 1 GHz）；真机用 `sleep 1` 对照秒表校准，必要时修正。
 - **A1 无 env/SPI/NAND/网络/bootm**：这是有意的阶段边界，不是缺陷。
 - **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
@@ -185,3 +198,6 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
   `e2631-uboot-a1-44869143179`（7 文件，含 `.config`），u-boot.bin sha256
   `a3771aca6144879701d5336ae032a6d242fab3e1c90a80dbea0710a6816679b3`、347,640 B；
   证据见 [evidence/uboot-ci-build-20261121.md](../evidence/uboot-ci-build-20261121.md)。
+- 2026-11-21（task-47）：新增 patch 0004（ZTE 变体 PL011 偏移表 + `zte,zx29-uart` compatible），
+  重钉结果 tree 为 `418ae89f09b34238daf37d0db78b4485001ffc2c`；根因与 A/B 探针证据见
+  [evidence/a1-ramchain-poc-20261121.md](../evidence/a1-ramchain-poc-20261121.md) §7-§9。

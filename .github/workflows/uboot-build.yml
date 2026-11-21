@@ -154,6 +154,10 @@ jobs:
               exit 1
             }
           done
+          if ! grep -aq 'zte,zx29-uart' build/u-boot.bin; then
+            echo "::error::the embedded DTB does not use the ZTE UART compatible"
+            exit 1
+          fi
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"
