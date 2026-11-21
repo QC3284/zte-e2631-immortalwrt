@@ -132,7 +132,7 @@ overridden by an environment variable or by `.env` (untracked; copy `.env.exampl
 
     make check            # or: bash scripts/check.sh
 
-Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
+Fifteen gates, each reporting PASS / FAIL / SKIP with the reason:
 
 | gate | what it proves |
 |---|---|
@@ -143,6 +143,7 @@ Thirteen gates, each reporting PASS / FAIL / SKIP with the reason:
 | busybox ash | the scripts that get put on the *device* parse under the device's shell, with CRLF stripped - a bashism or a `\r` here only shows up on the board |
 | slot tool | `e2631-fwslot.c` (the host-native copy) compiles with `-Wall -Wextra -Werror`, then accepts a synthesized package and rejects the same package with one kernel byte changed. Its identity tests require both brand prefixes (`OpenWrt` and `ImmortalWrt`) to classify as ours, so a package from either era is not mistaken for the vendor system |
 | slot layout | the kit copies (`tools/verify_img.mjs`, `host/release.mjs`, `scripts/preflight.sh`) and, after a bootstrap, the tree copies (board DTS, `target/linux/zx279128/image/Makefile`, device `e2631-preflight`) agree on KERNEL_AT `0x400000`, ROOTFS_SPAN `0x1100000` and HEADER_AT `0x1500000`; the retired `image/Makefile.e2631` must be gone. A stale `0x1400000` in any one of them is how a package gets built for the wrong header offset |
+| U-Boot tools round-trip | `tests/test_mtd0_tools.mjs` builds a synthetic 1 MiB mtd0 (secondboot header, U-Boot header block + payload + 64-byte tail, erased gap, CRC32 env block) and proves the P2 tools round-trip it byte for byte: `tools/mkuboot-image.mjs` (unpack + build of the 0x20000..0xC0000 image area, payload limit 0x9F800), `tools/e2631-env.mjs` (env block parse/rebuild with the same CRC32 as the vendor image), `tools/patch-uboot.mjs` (only the 20-byte unsalted SHA1 digest at 0x61F80 moves; flag untouched), `tools/verify-mtd0.mjs` (sha256 and baseline diff with reported offsets). Purely offline. The real-dump acceptance (live mtd0 sha256 `de4ea5bd...`, both 2026-11-20 v2 dumps) runs by hand and is not required in CI |
 | base pin | `scripts/pins.env` exists, carries every pin as a plain value, and matches the fork/branch/tip, the ImmortalWrt SHA, the base-port tree hash and the feed commits; the gate also fails if the scripts stop enforcing them. Runs on every `make check`, even before a tree exists |
 | base tree hash | the tree at `E2631_TREE` is a depth-1 checkout of the pinned fork tip, and the scratch repo really contains the `6136bd92` base-port tree, the ImmortalWrt pin `a4ba8240` in its ancestry with its tree at `b905483c`, exactly four reviewed port commits above it, the 18-commit plan-C series (including the check-size fix), the renamed zx279128 paths and seed, and the two pinned feed HEADs. SKIPs until bootstrap has made a tree; never deepens the build tree |
 | board dts | `#include`s and every `&label` in the board file resolve against the tree fork's zx279128 patch series (needs the tree, so it SKIPs before bootstrap) |

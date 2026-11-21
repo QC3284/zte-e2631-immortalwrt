@@ -30,7 +30,7 @@
 
 ### 0.3 最大的风险（先说）
 
-- **mtd0 的 U-Boot 区（0x20000–0xA0000）写入方案未验证。** 两次整片 dump 的 64 B spare/OOB 全是 0xFF（手册 §6.6），说明编程器只导出了主区；而本芯片是**片内 ECC**（4 bit/512 B，校验位固定占每 16 B OOB 段的 8..15 字节，见内核 patch 028 与 IWRT backport 436）。写回时 ECC 位不对，BootROM 读 secondboot 就会失败。
+- **mtd0 的 U-Boot 区（0x20000–0xC0000，env 之前）写入方案未验证。** 两次整片 dump 的 64 B spare/OOB 全是 0xFF（手册 §6.6），说明编程器只导出了主区；而本芯片是**片内 ECC**（4 bit/512 B，校验位固定占每 16 B OOB 段的 8..15 字节，见内核 patch 028 与 IWRT backport 436）。写回时 ECC 位不对，BootROM 读 secondboot 就会失败。
 - 写引导区的工具优先级：**vendor U-Boot 自带命令 > 编程器 > Linux 侧强写**。vendor U-Boot 有专门的 `nand write.uboot - addr off size`，紧跟 `write uboot to nand with 4-bit-ecc, compatible with bootrom.`（@file 0x6173f/0x61760），这是厂商留给写 boot 区的通道；参数语义尚未实测。
 - OOB/ECC 观测与写回验证完成前，**把首次刷引导区当成不可逆操作**。
 
@@ -59,7 +59,7 @@ mtd0（1 MiB，flash 0x0）内部布局（RE 证据 §2）：
 | 0x20000–0x207FF | 0x800 | U-Boot 封装头（结构同上，+0xB0=0x66080） |
 | 0x20800–0x8683F | 0x68000 | U-Boot 载荷（运行时 0x47F00000 + (偏移-0x20800)；2013.04 的 416 KiB 镜像） |
 | 0x86800 / 0x88800 | 0x40×2 | 载荷尾部/镜像尾部 64 B 描述块（可选，secondboot 不校验） |
-| 0x88840–0xBFFFF | ~222 KiB | 0xFF 空区（载荷上限 0x9F800，即载荷末 ≤ 0xA0000；0xA0000–0xBFFFF 另有 128 KiB 空闲） |
+| 0x88840–0xBFFFF | ~222 KiB | 0xFF 空区（当前镜像之后到 env 之前；载荷上限 0x9F800 时载荷末可到 0xC0000，这段空间都在可用范围内） |
 | 0xC0000–0xDFFFF | 0x20000 | env：[u32 LE CRC32][0x1FFFC 数据] |
 | 0xE0000–0xFFFFF | 0x20000 | 0xFF 空区（保留） |
 
@@ -220,7 +220,7 @@ B1（env）走 `saveenv`（U-Boot 自己写+自己校验），风险最低；B2 
 
 | 工具 | 作用 | 验收（离线） |
 | --- | --- | --- |
-| `tools/mkuboot-image.mjs` | 生成 U-Boot 区镜像（覆盖 0x20000–0xA0000，共 0x80000 字节）：0x800 头块从原 dump 模板复制（只改 +0x14=载荷长度，+0x2D4 原样），载荷放 0x20800，尾部按需保留 trailer；超 0x9F800 报错 | 对 vendor 原镜像「拆-装」往返：输出与 mtd0[0x20000:0xA0000] 逐字节一致（除自动填的长度字段） |
+| `tools/mkuboot-image.mjs` | 生成 U-Boot 区镜像（覆盖 0x20000–0xC0000，共 0xA0000 字节，止于 env）：0x800 头块从原 dump 模板复制（只改 +0x14=载荷长度，+0x2D4 原样），载荷放 0x20800，尾部按需保留 trailer；载荷超 0x9F800 报错（0x20800+0x9F800=0xC0000，再大就侵入 env） | 对 vendor 原镜像「拆-装」往返：输出与 mtd0[0x20000:0xC0000] 逐字节一致（长度字段按载荷自动填） |
 | `tools/e2631-env.mjs` | env 文本 ⇄ 0x20000 区块：解析/生成 key=value、pad 0x1FFFC、写 LE CRC32 | 对现网 env 解析-重生成，输出逐字节等于原块（CRC=0xAFFCEC3E） |
 | `tools/patch-uboot.mjs` | 定点 patch：`password=<new>` → 0x61F80 写 SHA1；打印 before/after hex | 对原 dump patch，只有目标字节变化；SHA1 与 sha1sum 对拍 |
 | `tools/verify-mtd0.mjs` | 回读比对：给串口/文件块与 sha256 基线，报告差异偏移 | 原 dump 自比对 0 差异；篡改副本报出偏移 |
@@ -235,7 +235,7 @@ B1（env）走 `saveenv`（U-Boot 自己写+自己校验），风险最低；B2 
 | +0x14 | u32 LE 载荷长度 | = 载荷字节数（如 0x68000）；secondboot 只按它 memcpy |
 | +0x80/+0x90/+0xA0/+0xAC/+0xB0 | "0001ZXIC.."/"BOOTROM"/"RSA2048"/4/0x66080 | 保持原值 |
 | +0x2D4–0x2F3 | 32 B 未知摘要 | 保持原值（secondboot 不校验） |
-| +0x800 起 | 载荷 | ≤0x9F800（载荷末 ≤0xA0000），超限报错 |
+| +0x800 起 | 载荷 | ≤0x9F800（载荷末 ≤0xC0000，不得侵入 env），超限报错 |
 | env（0xC0000，独立工具） | `[u32 LE CRC32][0x1FFFC 数据]` | CRC32 覆盖 0x1FFFC 数据区；数据为 NUL 分隔 key=value，尾部 0x00 填充 |
 
 ### 4.3 刷写通道矩阵

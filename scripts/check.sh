@@ -40,7 +40,7 @@ g_shell() {	# every helper in the kit has to parse
 g_js() {
 	e2631_need_cmd node "check the JavaScript tools" || return 77
 	local bad=0 f
-	for f in "$E2631_KIT"/tools/*.mjs "$E2631_KIT"/host/*.mjs; do
+	for f in "$E2631_KIT"/tools/*.mjs "$E2631_KIT"/tools/lib/*.mjs "$E2631_KIT"/host/*.mjs; do
 		node --check "$f" 2>/dev/null || { echo "node --check: $f"; bad=1; }
 	done
 	return $bad
@@ -157,6 +157,11 @@ g_layout() {	# one slot geometry across the packer, the rule, the DTS and the pr
 	bash "$E2631_KIT/scripts/layout-check.sh"
 }
 
+g_mtd0_tools() {	# offline round-trip: U-Boot image/env/patch/verify tools
+	e2631_need_cmd node "run the P2 U-Boot area round-trip tests" || return 77
+	node "$E2631_KIT/tests/test_mtd0_tools.mjs"
+}
+
 g_base_pin() {	# pin file + provenance + enforcement greps (always)
 	bash "$E2631_KIT/scripts/base-pin-check.sh" static
 }
@@ -195,6 +200,7 @@ run "slot tool (-Werror, parse, reject)" g_slot_tool
 run "host-native copies vs tree fork" g_native_sync
 run "image pipeline parse (check-size)" g_image_parse
 run "slot layout constants (kit + tree)" g_layout
+run "U-Boot area tools (round-trip)" g_mtd0_tools
 run "base pin (pins.env + provenance)" g_base_pin
 run "base tree (fork history + 4 commits)" g_base_tree
 run "board dts cross-reference" g_dts
