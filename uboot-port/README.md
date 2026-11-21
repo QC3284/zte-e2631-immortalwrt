@@ -1,8 +1,9 @@
 # E2631 自定义 U-Boot：A1 RAM 链 + A2 SPI-NAND 只读路径 + A3 槽位启动（kit 侧交付物）
 
-本目录是 task-43/task-44/task-47/task-50/task-51 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为
+本目录是 task-43/task-44/task-47/task-50/task-51/task-53 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为
 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC + SPI-NAND 只读
-路径，0006/0007 为 A3 的槽位感知启动 + 只读 env）、pin 文件、两份设计说明
+路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 + env 日志名称
+诊断）、pin 文件、两份设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)），
 以及供 task-44/task-48（CI 构建）和后续真机 A1/A2/A3 会话使用的说明。
 **只含代码与文档；A1/A2/A3 阶段都不写 flash。**
@@ -18,10 +19,12 @@ A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口�
 - **A2（已交付）**：SPI-NAND 只读路径。SPIFC（0x94406000）PIO 驱动 + U-Boot 现成的 SPI-NAND 核心与
   FORESEE F35SQA001G 条目 + 内置 `mtd` 命令；在 RAM 链里用 `mtd list` / `mtd read` 读 flash，为 A3 的
   槽位启动打地基。只读、不写 flash；设计与风险见 [a2-spi-nand-design.md](a2-spi-nand-design.md)。
-- **A3（本次交付）**：槽位感知启动。在 U-Boot 内复刻 cspboot 的槽位选择（版本头内层 magic + CRC1 +
+- **A3（已交付）**：槽位感知启动。在 U-Boot 内复刻 cspboot 的槽位选择（版本头内层 magic + CRC1 +
   serial），从胜出槽位的 `slot+0x20` 读出 legacy uImage 内核并用 `bootm` 启动（ATAGS 路径，内核自带
   append-dtb）；env 从厂商块 `0xC0000` 只读载入，`saveenv` 编译掉。只读、不写 flash；设计与验收见
-  [a3-slot-boot-design.md](a3-slot-boot-design.md)。
+  [a3-slot-boot-design.md](a3-slot-boot-design.md)。C1a 真机干跑暴露了 `bootm` 缺 ATAGS 缓冲区
+  （`boot_prep_linux` data abort），patch 0008 修复、0009 修正 env 日志名称；重跑清单见
+  [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。
 - **不做（后续阶段）**：写 mtd0/写槽位（刷写阶段，需用户批准）、网络、CPU1/SMP 交接（secondboot 已
   完成停车）、DDR/时钟初始化（secondboot 已完成）、时钟/复位驱动（依赖 secondboot 的控制器状态）、
   env 持久化（B1）、按活动槽位切换根文件系统。
@@ -54,7 +57,11 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0006 sha256 | `35ba682af0a5b5c71ff41c94c104a99afca609087c3bf42e4721370d6dde26ca` |
 | patch 0007 | `uboot-port/patches/0007-env-mtd-load-the-vendor-environment-read-only.patch`（A3：只读 env + `env_mtd_load()` 修复） |
 | patch 0007 sha256 | `bf54aa985373952cac402dafacc2b49f9876993b8150541ec13a10d94f800f97` |
-| am 之后 tree | `40f52fb46d9987d8082babac151f9f8dcbdcba4a`（与机器无关，7 个 patch） |
+| patch 0008 | `uboot-port/patches/0008-board-zte-give-bootm-a-valid-ATAGS-buffer.patch`（C1a：`bi_boot_params` 初始化 + 编译期边界断言） |
+| patch 0008 sha256 | `d75f809f91f7cfcca08de5b04a6ec4c77e77df6f64c14a9f73544515a7c20748` |
+| patch 0009 | `uboot-port/patches/0009-env-keep-the-location-name-when-saveenv-is-disabled.patch`（env 名称诊断，独立可回退） |
+| patch 0009 sha256 | `4bf75d5afe821f0e58dce01c88fa326a3adf4a33c708f5d7c4712d243ad14e91` |
+| am 之后 tree | `aed6c5b700f2a7e405088572c216e2ca23a04996`（与机器无关，9 个 patch） |
 | TEXT_BASE | `0x43000000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -70,7 +77,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = 40f52fb46d9987d8082babac151f9f8dcbdcba4a
+test "$(git rev-parse HEAD^{tree})" = aed6c5b700f2a7e405088572c216e2ca23a04996
 ```
 
 ## 2. 新增/修改的文件
@@ -121,6 +128,25 @@ ATAGS），`CONFIG_BOOTCOMMAND` 改为 `e2631boot`。命令只读：扫描两槽
 `env_mtd_load()`：`setup_mtd_device()` 失败时 `mtd_env` 未初始化却仍被 `put_mtd_device()` 解引用，
 SPI-NAND 缺失会在提示符前 panic；改为 `mtd_env = NULL` + `if (mtd_env)`。
 
+补丁 0008（2026-11-21，task-53，C1a pre-flash blocker）：只改 `board/zte/zxhn-e2631/e2631boot.c`。
+真机 A3 干跑执行 `bootm` 时在 `boot_prep_linux() + 0x74` 发生 data abort（写 ATAG_MEM 的
+`str r0,[r1,#4]`，`r1=0x967fc480` 在 DRAM 之外）：移植板级代码从未给 `gd->bd->bi_boot_params`
+赋值，而 `bd_info` 在 `reserve_board()` 里被清零、本配置又没开 `CONFIG_SYS_MALLOC_BOOTPARAMS`，
+所以 ATAGS 缓冲区指针不是合法 DRAM 地址。patch 在 `board_late_init()`（早于 autoboot/bootm）里把
+`bi_boot_params` 指向 `CFG_SYS_SDRAM_BASE + 0x100`，并用两条 `static_assert` 把该窗口钉在 DRAM
+base 之上、内核 load 地址 `0x40008000` 之下：将来改常量会在编译期失败而不是在启动时 crash。
+ATAGS 只需 44 字节（CORE + 一个 MEM tag + END，`CONFIG_SETUP_MEMORY_TAGS=y`、其余 tag 全关），
+预留 0x100 字节；该窗口与内核（0x40008000）、uImage staging（0x42000000）、重定位后的 U-Boot
+（0x4ff…）都不冲突。内核本身走 append-dtb（`CONFIG_ARM_APPENDED_DTB=y`、`CONFIG_ATAG_DTB_COMPAT`
+未开、`CONFIG_CMDLINE_FORCE=y`），但 `bootm` 必须先写完 ATAGS 才能进入内核。
+
+补丁 0009（2026-11-21，task-53，诊断）：只改 `include/env_internal.h`。`ENV_NAME()` 原本只在
+`CONFIG_CMD_SAVEENV` 打开时才定义 `.name`，而 A3 把 `saveenv` 编译掉，于是 `env_load()` 打印
+`Loading Environment from <NULL>... OK`——C1a 因此误判“env-mtd 未生效”。源码分析（`env/env.c:172-230`
+只在 `drv->load()` 返回 0 时打印 OK；`env/mtd.c:142-199` 的 `env_mtd_load()` 成功才会返回 0）证明
+厂商 env 块实际已从 `0xC0000` 载入成功；0009 让名称无条件定义，日志变成
+`Loading Environment from MTD... OK`。此 patch 与启动逻辑无关，可单独回退。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
@@ -131,8 +157,9 @@ SPI-NAND 缺失会在提示符前 panic；改为 `mtd_env = NULL` + `if (mtd_env
 | UART0 | ZTE 变体 PL011 @ `0x94404000`，115200 8N1 | compatible `zte,zx29-uart` 选择 ZTE 偏移表（DR 0x04 / FR 0x14 / LCRH 0x30 / CR 0x34；IBRD/FBRD 0x24/0x28 与标准相同）。`CFG_PL011_CLOCK=0`：输入时钟未知，**跳过 IBRD/FBRD 设置**，沿用 secondboot 的 115200；DT 里故意不写 `clock` 属性 |
 | Timer | A9 global timer @ `0x800200` | DT `fixed-clock` a9_periph = 500 MHz（CPU 1 GHz / 2）；`CFG_SYS_HZ_CLOCK` 作为 DT 查询失败的回退 |
 | Cache/MMU | 全关 | `SYS_ICACHE_OFF`/`SYS_DCACHE_OFF`/`SYS_L2CACHE_OFF`：secondboot→vendor U-Boot→`go` 的交接状态（MMU/cache/CPU 模式）未知，A1 用最保守配置 |
-| env | `ENV_IS_IN_MTD`（只读） | A3 从厂商块 `0xC0000`/`0x20000` 只读载入（格式与 `env_t` 逐字节兼容）；`saveenv` 编掉；持久化策略（bootdelay/旁路变量）留给 B1 |
+| env | `ENV_IS_IN_MTD`（只读） | A3 从厂商块 `0xC0000`/`0x20000` 只读载入（格式与 `env_t` 逐字节兼容）；`saveenv` 编掉；持久化策略（bootdelay/旁路变量）留给 B1；0009 起日志名称显示为 `MTD`（此前 `<NULL>` 只是 `CMD_SAVEENV` 关闭后 `.name` 没定义，不代表未生效） |
 | 槽位启动 | `e2631boot`（A3） | 扫描两槽每 128 KiB 块找版本头（内层 magic + CRC1），serial 大者胜出（`slot0.serial==0` 也按小处理）；从 `slot+0x20` 读 uImage 到 `0x42000000` 后 `bootm`；ATAGS + 内核 append-dtb |
+| ATAGS 缓冲区 | `CFG_SYS_SDRAM_BASE + 0x100`（= `0x40000100`） | 0008 在 `board_late_init()` 设置 `gd->bd->bi_boot_params`；`static_assert` 保证 > DRAM base 且 +0x100 ≤ 内核 load `0x40008000`；本配置 `SYS_MALLOC_BOOTPARAMS` 关闭，没有其它代码分配该缓冲区 |
 | 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；后续再考虑分离/追加格式 |
 | SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
 | 网络 | 无 | 网络引导仍用厂商 U-Boot 的 tftp |
@@ -165,8 +192,8 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `40f52fb46d9987d8082babac151f9f8dcbdcba4a`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 7）。
+1. `git rev-parse HEAD^{tree}` == `aed6c5b700f2a7e405088572c216e2ca23a04996`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 9）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x43000000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -189,6 +216,9 @@ make O=build -j"$(nproc)"
    并且 `# CONFIG_CMD_SAVEENV is not set`（A3 不能写 env）、`CONFIG_ENV_IS_NOWHERE` 未启用。
 10. A3 二进制：`grep -aq 'e2631boot' build/u-boot.bin` 且 `grep -aq 'spi-nand0' build/u-boot.bin`
     （槽位命令与 env 设备名确实链接进镜像）。
+11. A3/C1a 修复（0008/0009）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`
+    且 `grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h`。形状断言只防回归；
+    编译由 CI 保证，运行期（bootm 真的进内核、env 日志真的显示 MTD）由 C1a 重跑保证（见 §5）。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -229,14 +259,18 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 `bootcmd` 指向 `e2631boot`，3 s 后自动执行；也可在提示符下手动跑只读子命令：
 
 1. `e2631boot info`：打印两槽的版本头偏移、serial、version，以及 `cspboot would boot slotN`。当前
-   设备应显示 slot0（serial 7、`V1.0.0.7B5.8000`、头在 `0x1C60000`）与 slot1（serial 11、头在
-   `0x1500000`），结论 slot1。
+   设备应显示 slot0（serial 7、`V1.0.0.7B5.8000`、头在 `0x1C60000`）与 slot1（serial 12、头在
+   `0x1500000`，C1a 实测值），结论 slot1。
 2. `e2631boot load`：校验 `slot+0x20` 的 uImage（magic/type/os/comp/hcrc/size/dcrc），打印名称、
    load/entry、大小与 CRC 结论，并载入到 `0x42000000` 但**不 boot**。
 3. 与 A2 的 `mtd read spi-nand0 ...` 对照 slot1 版本头字节；两次读取应一致。
-4. （可选）直接 `e2631boot` 走完整 `bootm`：串口应看到 ImmortalWrt 内核启动。
-5. env 检查：`printenv` 应显示厂商 env 的值（`bootdelay=3`、厂商 `bootcmd` 等），但当前生效的
-   `bootcmd` 已被 RAM 内改成 `e2631boot`；`saveenv` 命令不存在（已编掉）。
+4. `e2631boot` 走完整 `bootm`（C1a 重跑必需，不再可选）：串口必须依次出现
+   `Loading Kernel Image to 40008000` →（不再有 data abort）→ ImmortalWrt 内核启动。0008 之前这里
+   固定 data abort 在 `boot_prep_linux`；0008 之后应能进入内核（C1a 只读、不写 flash）。
+5. env 检查：启动日志应是 `Loading Environment from MTD... OK`（0009 之前为 `<NULL>`）；`printenv`
+   应显示厂商 env 的值（`bootdelay=3`、厂商 `bootcmd`、`ethaddr`/`ipaddr`/`memsize` 等——这些值不在
+   编译期默认 env 里，是 env-mtd 真正生效的运行期证据）；当前生效的 `bootcmd` 已被 RAM 内改成
+   `e2631boot`；`saveenv` 命令不存在（已编掉）。
 6. **禁止** `mtd write`/`mtd erase`/`nand write`/`saveenv`；A3 不写 flash、不持久化 env。
 
 失败定位：`e2631boot: spi-nand0 is not available` → 先回到 A2 的 `mtd list`；`no valid version
@@ -261,7 +295,7 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，后续阶段再补复位路径。
 - **载荷 0x9F800**：刷写阶段封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在
   刷写阶段必须原样保留。
-- **checkpatch**：本系列 0 errors、7 reviewed warnings，均为已核对的已知项——4 条 "does MAINTAINERS
+- **checkpatch**：本系列 0 errors、7 reviewed warnings（0008/0009 各自 0 errors / 0 warnings），均为已核对的已知项——4 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
   patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c` 各一条；
   checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
@@ -303,3 +337,8 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `SUPPORT_PASSING_ATAGS`/`ENV_IS_IN_MTD` 并把 `CONFIG_BOOTCOMMAND` 改为 `e2631boot`；重钉结果
   tree 为 `40f52fb46d9987d8082babac151f9f8dcbdcba4a`（7 个 patch）。设计见
   [a3-slot-boot-design.md](a3-slot-boot-design.md)；A3 仍不写 flash、不写 env。
+- 2026-11-21（task-53）：新增 patch 0008（C1a：`board_late_init()` 设置
+  `gd->bd->bi_boot_params = 0x40000100` + 两条编译期边界断言）与 patch 0009（`ENV_NAME` 无条件定义，
+  env 日志从 `<NULL>` 变为 `MTD`）；重钉结果 tree 为
+  `aed6c5b700f2a7e405088572c216e2ca23a04996`（9 个 patch）。C1a 重跑清单见
+  [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。

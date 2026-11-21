@@ -1,0 +1,103 @@
+From 47393e14158d2d68a533808a3fed5b14a0365eda Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 17:55:35 +0800
+Subject: [PATCH 1/2] board: zte: give bootm a valid ATAGS buffer
+
+bootm builds the ARM ATAGS for the kernel at bd->bi_boot_params before it
+jumps to the kernel. bd_info is zeroed by reserve_board() and this port
+leaves CONFIG_SYS_MALLOC_BOOTPARAMS off, so nothing ever set that pointer:
+the C1a RAM dry run data-aborted inside boot_prep_linux() (pc 0x4300178c,
++0x74) while writing the ATAG_MEM tag to 0x967fc480, an address outside
+DRAM 0x40000000-0x4fffffff.
+
+Set bi_boot_params to CFG_SYS_SDRAM_BASE + 0x100 in board_late_init(),
+which runs before autoboot and therefore before bootm. That window is
+clear of the uImage staging area (0x42000000), the kernel load address
+(0x40008000) and relocated U-Boot near the top of DRAM. boot_prep_linux()
+needs 44 bytes today (CORE, one MEM and END tags with
+CONFIG_SETUP_MEMORY_TAGS=y and the CMDLINE/INITRD/REVISION/SERIAL tags
+off); reserve a full 0x100-byte page for whatever bootm needs later and
+pin both bounds with static assertions, so a future change to the buffer
+or the kernel load address fails the build instead of the boot.
+
+The kernel does not consume these ATAGS: it runs from the appended DTB
+(CONFIG_ARM_APPENDED_DTB=y, CONFIG_ATAG_DTB_COMPAT not set,
+CONFIG_CMDLINE_FORCE=y). bootm still has to finish writing them before it
+starts the kernel, which is exactly what failed in C1a.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631boot.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 630c8992..3d012bca 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -26,10 +26,12 @@
+  */
+ 
+ #include <config.h>
++#include <asm/global_data.h>
+ #include <command.h>
+ #include <env.h>
+ #include <image.h>
+ #include <init.h>
++#include <linux/build_bug.h>
+ #include <linux/errno.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/string.h>
+@@ -38,6 +40,8 @@
+ #include <stdio.h>
+ #include <u-boot/crc.h>
+ 
++DECLARE_GLOBAL_DATA_PTR;
++
+ #define E2631_MTD_DEV			"spi-nand0"
+ 
+ #define E2631_SLOT_COUNT		2
+@@ -61,6 +65,23 @@
+ 	"console=ttyAMA0,115200n8 earlycon root=/dev/mtdblock7 " \
+ 	"rootfstype=squashfs ro rootwait"
+ 
++/*
++ * bootm writes the ARM ATAGS for the kernel at bd->bi_boot_params. This port
++ * does not enable CONFIG_SYS_MALLOC_BOOTPARAMS, so no generic code reserves a
++ * buffer for them: keep the classic low-DRAM slot, clear of the kernel load
++ * address (0x40008000), the uImage staging area (0x42000000) and the
++ * relocated U-Boot near the top of DRAM. A CORE tag, one MEM tag and the END
++ * tag need 44 bytes; reserve a full 256-byte page for whatever bootm adds.
++ */
++#define E2631_KERNEL_LOAD_ADDR		0x40008000
++#define E2631_ATAGS_ADDR		(CFG_SYS_SDRAM_BASE + 0x100)
++#define E2631_ATAGS_MAX			0x100
++
++static_assert(E2631_ATAGS_ADDR > CFG_SYS_SDRAM_BASE,
++	      "ATAGS buffer must start above the DRAM base");
++static_assert(E2631_ATAGS_ADDR + E2631_ATAGS_MAX <= E2631_KERNEL_LOAD_ADDR,
++	      "ATAGS buffer must stay below the kernel load address");
++
+ static const u8 e2631_inner_magic[16] = {
+ 	0x33, 0x33, 0x33, 0x33, 0x66, 0x66, 0x66, 0x66,
+ 	0x99, 0x99, 0x99, 0x99, 0xcc, 0xcc, 0xcc, 0xcc,
+@@ -323,6 +344,17 @@ U_BOOT_CMD(e2631boot, 2, 1, do_e2631boot,
+  */
+ int board_late_init(void)
+ {
++	/*
++	 * bootm builds the ARM ATAGS at bd->bi_boot_params before jumping to
++	 * the kernel. bd_info is zeroed by reserve_board() and
++	 * CONFIG_SYS_MALLOC_BOOTPARAMS is off, so the pointer must be set
++	 * here: the C1a dry run data-aborted in boot_prep_linux() while
++	 * writing the ATAG_MEM tag through it (r1 = 0x967fc480, outside
++	 * DRAM). Nothing below this address is live: the uImage is staged at
++	 * 0x42000000 and loaded to 0x40008000.
++	 */
++	gd->bd->bi_boot_params = E2631_ATAGS_ADDR;
++
+ 	if (env_set("bootcmd", "e2631boot"))
+ 		printf("e2631boot: cannot override bootcmd\n");
+ 
+-- 
+2.56.1
+

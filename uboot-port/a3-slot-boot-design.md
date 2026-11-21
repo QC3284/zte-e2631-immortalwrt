@@ -82,6 +82,17 @@ slot1=11（均非 0），该边角不可达；A3 按 cspboot 实现，因为启�
   `board_late_init` 覆盖 `bootcmd`。
 - 载入失败（CRC 坏/设备缺失）：env 驱动打印失败并回退默认 env，`CONFIG_BOOTCOMMAND` 为
   `e2631boot`，启动路径不依赖已载入 env 的 `bootcmd` 内容。
+
+### 4.1 `<NULL>` 名称的真相（task-53 更正）
+
+C1a 真机日志是 `Loading Environment from <NULL>... OK`，当时被读成“env-mtd 未生效”。读源码可知：
+`env_load()` 只在其 `drv->load()` 返回 0 时打印 `OK`（`env/env.c:172-230`），而 `ENV_NAME()` 在
+`CONFIG_CMD_SAVEENV` 关闭时被定义成空（`include/env_internal.h` 原第 176-184 行），于是所有 env
+驱动的 `.name` 都是 NULL，`%s` 打印出 `<NULL>`。因此 **MTD env 实际上载入成功了**
+（`env/mtd.c:142-199` 的 `env_mtd_load()` 返回 0 才会走到 OK），C1a 的“未生效”是名称缺失造成的
+误判；也不需要改 probe/init 顺序。patch 0009 让 `.name` 无条件定义，日志变为
+`Loading Environment from MTD... OK`；它与启动逻辑无关，可独立回退。运行期复核见 §8 的 `printenv`
+厂商值检查。
 - **上游健壮性缺陷与修复**：`env/mtd.c` 的 `env_mtd_load()` 在 `setup_mtd_device()` 失败时 `goto out`，
   而 `out` 处无条件 `put_mtd_device(mtd_env)`；此时 `mtd_env` 未初始化，`put_mtd_device()` 不做 NULL
   检查并直接解引用，SPI-NAND 探测失败会在提示符之前 panic。patch 0007 修两行
@@ -107,6 +118,19 @@ slot1=11（均非 0），该边角不可达；A3 按 cspboot 实现，因为启�
 6. 只读子命令：`e2631boot info`（只打印槽头与选择）、`e2631boot load`（含 uImage 校验与载入，
    不 boot）、`e2631boot`（= boot）。
 
+### 5.1 ATAGS 缓冲区（patch 0008，C1a 修复）
+
+`bootm` 在跳转内核前把 ARM ATAGS 写到 `bd->bi_boot_params`（`arch/arm/lib/bootm.c:47`、`:336`）。
+本板 `bd_info` 在 `reserve_board()` 中被清零，且配置里没有 `CONFIG_SYS_MALLOC_BOOTPARAMS`，所以
+在此之前该指针是无效值；C1a 干跑就在第二个 tag（`ATAG_MEM`）写入时 data abort
+（`pc 0x4300178c`、`r1=0x967fc480`）。patch 0008 在 `board_late_init()`（早于 autoboot，因此早于
+`bootm`）设置 `gd->bd->bi_boot_params = CFG_SYS_SDRAM_BASE + 0x100`（= `0x40000100`），并用两条
+`static_assert` 保证 `ATAGS_ADDR > CFG_SYS_SDRAM_BASE` 且 `ATAGS_ADDR + 0x100 <= 0x40008000`
+（内核 load 地址）。当前配置下 ATAGS 只含 CORE、一个 MEM 与 END 三个 tag，共 44 字节，0x100 字节
+窗口足够；该窗口不与内核、uImage staging（0x42000000）、重定位 U-Boot（0x4ff…）重叠。内核用
+append-dtb（`ARM_APPENDED_DTB=y`、`ATAG_DTB_COMPAT` 关、`CMDLINE_FORCE=y`），不消费这些 ATAGS，
+但 `bootm` 必须先写完它们才能进入内核。
+
 ## 6. 大小预算
 
 A2 镜像 `u-boot.bin` 为 444152 B（上限 653312 = `0x9F800`，余量 209160 B = 204 KiB）。
@@ -119,9 +143,11 @@ patch 0006 新增约 250 行 C（text+字符串估计 3–5 KiB），patch 0007 
   提示符前暴露。已修 `env_mtd_load()` 的未初始化指针（§4）；若仍怀疑 env 路径，只回退 0007 重建即可
   （0006 的启动逻辑不依赖 env）。
 - **全槽扫描成本**：2×448 块，预计 <2 s；A3 真机记录实测值。
-- **ATAGS / append-dtb**：若内核在 “FDT and ATAGS support not compiled in” 处 panic，说明
-  `SUPPORT_PASSING_ATAGS` 丢了；若内核不认追加 DTB，回退方案是在 uImage 数据段里找 `0xD00DFEED`
-  的 FDT 交给 bootm（当前不做，因为厂商链就是 ATAGS 方式）。
+- **ATAGS / append-dtb**：0008 已修 C1a 的 `bi_boot_params` data abort；若内核在 “FDT and ATAGS
+  support not compiled in” 处 panic，说明 `SUPPORT_PASSING_ATAGS` 丢了；若内核不认追加 DTB，回退
+  方案是在 uImage 数据段里找 `0xD00DFEED` 的 FDT 交给 bootm（当前不做，因为厂商链就是 ATAGS 方式）。
+  重跑 C1a 时若在 `boot_prep_linux` 再次 abort，先确认 0008 是否在镜像里、`bi_boot_params` 是否被
+  后续代码改写。
 - **活动槽位不是 slot1 时的 rootfs**：cmdline 的 `root=/dev/mtdblock7` 指向 DTS 固定分区
   （即 slot1 根文件系统）。若将来最高 serial 落在 slot0，A3 会把 slot0 的内核与 slot1 的根走在一起。
   当前实测 slot1 serial 11 > slot0 7，A3 验收只覆盖现状；“按活动槽位切换根文件系统”属于后续阶段
@@ -138,13 +164,20 @@ A3 真机会话（需用户批准；只读、不写 flash）建议顺序：
 2. `e2631boot load`：应显示 uImage 名 `ARM ImmortalWrt Linux-6.18.60`、load/entry `0x40008000`、
    大小 3491850、hcrc/dcrc OK，且**不 boot**。
 3. 与 A2 的 `mtd read spi-nand0 ...` 结果对照 slot1 版本头字节（同一区域两次读取一致）。
-4. （可选）`e2631boot` 完整走 `bootm`：串口应看到 ImmortalWrt 内核启动。
-5. **禁止** `mtd write`/`mtd erase`/`nand write`/`saveenv`（`CMD_SAVEENV` 已编掉）。
+4. `e2631boot` 完整走 `bootm`（C1a 重跑必需）：`Loading Kernel Image to 40008000` 之后不得再出现
+   data abort，串口应继续出现 ImmortalWrt 内核启动日志。
+5. env 证据：启动日志应为 `Loading Environment from MTD... OK`（0009）；`printenv` 应显示厂商值
+   （`bootdelay=3`、`bootcmd`、`ethaddr`/`ipaddr`/`memsize` 等不在编译期默认 env 中的值），而当前
+   生效的 `bootcmd` 已被 RAM 内改成 `e2631boot`。
+6. **禁止** `mtd write`/`mtd erase`/`nand write`/`saveenv`（`CMD_SAVEENV` 已编掉）。
 
 ## 9. 变更记录与关联
 
 - 2026-11-21（task-51）：patch 0006（槽位解析 + `e2631boot` + ATAGS/bootcmd）、patch 0007
   （env-mtd 只读 + `env/mtd.c` 健壮性修复）；本设计说明首版。
+- 2026-11-21（task-53）：patch 0008（`board_late_init()` 设置 `bi_boot_params` + 编译期边界断言，
+  修 C1a 的 `boot_prep_linux` data abort）与 patch 0009（`ENV_NAME` 无条件定义，env 日志名称恢复）；
+  新增 §4.1 `<NULL>` 更正与 §5.1 ATAGS 缓冲区。
 - 相关：[README.md](README.md) §3/§5、[a2-spi-nand-design.md](a2-spi-nand-design.md)（SPI-NAND 读路径）、
   [evidence/chip-level-layout-20261120.md](../evidence/chip-level-layout-20261120.md)（槽位实测内容）、
   [evidence/b1-env-design-20261121.md](../evidence/b1-env-design-20261121.md)（env 块取证）。

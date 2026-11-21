@@ -198,6 +198,17 @@ jobs:
             echo "::error::ENV_IS_NOWHERE must not be set when ENV_IS_IN_MTD is"
             exit 1
           fi
+          # A3/C1a (task-53): bootm needs a valid ATAGS buffer, and the env
+          # location name must stay visible in the log. These are shape gates;
+          # the runtime proof is the C1a RAM-chain re-run (evidence doc 11.3).
+          if ! grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c; then
+            echo "::error::the board must set gd->bd->bi_boot_params before bootm"
+            exit 1
+          fi
+          if ! grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h; then
+            echo "::error::the env location name is hidden again (ENV_NAME guard)"
+            exit 1
+          fi
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"
