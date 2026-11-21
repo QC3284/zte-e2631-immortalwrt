@@ -72,7 +72,7 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0011 sha256 | `98aa4b3914ff1741e0621116b4d630ab43f448d7d0ca31496c2001e815b51095` |
 | patch 0012 | `uboot-port/patches/0012-board-zte-bring-up-the-network-reference-clocks.patch`（A5：厂商 board_eth_init 的参考时钟/SerDes/管脚序列，按两链 pre/post 寄存器差分裁剪 + `e2631refclk` 前后 dump） |
 | patch 0012 sha256 | `9c075c60f5cd6282e8b507d7ee0e02b4fc68544d0f55f4d1b4c43a8f187ed87b` |
-| patch 0013 | `uboot-port/patches/0013-board-zte-drive-the-two-late-GPIO-lines-high.patch`（A6：厂商 `zte_gpio_init()` 尾部两根特例 GPIO，pin 2 / pin 51 置 1） |
+| patch 0013 | `uboot-port/patches/0013-board-zte-drive-the-two-late-GPIO-lines-high.patch`（A6：厂商 `zte_gpio_init()` 尾部两根特例 GPIO，pin 2 置 1 → `mdelay(4)` → pin 51 置 1；保留厂商 4 ms 间隔） |
 | patch 0013 sha256 | `f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c` |
 | am 之后 tree | `f04e5ed9525c87bddc329b24a311dfa4a302b750`（与机器无关，13 个 patch） |
 | TEXT_BASE | `0x47F00000` |
@@ -196,7 +196,7 @@ PHY 驱动）仍归内核；flat GPIO 53（H3600 时期的 `pcie0 reset-gpios` �
 51 与 50 对应的使能输出项（pin 2 与 pin 51）无视表值 0 直接置 1。A5 真机会话的两链差分里残留的 10 个寄存器字
 正是这两根线（`0x94407014` bit2、`0x944070d4` bit3）；留低时内核只枚举到两个 PCIe root port、没有任何
 endpoint（`14c3:7906`/`14c3:790a` 缺失，`mt7915e` 无法绑定），厂商链能看到两个 endpoint。两根线的功能文档未给出，
-按“PCIe 端点复位/供电”假设处理；只做 SET 位 RMW，幂等。设计与验收见
+按“PCIe 端点复位/供电”假设处理；两次置位之间按厂商代码保留 `mdelay(4)`，只做 SET 位 RMW，幂等。设计与验收见
 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)。
 
 ## 3. 关键设计参数
@@ -490,14 +490,4 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   sha256 `367b8fa63364d302bc13ade4dd6f9edcd2a49a706a906207fb33e9dc8ced8b41`、env 块 `6eee153b…` 未变；
   详见 [evidence/uboot-a5-20261122.md](../evidence/uboot-a5-20261122.md)。
 
-- 2026-11-22（A6，patch 0013）：在 0012 的 `e2631_pinmux_gpio_init()` 之后补厂商 `zte_gpio_init()` 的
-两段尾部特例（`0x47f2f61c` 索引 0x33→pin 2、`0x47f2f66c` 索引 0x32→pin 51，无视表值 0 置 1），
-修掉 A5 会话残留的 PCIe endpoint 缺失（只有 root port、没有 `14c3:7906`/`14c3:790a`）。重钉结果 tree
-`f04e5ed9525c87bddc329b24a311dfa4a302b750`（13 个 patch），patch sha256
-`f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c`。设计见
-[a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)；CI run `44934077401`（head `d546664`）
- SUCCESS：banner `g6620d6e97d78`、`u-boot.bin` 450,936 B sha256
-`7117fd88920b8f45c68e4f4114e38001ca216d0da465f32921c2a8ae41ff3bc0`、mtd0 镜像 sha256
-`4851345cff0d838216e448ae67ab3fa00b8e46825f88a9a82afb3b4b0717829a`、装配后 header sha256
-`508c325cbc59b22e4cd78f43d3b51a05926f4725fc1f4bbe0ec7536905d303e9`、env 块 `6eee153b…` 未变；
-详见 [evidence/uboot-a6-20261122.md](../evidence/uboot-a6-20261122.md)。
+- 2026-11-22（A6，patch 0013）：在 0012 的 `e2631_pinmux_gpio_init()` 之后补厂商 `zte_gpio_init()` 的两段尾部特例（`0x47f2f61c` 索引 0x33→pin 2、`0x47f2f66c` 索引 0x32→pin 51，无视表值 0 置 1），并保留厂商在 loop B 之前的 4 ms 间隔（pin 2 → `mdelay(4)` → pin 51），修掉 A5 会话残留的 PCIe endpoint 缺失（只有 root port、没有 `14c3:7906`/`14c3:790a`）。v3 重钉结果 tree `f04e5ed9525c87bddc329b24a311dfa4a302b750`（13 个 patch），patch sha256 `f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c`。设计见 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)；CI run `44935007253`（head `c6a89a8`）SUCCESS：banner `g85c7367a3106`、`u-boot.bin` 450,936 B sha256 `3bf182f148226b6f64696a05bba5d75ca59426747f87eee3f13c5d2b0269423a`、mtd0 镜像 sha256 `f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42`、装配后 header sha256 `508c325cbc59b22e4cd78f43d3b51a05926f4725fc1f4bbe0ec7536905d303e9`、env 块 `6eee153b…` 未变；详见 [evidence/uboot-a6-20261122.md](../evidence/uboot-a6-20261122.md)。
