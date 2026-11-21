@@ -1,0 +1,59 @@
+{
+ "mode": "c1b1a2-preflight",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-c1b0-44898534408/e2631-uboot-44898534408/u-boot.bin",
+  "size": 448112,
+  "sha256": "010379fde3496fdcbbe835c249cff2bd79234f946918266721e098dd64479f75",
+  "sha_ok": true,
+  "token": "U-Boot 2027.01-rc2-g2797f3dd3860",
+  "token_ok": true,
+  "token_offset": 380822
+ },
+ "config": {
+  "CONFIG_TEXT_BASE": "CONFIG_TEXT_BASE=0x47F00000",
+  "CONFIG_BOOTDELAY": "CONFIG_BOOTDELAY=3",
+  "CONFIG_SYS_PROMPT": "CONFIG_SYS_PROMPT=\"=> \"",
+  "CONFIG_CMD_LOADB": "CONFIG_CMD_LOADB=y",
+  "CONFIG_CMD_MTD": "CONFIG_CMD_MTD=y"
+ },
+ "config_text_base": "CONFIG_TEXT_BASE=0x47F00000",
+ "vendor_ram": {
+  "size": 426048,
+  "sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30",
+  "sha_ok": true
+ },
+ "c1b0_green": true,
+ "run1_facts": {
+  "loadx_128": true,
+  "loadx_1024": true,
+  "loadx_128_md": true,
+  "loadx_1024_md": true,
+  "scratch_readback_md": true,
+  "scratch_erase_md": true,
+  "vendor_md": true,
+  "vendor_banner": true
+ },
+ "run1_ok": true,
+ "device": {
+  "ssh_rc": 0,
+  "mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "uptime": "1591",
+  "version": "ImmortalWrt v1.10.0",
+  "kernel": "6.18.60"
+ },
+ "route": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000",
+ "capture_chain": {
+  "supervisor_pids": [
+   2212345
+  ],
+  "bootwatch_pids": [
+   2213057
+  ],
+  "tty_holders": [
+   2212441
+  ]
+ },
+ "start_mode": "ssh-reboot",
+ "vendor_pw_mode": "0o600",
+ "ok": true
+}

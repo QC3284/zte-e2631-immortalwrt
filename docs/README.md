@@ -39,6 +39,8 @@
 | [../evidence/c1a-bootm/](../evidence/c1a-bootm/) | C1a 附件：首跑驱动/results/预检、abort 原文、恢复验证与 health；`run-2/` 为重跑 PASS 附件（postcheck、恢复段、驱动、sha256 清单） |
 | [../evidence/c1b0-entry-20261121.md](../evidence/c1b0-entry-20261121.md) | P2-C1b-0：0x47F00000 产品入口 RAM 链干跑 GREEN（新 banner g2797f3dd3860、xmodem 448,112 B、md 抽查、env MTD 只读、e2631boot→bootm→内核/用户态；零 flash 写入以 mtd0 sha256 前后一致实证；SSH reboot 恢复 stock 链；含 C1b-1 写通道计划变更记录） |
 | [../evidence/c1b0-entry/](../evidence/c1b0-entry/) | C1b-0 附件：驱动、results/preflight、串口/驱动/health 日志、artifact UBOOT-INFO/SHA256SUMS/config、sha256 清单 |
+| [../evidence/c1b1a-write-rehearsal-20261121.md](../evidence/c1b1a-write-rehearsal-20261121.md) | P2-C1b-1a：写通道 dress rehearsal GREEN（run-1 冷启动：loadx 128 B/1 KiB、mtd write/read/cmp/erase 0x7F00000 块全 clean；run-2 SSH warm reboot：reverse go → vendor Press-1 → 密码 → `=>` → version → reset → stock Linux；零越界写入，mtd0 前后 887a7f6c… 不变） |
+| [../evidence/c1b1a-write-rehearsal/](../evidence/c1b1a-write-rehearsal/) | C1b-1a 附件：两次 run 的 results/preflight/驱动日志、串口选段（scratch 写/擦、vendor 控制台/reset）、驱动源码、sha256 清单 |
 
 
 | 文件 | 内容 |

@@ -1,0 +1,197 @@
+{
+ "mode": "c1b1a2-vendor-console",
+ "started": "2026-11-21T20:23:37+0800",
+ "outdir": "/home/qc233/zte/e2631-p3/c1b1a2-vendor-console/run-1",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-c1b0-44898534408/e2631-uboot-44898534408/u-boot.bin",
+  "size": 448112,
+  "sha256": "010379fde3496fdcbbe835c249cff2bd79234f946918266721e098dd64479f75",
+  "sha_ok": true,
+  "token": "U-Boot 2027.01-rc2-g2797f3dd3860",
+  "token_ok": true,
+  "token_offset": 380822
+ },
+ "start_mode": "ssh-reboot",
+ "expected_mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "capture_before": {
+  "supervisor_pids": [
+   2212345
+  ],
+  "bootwatch_pids": [
+   2213057
+  ],
+  "tty_holders": [
+   2212441
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 2321629,
+ "reboot_trigger": {
+  "rc": 0,
+  "err_tail": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+ },
+ "vendor_entry": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "uboot_xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 448112,
+  "block_size": 1024,
+  "blocks": 438,
+  "pad": 400,
+  "bytes_sent": 448112,
+  "elapsed_s": 42.0,
+  "eot_acked": true,
+  "tail_b64": "PT4g",
+  "attempt": 1
+ },
+ "commands": [
+  "go 0x47f00000",
+  "version",
+  "loadx 0x47f00000",
+  "md.b 0x47f00000 0x4000",
+  "md.b 0x47f04000 0x4000",
+  "md.b 0x47f08000 0x4000",
+  "md.b 0x47f0c000 0x4000",
+  "md.b 0x47f10000 0x4000",
+  "md.b 0x47f14000 0x4000",
+  "md.b 0x47f18000 0x4000",
+  "md.b 0x47f1c000 0x4000",
+  "md.b 0x47f20000 0x4000",
+  "md.b 0x47f24000 0x4000",
+  "md.b 0x47f28000 0x4000",
+  "md.b 0x47f2c000 0x4000",
+  "md.b 0x47f30000 0x4000",
+  "md.b 0x47f34000 0x4000",
+  "md.b 0x47f38000 0x4000",
+  "md.b 0x47f3c000 0x4000",
+  "md.b 0x47f40000 0x4000",
+  "md.b 0x47f44000 0x4000",
+  "md.b 0x47f48000 0x4000",
+  "md.b 0x47f4c000 0x4000",
+  "md.b 0x47f50000 0x4000",
+  "md.b 0x47f54000 0x4000",
+  "md.b 0x47f58000 0x4000",
+  "md.b 0x47f5c000 0x4000",
+  "md.b 0x47f60000 0x4000",
+  "md.b 0x47f64000 0x4000",
+  "md.b 0x47f68000 0x40",
+  "go 0x47f00000",
+  "reset"
+ ],
+ "uboot_md": [
+  {
+   "label": "uboot-start",
+   "addr": "0x47f00000",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "fa5376dcd28b870f67a0a654c84fd7d315fa39290867331e45fd6fb487c88ea5",
+   "got_sha256": "fa5376dcd28b870f67a0a654c84fd7d315fa39290867331e45fd6fb487c88ea5"
+  },
+  {
+   "label": "uboot-banner",
+   "addr": "0x47f5cf90",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "dfad1ea82a21ee22b0bface4934dabf542ae63dc64b0861bc7598918967242f1",
+   "got_sha256": "dfad1ea82a21ee22b0bface4934dabf542ae63dc64b0861bc7598918967242f1"
+  },
+  {
+   "label": "uboot-tail",
+   "addr": "0x47f6d570",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "02a70dbd7f13a833cb3200271b0354ea7de3f5d49b41c9bf8b8db578d8c8ff0a",
+   "got_sha256": "02a70dbd7f13a833cb3200271b0354ea7de3f5d49b41c9bf8b8db578d8c8ff0a"
+  }
+ ],
+ "our_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true,
+  "tail": "go 0x47f00000\r\n## Starting application at 0x47F00000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g2797f3dd3860 (Nov 21 2026 - 11:20:33 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  10 devices, 8 uclasses, devicetree: embed\r\nMMC:   \r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   No ethernet found.\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=> "
+ },
+ "command_outputs": {
+  "version": "version\r\nU-Boot 2027.01-rc2-g2797f3dd3860 (Nov 21 2026 - 11:20:33 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+  "reset": ""
+ },
+ "our_version_ok": true,
+ "vendor_loadx": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 426048,
+  "block_size": 128,
+  "blocks": 3329,
+  "pad": 64,
+  "bytes_sent": 426048,
+  "elapsed_s": 44.7,
+  "eot_acked": true,
+  "tail_b64": "BiMjIFRvdGFsIFNpemUgICAgICA9IDB4MDAwNjgwNDAgPSA0MjYwNDggQnl0ZXMNCiMjIFN0YXJ0IEFkZHIgICAgICA9IDB4NDdGMDAwMDANCj0+IA=="
+ },
+ "vendor_md": {
+  "label": "vendor-ram",
+  "addr": "0x47f00000",
+  "size": 426048,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30",
+  "got_sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30"
+ },
+ "vendor_console": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "vendor_prompt_ok": true,
+ "vendor_version_ok": true,
+ "vendor_reset_sent": true,
+ "stock_monitor": {
+  "boot_spi_nand": true,
+  "secondboot": true,
+  "vendor_uboot": true,
+  "vfs_root": true,
+  "wifi": false,
+  "panic": null,
+  "log_bytes": 2083141
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   2387257
+  ],
+  "bootwatch_pids": [
+   2387310
+  ],
+  "tty_holders": [
+   2387264
+  ],
+  "events_tail": "2026-11-21T20:18:31+08:00 reader-start pid=2212345\n2026-11-21T20:28:48+08:00 reader-start pid=2387257",
+  "ok": true
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 \nROUTE_FIX: trying to restore the direct link\n192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2002ms\nrtt min/avg/max/mdev = 2.003/2.038/2.096/0.041 ms\n== ssh identity (retries) ==\n  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n  VERSION=ImmortalWrt v1.10.0\n  UPTIME=36\n  MTD0=mtd0: 00100000 00020000 \"bootloader\"\n  PANICS=0\n  MT7916=0\n  WIFIBOOT=[ 27.069818] e2631-wifi-boot: waiting 25s\n== done ==",
+ "uptime_wait": {
+  "ok": true,
+  "uptime": 73
+ },
+ "post_mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "post_uptime": "74",
+ "post_version": "ImmortalWrt v1.10.0",
+ "post_kernel": "6.18.60",
+ "write_audit": {
+  "mtd_writes": [],
+  "mtd_erases": [],
+  "forbidden_tokens": []
+ },
+ "mtd0_unchanged": true,
+ "health_ok": true,
+ "verdict": "GREEN",
+ "finished": "2026-11-21T20:29:40+0800"
+}

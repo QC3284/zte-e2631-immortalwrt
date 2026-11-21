@@ -1,0 +1,24 @@
+19:44:27 capture paused: {"supervisor_pids": [1608845], "bootwatch_pids": [1608907], "tty_holders": [1608859], "tty_holders_after": [], "free": true}
+19:44:28 serial hub started pid=1746222 log=/home/qc233/zte/e2631-p3/c1b1a-rehearsal/run-1/serial.log
+19:44:28 READY FOR USER POWER CYCLE (C1b-1a rehearsal)
+19:46:59 cold-boot prompt caught; sending 1
+19:46:59 vendor password attempt 1 -> autoboot
+19:47:42 md_check uboot-start: OK
+19:47:43 md_check uboot-banner: OK
+19:47:43 md_check uboot-tail: OK
+19:47:43 banner seen; stopping autoboot
+19:47:46 stop_autoboot: {"banner": true, "prompt": true}
+19:48:02 xmodem_cmd loadx 0x42000000 block=128 ok=True elapsed=15.4s
+19:48:57 md_check loadx-128-data: OK
+19:49:12 xmodem_cmd loadx 0x42000000 block=1024 ok=True elapsed=14.1s
+19:50:08 md_check loadx-1024-data: OK
+19:50:23 xmodem_cmd loadx 0x42000000 block=128 ok=True elapsed=15.3s
+19:51:19 md_check loadx-redo-data: OK
+19:52:15 md_check scratch-readback: OK
+19:53:10 md_check scratch-erase-readback: OK
+19:53:55 xmodem_cmd loadx 0x47f00000 block=128 ok=True elapsed=44.4s
+19:56:56 md_check vendor-ram: OK
+19:57:26 banner seen; stopping autoboot
+19:57:49 stop_autoboot: {"banner": true, "prompt": false}
+20:03:26 capture restore: {"restore_rc": 0, "supervisor_pids": [1884962], "bootwatch_pids": [1885611], "tty_holders": [1885027], "events_tail": "2026-11-21T19:30:01+08:00 reader-start pid=1608845\n2026-11-21T20:03:22+08:00 reader-start pid=1884962", "ok": true}
+20:03:26 VERDICT FAIL

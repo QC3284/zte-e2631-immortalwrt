@@ -1,0 +1,68 @@
+{
+ "mode": "c1b1a-preflight",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-c1b0-44898534408/e2631-uboot-44898534408/u-boot.bin",
+  "size": 448112,
+  "sha256": "010379fde3496fdcbbe835c249cff2bd79234f946918266721e098dd64479f75",
+  "sha_ok": true,
+  "token": "U-Boot 2027.01-rc2-g2797f3dd3860",
+  "token_offset": 380822,
+  "token_ok": true,
+  "entry_bytes": "b80000ea14f09fe5"
+ },
+ "config": {
+  "CONFIG_TEXT_BASE": "CONFIG_TEXT_BASE=0x47F00000",
+  "CONFIG_BOOTDELAY": "CONFIG_BOOTDELAY=3",
+  "CONFIG_SYS_PROMPT": "CONFIG_SYS_PROMPT=\"=> \"",
+  "CONFIG_CMD_MEMORY": "CONFIG_CMD_MEMORY=y",
+  "CONFIG_CMD_LOADB": "CONFIG_CMD_LOADB=y",
+  "CONFIG_CMD_MTD": "CONFIG_CMD_MTD=y"
+ },
+ "config_text_base": "CONFIG_TEXT_BASE=0x47F00000",
+ "config_cmd_mtd": true,
+ "config_cmd_loadb": true,
+ "vendor_ram": {
+  "path": "/home/qc233/zte/e2631-immortalwrt/evidence/p2-oob/vendor-uboot-ram.bin",
+  "size": 426048,
+  "sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30",
+  "sha_ok": true
+ },
+ "test_data": {
+  "path": "/home/qc233/zte/e2631-p3/c1b1a-rehearsal/run-1/scratch-0x20000.bin",
+  "size": 131072,
+  "sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e",
+  "ok": true
+ },
+ "scratch": {
+  "off": "0x7f00000",
+  "size": "0x20000",
+  "range": "0x7f00000..0x7f20000",
+  "outside_all_partitions": true,
+  "partition_end": "0x6e00000",
+  "chip_size": "0x8000000",
+  "write_cmd": "mtd write spi-nand0 0x42000000 0x7f00000 0x20000",
+  "erase_cmd": "mtd erase spi-nand0 0x7f00000 0x20000"
+ },
+ "c1b0_green": true,
+ "device": {
+  "ssh_rc": 0,
+  "mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "uptime": "773",
+  "version": "ImmortalWrt v1.10.0",
+  "kernel": "6.18.60"
+ },
+ "route": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000",
+ "capture_chain": {
+  "supervisor_pids": [
+   1608845
+  ],
+  "bootwatch_pids": [
+   1608907
+  ],
+  "tty_holders": [
+   1608859
+  ]
+ },
+ "vendor_pw_mode": "0o600",
+ "ok": true
+}

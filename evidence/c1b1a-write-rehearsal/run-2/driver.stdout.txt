@@ -1,0 +1,23 @@
+20:23:39 capture paused: {"supervisor_pids": [2212345], "bootwatch_pids": [2213057], "tty_holders": [2212441], "tty_holders_after": [], "free": true}
+20:23:40 serial hub started pid=2321629 log=/home/qc233/zte/e2631-p3/c1b1a2-vendor-console/run-1/serial.log
+20:23:40 triggering SSH reboot to catch the vendor Press-1 prompt (no manual power cycle)
+20:23:40 ssh reboot rc=0 err=Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.
+
+20:23:43 cold-boot prompt caught; sending 1
+20:23:43 vendor password attempt 1 -> autoboot
+20:24:26 md_check uboot-start: OK
+20:24:26 md_check uboot-banner: OK
+20:24:26 md_check uboot-tail: OK
+20:24:26 banner seen; stopping autoboot
+20:24:29 stop_autoboot: {"banner": true, "prompt": true}
+20:25:15 xmodem_cmd loadx 0x47f00000 block=128 ok=True elapsed=44.7s
+20:28:15 md_check vendor-ram: OK
+20:28:15 reverse go sent; waiting for the vendor Press-1 boot-mode window
+20:28:16 cold-boot prompt caught; sending 1
+20:28:16 vendor password attempt 1 -> autoboot
+20:28:46 stock marker: boot_spi_nand
+20:28:46 stock marker: secondboot
+20:28:46 stock marker: vendor_uboot
+20:28:46 stock marker: vfs_root
+20:28:52 capture restore: {"restore_rc": 0, "supervisor_pids": [2387257], "bootwatch_pids": [2387310], "tty_holders": [2387264], "events_tail": "2026-11-21T20:18:31+08:00 reader-start pid=2212345\n2026-11-21T20:28:48+08:00 reader-start pid=2387257", "ok": true}
+20:29:40 VERDICT GREEN

@@ -1,0 +1,350 @@
+{
+ "mode": "c1b1a-rehearsal",
+ "started": "2026-11-21T19:44:26+0800",
+ "outdir": "/home/qc233/zte/e2631-p3/c1b1a-rehearsal/run-1",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-c1b0-44898534408/e2631-uboot-44898534408/u-boot.bin",
+  "size": 448112,
+  "sha256": "010379fde3496fdcbbe835c249cff2bd79234f946918266721e098dd64479f75",
+  "sha_ok": true,
+  "token": "U-Boot 2027.01-rc2-g2797f3dd3860",
+  "token_offset": 380822,
+  "token_ok": true,
+  "entry_bytes": "b80000ea14f09fe5"
+ },
+ "scratch": {
+  "off": "0x7f00000",
+  "size": "0x20000",
+  "range": "0x7f00000..0x7f20000",
+  "outside_all_partitions": true,
+  "partition_end": "0x6e00000",
+  "chip_size": "0x8000000",
+  "write_cmd": "mtd write spi-nand0 0x42000000 0x7f00000 0x20000",
+  "erase_cmd": "mtd erase spi-nand0 0x7f00000 0x20000"
+ },
+ "expected_mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "capture_before": {
+  "supervisor_pids": [
+   1608845
+  ],
+  "bootwatch_pids": [
+   1608907
+  ],
+  "tty_holders": [
+   1608859
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 1746222,
+ "vendor_entry": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "uboot_xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 448112,
+  "block_size": 1024,
+  "blocks": 438,
+  "pad": 400,
+  "bytes_sent": 448112,
+  "elapsed_s": 41.9,
+  "eot_acked": true,
+  "tail_b64": "PT4g",
+  "attempt": 1
+ },
+ "commands": [
+  "go 0x47f00000",
+  "version",
+  "mtd list",
+  "loadx 0x42000000",
+  "md.b 0x42000000 0x4000",
+  "md.b 0x42004000 0x4000",
+  "md.b 0x42008000 0x4000",
+  "md.b 0x4200c000 0x4000",
+  "md.b 0x42010000 0x4000",
+  "md.b 0x42014000 0x4000",
+  "md.b 0x42018000 0x4000",
+  "md.b 0x4201c000 0x4000",
+  "loadx 0x42000000",
+  "md.b 0x42000000 0x4000",
+  "md.b 0x42004000 0x4000",
+  "md.b 0x42008000 0x4000",
+  "md.b 0x4200c000 0x4000",
+  "md.b 0x42010000 0x4000",
+  "md.b 0x42014000 0x4000",
+  "md.b 0x42018000 0x4000",
+  "md.b 0x4201c000 0x4000",
+  "loadx 0x42000000",
+  "md.b 0x42000000 0x4000",
+  "md.b 0x42004000 0x4000",
+  "md.b 0x42008000 0x4000",
+  "md.b 0x4200c000 0x4000",
+  "md.b 0x42010000 0x4000",
+  "md.b 0x42014000 0x4000",
+  "md.b 0x42018000 0x4000",
+  "md.b 0x4201c000 0x4000",
+  "mtd write spi-nand0 0x42000000 0x7f00000 0x20000",
+  "mtd read spi-nand0 0x43000000 0x7f00000 0x20000",
+  "md.b 0x43000000 0x4000",
+  "md.b 0x43004000 0x4000",
+  "md.b 0x43008000 0x4000",
+  "md.b 0x4300c000 0x4000",
+  "md.b 0x43010000 0x4000",
+  "md.b 0x43014000 0x4000",
+  "md.b 0x43018000 0x4000",
+  "md.b 0x4301c000 0x4000",
+  "cmp 0x42000000 0x43000000 0x20000",
+  "mtd erase spi-nand0 0x7f00000 0x20000",
+  "mtd read spi-nand0 0x44000000 0x7f00000 0x20000",
+  "md.b 0x44000000 0x4000",
+  "md.b 0x44004000 0x4000",
+  "md.b 0x44008000 0x4000",
+  "md.b 0x4400c000 0x4000",
+  "md.b 0x44010000 0x4000",
+  "md.b 0x44014000 0x4000",
+  "md.b 0x44018000 0x4000",
+  "md.b 0x4401c000 0x4000",
+  "loadx 0x47f00000",
+  "md.b 0x47f00000 0x4000",
+  "md.b 0x47f04000 0x4000",
+  "md.b 0x47f08000 0x4000",
+  "md.b 0x47f0c000 0x4000",
+  "md.b 0x47f10000 0x4000",
+  "md.b 0x47f14000 0x4000",
+  "md.b 0x47f18000 0x4000",
+  "md.b 0x47f1c000 0x4000",
+  "md.b 0x47f20000 0x4000",
+  "md.b 0x47f24000 0x4000",
+  "md.b 0x47f28000 0x4000",
+  "md.b 0x47f2c000 0x4000",
+  "md.b 0x47f30000 0x4000",
+  "md.b 0x47f34000 0x4000",
+  "md.b 0x47f38000 0x4000",
+  "md.b 0x47f3c000 0x4000",
+  "md.b 0x47f40000 0x4000",
+  "md.b 0x47f44000 0x4000",
+  "md.b 0x47f48000 0x4000",
+  "md.b 0x47f4c000 0x4000",
+  "md.b 0x47f50000 0x4000",
+  "md.b 0x47f54000 0x4000",
+  "md.b 0x47f58000 0x4000",
+  "md.b 0x47f5c000 0x4000",
+  "md.b 0x47f60000 0x4000",
+  "md.b 0x47f64000 0x4000",
+  "md.b 0x47f68000 0x40",
+  "go 0x47f00000",
+  "reset"
+ ],
+ "uboot_md": [
+  {
+   "label": "uboot-start",
+   "addr": "0x47f00000",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "fa5376dcd28b870f67a0a654c84fd7d315fa39290867331e45fd6fb487c88ea5",
+   "got_sha256": "fa5376dcd28b870f67a0a654c84fd7d315fa39290867331e45fd6fb487c88ea5"
+  },
+  {
+   "label": "uboot-banner",
+   "addr": "0x47f5cf90",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "dfad1ea82a21ee22b0bface4934dabf542ae63dc64b0861bc7598918967242f1",
+   "got_sha256": "dfad1ea82a21ee22b0bface4934dabf542ae63dc64b0861bc7598918967242f1"
+  },
+  {
+   "label": "uboot-tail",
+   "addr": "0x47f6d570",
+   "size": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "02a70dbd7f13a833cb3200271b0354ea7de3f5d49b41c9bf8b8db578d8c8ff0a",
+   "got_sha256": "02a70dbd7f13a833cb3200271b0354ea7de3f5d49b41c9bf8b8db578d8c8ff0a"
+  }
+ ],
+ "stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true,
+  "tail": "go 0x47f00000\r\n## Starting application at 0x47F00000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g2797f3dd3860 (Nov 21 2026 - 11:20:33 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  10 devices, 8 uclasses, devicetree: embed\r\nMMC:   \r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   No ethernet found.\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=> "
+ },
+ "command_outputs": {
+  "version": "version\r\nU-Boot 2027.01-rc2-g2797f3dd3860 (Nov 21 2026 - 11:20:33 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+  "mtd list": "mtd list\r\nList of MTD devices:\r\n* spi-nand0\r\n  - device: flash@0\r\n  - parent: spi@94406000\r\n  - driver: spi_nand\r\n  - path: /spi@94406000/flash@0\r\n  - type: NAND flash\r\n  - block size: 0x20000 bytes\r\n  - min I/O: 0x800 bytes\r\n  - OOB size: 64 bytes\r\n  - OOB available: 62 bytes\r\n  - ECC strength: 1 bits\r\n  - ECC step size: 512 bytes\r\n  - bitflip threshold: 1 bits\r\n  - 0x000000000000-0x000008000000 : \"spi-nand0\"\r\n=> ",
+  "mtd write spi-nand0 0x42000000 0x7f00000 0x20000": "mtd write spi-nand0 0x42000000 0x7f00000 0x20000\r\nWriting 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+  "mtd read spi-nand0 0x43000000 0x7f00000 0x20000": "mtd read spi-nand0 0x43000000 0x7f00000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+  "cmp 0x42000000 0x43000000 0x20000": "cmp 0x42000000 0x43000000 0x20000\r\nword at 0x42020000 (0x33333333) != word at 0x43020000 (0x140001c1)\r\nTotal of 32768 word(s) were the same\r\n=> ",
+  "mtd erase spi-nand0 0x7f00000 0x20000": "mtd erase spi-nand0 0x7f00000 0x20000\r\nErasing 0x07f00000 ... 0x07f1ffff (1 eraseblock(s))\r\n=> ",
+  "mtd read spi-nand0 0x44000000 0x7f00000 0x20000": "mtd read spi-nand0 0x44000000 0x7f00000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+  "go 0x47f00000": "",
+  "reset": ""
+ },
+ "version_ok": true,
+ "mtd_list": "mtd list\r\nList of MTD devices:\r\n* spi-nand0\r\n  - device: flash@0\r\n  - parent: spi@94406000\r\n  - driver: spi_nand\r\n  - path: /spi@94406000/flash@0\r\n  - type: NAND flash\r\n  - block size: 0x20000 bytes\r\n  - min I/O: 0x800 bytes\r\n  - OOB size: 64 bytes\r\n  - OOB available: 62 bytes\r\n  - ECC strength: 1 bits\r\n  - ECC step size: 512 bytes\r\n  - bitflip threshold: 1 bits\r\n  - 0x000000000000-0x000008000000 : \"spi-nand0\"\r\n=> ",
+ "mtd_list_ok": true,
+ "loadx_128": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 131072,
+  "block_size": 128,
+  "blocks": 1024,
+  "pad": 0,
+  "bytes_sent": 131072,
+  "elapsed_s": 15.4,
+  "eot_acked": true,
+  "tail_b64": "BiMjIFRvdGFsIFNpemUgICAgICA9IDB4MDAwMjAwMDAgPSAxMzEwNzIgQnl0ZXMNCiMjIFN0YXJ0IEFkZHIgICAgICA9IDB4NDIwMDAwMDANCj0+IA=="
+ },
+ "loadx_128_md": {
+  "label": "loadx-128-data",
+  "addr": "0x42000000",
+  "size": 131072,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e",
+  "got_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e"
+ },
+ "loadx_1024": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 131072,
+  "block_size": 1024,
+  "blocks": 128,
+  "pad": 0,
+  "bytes_sent": 131072,
+  "elapsed_s": 14.1,
+  "eot_acked": true,
+  "tail_b64": "BiMjIFRvdGFsIFNpemUgICAgICA9IDB4MDAwMjAwMDAgPSAxMzEwNzIgQnl0ZXMNCiMjIFN0YXJ0IEFkZHIgICAgICA9IDB4NDIwMDAwMDANCj0+IA=="
+ },
+ "loadx_1024_md": {
+  "label": "loadx-1024-data",
+  "addr": "0x42000000",
+  "size": 131072,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e",
+  "got_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e"
+ },
+ "loadx_redo": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 131072,
+  "block_size": 128,
+  "blocks": 1024,
+  "pad": 0,
+  "bytes_sent": 131072,
+  "elapsed_s": 15.3,
+  "eot_acked": true,
+  "tail_b64": "BiMjIFRvdGFsIFNpemUgICAgICA9IDB4MDAwMjAwMDAgPSAxMzEwNzIgQnl0ZXMNCiMjIFN0YXJ0IEFkZHIgICAgICA9IDB4NDIwMDAwMDANCj0+IA=="
+ },
+ "loadx_redo_md": {
+  "label": "loadx-redo-data",
+  "addr": "0x42000000",
+  "size": 131072,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e",
+  "got_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e"
+ },
+ "mtd_write": {
+  "cmd": "mtd write spi-nand0 0x42000000 0x7f00000 0x20000",
+  "tail": "mtd write spi-nand0 0x42000000 0x7f00000 0x20000\r\nWriting 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+  "error_tokens": []
+ },
+ "mtd_read_tail": "mtd read spi-nand0 0x43000000 0x7f00000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+ "scratch_readback_md": {
+  "label": "scratch-readback",
+  "addr": "0x43000000",
+  "size": 131072,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e",
+  "got_sha256": "2809cb8a646aa7d5821261d1b4d00faf3e9da95d268074682785562157ce9b9e"
+ },
+ "scratch_cmp": "cmp 0x42000000 0x43000000 0x20000\r\nword at 0x42020000 (0x33333333) != word at 0x43020000 (0x140001c1)\r\nTotal of 32768 word(s) were the same\r\n=> ",
+ "mtd_erase_tail": "mtd erase spi-nand0 0x7f00000 0x20000\r\nErasing 0x07f00000 ... 0x07f1ffff (1 eraseblock(s))\r\n=> ",
+ "mtd_read_erase_tail": "mtd read spi-nand0 0x44000000 0x7f00000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x07f00000\r\n=> ",
+ "scratch_erase_md": {
+  "label": "scratch-erase-readback",
+  "addr": "0x44000000",
+  "size": 131072,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+  "got_sha256": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260"
+ },
+ "vendor_loadx": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 426048,
+  "block_size": 128,
+  "blocks": 3329,
+  "pad": 64,
+  "bytes_sent": 426048,
+  "elapsed_s": 44.4,
+  "eot_acked": true,
+  "tail_b64": "BiMjIFRvdGFsIFNpemUgICAgICA9IDB4MDAwNjgwNDAgPSA0MjYwNDggQnl0ZXMNCiMjIFN0YXJ0IEFkZHIgICAgICA9IDB4NDdGMDAwMDANCj0+IA=="
+ },
+ "vendor_md": {
+  "label": "vendor-ram",
+  "addr": "0x47f00000",
+  "size": 426048,
+  "ok": true,
+  "gaps": 0,
+  "want_sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30",
+  "got_sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30"
+ },
+ "vendor_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": false,
+  "tail": "tered allmulticast mode\r\n[   23.367845] zx279128s-eth 92000000.ethernet lan3: entered promiscuous mode\r\n[   23.403482] zx279128s-eth 92000000.ethernet wan: configuring for phy/internal link mode\r\n      [   24.493002] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\r\n[   24.493520] zx279128s-eth 92000000.ethernet: hardware flow offload disabled\r\n[   24.909287] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\r\n[   27.120595] e2631-wifi-boot: waiting 25s\r\n[   27.449896] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off\r\n[   27.449967] br-lan: port 1(lan1) entered blocking state\r\n[   27.449985] br-lan: port 1(lan1) entered forwarding state\r\n[   27.600896] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off\r\n"
+ },
+ "vendor_prompt_ok": false,
+ "vendor_reset_sent": true,
+ "stock_monitor": {
+  "boot_spi_nand": false,
+  "secondboot": false,
+  "vendor_uboot": false,
+  "vfs_root": false,
+  "wifi": false,
+  "panic": null,
+  "bytes": 0
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   1884962
+  ],
+  "bootwatch_pids": [
+   1885611
+  ],
+  "tty_holders": [
+   1885027
+  ],
+  "events_tail": "2026-11-21T19:30:01+08:00 reader-start pid=1608845\n2026-11-21T20:03:22+08:00 reader-start pid=1884962",
+  "ok": true
+ },
+ "write_audit": {
+  "mtd_writes": [
+   "mtd write spi-nand0 0x42000000 0x7f00000 0x20000"
+  ],
+  "mtd_erases": [
+   "mtd erase spi-nand0 0x7f00000 0x20000"
+  ],
+  "forbidden": [
+   "mtd write spi-nand0 0x42000000 0x7f00000 0x20000",
+   "mtd read spi-nand0 0x43000000 0x7f00000 0x20000",
+   "mtd erase spi-nand0 0x7f00000 0x20000",
+   "mtd read spi-nand0 0x44000000 0x7f00000 0x20000"
+  ]
+ },
+ "mtd0_unchanged": false,
+ "health_ok": false,
+ "verdict": "FAIL",
+ "finished": "2026-11-21T20:03:26+0800"
+}
