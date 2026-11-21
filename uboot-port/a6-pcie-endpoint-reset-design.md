@@ -56,7 +56,8 @@ verify-docs 在 A5 会话里做了两链 post 状态对比（我们的 flash 链
 `board/zte/zxhn-e2631/e2631net.c`：
 
 - 新增 `E2631_GPIO_PCIE_RST0 = 2`、`E2631_GPIO_PCIE_RST1 = 51`；
-- 在 `e2631_pinmux_gpio_init()` 的板级表输出回放循环之后，调用 `e2631_gpio_drive(pin, 1)` 两次；
+- 在 `e2631_pinmux_gpio_init()` 的板级表输出回放循环之后，先 `e2631_gpio_drive(2, 1)`，
+  `mdelay(4)`（厂商在 loop B 之前就有这个 4 ms 等待），再 `e2631_gpio_drive(51, 1)`；
 - 只对 SET 寄存器做 RMW（写 1 位置位），幂等；`e2631boot` 与 `e2631refclk` 共用同一路径（0012 的调用点）。
 
 不新增命令：验收用 U-Boot 自带的 `md` 读 GPIO 寄存器即可。
@@ -77,7 +78,7 @@ md.l 0x944070d4 1     # bank3 DATA，bit3 应为 1（0x...008）
 3. `br-lan` 有 PHY，eth 链路不受影响（0012 的验收项保持）；
 4. 全程不写 flash、不写 env。
 
-CI（uboot-build.yml）断言：series tree `cc39ae59a999f0f19a4c419465bedf1585007345`（13 个 patch）、
+CI（uboot-build.yml）断言：series tree `f04e5ed9525c87bddc329b24a311dfa4a302b750`（13 个 patch）、
 `E2631_GPIO_PCIE_RST0` 形状 gate。
 
 ## 7. 风险与回退

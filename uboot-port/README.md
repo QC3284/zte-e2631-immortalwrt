@@ -73,8 +73,8 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0012 | `uboot-port/patches/0012-board-zte-bring-up-the-network-reference-clocks.patch`（A5：厂商 board_eth_init 的参考时钟/SerDes/管脚序列，按两链 pre/post 寄存器差分裁剪 + `e2631refclk` 前后 dump） |
 | patch 0012 sha256 | `9c075c60f5cd6282e8b507d7ee0e02b4fc68544d0f55f4d1b4c43a8f187ed87b` |
 | patch 0013 | `uboot-port/patches/0013-board-zte-drive-the-two-late-GPIO-lines-high.patch`（A6：厂商 `zte_gpio_init()` 尾部两根特例 GPIO，pin 2 / pin 51 置 1） |
-| patch 0013 sha256 | `7dc49eb987e7e17a7f75d73ca9d4f82fa2e4ad7f891e92134c6c6fe54e957175` |
-| am 之后 tree | `cc39ae59a999f0f19a4c419465bedf1585007345`（与机器无关，13 个 patch） |
+| patch 0013 sha256 | `f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c` |
+| am 之后 tree | `f04e5ed9525c87bddc329b24a311dfa4a302b750`（与机器无关，13 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -90,7 +90,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = cc39ae59a999f0f19a4c419465bedf1585007345
+test "$(git rev-parse HEAD^{tree})" = f04e5ed9525c87bddc329b24a311dfa4a302b750
 ```
 
 ## 2. 新增/修改的文件
@@ -249,7 +249,7 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `cc39ae59a999f0f19a4c419465bedf1585007345`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `f04e5ed9525c87bddc329b24a311dfa4a302b750`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 13）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
@@ -493,8 +493,8 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 - 2026-11-22（A6，patch 0013）：在 0012 的 `e2631_pinmux_gpio_init()` 之后补厂商 `zte_gpio_init()` 的
 两段尾部特例（`0x47f2f61c` 索引 0x33→pin 2、`0x47f2f66c` 索引 0x32→pin 51，无视表值 0 置 1），
 修掉 A5 会话残留的 PCIe endpoint 缺失（只有 root port、没有 `14c3:7906`/`14c3:790a`）。重钉结果 tree
-`cc39ae59a999f0f19a4c419465bedf1585007345`（13 个 patch），patch sha256
-`7dc49eb987e7e17a7f75d73ca9d4f82fa2e4ad7f891e92134c6c6fe54e957175`。设计见
+`f04e5ed9525c87bddc329b24a311dfa4a302b750`（13 个 patch），patch sha256
+`f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c`。设计见
 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)；CI run `44934077401`（head `d546664`）
  SUCCESS：banner `g6620d6e97d78`、`u-boot.bin` 450,936 B sha256
 `7117fd88920b8f45c68e4f4114e38001ca216d0da465f32921c2a8ae41ff3bc0`、mtd0 镜像 sha256
