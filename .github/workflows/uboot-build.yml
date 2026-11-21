@@ -186,9 +186,18 @@ jobs:
           done
           # A3: the slot boot command and the env device name must be linked
           # into the image, and saveenv must be compiled out (read-only stage).
-          for binary_string in e2631boot e2631soc e2631refclk spi-nand0; do
+          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot spi-nand0; do
             if ! grep -aq "$binary_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing $binary_string"
+              exit 1
+            fi
+          done
+          # D-U1: the defconfig must keep the raw mtd write/erase subcommands
+          # compiled out, and the three new commands must carry their help text.
+          grep -qx '# CONFIG_CMD_MTD_WRITE is not set' configs/zx279128s_zte_zxhn-e2631_defconfig
+          for usage_string in 'flash an image to SPI-NAND with erase, blank and readback checks' 'compare a RAM image with a SPI-NAND range by CRC32 (read-only)' 'print the firmware slot table'; do
+            if ! grep -aq "$usage_string" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the help text: $usage_string"
               exit 1
             fi
           done
@@ -255,6 +264,45 @@ jobs:
             exit 1
           fi
           echo "entry point: $entry"
+      - name: Assert e2631flash is the only MTD writer (D-U1)
+        # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out; the
+        # call-site allowlist then proves every mtd_write()/mtd_erase() call in
+        # the linked image sits inside the e2631flash code, and requires at
+        # least one site so the gate cannot pass vacuously.
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          grep -qx '# CONFIG_CMD_MTD_WRITE is not set' build/.config
+          grep -qx '# CONFIG_CMD_MTD_WRITE is not set' configs/zx279128s_zte_zxhn-e2631_defconfig
+          sites=$(arm-none-eabi-objdump -d build/u-boot | awk '
+            /^[0-9a-f]+ <[^>]+>:/ {
+              fn = $2
+              gsub(/[<>:]/, "", fn)
+              next
+            }
+            /<mtd_write>|<mtd_erase>|<mtd_special_write_oob>/ {
+              print fn "|" $0
+            }')
+          if [ -z "$sites" ]; then
+            echo "::error::no mtd_write/mtd_erase call site found (vacuous gate)"
+            exit 1
+          fi
+          echo "$sites"
+          bad=$(echo "$sites" | awk -F'|' '
+            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash)$/ {
+              print
+            }')
+          if [ -n "$bad" ]; then
+            echo "::error::mtd write/erase call outside e2631flash:"
+            echo "$bad"
+            exit 1
+          fi
+          writers=$(echo "$sites" | grep -cE '<mtd_write>|<mtd_erase>' || true)
+          if [ "$writers" -lt 1 ]; then
+            echo "::error::e2631flash has no mtd_write/mtd_erase call"
+            exit 1
+          fi
+          echo "mtd writer sites: $writers, all inside e2631flash"
       - name: Run checkpatch on the port series (informational)
         if: inputs.checkpatch
         run: |

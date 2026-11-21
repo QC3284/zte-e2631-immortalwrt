@@ -1,0 +1,570 @@
+From dc4fe50d45be89475aab793c681c80c4967c69d9 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 03:55:11 +0800
+Subject: [PATCH] board: zte: add self-contained flash and verify commands
+ (D-U1)
+
+e2631flash erases a block-aligned range, verifies it is blank, writes the
+image and reads it back for a byte compare, and refuses unaligned ranges,
+the secondboot area (0x00000..0x20000), the environment area
+(0xC0000..0xE0000) and anything outside the chip.
+
+The source is either a RAM address (0x40000000 and above) or a NAND byte
+offset below 0x10000000; the flash path stages the image in a 1 MiB RAM
+bounce buffer at 0x44000000 before erasing, so a flash-to-flash update
+never reads the destination while erasing it. The staged payload and the
+read-back data both get a CRC32 printed for the host-side comparison.
+
+e2631verify compares a RAM image with a flash range without writing, and
+e2631slot prints the firmware slot table using the boot command's own
+slot scan routine (no duplicated scan logic).
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile     |   1 +
+ board/zte/zxhn-e2631/e2631boot.c  |  50 ++++
+ board/zte/zxhn-e2631/e2631flash.c | 462 ++++++++++++++++++++++++++++++
+ 3 files changed, 513 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631flash.c
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index a503efa6..31898ddc 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -6,3 +6,4 @@ obj-y += e2631boot.o
+ obj-y += e2631net.o
+ obj-y += e2631soc.o
+ obj-y += zxhn-e2631.o
++obj-y += e2631flash.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index b94d2839..4054f4a5 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -351,6 +351,56 @@ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	return run_command(cmd, 0) ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
+ }
+ 
++static int do_e2631slot(struct cmd_tbl *cmdtp, int flag, int argc,
++			 char *const argv[])
++{
++	struct e2631_slot slots[E2631_SLOT_COUNT];
++	struct mtd_info *mtd;
++	int active, i;
++
++	if (argc != 1)
++		return CMD_RET_USAGE;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_MTD_DEV);
++	if (!mtd) {
++		printf("e2631slot: %s is not available\n", E2631_MTD_DEV);
++		return CMD_RET_FAILURE;
++	}
++
++	e2631_scan_slot(mtd, E2631_SLOT0_BASE, &slots[0]);
++	e2631_scan_slot(mtd, E2631_SLOT1_BASE, &slots[1]);
++
++	for (i = 0; i < E2631_SLOT_COUNT; i++) {
++		if (!slots[i].valid) {
++			printf("e2631slot: slot%d base 0x%08x span 0x%08x: no valid version header\n",
++			       i, slots[i].base, E2631_SLOT_SIZE);
++			continue;
++		}
++
++		printf("e2631slot: slot%d base 0x%08x span 0x%08x serial %u\n",
++		       i, slots[i].base, E2631_SLOT_SIZE, slots[i].serial);
++		printf("e2631slot:   version \"%s\", header 0x%08x (+0x%x)\n",
++		       slots[i].version, slots[i].hdr,
++		       slots[i].hdr - slots[i].base);
++	}
++
++	active = e2631_pick_slot(slots);
++	if (active < 0)
++		printf("e2631slot: no bootable slot; cspboot would not boot either\n");
++	else
++		printf("e2631slot: cspboot would boot slot%d\n", active);
++
++	put_mtd_device(mtd);
++	return active < 0 ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631slot, 1, 1, do_e2631slot,
++	   "print the firmware slot table",
++	   "  - scan both slots like e2631boot and print base, span, serial,\n"
++	   "    version, header offset and the slot cspboot would select;\n"
++	   "    read-only, never writes flash or the environment\n");
++
+ U_BOOT_CMD(e2631boot, 2, 1, do_e2631boot,
+ 	   "boot the active ZXHN E2631 firmware slot",
+ 	   "       - pick the slot cspboot would boot, load and boot it\n"
+diff --git a/board/zte/zxhn-e2631/e2631flash.c b/board/zte/zxhn-e2631/e2631flash.c
+new file mode 100644
+index 00000000..67e11d36
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631flash.c
+@@ -0,0 +1,462 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 self-contained SPI-NAND update commands (D-U1)
++ *
++ * e2631flash  - block-aligned erase, all-0xff verify, write, read back and
++ *               compare; prints PASS/FAIL, the first differing flash offset
++ *               and the payload and read-back CRC32
++ * e2631verify - read-only CRC32 comparison between a RAM image and flash
++ *
++ * e2631flash takes its image either from a RAM address (0x40000000 and
++ * above) or from a NAND byte offset (below 0x10000000, the fast path: the
++ * image is first staged in a 1 MiB RAM bounce buffer at 0x44000000). The
++ * staged copy is what gets erased against, written and compared, so a
++ * flash-to-flash update never reads the destination while erasing it.
++ *
++ * Both commands are deliberately narrow. e2631flash refuses unaligned
++ * ranges, ranges that leave the chip, the secondboot (0x00000..0x20000)
++ * and environment (0xC0000..0xE0000) areas, sources outside the chip or
++ * usable DRAM, and lengths above the 1 MiB bounce buffer. Nothing here
++ * can write the environment: the only write path is mtd_write() below,
++ * guarded by e2631_flash_check().
++ *
++ * The replacement for the manual md.b ladder: transfer the image over
++ * Ethernet, stage it in the userdata area, reboot into this U-Boot and
++ * run e2631verify (flash source, read-only) followed by e2631flash;
++ * e2631slot prints the slot table first for orientation.
++ */
++
++#include <config.h>
++#include <command.h>
++#include <linux/errno.h>
++#include <linux/mtd/mtd.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <malloc.h>
++#include <memalign.h>
++#include <mtd.h>
++#include <stdio.h>
++#include <u-boot/crc.h>
++#include <vsprintf.h>
++
++#define E2631_MTD_DEV		"spi-nand0"
++
++/* Areas that e2631flash must never touch. */
++#define E2631_BOOTLOADER_OFF	0x00000UL
++#define E2631_BOOTLOADER_LEN	0x20000UL
++#define E2631_ENV_OFF		0xc0000UL
++#define E2631_ENV_LEN		0x20000UL
++
++/* Source buffers come from usable DRAM; stay clear of relocated U-Boot. */
++#define E2631_RAM_BASE		0x40000000UL
++#define E2631_RAM_LIMIT		0x4f000000UL
++
++/* Bound the length before any arithmetic against the chip size. */
++#define E2631_LEN_LIMIT		(64UL * 1024 * 1024)
++
++/*
++ * e2631flash stages its source in this RAM bounce buffer: the
++ * flash-to-flash path (src below 0x10000000 is a NAND offset) must not read
++ * the destination while it is being erased, and the payload CRC32 comes from
++ * the staged copy. Keep it clear of the kernel load area, the uImage staging
++ * area and relocated U-Boot.
++ */
++#define E2631_BOUNCE_ADDR	0x44000000UL
++#define E2631_BOUNCE_MAX	0x100000UL
++#define E2631_FLASH_SRC_MAX	0x10000000UL
++
++static int e2631_mtd_get(struct mtd_info **mtdp)
++{
++	struct mtd_info *mtd;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_MTD_DEV);
++	if (!mtd) {
++		printf("e2631flash: %s is not available\n", E2631_MTD_DEV);
++		return -ENODEV;
++	}
++
++	if (!mtd->size || !mtd->erasesize) {
++		printf("e2631flash: %s reports no geometry\n", E2631_MTD_DEV);
++		put_mtd_device(mtd);
++		return -EINVAL;
++	}
++
++	*mtdp = mtd;
++	return 0;
++}
++
++static bool e2631_overlap(u64 a, u64 alen, u64 b, u64 blen)
++{
++	return a < b + blen && b < a + alen;
++}
++
++static int e2631_read_region(struct mtd_info *mtd, u64 off, void *buf,
++			     size_t len)
++{
++	size_t retlen = 0;
++	int ret;
++
++	ret = mtd_read(mtd, off, len, &retlen, buf);
++	if ((ret && ret != -EUCLEAN) || retlen != len) {
++		printf("e2631flash: read failed at 0x%08llx (%d, %lu bytes)\n",
++		       off, ret, (ulong)retlen);
++		return ret ? ret : -EIO;
++	}
++
++	return 0;
++}
++
++static int e2631_stage_source(struct mtd_info *mtd, ulong src,
++			      ulong len, u_char *bounce)
++{
++	if (src < E2631_FLASH_SRC_MAX) {
++		printf("e2631flash: reading 0x%lx bytes from flash 0x%08lx\n",
++		       len, src);
++		return e2631_read_region(mtd, src, bounce, len);
++	}
++
++	memcpy(bounce, (const void *)src, len);
++	return 0;
++}
++
++/* Refuse anything e2631flash must not erase: alignment, chip, protected areas. */
++static int e2631_flash_check(struct mtd_info *mtd, ulong src, ulong off,
++			     ulong len)
++{
++	u64 end = (u64)off + len;
++
++	if (!len) {
++		printf("e2631flash: length is zero\n");
++		return -EINVAL;
++	}
++	if (len > E2631_BOUNCE_MAX) {
++		printf("e2631flash: length 0x%lx is above the 1 MiB bounce buffer\n",
++		       len);
++		return -EINVAL;
++	}
++	if (src < E2631_FLASH_SRC_MAX) {
++		/* A flash offset source is staged in RAM before the erase. */
++		if ((u64)src + len > mtd->size) {
++			printf("e2631flash: source range 0x%08lx+0x%lx is above the chip size 0x%08llx\n",
++			       src, len, (u64)mtd->size);
++			return -EINVAL;
++		}
++	} else if (src < E2631_RAM_BASE ||
++		   (u64)src + len > E2631_RAM_LIMIT) {
++		printf("e2631flash: source 0x%08lx..0x%08llx is outside usable DRAM (0x%08lx..0x%08lx)\n",
++		       src, (u64)src + len, E2631_RAM_BASE, E2631_RAM_LIMIT);
++		return -EINVAL;
++	}
++	if (off % mtd->erasesize || len % mtd->erasesize) {
++		printf("e2631flash: range 0x%08lx+0x%lx is not 0x%x aligned\n",
++		       off, len, mtd->erasesize);
++		return -EINVAL;
++	}
++	if (end > mtd->size) {
++		printf("e2631flash: range ends at 0x%08llx, above the chip size 0x%08llx\n",
++		       end, (u64)mtd->size);
++		return -EINVAL;
++	}
++	if (e2631_overlap(off, len, E2631_BOOTLOADER_OFF,
++			  E2631_BOOTLOADER_LEN)) {
++		printf("e2631flash: range 0x%08lx+0x%lx overlaps secondboot (0x%08lx..0x%08lx)\n",
++		       off, len, E2631_BOOTLOADER_OFF,
++		       E2631_BOOTLOADER_OFF + E2631_BOOTLOADER_LEN);
++		return -EINVAL;
++	}
++	if (e2631_overlap(off, len, E2631_ENV_OFF, E2631_ENV_LEN)) {
++		printf("e2631flash: range 0x%08lx+0x%lx overlaps the environment (0x%08lx..0x%08lx)\n",
++		       off, len, E2631_ENV_OFF,
++		       E2631_ENV_OFF + E2631_ENV_LEN);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int e2631_erase_range(struct mtd_info *mtd, u64 off, u64 len)
++{
++	struct erase_info einfo;
++	u64 addr;
++	int ret;
++
++	for (addr = off; addr < off + len; addr += mtd->erasesize) {
++		ret = mtd_block_isbad(mtd, addr);
++		if (ret < 0) {
++			printf("e2631flash: cannot read the block state at 0x%08llx\n",
++			       addr);
++			return ret;
++		}
++		if (ret > 0) {
++			printf("e2631flash: block 0x%08llx is marked bad, refusing\n",
++			       addr);
++			return -EIO;
++		}
++
++		printf("e2631flash: erasing block 0x%08llx\n", addr);
++		memset(&einfo, 0, sizeof(einfo));
++		einfo.mtd = mtd;
++		einfo.addr = addr;
++		einfo.len = mtd->erasesize;
++		ret = mtd_erase(mtd, &einfo);
++		if (ret) {
++			printf("e2631flash: erase of block 0x%08llx failed (%d)\n",
++			       addr, ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int e2631_check_blank(struct mtd_info *mtd, u64 off, u64 len,
++			     u_char *buf)
++{
++	u64 addr;
++	ulong i;
++	int ret;
++
++	for (addr = off; addr < off + len; addr += mtd->erasesize) {
++		ret = e2631_read_region(mtd, addr, buf, mtd->erasesize);
++		if (ret)
++			return ret;
++
++		for (i = 0; i < mtd->erasesize; i++) {
++			if (buf[i] != 0xff) {
++				printf("e2631flash: block 0x%08llx is not blank after erase (0x%02x at +0x%lx)\n",
++				       addr, buf[i], i);
++				return -EIO;
++			}
++		}
++	}
++
++	return 0;
++}
++
++static int e2631_write_range(struct mtd_info *mtd, const u_char *src, u64 off,
++			     u64 len)
++{
++	u64 addr;
++	size_t retlen;
++	int ret;
++
++	for (addr = off; addr < off + len; addr += mtd->erasesize) {
++		const u_char *p = src + (addr - off);
++
++		retlen = 0;
++		ret = mtd_write(mtd, addr, mtd->erasesize, &retlen, p);
++		if (ret || retlen != mtd->erasesize) {
++			printf("e2631flash: write of block 0x%08llx failed (%d, %lu bytes)\n",
++			       addr, ret, (ulong)retlen);
++			return ret ? ret : -EIO;
++		}
++	}
++
++	return 0;
++}
++
++static int e2631_compare_range(struct mtd_info *mtd, const u_char *src,
++			       u64 off, u64 len, u_char *buf, u32 *crc_out)
++{
++	u64 addr;
++	ulong i;
++	int ret;
++
++	for (addr = off; addr < off + len; addr += mtd->erasesize) {
++		const u_char *p = src + (addr - off);
++
++		ret = e2631_read_region(mtd, addr, buf, mtd->erasesize);
++		if (ret)
++			return ret;
++
++		*crc_out = crc32(*crc_out, buf, mtd->erasesize);
++
++		for (i = 0; i < mtd->erasesize; i++) {
++			if (buf[i] != p[i]) {
++				printf("e2631flash: FAIL: mismatch at flash offset 0x%08llx (wrote 0x%02x, read 0x%02x)\n",
++				       addr + i, p[i], buf[i]);
++				return -EIO;
++			}
++		}
++	}
++
++	return 0;
++}
++
++static int do_e2631flash(struct cmd_tbl *cmdtp, int flag, int argc,
++			 char *const argv[])
++{
++	struct mtd_info *mtd;
++	u_char *bounce = (u_char *)E2631_BOUNCE_ADDR;
++	u_char *buf;
++	ulong src, off, len;
++	u32 crc_payload = 0, crc_readback = 0;
++	bool src_is_flash;
++	int ret;
++
++	if (argc != 4)
++		return CMD_RET_USAGE;
++
++	src = hextoul(argv[1], NULL);
++	off = hextoul(argv[2], NULL);
++	len = hextoul(argv[3], NULL);
++
++	ret = e2631_mtd_get(&mtd);
++	if (ret)
++		return CMD_RET_FAILURE;
++
++	ret = e2631_flash_check(mtd, src, off, len);
++	if (ret) {
++		put_mtd_device(mtd);
++		return CMD_RET_FAILURE;
++	}
++	src_is_flash = src < E2631_FLASH_SRC_MAX;
++
++	buf = malloc_cache_aligned(mtd->erasesize);
++	if (!buf) {
++		printf("e2631flash: no memory for a 0x%x byte block buffer\n",
++		       mtd->erasesize);
++		put_mtd_device(mtd);
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631flash: ****************************************\n");
++	printf("e2631flash: DO NOT POWER OFF DURING WRITE\n");
++	if (src_is_flash)
++		printf("e2631flash: flash source 0x%08lx -> flash 0x%08lx..0x%08llx\n",
++		       src, off, (u64)off + len);
++	else
++		printf("e2631flash: RAM source 0x%08lx -> flash 0x%08lx..0x%08llx\n",
++		       src, off, (u64)off + len);
++	printf("e2631flash: 0x%lx bytes, %lu erase blocks, %lu bytes each\n",
++	       len, len / mtd->erasesize, (ulong)mtd->erasesize);
++	printf("e2631flash: ****************************************\n");
++
++	ret = e2631_stage_source(mtd, src, len, bounce);
++	if (!ret)
++		crc_payload = crc32(0, bounce, len);
++	if (!ret)
++		printf("e2631flash: staged payload CRC32 0x%08x\n", crc_payload);
++	if (!ret)
++		ret = e2631_erase_range(mtd, off, len);
++	if (!ret)
++		ret = e2631_check_blank(mtd, off, len, buf);
++	if (!ret)
++		ret = e2631_write_range(mtd, bounce, off, len);
++	if (!ret)
++		ret = e2631_compare_range(mtd, bounce, off, len, buf,
++					   &crc_readback);
++
++	free(buf);
++	put_mtd_device(mtd);
++
++	if (ret) {
++		printf("e2631flash: FAIL (see the message above)\n");
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631flash: PASS: 0x%lx bytes at 0x%08lx written and verified\n",
++	       len, off);
++	printf("e2631flash: payload CRC32 0x%08x, read-back CRC32 0x%08x\n",
++	       crc_payload, crc_readback);
++
++	return CMD_RET_SUCCESS;
++}
++
++static int do_e2631verify(struct cmd_tbl *cmdtp, int flag, int argc,
++			  char *const argv[])
++{
++	struct mtd_info *mtd;
++	u_char *buf;
++	ulong src, off, len, done;
++	u32 crc_ram, crc_flash = 0;
++	u64 end;
++	int ret = 0;
++
++	if (argc != 4)
++		return CMD_RET_USAGE;
++
++	src = hextoul(argv[1], NULL);
++	off = hextoul(argv[2], NULL);
++	len = hextoul(argv[3], NULL);
++	end = (u64)off + len;
++
++	if (!len || len > E2631_LEN_LIMIT) {
++		printf("e2631verify: invalid length 0x%lx\n", len);
++		return CMD_RET_USAGE;
++	}
++	if (!src || src < E2631_RAM_BASE ||
++	    (u64)src + len > E2631_RAM_LIMIT) {
++		printf("e2631verify: source 0x%08lx..0x%08llx is outside the usable DRAM window\n",
++		       src, (u64)src + len);
++		return CMD_RET_FAILURE;
++	}
++
++	ret = e2631_mtd_get(&mtd);
++	if (ret)
++		return CMD_RET_FAILURE;
++
++	if (end > mtd->size) {
++		printf("e2631verify: range ends at 0x%08llx, above the chip size 0x%08llx\n",
++		       end, (u64)mtd->size);
++		put_mtd_device(mtd);
++		return CMD_RET_FAILURE;
++	}
++
++	buf = malloc_cache_aligned(mtd->erasesize);
++	if (!buf) {
++		printf("e2631verify: no memory for a 0x%x byte block buffer\n",
++		       mtd->erasesize);
++		put_mtd_device(mtd);
++		return CMD_RET_FAILURE;
++	}
++
++	crc_ram = crc32(0, (const u_char *)src, len);
++	for (done = 0; done < len; done += mtd->erasesize) {
++		ulong chunk = len - done;
++
++		if (chunk > mtd->erasesize)
++			chunk = mtd->erasesize;
++		ret = e2631_read_region(mtd, off + done, buf, chunk);
++		if (ret)
++			break;
++		crc_flash = crc32(crc_flash, buf, chunk);
++	}
++
++	free(buf);
++	put_mtd_device(mtd);
++	if (ret)
++		return CMD_RET_FAILURE;
++
++	printf("e2631verify: RAM   0x%08lx+0x%lx CRC32 0x%08x\n",
++	       src, len, crc_ram);
++	printf("e2631verify: flash 0x%08lx+0x%lx CRC32 0x%08x\n",
++	       off, len, crc_flash);
++	if (crc_ram != crc_flash) {
++		printf("e2631verify: FAIL: the flash range does not match the RAM image\n");
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631verify: PASS: the flash range matches the RAM image\n");
++
++	return CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631flash, 4, 1, do_e2631flash,
++	   "flash an image to SPI-NAND with erase, blank and readback checks",
++	   " <src> <off> <len>\n"
++	   "    - erase a block-aligned range, verify it is blank, write the\n"
++	   "      image, read it back and compare byte by byte. <src> below\n"
++	   "      0x10000000 is a NAND byte offset staged in a 1 MiB RAM\n"
++	   "      bounce buffer at 0x44000000; <src> at 0x40000000 or above is\n"
++	   "      a RAM address. <len> must not exceed 1 MiB. Prints the\n"
++	   "      payload and read-back CRC32; refuses unaligned or out-of-chip\n"
++	   "      ranges, secondboot (0x00000..0x20000) and the environment\n"
++	   "      (0xC0000..0xE0000)\n");
++
++U_BOOT_CMD(e2631verify, 4, 1, do_e2631verify,
++	   "compare a RAM image with a SPI-NAND range by CRC32 (read-only)",
++	   " <src> <off> <len>\n"
++	   "    - read the flash range and compare CRC32 with the RAM buffer;\n"
++	   "      never writes flash or the environment\n");
+-- 
+2.56.1
+
