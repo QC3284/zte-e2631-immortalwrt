@@ -10,14 +10,15 @@
 | e2631refclk 契约（7 个寄存器 before/after） | **PASS** | run-3 串口选段；e2631boot 内再次执行同样命中 |
 | SerDes 0x9fe00000 24 字读回 | **PASS** 24/24 | `run3-session-results.json` |
 | 以太网（PHY 10-13 / lan1 / wan 1 Gbps / mdio_wclk 2.5 MHz） | **PASS（已确认修复）** | 内核日志 2.72 s 枚举四 PHY，14.6 s / 30.6 s lan1 Link Up，31.8 s wan Link Up |
-| PCIe 端点（14c3:7906 / 14c3:790a） | **FAIL（正式 run-3）**，但**同一镜像在 run-2 的自动启动里出现过两个端点** | 见 §3 / §4，判定 INCONCLUSIVE |
-| MT7916 / Wi-Fi | **FAIL（正式 run-3）**；观察 B 里正常 | 同上 |
+| PCIe 端点（14c3:7906 / 14c3:790a） | **FAIL（确定性）**——patch 0012 把 flat GPIO 2/51 拉低，端点被按在复位里 | run-3 内核日志两条 `Device not found`；根因见 §5 |
+| MT7916 / Wi-Fi | **FAIL（确定性，PCIe 的后果）** | run-3：`previous initialization unfinished`、`wifi-on: done: 7906= 790a=`、无 mt7915e 绑定 |
 | 零 flash 写入 | **PASS** | mtd0 sha256 前后都是 `d571b764...d286b0f5` |
 
-一句话：**patch 0012 的以太网缺口确认修好**；正式 run-3 里 PCIe 两个主机都在 link training 阶段
-`Device not found`，于是 Wi-Fi 起不来；但 run-2 驱动中止后 U-Boot 自动启动的同一条 RAM 链上，
-内核枚举到了两个 14c3 端点且 MT7916 ready。两次观察互相矛盾，本次会话无法复现同一状态，
-因此 PCIe 侧结论标 **INCONCLUSIVE**，归因交给 patch 0013（GPIO pin 2 / pin 51，见 §5 H1）与 A6 会话。
+一句话：本次会话 **PARTIAL**。patch 0012 的网络参考时钟/SerDes 与**以太网缺口确认修好**；
+PCIe/Wi-Fi **确定性失败**——iwrt-baseline 的逆向确认 0012 把 flat GPIO 2/51 驱动为低，而厂商是在板级表
+回放后把它们拉高（deassert PCIe 端点复位/使能），所以端点每次都停在复位里。修复 = patch 0013
+（表回放后把 pin 2 / pin 51 拉高），A6 会话验收。此前草稿把一次厂商链启动误记为 A5 镜像的 PCIe 成功，
+已在 §4 复核并更正。
 
 ## 1. 输入与产物
 
@@ -97,45 +98,39 @@ pci-probe 里 wifi-on: done: 7906= 790a=（两个 ID 都为空）
 驱动自己的 verdict 是 FAIL，唯一原因是 `pci_790a=false`；Wi-Fi 两个布尔当时被“命令回显”污染（驱动缺陷 3），
 手动以 dmesg/wifi-on 原始输出为准，结论同样是 Wi-Fi FAIL。
 
-## 4. 观察 B：run-2 中止后的自动启动（PCIe / MT7916 正常）
+## 4. 观察 B 复核：那是厂商链的启动，不是 A5 镜像（已更正）
 
-run-2 在 01:38:26 装入 patch-0012 U-Boot 并校验通过、出现新 banner 后，`stop_autoboot` 抛异常，
-驱动随即停止；U-Boot 自己的 3 s autoboot 继续执行 `e2631boot` 把同一镜像的内核启动起来。
-捕获链在 01:38:28 恢复（events `reader-start pid=3309788`），随后记录到的这次启动（`e2631-serial-boot-002.log`，行号为文件行）：
+草稿曾写“run-2 中止后自动启动的同一条 RAM 链上出现了两个 14c3 端点和 MT7916 ready”。复核结论：
+**该说法错误，现予撤回。**证据：
 
-```
-5586: Starting kernel ...
-5596: [    0.589378] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
-5610: [    0.591111] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
-5650: [    0.691145] pci 0001:01:00.0: [14c3:790a] type 00 class 0x028000 PCIe Endpoint
-5679: [    0.861134] VFS: Mounted root (squashfs filesystem) readonly on device 31:7.
-5799: [   54.486818] wifi-on: done: 7906=mt7915e 790a=
-5800: [   54.584489] e2631-wifi-boot: MT7916 ready
-5801: [   54.836899] e2631-wifi-boot: automatic Wi-Fi initialization complete
-```
+- `e2631-serial-boot-002.log` 是捕获链的**累计**日志，包含本次会话之前多个会话的启动段，不能只看行号就归给 run-2。
+- 该段（`Starting kernel ...` 在行 5587）前面紧邻的是厂商启动路径：行 5395 是 `U-Boot 2013.04 (Aug 28 2023 - 18:40:22)`，
+  行 5555–5586 是 `zteboot_do_settings` / `zteboot_search_firmware` 的表与 `bootm` 输出，行 5586 的 `Starting kernel`
+  来自厂商 `bootm`，不是我们的 `e2631boot`。
+- 决定性反证：全日志 `grep -c 'g9a7538311376'` = **0**，即 **A5 镜像的 banner 从未出现在捕获日志里**；
+  同样没有我们 flash U-Boot 的 `g2797f3dd3860`。带 PCIe 枚举的段（行 5042/5087 与 5587/5636 两处）
+  都属于厂商 U-Boot 2013.04 的启动链（例如 00:40 的厂商对照会话：loadx vendor U-Boot → go → 厂商控制台 → `cspstart`）。
+- run-2 自己的 hub 日志在装入 patch-0012 后的 autoboot 前就结束了；驱动中止后没有留下“A5 镜像启动内核”的
+  完整 loader 行。因此**没有任何一条日志能证明 A5 镜像枚举过 PCIe**。
 
-（同一段内容在日志里因重复 reader 追加了一份，行 5869–5875 是同样序列的副本；摘录见 `interim-capture-lines.txt`。）
+结论：A5 镜像的 PCIe/Wi-Fi 失败是**确定性**的，与厂商链的 PCIe 正常并不矛盾——厂商在做板级初始化时
+把 flat GPIO 2/51 拉高，而 patch 0012 把它们拉低。附件 `interim-capture-lines.txt` 保留原摘录，
+本节为归属更正；`docs/README.md` 索引文字同步改为确定性失败。
 
-**归属说明（诚实标注）**：这次启动的 loader 行没有完整保留（捕获链在 loader 打印后才恢复，日志里还有
-重复 reader 段），因此“这一 boot 就是 run-2 自动启动”依据的是驱动时间线 + 内容一致性，而不是一条
-`e2631boot:` 行。内核输出本身完整：两个端点、MT7916 ready、Wi-Fi complete 都出现过。
-这次启动**没有**执行显式的 `e2631refclk` 命令（驱动在中止前就死了）。
+## 5. 根因（iwrt-baseline 逆向，已由 A5 数据佐证）
 
-## 5. 归因假设（待 patch 0013 / A6 判别）
+iwrt-baseline 的静态逆向 [`p2-vendor-pcie-init-20261122.md`](p2-vendor-pcie-init-20261122.md) + base-builder 的
+vendor 反汇编给出确定性解释：厂商 `zte_gpio_init()` 在板级表回放之后还有两段循环（`0x47f2f61c`、`0x47f2f66c`），
+把表项 51 与 50 对应的输出脚 **pin 2 / pin 51 强制拉高**（表值为 0，间隔约 4 ms），作用是对 PCIe 端点
+deassert 复位/使能。patch 0012 按板级表值把这两脚驱动为**低**，于是两个端点被按在复位里，内核只能看到
+root port（`Device not found`），Wi-Fi 随之起不来——这与 run-3 的两条 `Device not found` 和
+`wifi-on: done: 7906= 790a=` 完全一致。
 
-**H1（base-builder 2026-11-22 02:05 反汇编，当前最强）**：厂商 `zte_gpio_init()` 在板级表回放之后还有两段循环
-（`0x47f2f61c`、`0x47f2f66c`），把表项 51 与 50 对应的输出脚 **pin 2 / pin 51 强制拉高**（表值为 0）。
-这两个脚正好对应本次 10 个残余字里的 `0x94407014` bit2 与 `0x944070d4` bit3；vendor U-Boot 对 PCIe
-host/PHY 寄存器（0xf000000、0xf100000、0x9500000、0x9600000、0x1c000000、0x2c000000）**零引用**，
-所以 bootloader 侧 PCIe 唯一依赖就是这两条 reset/power enable 线。patch 0013 已在 CI（run `44933539990`，
-kit commit `21234b0`）里加“表回放后把 pin 2/pin 51 拉高”，A6 会话验证。
+修复 = **patch 0013**（`uboot-port/patches/0013-...`，CI run `44934077401`，kit tip `384bb73`）：在 0012 的
+`e2631_pinmux_gpio_init()` 末尾补上这两次特例拉高，SET 位 RMW、幂等。A6 会话验收其效果。
 
-**H2（双次执行 / 时序）**：run-3 里 `e2631refclk` 被显式执行一次、`e2631boot` 前又执行一次（`e2631boot` 的 load 路径
-自动调用同一函数，所以 run-3 实际执行两次）；run-2 的自动启动只经过 `e2631boot` 的 load 路径（一次）。若序列对 PLL/GPIO 不是幂等（例如两次拉低再拉高
-pin 2/51，或 PLL 重复 relock），第二次执行就可能把 PCIe 使能线留在低电平——与 H1 的“低位=无端点”一致。
-
-**H3（读侧影响）**：run-3 在 e2631refclk 与 e2631boot 之间还做了 post-dump（含 `md 0x9fe00000 24` 读 SerDes 块）。
-run-2 没有这些读。若 SerDes/时钟块读取有副作用（例如需要时钟域就绪），也会造成两次观察差异；A6 可对比“读与不读”。
+**之前列出的 H2（双次执行）/ H3（读侧影响）不再是解释 PCIe 失败所必需**：失败可由 0012 的低电平确定性解释。
+A6 仍默认采用“只经 `e2631boot` 执行一次”的路径以去掉这两个变量；`--with-refclk` 才显式跑 `e2631refclk` + post-dump。
 
 ## 6. 残余差分（我们 post 状态 vs 厂商 post-init，200 vs 220 字）
 

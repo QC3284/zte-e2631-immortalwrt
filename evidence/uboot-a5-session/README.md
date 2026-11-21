@@ -12,7 +12,7 @@
 | `run2-loader-tail.txt` | run-2 hub 日志尾部：patch-0012 banner `g9a7538311376` 装入 RAM |
 | `run3-prelude-refclk.txt` | run-3 串口选段：新 banner、e2631refclk before/after、prompt |
 | `run3-kernel-evidence.txt` | run-3 内核侧证据：eth PHY/link、PCIe Device not found、Wi-Fi 重试 |
-| `interim-capture-lines.txt` | 捕获链日志中自动启动那一段的选行（PCIe link up、14c3:7906/790a、MT7916 ready） |
+| `interim-capture-lines.txt` | 捕获链日志中厂商链启动那一段的选行（曾误标为 A5 自动启动；见正文 §4 更正：厂商 U-Boot 2013.04 链） |
 | `residual-vs-vendor.txt` | 我方 post 状态 vs 厂商 post-init 的 10 个残余字 |
 | `pci-probe.json` | 只读 PCIe/Wi-Fi 诊断结果（rescan 无效、wifi-on 空） |
 | `zero-write-check.txt` | 会话后只读 SSH 的 mtd0 sha256 与健康数据（= pre-session 值） |
