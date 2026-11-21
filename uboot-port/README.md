@@ -200,7 +200,8 @@ A1 会话只允许 `tftp`/`go`/`md`/`mtest`/`reset` 一类命令；**禁止任�
 2. 厂商控制台：`tftp 0x43000000 u-boot.bin`（确认 "Bytes transferred" 与文件大小一致）。
 3. `go 0x43000000`。
 4. 预期串口出现 U-Boot banner（版本 v2027.01-rc2 代）、`Model: ZTE ZXHN E2631 (ZX279128S)`、
-   `DRAM: 256 MiB`、`Core: ARMv7`，随后是 `E2631>` 提示符与 `bdinfo` 输出。
+   `DRAM: 256 MiB`、`Core: ARMv7`，随后是 `=>` 提示符（defconfig 的 `CONFIG_SYS_PROMPT`）与
+   `bdinfo` 输出。
 5. 验证：`bdinfo`（DRAM/重定位）、`md.l 0x800200 8`（global timer 计数在走）、`mtest`（安全区间）、
    `reset` 或断电后应能正常回到厂商 U-Boot。
 6. 记录完整串口日志（含 tftp 大小、banner、bdinfo、md、mtest 结果）作为 A1 验收证据，落盘到
