@@ -1,0 +1,39 @@
+From eafe07520bbae130ea1cf49abef83a895a5d637c Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 19:08:21 +0800
+Subject: [PATCH] zx279128s: link the image at the 0x47F00000 boot entry
+
+The product boot chain does not run U-Boot at the address the A1 RAM-chain
+port links it to. secondboot copies the payload to 0x47F00000 and calls it
+with blx (reverse-engineering evidence, evidence/uboot-re-20261115.md),
+while the A1 port links at 0x43000000 for the vendor-console tftp+go flow.
+
+U-Boot is not position independent: CONFIG_POSITION_INDEPENDENT is off,
+relocate.S computes its fixup delta as relocaddr - run_image_start and
+assumes the run address equals the link address, and pre-relocation code
+reads .rodata/.data at link-time addresses. Entering this image at
+0x47F00000 would hang or data abort before the banner.
+
+Link at 0x47F00000 instead, which is also where the vendor console loads it
+from now on. The initial stack stays at 0x48000000 and the relocation
+target is still computed from the top of DRAM, so the image and the stack
+keep a wide gap.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 5bc3adb8..48cdef48 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -5,7 +5,7 @@ CONFIG_SYS_DCACHE_OFF=y
+ CONFIG_SYS_L2CACHE_OFF=y
+ CONFIG_ARCH_ZX279128=y
+ CONFIG_SUPPORT_PASSING_ATAGS=y
+-CONFIG_TEXT_BASE=0x43000000
++CONFIG_TEXT_BASE=0x47F00000
+ CONFIG_SYS_MALLOC_F_LEN=0x800
+ CONFIG_NR_DRAM_BANKS=1
+ CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
