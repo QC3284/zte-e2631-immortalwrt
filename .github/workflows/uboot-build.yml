@@ -1,0 +1,209 @@
+name: Build the E2631 A1 U-Boot (RAM chain)
+on:
+  workflow_dispatch:
+    inputs:
+      checkpatch:
+        description: 'Run scripts/checkpatch.pl on the two port patches (informational; the series is expected to report 0 errors and 3 known warnings)'
+        type: boolean
+        default: true
+run-name: E2631 A1 U-Boot - ${{ github.ref_name }} - run ${{ github.run_number }}
+permissions:
+  contents: read
+concurrency:
+  group: e2631-uboot-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    # task-44: custom U-Boot A1 (pure RAM chain) cross-build.
+    # This workflow is standalone: it does not touch the firmware.yml/check.yml
+    # main chain and it has no publish step.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      UBOOT_DIR: ${{ runner.temp }}/u-boot
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load the U-Boot pins from uboot-port/commits.env
+        # Pin values live in uboot-port/commits.env (task-43); this workflow keeps
+        # no second copy of them. Every value is validated before use.
+        run: |
+          set -euo pipefail
+          set -a
+          . uboot-port/commits.env
+          set +a
+          for name in \
+            E2631_UBOOT_REPO \
+            E2631_UBOOT_BRANCH \
+            E2631_UBOOT_SHA \
+            E2631_UBOOT_BASE_TREE_SHA \
+            E2631_UBOOT_TREE_SHA \
+            E2631_UBOOT_PATCH_SHA256_0001 \
+            E2631_UBOOT_PATCH_SHA256_0002 \
+            E2631_UBOOT_PAYLOAD_MAX \
+            E2631_UBOOT_TEXT_BASE; do
+            value=${!name:-}
+            if [ -z "$value" ]; then
+              echo "::error::uboot-port/commits.env does not define $name"
+              exit 1
+            fi
+            printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+          done
+          echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
+      - name: Install the ARM cross toolchain and U-Boot build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bison flex device-tree-compiler bc \
+            python3 python3-dev python3-setuptools python3-pyelftools \
+            swig libssl-dev gcc-arm-none-eabi binutils-arm-none-eabi
+          arm-none-eabi-gcc --version | head -1
+      - name: Fetch the pinned u-boot baseline and check its tree
+        run: |
+          set -euo pipefail
+          mkdir -p "$UBOOT_DIR"
+          cd "$UBOOT_DIR"
+          git init -q .
+          git remote add origin "$E2631_UBOOT_REPO"
+          git fetch -q --depth 1 origin "$E2631_UBOOT_SHA"
+          git -c advice.detachedHead=false checkout -q FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$E2631_UBOOT_SHA" || {
+            echo "::error::fetched commit is not the pinned u-boot commit"
+            exit 1
+          }
+          base_tree=$(git rev-parse 'HEAD^{tree}')
+          if [ "$base_tree" != "$E2631_UBOOT_BASE_TREE_SHA" ]; then
+            echo "::error::baseline tree $base_tree != $E2631_UBOOT_BASE_TREE_SHA"
+            exit 1
+          fi
+          echo "baseline: $E2631_UBOOT_SHA tree $base_tree"
+      - name: Verify and apply the two port patches
+        # Triple pin: commit -> patch sha256 -> post-am tree. A patch or baseline
+        # change must update uboot-port/commits.env and be re-reviewed.
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          for n in 0001 0002; do
+            name="E2631_UBOOT_PATCH_SHA256_$n"
+            expected=${!name}
+            patch=$(ls "$GITHUB_WORKSPACE"/uboot-port/patches/"$n"-*.patch)
+            echo "$expected  $patch" | sha256sum -c -
+          done
+          git -c user.name='E2631 CI' -c user.email='ci@localhost' am \
+            "$GITHUB_WORKSPACE"/uboot-port/patches/0001-*.patch \
+            "$GITHUB_WORKSPACE"/uboot-port/patches/0002-*.patch
+          tree=$(git rev-parse 'HEAD^{tree}')
+          if [ "$tree" != "$E2631_UBOOT_TREE_SHA" ]; then
+            echo "::error::post-am tree $tree != $E2631_UBOOT_TREE_SHA"
+            exit 1
+          fi
+          commits=$(git rev-list --count "$E2631_UBOOT_SHA..HEAD")
+          test "$commits" = 2 || {
+            echo "::error::expected 2 port commits, found $commits"
+            exit 1
+          }
+          echo "post-am: $commits commits, tree $tree"
+      - name: Configure and build with the ARM cross toolchain
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          make O=build zx279128s_zte_zxhn-e2631_defconfig
+          make O=build -j"$(nproc)" CROSS_COMPILE=arm-none-eabi- 2>&1 | tee build/build.log
+      - name: Enforce the A1 acceptance gates
+        # Acceptance gates from uboot-port/README.md section 4: config symbols,
+        # payload size (mtd0 0x9F800 budget for the later A3 stage) and entry
+        # point (vendor U-Boot tftp 0x43000000 + go 0x43000000).
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          test -f build/u-boot.bin || {
+            echo "::error::build/u-boot.bin was not produced"
+            exit 1
+          }
+          for symbol in \
+            CONFIG_ARCH_ZX279128=y \
+            CONFIG_TARGET_ZXHN_E2631=y \
+            CONFIG_TEXT_BASE=0x43000000 \
+            CONFIG_OF_EMBED=y \
+            CONFIG_ARM_GLOBAL_TIMER=y \
+            CONFIG_TIMER=y \
+            CONFIG_PL01X_SERIAL=y \
+            CONFIG_DM_SERIAL=y \
+            CONFIG_CLK=y; do
+            grep -qx "$symbol" build/.config || {
+              echo "::error::build/.config is missing $symbol"
+              exit 1
+            }
+          done
+          size=$(stat -c%s build/u-boot.bin)
+          max=$((E2631_UBOOT_PAYLOAD_MAX))
+          echo "u-boot.bin: $size bytes, limit $max bytes"
+          if [ "$size" -gt "$max" ]; then
+            echo "::error::u-boot.bin ($size bytes) exceeds the mtd0 payload budget $max bytes"
+            exit 1
+          fi
+          entry=$(readelf -h build/u-boot | sed -n 's/.*Entry point address:[[:space:]]*//p')
+          if [ "$entry" != "$E2631_UBOOT_TEXT_BASE" ]; then
+            echo "::error::ELF entry point $entry != $E2631_UBOOT_TEXT_BASE"
+            exit 1
+          fi
+          echo "entry point: $entry"
+      - name: Run checkpatch on the port series (informational)
+        if: inputs.checkpatch
+        run: |
+          set -uo pipefail
+          cd "$UBOOT_DIR"
+          out_dir="$RUNNER_TEMP/port-patches"
+          mkdir -p "$out_dir"
+          git -c user.name='E2631 CI' -c user.email='ci@localhost' \
+            format-patch -q -o "$out_dir" "$E2631_UBOOT_SHA"..HEAD
+          out=$(scripts/checkpatch.pl --no-tree --terse "$out_dir"/*.patch 2>&1) || true
+          printf '%s\n' "$out" > "$UBOOT_DIR/build/checkpatch.txt"
+          printf '%s\n' "$out" | tail -20
+          errors=$(printf '%s\n' "$out" | grep -c '^ERROR:' || true)
+          warnings=$(printf '%s\n' "$out" | grep -c '^WARNING:' || true)
+          echo "checkpatch: errors=$errors warnings=$warnings (expected 0 / 3 known)"
+          if [ "$errors" -gt 0 ]; then
+            echo "::warning::checkpatch reported $errors error(s); inspect the artifact"
+          fi
+      - name: Stage the artifact and record provenance
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          size=$(stat -c%s build/u-boot.bin)
+          entry=$(readelf -h build/u-boot | sed -n 's/.*Entry point address:[[:space:]]*//p')
+          mkdir -p artifacts
+          cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
+          cp build/checkpatch.txt artifacts/ 2>/dev/null || true
+          {
+            echo "E2631 A1 custom U-Boot (pure RAM chain, no flash writes)"
+            echo "Repository: $E2631_UBOOT_REPO"
+            echo "Branch: $E2631_UBOOT_BRANCH"
+            echo "Baseline commit: $E2631_UBOOT_SHA"
+            echo "Baseline tree: $E2631_UBOOT_BASE_TREE_SHA"
+            echo "Port patches sha256: $E2631_UBOOT_PATCH_SHA256_0001 $E2631_UBOOT_PATCH_SHA256_0002"
+            echo "Post-am tree: $E2631_UBOOT_TREE_SHA"
+            echo "Defconfig: zx279128s_zte_zxhn-e2631_defconfig"
+            echo "Toolchain: $(arm-none-eabi-gcc --version | head -1)"
+            echo "u-boot.bin size: $size bytes (limit $E2631_UBOOT_PAYLOAD_MAX = $((E2631_UBOOT_PAYLOAD_MAX)) bytes)"
+            echo "Entry point: $entry"
+            echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Hardware tested: NO (A1 RAM-chain session is a separate, user-approved step)"
+          } > artifacts/UBOOT-INFO.txt
+          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt > SHA256SUMS)
+          cat artifacts/SHA256SUMS
+          {
+            echo "### E2631 A1 U-Boot build"
+            echo ""
+            echo "- pins: `$E2631_UBOOT_REPO` `$E2631_UBOOT_BRANCH@$E2631_UBOOT_SHA`"
+            echo "- post-am tree: `$E2631_UBOOT_TREE_SHA`"
+            echo "- u-boot.bin: $size bytes (limit $((E2631_UBOOT_PAYLOAD_MAX)))"
+            echo "- entry point: $entry"
+            echo "- note: no flash writes; A1 loads it over tftp into RAM"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the A1 U-Boot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2631-uboot-a1-${{ github.run_id }}
+          path: ${{ runner.temp }}/u-boot/artifacts/
+          if-no-files-found: error
+          retention-days: 14
