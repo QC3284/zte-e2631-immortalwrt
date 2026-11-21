@@ -248,7 +248,7 @@ mtd list（a2-only-3/serial.log:27952 起）关键行：
 
 | # | 判据对应 | 证据位置 |
 |---|----------|----------|
-| 1 | A1 xmodem EOT ack + 全文 md.b 0 差异（crc32 以 md.b 替代，镜像内 crc32 另证可用） | §5、§7、combined-4-driver.log |
+| 1 | A1 xmodem EOT ack + 全文 md.b 0 差异（crc32 以 md.b 替代，镜像内 crc32 另证可用） | §5、§7、combined-4-driver.txt |
 | 2 | A1 banner 4910ee2045bd | §6、a1-serial-excerpt.txt |
 | 3 | A1 prompt 存活 + reset 命令存在（no-op → 断电恢复）；恢复后 0 panic、MT7916 ready | §7、§8、§12 |
 | 4 | 零写入 + 抓取链在位 | §12.2、§4、a2-only-3-results.json |
@@ -273,10 +273,10 @@ mtd list（a2-only-3/serial.log:27952 起）关键行：
 | 文件 | sha256 |
 |------|--------|
 | combined-4-session-results.json | 5f535ca831c9aff94624dad80ac5959269854b9ab17c0647a3094aab510a0650 |
-| combined-4-driver.log | 5c63f315986ff7c8344757b2430d97915e49a816c9881b90e91fcb2b07248949 |
+| combined-4-driver.txt | 5c63f315986ff7c8344757b2430d97915e49a816c9881b90e91fcb2b07248949 |
 | combined-4-health.txt | 0e38714987ac0b5d4c7dcce94e58a21fe3cbc7e6c591ac4901d10b20990be9c3 |
 | a2-only-3-results.json | 48def6ce07bc4df5f41768c491de106c7b73ae262fd0839b726d3a459ae2fdc1 |
-| a2-only-3-driver.log | 421452b4f3d82ecec200c7f84108861c71e57ccfbcd661f19582f9fd7a0b01c2 |
+| a2-only-3-driver.txt | 421452b4f3d82ecec200c7f84108861c71e57ccfbcd661f19582f9fd7a0b01c2 |
 | a2-only-3-health.txt | c90c763058faa03c3f31b87a0aa21a3cd351dabbfc62ac489c1f720062a51d9a |
 | a2-only-3-post-health.txt | 745071c91a34ef97945468cfc3621a587b97db7a88f58dfedb725ea5b35b2bf0 |
 | a1-serial-excerpt.txt | 7e3f9e3e06bc1d7a29b459b05562ce075ba52bc7231070417a54b80270a9c7a6 |
@@ -284,6 +284,8 @@ mtd list（a2-only-3/serial.log:27952 起）关键行：
 | a2-serial-excerpt-part2.txt | 3c962a523bd2b0ee4da7bed07cb60db55e57270d227d4c740dc2d3615e2242f0 |
 
 驱动脚本（完整可复查）：tool-a1_banner_accept.py、tool-a1a2_banner_accept.py、tool-a2_only_accept.py、tool-serialhub.py、tool-ctl.py、tool-a1_banner_health.sh。
+
+> 驱动日志用 .txt 命名以避开仓库的 `*.log` 忽略规则；内容与主机侧 .log 相同，sha256 不变。
 
 ### 14.2 主机侧原始日志（体积大，未入仓）
 

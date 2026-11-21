@@ -1,0 +1,46 @@
+15:37:47 capture paused: {"supervisor_pids": [94995], "bootwatch_pids": [95002], "tty_holders": [95001], "tty_holders_after": [], "free": true}
+15:37:47 serial hub started pid=95197 log=/home/qc233/zte/e2631-p3/a1-banner-accept/a2-only-3/serial.log
+15:37:47 attaching to the existing vendor console prompt
+15:37:47 attach: {"ok": true, "tail": "<INTERRUPT>\r\n=>"}
+15:37:47 A2 artifact: sha_ok=True size_ok=True token_offset=377199
+15:38:29 A2 xmodem: {"mode": "crc", "blocks": 434, "bytes_sent": 444152, "elapsed_s": 41.5, "eot_acked": true, "error": null}
+15:38:30 A2 crc32: {"available": false, "device_crc32": null, "host_crc32": "5428b85b", "ok": false, "raw": "crc32 0x43000000 0x6C6F8\r\nUnknown command 'crc32' - try 'help'\r\n=>"}
+15:38:37 stage a2 md compare 16384/444152, mismatches=0, 7.1s
+15:38:44 stage a2 md compare 32768/444152, mismatches=0, 7.1s
+15:38:54 stage a2 md compare 49152/444152, mismatches=0, 10.4s
+15:39:02 stage a2 md compare 65536/444152, mismatches=0, 8.4s
+15:39:10 stage a2 md compare 81920/444152, mismatches=0, 7.1s
+15:39:17 stage a2 md compare 98304/444152, mismatches=0, 7.1s
+15:39:24 stage a2 md compare 114688/444152, mismatches=0, 7.1s
+15:39:31 stage a2 md compare 131072/444152, mismatches=0, 7.1s
+15:39:38 stage a2 md compare 147456/444152, mismatches=0, 7.1s
+15:39:45 stage a2 md compare 163840/444152, mismatches=0, 7.1s
+15:39:52 stage a2 md compare 180224/444152, mismatches=0, 7.1s
+15:39:59 stage a2 md compare 196608/444152, mismatches=0, 7.1s
+15:40:07 stage a2 md compare 212992/444152, mismatches=0, 7.4s
+15:40:14 stage a2 md compare 229376/444152, mismatches=0, 7.1s
+15:40:21 stage a2 md compare 245760/444152, mismatches=0, 7.1s
+15:40:28 stage a2 md compare 262144/444152, mismatches=0, 7.1s
+15:40:35 stage a2 md compare 278528/444152, mismatches=0, 7.1s
+15:40:42 stage a2 md compare 294912/444152, mismatches=0, 7.1s
+15:40:49 stage a2 md compare 311296/444152, mismatches=0, 7.1s
+15:40:56 stage a2 md compare 327680/444152, mismatches=0, 7.1s
+15:41:03 stage a2 md compare 344064/444152, mismatches=0, 7.1s
+15:41:10 stage a2 md compare 360448/444152, mismatches=0, 7.1s
+15:41:17 stage a2 md compare 376832/444152, mismatches=0, 7.1s
+15:41:25 stage a2 md compare 393216/444152, mismatches=0, 7.7s
+15:41:32 stage a2 md compare 409600/444152, mismatches=0, 7.1s
+15:41:39 stage a2 md compare 425984/444152, mismatches=0, 7.1s
+15:41:46 stage a2 md compare 442368/444152, mismatches=0, 7.1s
+15:41:47 stage a2 md compare 444152/444152, mismatches=0, 0.8s
+15:41:47 A2 md compare: {"ok": true, "bytes_compared": 444152, "mismatches": 0, "first_mismatch_offset": null, "gaps": 0}
+15:41:50 A2 go: banner_token_seen=True banner_line='U-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)'
+15:41:51 A2 prompt: alive=True reset=True mtd=True stage_ok=True
+15:41:51 A2 mtd list checks: {"header": true, "spi_nand": true, "block_size": true, "min_io": true, "oob_size": true}
+15:41:55 A2 mtd read u-boot-header: {"offset": 131072, "size": 8192, "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+15:41:58 A2 mtd read u-boot-env: {"offset": 786432, "size": 8192, "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+15:41:58 A2 STAGE OK=True MTD_OK=True
+15:42:13 POWER CYCLE REQUIRED for recovery: unplug >=5 s, replug; waiting 600s for Linux
+15:43:35 recovery: {"method": "power-cycle", "reset_in_help": true, "reset_rebooted": false, "linux": {"ok": true, "marker": true}}
+15:43:42 capture restore: {"restore_rc": 0, "supervisor_pids": [96223], "bootwatch_pids": [96230], "tty_holders": [96229], "events_tail": "2026-11-21T15:37:28+08:00 reader-start pid=94995\n2026-11-21T15:43:38+08:00 reader-start pid=96223", "ok": true}
+15:44:14 VERDICT FAIL (results in /home/qc233/zte/e2631-p3/a1-banner-accept/a2-only-3/a2-results.json)

@@ -1,0 +1,41 @@
+15:15:39 capture paused: {"supervisor_pids": [77520], "bootwatch_pids": [77534], "tty_holders": [77526], "tty_holders_after": [], "free": true}
+15:15:40 serial hub started pid=79592 log=/home/qc233/zte/e2631-p3/a1-banner-accept/combined-4/serial.log
+15:15:40 ATTACHING to the existing console prompt (start-mode=vendor-prompt)
+15:15:40 console ready (start-mode=vendor-prompt)
+15:16:16 stage a1 xmodem: {"mode": "crc", "blocks": 340, "bytes_sent": 347824, "elapsed_s": 35.0, "eot_acked": true}
+15:16:16 stage a1 crc32: {"available": false, "device_crc32": null, "host_crc32": "528a7131", "ok": false, "raw": "crc32 0x43000000 0x54EB0\r\nUnknown command 'crc32' - try 'help'\r\n=>"}
+15:16:16 stage a1 crc32 command unavailable on this console; full md.b compare is the byte-identity proof
+15:16:23 stage a1 md compare 16384/347824, mismatches=0, 7.1s
+15:16:30 stage a1 md compare 32768/347824, mismatches=0, 7.1s
+15:16:37 stage a1 md compare 49152/347824, mismatches=0, 7.1s
+15:16:44 stage a1 md compare 65536/347824, mismatches=0, 7.1s
+15:16:51 stage a1 md compare 81920/347824, mismatches=0, 7.1s
+15:16:58 stage a1 md compare 98304/347824, mismatches=0, 7.1s
+15:17:05 stage a1 md compare 114688/347824, mismatches=0, 7.1s
+15:17:12 stage a1 md compare 131072/347824, mismatches=0, 7.1s
+15:17:19 stage a1 md compare 147456/347824, mismatches=0, 7.1s
+15:17:27 stage a1 md compare 163840/347824, mismatches=0, 7.1s
+15:17:34 stage a1 md compare 180224/347824, mismatches=0, 7.3s
+15:17:41 stage a1 md compare 196608/347824, mismatches=0, 7.1s
+15:17:48 stage a1 md compare 212992/347824, mismatches=0, 7.1s
+15:17:55 stage a1 md compare 229376/347824, mismatches=0, 7.1s
+15:18:02 stage a1 md compare 245760/347824, mismatches=0, 7.1s
+15:18:09 stage a1 md compare 262144/347824, mismatches=0, 7.1s
+15:18:17 stage a1 md compare 278528/347824, mismatches=0, 7.1s
+15:18:24 stage a1 md compare 294912/347824, mismatches=0, 7.1s
+15:18:31 stage a1 md compare 311296/347824, mismatches=0, 7.1s
+15:18:38 stage a1 md compare 327680/347824, mismatches=0, 7.1s
+15:18:45 stage a1 md compare 344064/347824, mismatches=0, 7.1s
+15:18:47 stage a1 md compare 347824/347824, mismatches=0, 1.6s
+15:18:47 stage a1 md compare: {"ok": true, "bytes_compared": 347824, "mismatches": 0, "first_mismatch_offset": null, "gaps": 0}
+15:18:50 stage a1 go: banner_token_seen=True prompt_seen=True banner_line='U-Boot 2027.01-rc2-g4910ee2045bd (Nov 21 2026 - 06:30:06 +0000)'
+15:18:50 stage a1 prompt: alive=True reset=True mtd=False
+15:18:50 stage a1 OK=True
+15:19:05 POWER CYCLE REQUIRED (stage transition): unplug >=5 s, replug; waiting 600s
+15:24:00 cold-boot prompt caught; sending 1
+15:24:00 vendor password attempt 1 -> autoboot
+15:24:00 stage transition: {"method": "power-cycle", "prev_help_has_reset": true, "reset_rebooted": false, "reset_unknown": false, "ok": true}
+15:24:01 stage a2 xmodem: {"mode": null, "blocks": null, "bytes_sent": null, "elapsed_s": 0.0, "eot_acked": null}
+15:24:01 SESSION ERROR: xmodem failed for a2
+15:24:07 capture restore: {"restore_rc": 0, "supervisor_pids": [87112], "bootwatch_pids": [87119], "tty_holders": [87118], "events_tail": "2026-11-21T15:12:54+08:00 reader-start pid=77520\n2026-11-21T15:24:03+08:00 reader-start pid=87112", "ok": true}
+15:24:39 VERDICT FAIL (results in /home/qc233/zte/e2631-p3/a1-banner-accept/combined-4/session-results.json)
