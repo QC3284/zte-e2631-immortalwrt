@@ -234,6 +234,12 @@ jobs:
               exit 1
             fi
           done
+          # A6: zte_gpio_init() drives two more table entries high after the
+          # replay (pins 2 and 51); without them the PCIe endpoints stay down.
+          if ! grep -q "E2631_GPIO_PCIE_RST0" board/zte/zxhn-e2631/e2631net.c; then
+            echo "::error::the late PCIe reset-line drives are missing from e2631net.c"
+            exit 1
+          fi
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"

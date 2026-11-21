@@ -1,0 +1,92 @@
+From f4466dbadff7b4d7eddda322cdf076cd132a0945 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 01:59:09 +0800
+Subject: [PATCH] board: zte: drive the two late GPIO lines the vendor drives
+ high
+
+zte_gpio_init() does not stop at the board-table replay: two more loops
+(0x47f2f61c and 0x47f2f66c) walk the same table and drive the enabled
+output entries at table index 51 and 50, pins 2 and 51, to 1 no matter
+what the table says (it says 0 for both). They are the remaining state
+difference against the vendor chain in the A5 pre/post register dump,
+and with them low the kernel enumerates both PCIe root ports but no
+endpoint, while the vendor-booted chain sees the two MT7916 endpoints.
+They are most likely the endpoint reset or power enables; drive them
+high right after the table replay, like the vendor does.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631net.c | 36 ++++++++++++++++++++++++++++-----
+ 1 file changed, 31 insertions(+), 5 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
+index 5a9c296b..01bc3687 100644
+--- a/board/zte/zxhn-e2631/e2631net.c
++++ b/board/zte/zxhn-e2631/e2631net.c
+@@ -33,6 +33,16 @@
+  * no-op on our chain. Flat 53 (the H3600 guess behind our pcie0
+  * reset-gpios) is not touched.
+  *
++ * zte_gpio_init() finishes with two more loops (0x47f2f61c and
++ * 0x47f2f66c) over the same table: for the enabled output entries at
++ * table index 51 and 50 (pins 2 and 51) it calls gpio_set(pin, 1),
++ * overriding their table value of 0. The vendor chain indeed shows
++ * both high at the prompt. This file drives them high as well, after
++ * the table replay: with them low the kernel sees both PCIe root
++ * ports but no endpoint at all, while the vendor-booted chain sees
++ * the MT7916 endpoints. They are most likely the endpoint reset or
++ * power enables.
++ *
+  * The vendor Ethernet driver's own probe (0x47f1f6xx, runs after
+  * board_eth_init) also selects bits[21:20] = 0b01 in TOP CRM 0x9400000c.
+  * The pre/post register dump of the two chains shows that mux differ
+@@ -82,6 +92,14 @@
+ #define E2631_GPIO_DIR			0x00
+ #define E2631_GPIO_SET			0x18
+ #define E2631_GPIO_CLR			0x1c
++
++/*
++ * The two output entries zte_gpio_init() drives high after the table
++ * replay (table index 51 and 50). Their function is not documented;
++ * PCIe endpoint reset/power is the working hypothesis.
++ */
++#define E2631_GPIO_PCIE_RST0		2
++#define E2631_GPIO_PCIE_RST1		51
+ #define E2631_SERDES			0x9fe00000
+ 
+ struct e2631_reg_write {
+@@ -122,10 +140,10 @@ struct e2631_gpio_init {
+  * their direction bits are already clear out of reset, which is exactly the
+  * state the vendor code puts them in, so they need no write.
+  *
+- * Values are the board-table values. The vendor chain shows pins 2 and 51
+- * driven high at its prompt although the table says 0; that happens after
+- * board init (the vendor boot tool drives them), so the table value is used
+- * here and the difference is recorded in the design note.
++ * Values are the board-table values. zte_gpio_init() itself later drives
++ * pins 2 and 51 high regardless of these values (its index-based
++ * second pass over the table, 0x47f2f61c/0x47f2f66c); that is done
++ * separately in e2631_pinmux_gpio_init().
+  */
+ static const struct e2631_gpio_init e2631_gpios[] = {
+ 	{ 8, 1 }, { 40, 1 }, { 60, 0 }, { 55, 0 },
+@@ -187,7 +205,15 @@ static void e2631_pinmux_gpio_init(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(e2631_gpios); i++)
+ 		e2631_gpio_drive(e2631_gpios[i].pin, e2631_gpios[i].value);
+-}
++
++	/*
++	 * The two late drives of zte_gpio_init() (0x47f2f61c/0x47f2f66c):
++	 * the vendor walks the table again and drives pins 2 and 51 high
++	 * even though their entries say 0. Keeping them low is what leaves
++	 * the PCIe endpoints unreachable on the flash chain.
++	 */
++	e2631_gpio_drive(E2631_GPIO_PCIE_RST0, 1);
++	e2631_gpio_drive(E2631_GPIO_PCIE_RST1, 1);
+ 
+ /*
+  * The vendor ref_clk_set(0) fractional PLL programming on 0x94000050/0x94000054.
+-- 
+2.56.1
+
