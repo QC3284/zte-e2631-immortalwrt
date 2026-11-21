@@ -217,8 +217,10 @@ jobs:
             echo "::error::u-boot.bin ($size bytes) exceeds the mtd0 payload budget $max bytes"
             exit 1
           fi
-          entry=$(readelf -h build/u-boot | sed -n 's/.*Entry point address:[[:space:]]*//p')
-          if [ "$entry" != "$E2631_UBOOT_TEXT_BASE" ]; then
+          # readelf prints the entry point in lowercase hex; the pin is uppercase.
+          entry=$(readelf -h build/u-boot | sed -n 's/.*Entry point address:[[:space:]]*//p' | tr 'A-F' 'a-f')
+          expected_entry=$(printf '%s' "$E2631_UBOOT_TEXT_BASE" | tr 'A-F' 'a-f')
+          if [ "$entry" != "$expected_entry" ]; then
             echo "::error::ELF entry point $entry != $E2631_UBOOT_TEXT_BASE"
             exit 1
           fi

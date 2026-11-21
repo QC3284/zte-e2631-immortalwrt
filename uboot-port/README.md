@@ -203,7 +203,7 @@ make O=build -j"$(nproc)"
    `CONFIG_MTD_SPI_NAND=y`、`CONFIG_CMD_MTD=y`。
 3. 镜像尺寸：`size=$(stat -c%s build/u-boot.bin); test "$size" -le 653312`
    （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。
-4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`。
+4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
    `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 7 reviewed warnings**。
