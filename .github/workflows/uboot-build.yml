@@ -194,8 +194,8 @@ jobs:
           {
             echo "### E2631 A1 U-Boot build"
             echo ""
-            echo "- pins: `$E2631_UBOOT_REPO` `$E2631_UBOOT_BRANCH@$E2631_UBOOT_SHA`"
-            echo "- post-am tree: `$E2631_UBOOT_TREE_SHA`"
+            echo "- pins: $E2631_UBOOT_REPO ($E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA)"
+            echo "- post-am tree: $E2631_UBOOT_TREE_SHA"
             echo "- u-boot.bin: $size bytes (limit $((E2631_UBOOT_PAYLOAD_MAX)))"
             echo "- entry point: $entry"
             echo "- note: no flash writes; A1 loads it over tftp into RAM"
