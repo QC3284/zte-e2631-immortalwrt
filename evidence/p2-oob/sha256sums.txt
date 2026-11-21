@@ -6,3 +6,7 @@
 216cc0cef165a3c3bf1f273f604ba29fed03aeda5e1e9eacb9b35f6405e35eec  session-512pages-normal.txt
 32e8b82ad5ae6233e00baff540924e64f372866e4d0f9330ca435090b729193d  session-512pages-raw.txt
 032a5ca0a96ddd796c523b39ce437143af9f873ffa3aeb2066a37efdbe754466  session-crosscheck-partitions.txt
+
+# C1b rescue inputs (task-54, 2026-11-21): extracted from the pinned 11-15 mtd0 dump
+a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30  vendor-uboot-ram.bin
+3b49d4fb50875ddf635704875c9b67878a643bfd993a6b5c9aebb75f22e32222  vendor-uboot-region-0x20000-0xC0000.bin
