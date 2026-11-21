@@ -347,3 +347,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `e2631-uboot-44892376502`；`u-boot.bin` sha256
   `2c90fc558dd8e35f50c887040cd25e00f98325e13e35422de1bc52d056de3eb3`，mtd0 镜像 sha256
   `f1021b9d64e0ba79bcfc0f89383bebe84980c482b165398b773961e871ba4617`。
+- 2026-11-21（C1a 重跑 PASS）：verify-docs 用 task-53 产物完成零写入 `bootm` 干跑并通过——banner
+  `U-Boot 2027.01-rc2-gb74974862b8d`、`Loading Environment from MTD... OK`（0009 生效）、`bootm`
+  进入内核且无 `data abort`/`prefetch abort`（0008 生效）、slot1 选中、内核 6.18.60 起用户态、
+  `mtd0` sha256 前后一致（`887a7f6c…0fa9f`）。记录见
+  [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §0.1/§11.4（kit 提交
+  `5817fb5`，check.yml run `44896218551` 绿）。C1b（写 mtd0）仍冻结，等 Lead 与用户最终 go。
