@@ -460,7 +460,8 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4`（12 个 patch）。设计见
   [a5-net-refclk-design.md](a5-net-refclk-design.md)；厂商逆向证据见
   [evidence/p2-vendorless-network-gap-20261122.md](../evidence/p2-vendorless-network-gap-20261122.md)。
-  CI run `44928690737`（head `e377498`）SUCCESS：banner `gdd251a1a3390`、`u-boot.bin` 450,888 B
-  sha256 `4da8a821659b85b40a08cde1f123ed4c39e46fbdf1b2487b2efde16a4ca11f0a`、mtd0 镜像
-  sha256 `0128c7bbdaefc033cc049079ef3948e6b3a14bf2826c1d1b52df9b78ca0aeba1`、env 块 `6eee153b…` 未变；
+  复查厂商 `pll_cfg_fractional` 后补上 `0x94000054` 的 bit26（分数 PLL 使能位），patch sha256 与 tree 随之重钉；
+  CI run `44929440623`（head `9a2b6fc`）SUCCESS：banner `g9a7538311376`、`u-boot.bin` 450,904 B
+  sha256 `e3c52ba4132910b1807708eadfc8a6f7c7b9740782e84df6afa6d2e7a861ecf2`、mtd0 镜像
+  sha256 `367b8fa63364d302bc13ade4dd6f9edcd2a49a706a906207fb33e9dc8ced8b41`、env 块 `6eee153b…` 未变；
   详见 [evidence/uboot-a5-20261122.md](../evidence/uboot-a5-20261122.md)。
