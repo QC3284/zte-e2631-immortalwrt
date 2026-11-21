@@ -1,4 +1,4 @@
-name: Build the E2631 A1 U-Boot (RAM chain)
+name: Build the E2631 A1/A2 U-Boot (RAM chain)
 on:
   workflow_dispatch:
     inputs:
@@ -6,7 +6,7 @@ on:
         description: 'Run scripts/checkpatch.pl on the port patches (informational; the series reports 0 errors and four reviewed warnings)'
         type: boolean
         default: true
-run-name: E2631 A1 U-Boot - ${{ github.ref_name }} - run ${{ github.run_number }}
+run-name: E2631 A1/A2 U-Boot - ${{ github.ref_name }} - run ${{ github.run_number }}
 permissions:
   contents: read
 concurrency:
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    # task-44: custom U-Boot A1 (pure RAM chain) cross-build.
+    # task-44/task-50: custom U-Boot A1/A2 (pure RAM chain) cross-build.
     # This workflow is standalone: it does not touch the firmware.yml/check.yml
     # main chain and it has no publish step.
     runs-on: ubuntu-24.04
@@ -128,7 +128,7 @@ jobs:
           cd "$UBOOT_DIR"
           make O=build zx279128s_zte_zxhn-e2631_defconfig
           make O=build -j"$(nproc)" CROSS_COMPILE=arm-none-eabi- 2>&1 | tee build/build.log
-      - name: Enforce the A1 acceptance gates
+      - name: Enforce the A1/A2 acceptance gates
         # Acceptance gates from uboot-port/README.md section 4: config symbols,
         # payload size (mtd0 0x9F800 budget for the later A3 stage) and entry
         # point (vendor U-Boot tftp 0x43000000 + go 0x43000000).
@@ -148,7 +148,14 @@ jobs:
             CONFIG_TIMER=y \
             CONFIG_PL01X_SERIAL=y \
             CONFIG_DM_SERIAL=y \
-            CONFIG_CLK=y; do
+            CONFIG_CLK=y \
+            CONFIG_SPI=y \
+            CONFIG_DM_SPI=y \
+            CONFIG_SPI_ZX=y \
+            CONFIG_MTD=y \
+            CONFIG_DM_MTD=y \
+            CONFIG_MTD_SPI_NAND=y \
+            CONFIG_CMD_MTD=y; do
             grep -qx "$symbol" build/.config || {
               echo "::error::build/.config is missing $symbol"
               exit 1
@@ -158,6 +165,15 @@ jobs:
             echo "::error::the embedded DTB does not use the ZTE UART compatible"
             exit 1
           fi
+          # A2: the SPI controller and the SPI-NAND child must be in the
+          # embedded DTB, otherwise the build passes while mtd would find no
+          # flash at runtime.
+          for dtb_string in zte,zx279128s-spifc spi-nand; do
+            if ! grep -aq "$dtb_string" build/u-boot.bin; then
+              echo "::error::the embedded DTB is missing $dtb_string"
+              exit 1
+            fi
+          done
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"
@@ -200,7 +216,7 @@ jobs:
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
           patch_shas=$(env | sed -n 's/^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=//p' | sort | tr '\n' ' ')
           {
-            echo "E2631 A1 custom U-Boot (pure RAM chain, no flash writes)"
+            echo "E2631 A1/A2 custom U-Boot (pure RAM chain, no flash writes)"
             echo "Repository: $E2631_UBOOT_REPO"
             echo "Branch: $E2631_UBOOT_BRANCH"
             echo "Baseline commit: $E2631_UBOOT_SHA"
@@ -212,23 +228,23 @@ jobs:
             echo "u-boot.bin size: $size bytes (limit $E2631_UBOOT_PAYLOAD_MAX = $((E2631_UBOOT_PAYLOAD_MAX)) bytes)"
             echo "Entry point: $entry"
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo "Hardware tested: NO (A1 RAM-chain session is a separate, user-approved step)"
+            echo "Hardware tested: NO (A1/A2 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
           (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt > SHA256SUMS)
           cat artifacts/SHA256SUMS
           {
-            echo "### E2631 A1 U-Boot build"
+            echo "### E2631 A1/A2 U-Boot build"
             echo ""
             echo "- pins: $E2631_UBOOT_REPO ($E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA)"
             echo "- post-am tree: $E2631_UBOOT_TREE_SHA"
             echo "- u-boot.bin: $size bytes (limit $((E2631_UBOOT_PAYLOAD_MAX)))"
             echo "- entry point: $entry"
-            echo "- note: no flash writes; A1 loads it over tftp into RAM"
+            echo "- note: no flash writes; A1/A2 load it over tftp into RAM"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload the A1 U-Boot artifact
+      - name: Upload the A1/A2 U-Boot artifact
         uses: actions/upload-artifact@v4
         with:
-          name: e2631-uboot-a1-${{ github.run_id }}
+          name: e2631-uboot-${{ github.run_id }}
           path: ${{ runner.temp }}/u-boot/artifacts/
           include-hidden-files: true
           if-no-files-found: error

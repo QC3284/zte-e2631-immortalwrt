@@ -1,8 +1,9 @@
-# E2631 自定义 U-Boot：A1 最小 RAM 链移植（kit 侧交付物）
+# E2631 自定义 U-Boot：A1 RAM 链 + A2 SPI-NAND 只读路径（kit 侧交付物）
 
-本目录是 task-43/task-44/task-47 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为 A1 移植，0003 为
-首个 CI 构建暴露的链接修复，0004 为 A1 串口修复）、pin 文件，
-以及供 task-44/task-48（CI 构建）和后续真机 A1 会话使用的说明。**只含代码与文档；A1 阶段不写 flash。**
+本目录是 task-43/task-44/task-47/task-50 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为 A1 移植，
+0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC + SPI-NAND 只读路径）、
+pin 文件、A2 设计说明（[a2-spi-nand-design.md](a2-spi-nand-design.md)），以及供 task-44/task-48
+（CI 构建）和后续真机 A1/A2 会话使用的说明。**只含代码与文档；A1/A2 阶段都不写 flash。**
 
 依据：[evidence/p2-uboot-research-20261121.md](../evidence/p2-uboot-research-20261121.md) §2（路径 A 分阶段）、
 [evidence/uboot-re-20261115.md](../evidence/uboot-re-20261115.md)（mtd0 布局/偏移）、
@@ -10,10 +11,13 @@
 
 ## 0. 阶段与范围
 
-- **A1（本次交付）**：纯 RAM 链 POC。ZTE 变体 PL011 控制台（0004 起）+ Cortex-A9 global timer + DRAM；由厂商 U-Boot
+- **A1（已交付）**：纯 RAM 链 POC。ZTE 变体 PL011 控制台（0004 起）+ Cortex-A9 global timer + DRAM；由厂商 U-Boot
   控制台用 `tftp` 把镜像装到 RAM，`go` 跳转运行。断电即恢复，**零砖风险**。
-- **不做**：SPI 控制器、SPI-NAND、env、mtd、网络、bootm、CPU1/SMP 交接（secondboot 已完成停车）、
-  DDR/时钟初始化（secondboot 已完成）。这些都留给 A2/A3。
+- **A2（本次交付）**：SPI-NAND 只读路径。SPIFC（0x94406000）PIO 驱动 + U-Boot 现成的 SPI-NAND 核心与
+  FORESEE F35SQA001G 条目 + 内置 `mtd` 命令；在 RAM 链里用 `mtd list` / `mtd read` 读 flash，为 A3 的
+  槽位启动打地基。只读、不写 flash；设计与风险见 [a2-spi-nand-design.md](a2-spi-nand-design.md)。
+- **不做（后续阶段）**：env（B1）、网络、`bootm` 启动链、CPU1/SMP 交接（secondboot 已完成停车）、
+  DDR/时钟初始化（secondboot 已完成）、时钟/复位驱动（A2 依赖 secondboot 的控制器状态）。A3 才讨论写 flash。
 - 引导链：BootROM → secondboot（闭源，已完成 DDR/时钟/串口/SPI-NAND/CPU1 停车）→ 厂商 U-Boot 2013.04
   →（A1 用 tftp+go）自定义 U-Boot。A3 才把自定义 U-Boot 写进 mtd0 0x20000..0xC0000（镜像区 0xA0000 字节）。
 
@@ -36,7 +40,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0003 sha256 | `d16e7b563adc8693ea59e23900870b07a168f44136218d740c3ba49e44c7b395` |
 | patch 0004 | `uboot-port/patches/0004-serial-pl01x-add-the-ZTE-ZX279128S-UART-map.patch`（ZTE 变体 UART 偏移） |
 | patch 0004 sha256 | `ce6a01ef5b0c1c47f213a79a30bc3bb13f0b8cdeec10ebb4395ce988b5e746ca` |
-| am 之后 tree | `418ae89f09b34238daf37d0db78b4485001ffc2c`（与机器无关） |
+| patch 0005 | `uboot-port/patches/0005-spi-add-the-ZX279128S-SPI-flash-controller.patch`（A2：SPIFC PIO + SPI-NAND 只读） |
+| patch 0005 sha256 | `43dcac25fe9c57e36898bcdbe7e4462c7bd865826bd7b72e389c7fa5d562f70f` |
+| am 之后 tree | `4cfd4a4fd3db0dc34aa46155370562323f58e90d`（与机器无关，5 个 patch） |
 | TEXT_BASE | `0x43000000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -52,10 +58,10 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = 418ae89f09b34238daf37d0db78b4485001ffc2c
+test "$(git rev-parse HEAD^{tree})" = 4cfd4a4fd3db0dc34aa46155370562323f58e90d
 ```
 
-## 2. 新增/修改的文件（12 个，209 行）
+## 2. 新增/修改的文件
 
 | 文件 | 作用 |
 | --- | --- |
@@ -84,19 +90,27 @@ DT 的 uart0 从 `arm,pl011` 切到该 compatible；不改基线、TEXT_BASE、�
 （`CONFIG_PL01X_SERIAL=y` 仍然编译该驱动）。此前 probe 往标准 CR 偏移写使能位，而 ZTE 真正的 CR(0x34)
 从未被写，镜像能执行但串口全程静默（见 [evidence/a1-ramchain-poc-20261121.md](../evidence/a1-ramchain-poc-20261121.md) §7/§9）。
 
+补丁 0005（2026-11-21，task-50，A2）：新增 5 个文件变更——`drivers/spi/spi-zx.c`（PIO-only SPIFC 驱动，
+仅实现 spi-mem 的 `exec_op`/`supports_op`/`adjust_op_size`；DMA/IRQ/reset/时钟初始化不搬，时钟可选）、
+`drivers/spi/Kconfig` 的 `SPI_ZX`、`drivers/spi/Makefile` 一行、DTS 的 `spi@94406000` + `flash@0`
+（`zte,zx279128s-spifc` / `spi-nand`）、defconfig 的
+`CONFIG_SPI/DM_SPI/SPI_ZX/MTD/DM_MTD/MTD_SPI_NAND/CMD_MTD`。不改基线、TEXT_BASE、载荷上限；寄存器表、
+ECC-on-read 决策与风险见 [a2-spi-nand-design.md](a2-spi-nand-design.md)。A2 不写 flash。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
 | --- | --- | --- |
-| `TEXT_BASE` | `0x43000000` | **只用于 A1 RAM 链**：厂商 U-Boot `tftp 0x43000000` + `go 0x43000000`。产品/A2/A3 仍由 secondboot 装到 `0x47F00000`，那时改 TEXT_BASE 后重编 |
+| `TEXT_BASE` | `0x43000000` | **只用于 A1/A2 RAM 链**：厂商 U-Boot `tftp 0x43000000` + `go 0x43000000`。产品/A3 仍由 secondboot 装到 `0x47F00000`，那时改 TEXT_BASE 后重编 |
 | 初始栈 | `CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000` | 256 MiB DRAM 中段，远离镜像与重定位目标（重定位在 DRAM 顶部附近） |
 | DRAM | `0x40000000` + 256 MiB | secondboot 完成 DDR 初始化；板级只知道大小，不做 DDR init |
 | UART0 | ZTE 变体 PL011 @ `0x94404000`，115200 8N1 | compatible `zte,zx29-uart` 选择 ZTE 偏移表（DR 0x04 / FR 0x14 / LCRH 0x30 / CR 0x34；IBRD/FBRD 0x24/0x28 与标准相同）。`CFG_PL011_CLOCK=0`：输入时钟未知，**跳过 IBRD/FBRD 设置**，沿用 secondboot 的 115200；DT 里故意不写 `clock` 属性 |
 | Timer | A9 global timer @ `0x800200` | DT `fixed-clock` a9_periph = 500 MHz（CPU 1 GHz / 2）；`CFG_SYS_HZ_CLOCK` 作为 DT 查询失败的回退 |
 | Cache/MMU | 全关 | `SYS_ICACHE_OFF`/`SYS_DCACHE_OFF`/`SYS_L2CACHE_OFF`：secondboot→vendor U-Boot→`go` 的交接状态（MMU/cache/CPU 模式）未知，A1 用最保守配置 |
-| env | `ENV_IS_NOWHERE` | A1 不读写 env；A2 再加 MTD env（0xC0000，格式与厂商逐字节兼容） |
-| 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；A2 再考虑分离/追加格式 |
-| 网络/SPI/NAND | 无 | A1 不做；网络引导用厂商 U-Boot 的 tftp |
+| env | `ENV_IS_NOWHERE` | A1/A2 不读写 env；B1 再加 MTD env（0xC0000，格式与厂商逐字节兼容） |
+| 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；后续再考虑分离/追加格式 |
+| SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
+| 网络 | 无 | 网络引导仍用厂商 U-Boot 的 tftp |
 | CPU1/SRAM | 不碰 | secondboot 已把 CPU1 停在 `wfe` → SRAM `0x200800` 循环；内核 platsmp 依赖该约定，U-Boot 不得改写 SRAM |
 
 ### 启动流程（A1）
@@ -125,19 +139,24 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `418ae89f09b34238daf37d0db78b4485001ffc2c`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量。
+1. `git rev-parse HEAD^{tree}` == `4cfd4a4fd3db0dc34aa46155370562323f58e90d`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 5）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x43000000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
-   `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`。
+   `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
+   `CONFIG_SPI=y`、`CONFIG_DM_SPI=y`、`CONFIG_SPI_ZX=y`、`CONFIG_MTD=y`、`CONFIG_DM_MTD=y`、
+   `CONFIG_MTD_SPI_NAND=y`、`CONFIG_CMD_MTD=y`。
 3. 镜像尺寸：`size=$(stat -c%s build/u-boot.bin); test "$size" -le 653312`
    （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是 A3 的硬前置）。
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x43000000`。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 4 reviewed warnings**。
+   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 5 reviewed warnings**。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
    （OF_EMBED 把 DTB 打进镜像）。少了这条，构建会通过但 A1 串口仍然静默，正是 task-45 的故障模式。
+8. 内嵌 DTB 的 SPI 节点：`grep -aq 'zte,zx279128s-spifc' build/u-boot.bin` 且
+   `grep -aq 'spi-nand' build/u-boot.bin`（A2 的控制器/芯片节点；防止 DTS 或 defconfig 被误删而
+   构建仍通过）。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -159,6 +178,18 @@ A1 会话只允许 `tftp`/`go`/`md`/`mtest`/`reset` 一类命令；**禁止任�
 再确认 115200 与接线；banner 后异常 → cache/MMU 交接或
 timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是否完整传输。
 
+### A2 真机读路径检查（后续会话，需用户批准；只读、不写 flash）
+
+装载方式与 A1 相同（`tftp 0x43000000 u-boot.bin` + `go 0x43000000`），之后**只允许读命令**：
+
+1. `mtd list`：应出现 `spi-nand0`，大小 128 MiB、页 2048、OOB 64。
+2. `mtd read spi-nand0 0x42000000 0 0x800`，再 `md.b 0x42000000 0x40`，与已知 mtd0 头 dump 逐字节对比。
+3. 读 slot 头（偏移见 [evidence/chip-level-layout-20261120.md](../evidence/chip-level-layout-20261120.md)）验证；
+   内核 MTD 与 U-Boot 读同一区域应一致（片内 ECC 都开，见设计说明 §6）。
+4. 若 `mtd list` 没有设备或 FIFO 超时：先 `md.l 0x94406000 8` 看 EN/VER 回读并记录完整日志，再按
+   [设计说明](a2-spi-nand-design.md) §9 的"时钟/门控 → 采样点 → 引脚复用"顺序定位。
+5. **禁止** `mtd write`/`mtd erase`/`nand write`/`saveenv`；A3 之前不讨论写 flash。
+
 ## 6. 已知限制与风险
 
 - **交接状态未知**（MMU/cache/CPU 模式）：A1 全关 cache/MMU、`SKIP_LOWLEVEL_INIT`，从最保守状态开始；
@@ -167,22 +198,27 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
   与 patch 是否齐全，再查接线/波特率；输入时钟仍未知，暂用 `CFG_PL011_CLOCK=0` 跳过波特率设置，若乱码，
   下一步从 lsp0crpm/实测反推（25 MHz / 100 MHz 候选）再改 DT 或头文件。
 - **timer 500 MHz 是假设**（a9_periph = CPU/2，A9 1 GHz）；真机用 `sleep 1` 对照秒表校准，必要时修正。
-- **A1 无 env/SPI/NAND/网络/bootm**：这是有意的阶段边界，不是缺陷。
+- **A1/A2 无 env/网络/bootm**：这是有意的阶段边界，不是缺陷。A2 只加 SPI-NAND 读路径。
+- **A2 的控制器时钟/门控状态未知**：DT 故意不写 `clocks`（U-Boot 没有 ZX CRPM 时钟驱动），probe 只做
+  EN/EN_BACK 与采样点；这是 A2 最大不确定项，真机先看 `md.l 0x94406000 8`，必要时 A3 前补最小 CRPM 时钟驱动。
+  详见 [a2-spi-nand-design.md](a2-spi-nand-design.md) §9。
 - **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
   厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，A2/A3 再补复位路径。
 - **载荷 0x9F800**：A3 封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在 A3 必须原样保留。
-- **checkpatch**：本系列 0 errors、4 reviewed warnings，均为已核对的已知项——2 条 "does MAINTAINERS
-  need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`
-  各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
+- **checkpatch**：本系列 0 errors、5 reviewed warnings，均为已核对的已知项——3 条 "does MAINTAINERS
+  need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
+  patch 0005 新建 `drivers/spi/spi-zx.c` 各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS
+  更新）+ 2 条 "Use the livetree API"
   （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
   常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
 
-- **A2**：加 SPIFC/SPI-NAND/env/mtd，在 RAM 里读 env 与 slot1 uImage 并 bootm；TEXT_BASE 改回
-  secondboot 装载地址 `0x47F00000`，加 MTD env（`0xC0000`/`0x20000`）、SPI-NAND 芯片 ID 实测
-  （0xCD/0x71 用现成 foresee 条目，0xC9 加 heyangtek 条目）。
+- **A2**：SPIFC + SPI-NAND 只读路径已由 patch 0005 交付（RAM 链内 `mtd list`/`mtd read`）。剩余的
+  env（B1，`0xC0000`/`0x20000`）、从 slot1 读 uImage 并 `bootm`、TEXT_BASE 改回 secondboot 装载地址
+  `0x47F00000` 放在后续会话；芯片 ID 实测为 `0xCD/0x71`，用现成 FORESEE `F35SQA001G` 条目
+  （若出现 `0xC9` 再加 heyangtek 条目）。
 - **A3**：按刷写工具链（路径 C）写 mtd0 U-Boot 区；需要 OOB/ECC 取证、写通道验证、回滚演练与用户批准。
   在 A3 之前，A1/A2 都不写 flash。
 - **A1 真机会话**在 task-44 的 CI 产物可用之后进行（用户已批准 RAM 链 POC）。
@@ -201,3 +237,6 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 - 2026-11-21（task-47）：新增 patch 0004（ZTE 变体 PL011 偏移表 + `zte,zx29-uart` compatible），
   重钉结果 tree 为 `418ae89f09b34238daf37d0db78b4485001ffc2c`；根因与 A/B 探针证据见
   [evidence/a1-ramchain-poc-20261121.md](../evidence/a1-ramchain-poc-20261121.md) §7-§9。
+- 2026-11-21（task-50）：新增 patch 0005（SPIFC PIO 驱动 + DTS/defconfig 的 SPI-NAND）；重钉结果 tree 为
+  `4cfd4a4fd3db0dc34aa46155370562323f58e90d`，设计/ECC/风险见 [a2-spi-nand-design.md](a2-spi-nand-design.md)；
+  A2 仍不写 flash。

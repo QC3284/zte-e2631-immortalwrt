@@ -1,0 +1,565 @@
+From 41c82bed578e52f701ba0049e46a3e612bca2737 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 14:45:54 +0800
+Subject: [PATCH] spi: add the ZX279128S SPI flash controller
+
+Add the SPI flash controller driver for the ZTE/Sanechips ZX279128S
+SoC and wire it into the A1/A2 device tree, so the custom U-Boot can
+probe the SPI-NAND and read it with the built-in mtd command.
+
+The driver is a U-Boot port of the PIO path of the vendor kernel
+driver that ships with the E2631 kernel tree. The register layout,
+the FIFO protocol and the exec_op sequence follow that driver, which
+in turn carries ZTE's SDK register definitions. DMA, interrupts,
+reset control and clock setup are left out on purpose: secondboot has
+already brought the controller up and the firmware only needs to read
+a few KiB of flash in the RAM chain. The clock is optional - when the
+device tree has no clock provider the driver keeps the rate secondboot
+programmed, which is also why the new node has no "clocks" property.
+
+U-Boot's spi-mem core drives the controller through exec_op and falls
+back to spi_mem_no_dirmap_read() when there is no dirmap, so the
+driver only implements mem_ops.exec_op, supports_op and adjust_op_size.
+Data is moved through the 32-bit PIO FIFO; unlike the kernel driver
+the byte count is not rounded to whole words, so the one-byte
+SET_FEATURE transfers used during SPI-NAND probing do not read or
+write past their buffers.
+
+Enable SPI, MTD and SPI-NAND in the defconfig and describe the
+controller and the FORESEE SPI-NAND in the device tree. The chip
+entry already exists in U-Boot (F35SQA001G, 0x71/0x71, 2048+64,
+on-die ECC); the A2 stage only needs the read path, writes stay
+unused until the slot boot work.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ arch/arm/dts/zx279128s-zte-zxhn-e2631.dts  |  27 +-
+ configs/zx279128s_zte_zxhn-e2631_defconfig |  11 +-
+ drivers/spi/Kconfig                        |   9 +
+ drivers/spi/Makefile                       |   1 +
+ drivers/spi/spi-zx.c                       | 411 +++++++++++++++++++++
+ 5 files changed, 454 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/spi/spi-zx.c
+
+diff --git a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+index b7c2d4b6..ba395dc8 100644
+--- a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
++++ b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+@@ -2,9 +2,9 @@
+ /*
+  * ZTE ZXHN E2631 (Sanechips ZX279128S), A1 RAM-chain device tree
+  *
+- * Only the pieces the A1 port uses are described: DRAM, the PL011 console
+- * and the Cortex-A9 global timer. SPI-NAND, Ethernet and CPU1 hand-off are
+- * intentionally left out until the A2 stage.
++ * Only the pieces the A1/A2 port uses are described: DRAM, the PL011 console,
++ * the Cortex-A9 global timer and the SPI-NAND controller. Ethernet and the
++ * CPU1 hand-off are intentionally left out until a later stage.
+  */
+ 
+ /dts-v1/;
+@@ -55,4 +55,25 @@
+ 		compatible = "zte,zx29-uart";
+ 		reg = <0x94404000 0x1000>;
+ 	};
++
++	/*
++	 * SPI-NAND controller. secondboot already brought it up, U-Boot only
++	 * needs the PIO read path. There is deliberately no "clocks" property:
++	 * U-Boot has no ZX CRPM clock driver, so the driver keeps the rate
++	 * secondboot programmed. See uboot-port/a2-spi-nand-design.md.
++	 */
++	spi@94406000 {
++		compatible = "zte,zx279128s-spifc";
++		reg = <0x94406000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		flash@0 {
++			compatible = "spi-nand";
++			reg = <0>;
++			spi-max-frequency = <50000000>;
++			spi-rx-bus-width = <2>;
++			spi-tx-bus-width = <1>;
++		};
++	};
+ };
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 11ff8658..0bde5241 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -15,13 +15,20 @@ CONFIG_TARGET_ZXHN_E2631=y
+ CONFIG_BOOTDELAY=3
+ CONFIG_USE_BOOTCOMMAND=y
+ CONFIG_BOOTCOMMAND="bdinfo"
++# CONFIG_DISPLAY_CPUINFO is not set
++# CONFIG_BOARD_INIT is not set
+ CONFIG_CMD_MEMTEST=y
++CONFIG_CMD_MTD=y
+ CONFIG_OF_CONTROL=y
+ CONFIG_OF_EMBED=y
+ CONFIG_CLK=y
++CONFIG_MTD=y
++CONFIG_DM_MTD=y
++CONFIG_MTD_SPI_NAND=y
+ CONFIG_DM_SERIAL=y
+ CONFIG_PL01X_SERIAL=y
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_SPI_ZX=y
+ CONFIG_TIMER=y
+ CONFIG_ARM_GLOBAL_TIMER=y
+-# CONFIG_DISPLAY_CPUINFO is not set
+-# CONFIG_BOARD_INIT is not set
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 007ad5e7..407a46cc 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -563,6 +563,15 @@ config SPI_SUNXI
+ 
+ 	  Same controller driver can reuse in all Allwinner SoC variants.
+ 
++config SPI_ZX
++	bool "ZTE ZX279128S SPI flash controller"
++	depends on ARCH_ZX279128
++	select SPI_MEM
++	help
++	  Enable the SPI flash controller driver for the ZTE/Sanechips
++	  ZX279128S SoC. It drives the SPI-NAND flash on the ZTE ZXHN
++	  E2631 board. Only the PIO path is implemented in U-Boot.
++
+ config STM32_OSPI
+ 	bool "STM32MP2 OSPI driver"
+ 	depends on (STM32MP23X || STM32MP25X) && STM32_OMM
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index 13d9c5dc..1d0def5b 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -76,6 +76,7 @@ obj-$(CONFIG_SANDBOX_SPI) += sandbox_spi.o
+ obj-$(CONFIG_SPI_SIFIVE) += spi-sifive.o
+ obj-$(CONFIG_SPI_SN_F_OSPI) += spi-sn-f-ospi.o
+ obj-$(CONFIG_SPI_SUNXI) += spi-sunxi.o
++obj-$(CONFIG_SPI_ZX) += spi-zx.o
+ obj-$(CONFIG_SH_QSPI) += sh_qspi.o
+ obj-$(CONFIG_STM32_OSPI) += stm32_ospi.o
+ obj-$(CONFIG_STM32_QSPI) += stm32_qspi.o
+diff --git a/drivers/spi/spi-zx.c b/drivers/spi/spi-zx.c
+new file mode 100644
+index 00000000..c28bb2fe
+--- /dev/null
++++ b/drivers/spi/spi-zx.c
+@@ -0,0 +1,411 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * ZTE ZX279128S SPI flash controller driver (PIO only)
++ *
++ * This is a U-Boot port of the PIO path of the vendor kernel SPI driver
++ * for the ZTE ZXHN E2631; the register layout comes from ZTE's SDK kernel.
++ * The provenance of the kernel driver is recorded in the design note at
++ * uboot-port/a2-spi-nand-design.md. DMA, interrupts, reset control and
++ * clock setup are intentionally left out: at the A2 stage secondboot has
++ * already brought the controller up and the firmware only needs to read a
++ * few KiB of flash.
++ *
++ * Copyright (C) ZTE (register definitions and the original PIO implementation)
++ * Copyright (C) 2026 Stefan Dösinger <stefandoesinger@gmail.com>
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <clk.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <spi.h>
++#include <spi-mem.h>
++#include <asm/io.h>
++#include <linux/bitfield.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/iopoll.h>
++#include <linux/kernel.h>
++
++#define ZX_QSPI_FIFO_SIZE			16
++#define ZX_QSPI_FIFO_TIMEOUT_US			30000
++#define ZX_QSPI_CMD_TIMEOUT_US			1000
++#define ZX_QSPI_MAX_DATA			4096
++
++/* Register offsets, copied from ZTE's SDK kernel */
++#define ZX_QSPI_VER_REG				0x0
++#define ZX_QSPI_START_REG			0x4
++#define ZX_QSPI_EN_REG				0x8
++#define ZX_QSPI_CTRL0_REG			0xc
++#define ZX_QSPI_CTRL1_REG			0x10
++#define ZX_QSPI_CTRL2_REG			0x14
++#define ZX_QSPI_BYTE_NUM_REG			0x18
++#define ZX_QSPI_ADDR_REG			0x1c
++#define ZX_QSPI_INS_REG				0x20
++#define ZX_QSPI_TIMING_REG			0x24
++#define ZX_QSPI_INT_EN_REG			0x28
++#define ZX_QSPI_INT_RAW_REG			0x2c
++#define ZX_QSPI_INT_SW_CLR_REG			0x30
++#define ZX_QSPI_SW_REG				0x34
++#define ZX_QSPI_DATA_REG			0x38
++
++#define ZX_QSPI_START				BIT(0)
++
++#define ZX_QSPI_EN				BIT(0)
++#define ZX_QSPI_EN_BACK				BIT(1)
++
++#define ZX_QSPI_SCLK_PAUSE_CLR_ALLOW		BIT(17)
++#define ZX_QSPI_SCLK_PAUSE_EN			BIT(16)
++#define ZX_QSPI_TXFIFO_CLR			BIT(15)
++#define ZX_QSPI_RXFIFO_CLR			BIT(14)
++#define ZX_QSPI_TXFIFO_THRES			BIT(10)
++#define ZX_QSPI_RXFIFO_THRES			BIT(6)
++#define ZX_QSPI_TX_DMA_EN			BIT(5)
++#define ZX_QSPI_RX_DMA_EN			BIT(4)
++#define ZX_QSPI_WDOG_EN				BIT(3)
++#define ZX_QSPI_SPI_MODE			BIT(1)
++#define ZX_QSPI_WR_PROTECT			BIT(0)
++
++#define ZX_QSPI_ADDR_TX_EN			BIT(4)
++#define ZX_QSPI_DUMMY_TX_EN			BIT(2)
++#define ZX_QSPI_READ_DATA_EN			BIT(1)
++#define ZX_QSPI_WRITE_DATA_EN			BIT(0)
++
++#define ZX_QSPI_DUMMY_BYTE_NUM			12
++#define ZX_QSPI_DUMMY_BIT_NUM			8
++#define ZX_QSPI_ADDR_BYTE_NUM			5
++#define ZX_QSPI_ADDR_MULTI_LINE_EN		BIT(4)
++#define ZX_QSPI_DATA_MULTI_LINE_EN		BIT(2)
++#define ZX_QSPI_TRANS_MOD			BIT(0)
++
++#define ZX_QSPI_ADDR_WIDTH_8			0
++#define ZX_QSPI_ADDR_WIDTH_16			1
++#define ZX_QSPI_ADDR_WIDTH_24			2
++#define ZX_QSPI_ADDR_WIDTH_32			3
++
++#define ZX_QSPI_TIMING_SAMPLE_POINT		GENMASK(17, 16)
++
++#define ZX_QSPI_INT_TX_BYD_THRES		BIT(7)
++#define ZX_QSPI_INT_RX_BYD_THRES		BIT(6)
++#define ZX_QSPI_INT_TX_UNDERRUN			BIT(5)
++#define ZX_QSPI_INT_RX_OVERRUN			BIT(4)
++#define ZX_QSPI_INT_WDOG_OVERRUN		BIT(2)
++#define ZX_QSPI_INT_FMT_ERR			BIT(1)
++#define ZX_QSPI_INT_CMD_END			BIT(0)
++#define ZX_QSPI_INT_ALL_MASK			GENMASK(7, 0)
++
++#define ZX_QSPI_TX_FIFO_CNT_MASK		GENMASK(20, 16)
++#define ZX_QSPI_RX_FIFO_CNT_MASK		GENMASK(12, 8)
++
++struct zx_qspi {
++	void __iomem *base;
++	struct clk clk;
++	bool has_clk;
++	u32 speed_hz;
++};
++
++static u32 zx_qspi_word_bytes(u32 len, u32 word)
++{
++	return min_t(u32, len - word * 4, 4);
++}
++
++static int zx_qspi_read_fifo(struct zx_qspi *qspi, void *buf, u32 len)
++{
++	u8 *p = buf;
++	u32 words = DIV_ROUND_UP(len, 4);
++	u32 done = 0;
++
++	while (done < words) {
++		u32 status, count;
++		int ret;
++
++		ret = readl_poll_timeout(qspi->base + ZX_QSPI_SW_REG, status,
++					 status & ZX_QSPI_RX_FIFO_CNT_MASK,
++					 ZX_QSPI_FIFO_TIMEOUT_US);
++		if (ret)
++			return ret;
++
++		count = min_t(u32, (status & ZX_QSPI_RX_FIFO_CNT_MASK) >>
++				   8, words - done);
++		while (count--) {
++			u32 value = readl(qspi->base + ZX_QSPI_DATA_REG);
++			u32 nbytes = zx_qspi_word_bytes(len, done);
++
++			memcpy(p, &value, nbytes);
++			p += nbytes;
++			done++;
++		}
++	}
++
++	return 0;
++}
++
++static int zx_qspi_write_fifo(struct zx_qspi *qspi, const void *buf, u32 len)
++{
++	const u8 *p = buf;
++	u32 words = DIV_ROUND_UP(len, 4);
++	u32 done = 0;
++
++	while (done < words) {
++		u32 status, count;
++		int ret;
++
++		ret = readl_poll_timeout(qspi->base + ZX_QSPI_SW_REG, status,
++					 status & ZX_QSPI_TX_FIFO_CNT_MASK,
++					 ZX_QSPI_FIFO_TIMEOUT_US);
++		if (ret)
++			return ret;
++
++		count = min_t(u32, (status & ZX_QSPI_TX_FIFO_CNT_MASK) >>
++				   16, words - done);
++		while (count--) {
++			u32 nbytes = zx_qspi_word_bytes(len, done);
++			u32 value = 0;
++
++			memcpy(&value, p, nbytes);
++			writel(value, qspi->base + ZX_QSPI_DATA_REG);
++			p += nbytes;
++			done++;
++		}
++	}
++
++	return 0;
++}
++
++static int zx_qspi_wait_for_cmd_end(struct zx_qspi *qspi)
++{
++	u32 status;
++	int ret;
++
++	ret = readl_poll_timeout(qspi->base + ZX_QSPI_INT_RAW_REG, status,
++				 status & ZX_QSPI_INT_CMD_END,
++				 ZX_QSPI_CMD_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	if (status & ZX_QSPI_INT_FMT_ERR)
++		return -EIO;
++
++	return 0;
++}
++
++static int zx_qspi_exec_op(struct spi_slave *slave,
++			   const struct spi_mem_op *op)
++{
++	struct zx_qspi *qspi = dev_get_priv(slave->dev->parent);
++	u32 ctrl0, ctrl1 = 0, ctrl2 = 0;
++	int ret;
++
++	ctrl0 = readl(qspi->base + ZX_QSPI_CTRL0_REG);
++	ctrl0 &= ~(ZX_QSPI_TX_DMA_EN | ZX_QSPI_RX_DMA_EN);
++	ctrl0 |= ZX_QSPI_TXFIFO_CLR | ZX_QSPI_RXFIFO_CLR |
++		 ZX_QSPI_TXFIFO_THRES | ZX_QSPI_RXFIFO_THRES;
++
++	if (op->addr.nbytes && op->addr.buswidth) {
++		ctrl1 |= ZX_QSPI_ADDR_TX_EN;
++		switch (op->addr.buswidth * op->addr.nbytes) {
++		case 1:
++			ctrl2 |= ZX_QSPI_ADDR_WIDTH_8 << ZX_QSPI_ADDR_BYTE_NUM;
++			break;
++		case 2:
++			ctrl2 |= ZX_QSPI_ADDR_WIDTH_16 << ZX_QSPI_ADDR_BYTE_NUM;
++			break;
++		case 3:
++			ctrl2 |= ZX_QSPI_ADDR_WIDTH_24 << ZX_QSPI_ADDR_BYTE_NUM;
++			break;
++		case 4:
++			ctrl2 |= ZX_QSPI_ADDR_WIDTH_32 << ZX_QSPI_ADDR_BYTE_NUM;
++			break;
++		default:
++			return -EIO;
++		}
++	}
++
++	if (op->dummy.nbytes && op->dummy.buswidth) {
++		ctrl1 |= ZX_QSPI_DUMMY_TX_EN;
++		ctrl2 |= 1 << ZX_QSPI_DUMMY_BYTE_NUM;
++	}
++
++	if (op->data.nbytes) {
++		if (op->data.dir == SPI_MEM_DATA_IN)
++			ctrl1 |= ZX_QSPI_READ_DATA_EN;
++		else
++			ctrl1 |= ZX_QSPI_WRITE_DATA_EN;
++
++		if (op->data.buswidth == 4)
++			ctrl2 |= ZX_QSPI_DATA_MULTI_LINE_EN |
++				 ZX_QSPI_TRANS_MOD;
++		else if (op->data.buswidth == 2)
++			ctrl2 |= ZX_QSPI_DATA_MULTI_LINE_EN;
++	}
++
++	writel(ctrl0, qspi->base + ZX_QSPI_CTRL0_REG);
++	writel(ctrl1, qspi->base + ZX_QSPI_CTRL1_REG);
++	writel(ctrl2, qspi->base + ZX_QSPI_CTRL2_REG);
++	writel(ZX_QSPI_INT_ALL_MASK, qspi->base + ZX_QSPI_INT_SW_CLR_REG);
++
++	if (op->data.nbytes)
++		writel(op->data.nbytes - 1,
++		       qspi->base + ZX_QSPI_BYTE_NUM_REG);
++
++	if (op->addr.nbytes && op->addr.buswidth)
++		writel((u32)op->addr.val, qspi->base + ZX_QSPI_ADDR_REG);
++
++	writel(op->cmd.opcode, qspi->base + ZX_QSPI_INS_REG);
++	writel(ZX_QSPI_START, qspi->base + ZX_QSPI_START_REG);
++
++	if (op->data.nbytes) {
++		if (op->data.dir == SPI_MEM_DATA_IN)
++			ret = zx_qspi_read_fifo(qspi, op->data.buf.in,
++						op->data.nbytes);
++		else
++			ret = zx_qspi_write_fifo(qspi, op->data.buf.out,
++						 op->data.nbytes);
++		if (ret)
++			return ret;
++	}
++
++	return zx_qspi_wait_for_cmd_end(qspi);
++}
++
++static bool zx_qspi_supports_op(struct spi_slave *slave,
++				const struct spi_mem_op *op)
++{
++	if (!spi_mem_default_supports_op(slave, op))
++		return false;
++
++	/* Command and address are always on one line */
++	if (op->cmd.nbytes != 1 || op->cmd.buswidth != 1)
++		return false;
++	if (op->addr.nbytes > 4 || (op->addr.nbytes && op->addr.buswidth != 1))
++		return false;
++	if (op->dummy.nbytes > 15 ||
++	    (op->dummy.nbytes && op->dummy.buswidth != 1))
++		return false;
++
++	/* The controller cannot transmit data on two lines */
++	if (op->data.nbytes && op->data.dir == SPI_MEM_DATA_OUT &&
++	    op->data.buswidth == 2)
++		return false;
++
++	return true;
++}
++
++static int zx_qspi_adjust_op_size(struct spi_slave *slave,
++				  struct spi_mem_op *op)
++{
++	op->data.nbytes = min_t(u32, op->data.nbytes, ZX_QSPI_MAX_DATA);
++
++	return 0;
++}
++
++static int zx_qspi_set_speed(struct udevice *bus, uint hz)
++{
++	struct zx_qspi *qspi = dev_get_priv(bus);
++	ulong rate;
++
++	if (!hz)
++		return -EINVAL;
++	if (qspi->speed_hz == hz)
++		return 0;
++
++	if (qspi->has_clk) {
++		rate = clk_set_rate(&qspi->clk, hz);
++		if (IS_ERR_VALUE(rate))
++			return -EINVAL;
++	}
++
++	qspi->speed_hz = hz;
++
++	return 0;
++}
++
++static int zx_qspi_set_mode(struct udevice *bus, uint mode)
++{
++	/* SPI NAND uses mode 0; the controller supports nothing else */
++	if (mode & (SPI_CPOL | SPI_CPHA | SPI_3WIRE | SPI_CS_HIGH))
++		return -EINVAL;
++
++	return 0;
++}
++
++static const struct spi_controller_mem_ops zx_qspi_mem_ops = {
++	.adjust_op_size = zx_qspi_adjust_op_size,
++	.supports_op = zx_qspi_supports_op,
++	.exec_op = zx_qspi_exec_op,
++};
++
++static int zx_qspi_probe(struct udevice *bus)
++{
++	struct zx_qspi *qspi = dev_get_priv(bus);
++	u32 status;
++	int ret;
++
++	qspi->base = dev_read_addr_ptr(bus);
++	if (!qspi->base)
++		return -EINVAL;
++
++	ret = clk_get_by_index(bus, 0, &qspi->clk);
++	if (!ret) {
++		ret = clk_enable(&qspi->clk);
++		if (ret) {
++			dev_err(bus, "cannot enable the QSPI clock: %d\n", ret);
++			return ret;
++		}
++		qspi->has_clk = true;
++	} else {
++		/*
++		 * No clock provider in U-Boot: keep whatever rate secondboot
++		 * programmed. The device tree intentionally has no clocks
++		 * property, see uboot-port/a2-spi-nand-design.md.
++		 */
++		dev_dbg(bus, "no QSPI clock provider (%d), keeping the boot rate\n",
++			ret);
++	}
++
++	writel(ZX_QSPI_EN, qspi->base + ZX_QSPI_EN_REG);
++	ret = readl_poll_timeout(qspi->base + ZX_QSPI_EN_REG, status,
++				 status & ZX_QSPI_EN_BACK,
++				 ZX_QSPI_CMD_TIMEOUT_US);
++	if (ret) {
++		dev_err(bus, "controller did not start (en=%#x)\n", status);
++		return ret;
++	}
++
++	writel(ZX_QSPI_SCLK_PAUSE_EN, qspi->base + ZX_QSPI_CTRL0_REG);
++	writel(0, qspi->base + ZX_QSPI_INT_EN_REG);
++
++	/* Ensure the proper data sampling point, as the kernel driver does */
++	status = readl(qspi->base + ZX_QSPI_TIMING_REG);
++	if (!FIELD_GET(ZX_QSPI_TIMING_SAMPLE_POINT, status)) {
++		status |= FIELD_PREP(ZX_QSPI_TIMING_SAMPLE_POINT, 1);
++		writel(status, qspi->base + ZX_QSPI_TIMING_REG);
++	}
++
++	status = readl(qspi->base + ZX_QSPI_SW_REG) >> 16;
++	if (status != ZX_QSPI_FIFO_SIZE)
++		dev_info(bus, "unexpected QSPI FIFO size %u\n", status);
++
++	return 0;
++}
++
++static const struct udevice_id zx_qspi_ids[] = {
++	{ .compatible = "zte,zx279128s-spifc" },
++	{ .compatible = "zte,zx29-qspi" },
++	{ }
++};
++
++static const struct dm_spi_ops zx_qspi_ops = {
++	.mem_ops = &zx_qspi_mem_ops,
++	.set_speed = zx_qspi_set_speed,
++	.set_mode = zx_qspi_set_mode,
++};
++
++U_BOOT_DRIVER(zx_qspi) = {
++	.name		= "zx_qspi",
++	.id		= UCLASS_SPI,
++	.of_match	= zx_qspi_ids,
++	.ops		= &zx_qspi_ops,
++	.probe		= zx_qspi_probe,
++	.priv_auto	= sizeof(struct zx_qspi),
++};
+-- 
+2.56.1
+
