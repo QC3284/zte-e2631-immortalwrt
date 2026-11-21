@@ -241,3 +241,77 @@ task-45 双偏移探针已硬件证实差异；见 `evidence/a1-ramchain-poc-202
 
 未 publish、未创建 Release/tag；`firmware.yml`/`check.yml` 未改；kit main 未动；真机未碰
 （A1 串口/banner 复测由 Lead 另排批准任务）。
+
+## 11. A3 mtd0 镜像打包（task-52，2026-11-21）
+
+task-51 的 A3 代码落地（kit `b90a0de` + `265c818`，patch 0005/0006/0007，post-am tree
+`40f52fb46d9987d8082babac151f9f8dcbdcba4a`）后，workflow 增加**镜像产出**：把 `u-boot.bin`
+用 P0 工具链打成可刷的 mtd0 镜像资产。**仍然只产出：不发布、不刷写、不碰设备。**
+
+### 11.1 打包管线（新增两步）
+
+1. **Package the flashable mtd0 image**：
+   - 从已入库的厂商读取证据重建 0x800 B U-Boot 头块：
+     `evidence/p2-oob/headblock-0x20000-0x20800.hex`（magic `128s`、厂商声明长度 `0x68000`，
+     sha256 `19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510`）；
+   - 用 `tools/e2631-env.mjs build` 从现网 env 文本
+     `evidence/b1-env-current-20261121.txt` 重建厂商 env 块（22 项、CRC32 `0xaffcec3e`、
+     0x20000 B、sha256 `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`，
+     与 P0「现网 dump 解析-重生成逐字节一致」的结论同源）；
+   - 合成 1 MiB 模板（头块 @0x20000、env @0xC0000、其余 0xFF），
+     `tools/mkuboot-image.mjs build` 把 payload 写到 0x20800 并只改头块 +0x14 的长度字段，
+     产出 `e2631-uboot-mtd0.bin` = mtd0 `0x20000..0xC0000`（0xA0000 B）；
+   - 镜像尾部默认无 64 B tail marker（工具按擦除 0xFF 处理；secondboot 只校验 magic，不校验 tail/CRC）。
+2. **Verify the mtd0 image against the P0 gates**：
+   - `mkuboot-image check`：解包/重打包逐字节一致；
+   - `e2631-env check`：env 块 CRC32 往返一致（22 项，`0xaffcec3e`）；
+   - `verify-mtd0 --sha256`：P0 的 sha256 回读门禁；
+   - 结构断言：镜像恰为 0xA0000；头块除 +0x14 外与厂商块逐字节一致；+0x14 == payload 长度；
+     payload 与 `u-boot.bin` 逐字节一致；payload 之后（到 0xA0000）全 0xFF；
+     payload 末端（绝对 `0x20800 + len`）不越过 env 起点 `0xC0000`。
+
+产物 zip 现在含：`u-boot.bin`、`e2631-uboot-mtd0.bin`、`e2631-env-block.bin`（只读参考，
+不属于镜像）、`u-boot.map`、`.config`、日志、`UBOOT-INFO.txt`、`SHA256SUMS`。
+`UBOOT-INFO.txt` 记录镜像/头块/env 的 sha256、payload 长度和边界。
+
+### 11.2 构建与门禁结果
+
+- run **44880753221**（head `20f2d9b`，workflow_dispatch，checkpatch=true）：
+  2026-11-21T07:32:55Z → 07:34:45Z，**15/15 step success**（含新增的打包与 P0 门禁两步）；
+- 门禁原始输出：`u-boot.bin: 448072 bytes, limit 653312 bytes`、`entry point: 0x43000000`、
+  `vendor U-Boot header block: 0x800 bytes`、`env: 22 entries, CRC 0xaffcec3e`、
+  `wrote artifacts/e2631-uboot-mtd0.bin (0xa0000 bytes, sha256 7cac2d39...)`、
+  `OK: unpack + build is byte-identical`、`OK: env dump + rebuild is byte-identical`、
+  `OK sha256 matches 7cac2d39...`、`mtd0 image: 0xa0000 bytes ... env @0xC0000 untouched`；
+- `.config` 9 个验收符号、9F800 上限、entry 门禁、embedded-DTB 门禁全部照旧通过；
+- checkpatch：**0 errors / 7 reviewed warnings**（0001/0002 的 4 条旧项 + A2/A3 新增 3 条：
+  0005 新建文件 1 条 MAINTAINERS、0006 新建文件 1 条 MAINTAINERS + 1 条 "Possible new command -
+  make sure you add a test"；均已在 task-50/51 证据中审阅，属信息性）；
+- kit `check.yml` 在 `20f2d9b` 上 run **44880750288** = SUCCESS。
+
+### 11.3 产物（已归档）
+
+- artifact id **14698261124**，name `e2631-uboot-44880753221`，zip 562,838 B，
+  zip SHA256 `33e6d9a8f78df726fb7837ff9acde473c7e31232bd1d981e714b9661d065a977`；
+- 9 文件，`sha256sum -c SHA256SUMS` **6/6 成功**；
+- `e2631-uboot-mtd0.bin` = 655,360 B（0xA0000），sha256
+  `7cac2d399cf8cf6c678bdfcea3fe6669bbb8a2e0af1b72a9b93e348a5b8aa8c8`；
+  header 块 sha256 `19a9d546...`；payload 长度 `0x6d648`（448,072 B），
+  payload 末端 `0x20800 + 0x6d648 = 0x8de48`，距 env `0xC0000` 余量 209,080 B；
+- `u-boot.bin` = 448,072 B，sha256 `adc00a8f08d5bde6584fcb7e4f63e117fd99c5189cc53122affb64aec32b5cd0`；
+- `e2631-env-block.bin` = 131,072 B，sha256 `6eee153b...`；
+- 本机归档：`/home/qc233/zte/e2631-t5-artifacts/uboot-a3-mtd0-44880753221/`
+  （`artifact.zip`、`artifact-id.txt`、`files/`）。
+
+### 11.4 可复现性说明
+
+`u-boot.bin` 的 banner 内嵌编译时间（本 run 记为 `adc00a8f...`，与本地用上一 run payload 的
+`4128523c...` 不同），因此 **镜像 sha256 会随构建时间变化**（本地预演镜像
+`e762c003...`，CI 产物 `7cac2d39...`）。在 payload 固定时镜像字节是确定的：
+头块、env 块、长度字段和擦除尾部都由钉点/证据唯一决定。产物身份以 run URL + SHA256SUMS 为准。
+
+### 11.5 边界
+
+未 publish、未发布 Release/tag；未 dispatch 任何额外 workflow；真机未碰（A1/A2/A3 设备会话
+是分开的用户批准任务）；`firmware.yml`/`check.yml` 未改；pin 文件未动——workflow 只是消费
+task-51 已钉的 4→7 个 patch 与 post-am tree `40f52fb4`。
