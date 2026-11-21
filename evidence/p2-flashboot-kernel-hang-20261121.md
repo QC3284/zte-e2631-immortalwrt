@@ -24,7 +24,7 @@
 
 已排除：镜像/载荷不同（闪入载荷与 C1b-0 成功所用 u-boot.bin 字节相同，sha256 010379fd...）、bootargs/ATAGS 差异（两条链都走我们自己的 bootm）、bootpara@0x40007000（内核注释明确说该页被 zImage 自解压器当页表覆盖）、厂商自定义 ATAG 0x54410011（只有厂商 bootm 会加，我们两条链都没有）、L2/SCU/ACTLR（厂商也不碰，不是差异）、CPU PLL（默认不重配）、secondboot 的 `backup header!!`（原厂正常启动日志同样打印）。
 
-建议下一步（§8）：在 U-Boot 入口和 bootm 前打印 SCTLR/CLIDR/CCSIDR/TTBR0/VBAR/ACTLR 做两条链的实测对比（决定性 A/B），并在 board_late_init 或 bootm 钩子里实现一份**无条件**的、不走 config stub 的 CP15 归一序列；加 `e2631soc` 命令在闪存链提示符下先跑归一、再 `e2631boot` 手测，不需额外写 flash。
+建议下一步（§8；Lead 2026-11-21 已采纳并落到 uboot-port patch 0011）：去掉 CONFIG_SKIP_LOWLEVEL_INIT，让主线 start.S 的 cpu_init_cp15/cpu_init_crit 在入口恢复执行，bootm 前再做一次幂等 CP15 cleanup，并用 `e2631soc` 回报 before/after；最终证据是 Session C 用新 mtd0 冷启动能进内核（Session A/B 只证明新二进制能跑、能 dump、能从 RAM 链 bootm 进内核）。直接观测“secondboot 交棒态”需要保留 SKIP_LOWLEVEL_INIT 的诊断构建，当前不计划。
 
 ## 1. 输入、工具与地址换算
 
@@ -249,6 +249,8 @@ ACTLR? (c1,c0,1)  —— 只读；若在 QEMU/真机上读不到就跳过
 
 同一序列放进 `e2631soc` 命令，用于：闪存链 U-Boot 提示符下先执行 `e2631soc`，再执行 `e2631boot`（**不复位**）——如果内核能起来，C1/C2 确认且修复有效，且不需要额外写 flash。
 
+**采用形态（2026-11-21，patch 0011，verify-docs 转述补丁内容）**：实现改为“去掉 defconfig 的 CONFIG_SKIP_LOWLEVEL_INIT，让 armv7 start.S 的 cpu_init_cp15/cpu_init_crit 在入口重新执行”（等价于上面第 1-3 步，且与厂商/主线一致）；bootm 前再执行一次幂等 CP15 cleanup；e2631soc 打印 before/after。不再另写 board_late_init hook，避免两套逻辑。注意 cpu_init_crit 还会走 lowlevel_init/s_init 链（SKIP_LOWLEVEL_INIT_ONLY 未开）——首次上电若 banner 都不出现，属入口改动引入的新失败模式，要先排查它而不是内核。
+
 ### 8.3 约束
 
 - 构建走 GitHub Actions（CI-only 提交），本机不做全量编译；
@@ -256,12 +258,12 @@ ACTLR? (c1,c0,1)  —— 只读；若在 QEMU/真机上读不到就跳过
 
 ### 8.4 后续（Lead 2026-11-21 决定）
 - 修复补丁（uboot-port patch 0011）按本报告改为 **CP15-only**：去掉 PL310/SCU 写，只做主线口径的 CP15/缓存/MMU 归一；e2631soc 命令 = 同一归一系列 + 入口寄存器回报（SCTLR/TTBR0/CLIDR/VBAR）。
-- 可选后续实验（不阻塞今晚的 green；2026-11-21 与 verify-docs 对齐的采集契约）：决定性证据是 SCTLR 的 M(bit0)/C(bit2)/I(bit12) 前后值。e2631soc 当前只报 SCTLR + PL310 + SCU；TTBR0/VBAR 为 nice-to-have（两行打印），CLIDR/CCSIDR/ACTLR 不要求。Session A 采法：闪存链旧 U-Boot（010379fd，cleanup 为 stub，不改 SCTLR）提示符 -> md 读 PL310 ctrl/aux 与 SCU ctrl -> loadx 新 u-boot.bin -> go -> e2631soc 前后值 -> e2631boot（hand-off 前再打印一次）。判定：before 的 M=1 或 C=1 -> 假设确认，after 应读 M=0,C=0,I=0（同时验证 cleanup 实现）；before 全 0 -> 假设弱化，转查 §7 的 C3/C4。RAM 链 vendor 对照默认不做（vendor 会话有 env 漂移风险，且归一顺序已实测、无判定价值）；md 只能读内存，CP15 只能靠 e2631soc 回报。
+- 后续实验契约（2026-11-21 与 verify-docs/Lead 对齐，含 patch 0011 的两个更正）：补丁 0011 会**去掉 CONFIG_SKIP_LOWLEVEL_INIT**（保留 SYS_*CACHE_OFF），因此新构建在入口就会执行 cpu_init_cp15/cpu_init_crit 把 SCTLR 的 M/C/I 清零；e2631soc 的 before 是“入口归一之后”的值，不是 secondboot 原始交棒态。于是：before 的 M=C=I=0 只证明入口归一按设计跑了（构建自检 PASS）；任一非 0 说明入口归一没跑（构建/配置缺陷，先停下查构建）；before/after 只能证明 dump 可用与 cleanup 幂等。**直接观测继承态需要保留 SKIP_LOWLEVEL_INIT 的诊断构建，当前不计划**。最终证据是产品级 Session C：新 mtd0 冷启动进内核；Session A/B 只证明新二进制能跑、能 dump CP15、能从 RAM 链 bootm 进内核。补丁当前打印 SCTLR/CLIDR/TTBR0/VBAR/ACTLR（DACR/CCSIDR 可选），PL310/SCU 由 md 只读探针 0xc00104/0xc00108/0x800004 补。闪存链采集仍经旧 U-Boot（010379fd）提示符 -> md -> loadx 新 u-boot.bin -> go -> e2631soc before/after -> e2631boot（含 hand-off 行）。
 - 记录口径：本报告的“排除项”基于当时的 vendor 载荷 sha256 a4c640ad… 与 C1b 镜像 010379fd…；若后续重建导致哈希变化需重跑 §10 的比对。
 
 ## 9. 低置信与未决
 
-- 没有实测 SCTLR：本文 C1/C2 是“厂商做、我们不做”的静态不对称 + RAM/闪存链唯一差异推出来的，不是直接观测。8.1 是决定性实验。
+- 没有实测“继承态” SCTLR：本文 C1/C2 是“厂商做、我们不做”的静态不对称 + RAM/闪存链唯一差异推出来的，不是直接观测。patch 0011 恢复入口归一后，新构建的 e2631soc before 已是归一后的值，无法再直接观测 secondboot 交棒态；直接观测需保留 SKIP_LOWLEVEL_INIT 的诊断构建（不计划）。C1/C2 的最终证据是产品级 Session C 冷启动成功。
 - secondboot 是否通过非 BL 路径（例如 BootROM 服务/协处理器）改变状态，静态无法排除。
 - 挂起后是否发生复位：失败日志在 `Starting kernel ...` 处结束，没有新的 `Boot SPI NAND`/BootROM 行；若串口捕获已停则不能定论。
 - 厂商 `versioninfo`/`bootargs` 的 saveenv 副作用已污染当前 mtd0 的 env 块（§2 附带事实），后续实验应以 c1b1-expected-mtd0.bin 为基准。
