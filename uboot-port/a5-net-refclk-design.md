@@ -52,7 +52,8 @@ eth0
 
 1. `0x94000050`：bit31=1（PLL 启动）、bit27=0、bit24=0、bits[23:18]=1、FBDIV[17:6]=0x5D、PD1[5:3]=5、
    PD2[2:0]=3；
-2. `0x94000054 = (old & 0xFF000000) | 0x004FDF3B`；
+2. `0x94000054`：清 bit27、置 bit26、清 bit25、清 bit24，再写 `(当前值 & 0xFF000000) | 0x004FDF3B`（保留高字节，
+   所以刚置上的 bit26 会保留；漏掉 bit26 会让分数 PLL 的使能位停在复位值）；
 3. `mdelay(100)` → 清 `0x94000050` bit31（结束启动）→ `mdelay(50)`；
 4. 网络 PLL：`0x94000050 = (old & 0x76000000) | 0x0004176B`。
 
@@ -138,7 +139,7 @@ e2631refclk: back at the prompt, nothing was booted
 
 ### 5.1 CI（uboot-build.yml）
 
-- 12 个 patch、tree `5de49c199b0515b95fc0ea21264b3f0bb3418eed`、patch sha256 与 §1 表一致；
+- 12 个 patch、tree `3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4`、patch sha256 与 §1 表一致；
 - `u-boot.bin` 含 `e2631refclk`；`e2631boot.c` 引用 `e2631_net_refclk_init`；
   `e2631net.c` 仍含厂商值 `0x004fdf3b`、`0x003c0040`、`0x0001381b` 与板级 pinmux 字
   `0x0f3ffffa`、`0x003dbf85`、`0x9400000C` 的 `0x00100000`；

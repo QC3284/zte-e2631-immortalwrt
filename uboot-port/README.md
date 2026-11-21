@@ -69,8 +69,8 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0011 | `uboot-port/patches/0011-board-zte-normalise-CP15-before-the-Linux-hand-off.patch`（C1b-1：入口归一化 + 跳转前 CP15 清理 + `e2631soc` 只读报告） |
 | patch 0011 sha256 | `98aa4b3914ff1741e0621116b4d630ab43f448d7d0ca31496c2001e815b51095` |
 | patch 0012 | `uboot-port/patches/0012-board-zte-bring-up-the-network-reference-clocks.patch`（A5：厂商 board_eth_init 的参考时钟/SerDes/管脚序列，按两链 pre/post 寄存器差分裁剪 + `e2631refclk` 前后 dump） |
-| patch 0012 sha256 | `62ca7afa4d6b4614fcd53b457db1f5475b94b9ef08f975395cd71992b982b24d` |
-| am 之后 tree | `5de49c199b0515b95fc0ea21264b3f0bb3418eed`（与机器无关，12 个 patch） |
+| patch 0012 sha256 | `9c075c60f5cd6282e8b507d7ee0e02b4fc68544d0f55f4d1b4c43a8f187ed87b` |
+| am 之后 tree | `3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4`（与机器无关，12 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -86,7 +86,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = 5de49c199b0515b95fc0ea21264b3f0bb3418eed
+test "$(git rev-parse HEAD^{tree})" = 3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4
 ```
 
 ## 2. 新增/修改的文件
@@ -204,7 +204,7 @@ PHY 驱动）仍归内核；flat GPIO 53（H3600 时期的 `pcie0 reset-gpios` �
 | ATAGS 缓冲区 | `CFG_SYS_SDRAM_BASE + 0x100`（= `0x40000100`） | 0008 在 `board_late_init()` 设置 `gd->bd->bi_boot_params`；`static_assert` 保证 > DRAM base 且 +0x100 ≤ 内核 load `0x40008000`；本配置 `SYS_MALLOC_BOOTPARAMS` 关闭，没有其它代码分配该缓冲区 |
 | 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；后续再考虑分离/追加格式 |
 | SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
-| 网络参考时钟/SerDes | `e2631_net_refclk_init()`（0012） | 厂商 `board_eth_init()` 的逐字段重放：分数 PLL `0x94000050/0x54`、`0x94000008` bit4/bit5、`0x9FE00000` SerDes 25 写、CRM2 `0x94100010`、`0x9400004C`→`0x9A100004`、`0x9400000C` 的 `bits[21:20]=0b01`（厂商以太网 probe 的时钟 mux，两链 dump 证明不同）；内核 clk 驱动假设 bootloader 已完成该初始化，且无内核驱动碰这些寄存器（DTS 无法描述）。`e2631refclk` 打印前后 7 个寄存器，不启动 |
+| 网络参考时钟/SerDes | `e2631_net_refclk_init()`（0012） | 厂商 `board_eth_init()` 的逐字段重放：分数 PLL `0x94000050/0x54`（第二寄存器先清 bit27/25/24、置 bit26，再以高字节保留的方式写 FRAC）、`0x94000008` bit4/bit5、`0x9FE00000` SerDes 25 写、CRM2 `0x94100010`、`0x9400004C`→`0x9A100004`、`0x9400000C` 的 `bits[21:20]=0b01`（厂商以太网 probe 的时钟 mux，两链 dump 证明不同）；内核 clk 驱动假设 bootloader 已完成该初始化，且无内核驱动碰这些寄存器（DTS 无法描述）。`e2631refclk` 打印前后 7 个寄存器，不启动 |
 | Pinmux / GPIO | `0x94200000` + 厂商板级表（0012） | pinmux 先三处 |= 厂商值，再按厂商顺序写入板级表六个整字；GPIO 只驱动八个输出（8=1/40=1/60=0 三色 LED、55/52/54/51/2=0），十个输入（strap 5/15/62/61/43/47/46/45、按键 18/20）复位后 DIR 已为 0，无需写；不驱动 flat 53。全部为板上外设的“回到厂商上电状态”，幂等 |
 | 网络协议栈 | 无 | 网络引导仍用厂商 U-Boot 的 tftp；A5 只让内核能自己接管 PHY/PCIe |
 | 刷写 | 不做 | A3 只读；写 mtd0/槽位属于之后的刷写阶段（需用户批准） |
@@ -236,7 +236,7 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `5de49c199b0515b95fc0ea21264b3f0bb3418eed`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 12）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
@@ -457,7 +457,7 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   详见 [evidence/uboot-cp15-cleanup-20261121.md](../evidence/uboot-cp15-cleanup-20261121.md)。
 - 2026-11-22（A5，patch 0012）：新增 `board/zte/zxhn-e2631/e2631net.c|.h` 与 `e2631refclk` 命令，按厂商
   `board_eth_init()` 重放参考时钟/SerDes/CRM2/管脚序列，并在 `e2631boot` 的 `bootm` 前调用；寄存器集按 verify-docs 两链 pre/post 寄存器差分裁剪（pinmux 六个整字、只驱动 GPIO 输出、补 `0x9400000C`），重钉结果 tree 为
-  `5de49c199b0515b95fc0ea21264b3f0bb3418eed`（12 个 patch）。设计见
+  `3f1eeb4941ada08255f7bd4b5c936d6a1a3750f4`（12 个 patch）。设计见
   [a5-net-refclk-design.md](a5-net-refclk-design.md)；厂商逆向证据见
   [evidence/p2-vendorless-network-gap-20261122.md](../evidence/p2-vendorless-network-gap-20261122.md)。
   CI run `44928690737`（head `e377498`）SUCCESS：banner `gdd251a1a3390`、`u-boot.bin` 450,888 B

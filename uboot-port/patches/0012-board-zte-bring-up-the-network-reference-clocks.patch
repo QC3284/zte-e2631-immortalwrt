@@ -1,4 +1,4 @@
-From f1762376983f7638e89db0db5baf2e9042cf596d Mon Sep 17 00:00:00 2001
+From bb761bd9feb3cbc585aae3316b016e226165a3b5 Mon Sep 17 00:00:00 2001
 From: QC3284 <2078725082@qq.com>
 Date: Sun, 22 Nov 2026 00:36:06 +0800
 Subject: [PATCH] board: zte: bring up the network reference clocks and SerDes
@@ -13,7 +13,9 @@ all four PHYs silent and both PCIe links down.
 Replay the vendor sequence in its exact order:
 
   - the fractional PLL on top CRM 0x94000050/0x94000054 (FBDIV 0x5d,
-    PD1 5, PD2 3, FRAC 0x004fdf3b, bits[25:18] = 1);
+    PD1 5, PD2 3, FRAC 0x004fdf3b, bits[25:18] = 1, and on the second
+    register bit26 set before the final write, which keeps the high
+    byte);
   - top CRM 0x94000008: clear bit5/bit4, delay, set bit5, delay;
   - the 24 SerDes/analog registers at 0x9fe00000 (0x40 written twice);
   - top CRM 0x94000008 bit4;
@@ -46,9 +48,9 @@ Signed-off-by: QC3284 <2078725082@qq.com>
 ---
  board/zte/zxhn-e2631/Makefile    |   1 +
  board/zte/zxhn-e2631/e2631boot.c |  11 ++
- board/zte/zxhn-e2631/e2631net.c  | 290 +++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631net.c  | 301 +++++++++++++++++++++++++++++++
  board/zte/zxhn-e2631/e2631net.h  |  14 ++
- 4 files changed, 316 insertions(+)
+ 4 files changed, 327 insertions(+)
  create mode 100644 board/zte/zxhn-e2631/e2631net.c
  create mode 100644 board/zte/zxhn-e2631/e2631net.h
 
@@ -94,10 +96,10 @@ index 5418a8c9..b94d2839 100644
  	if (!mtd) {
 diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
 new file mode 100644
-index 00000000..6a5d686d
+index 00000000..5a9c296b
 --- /dev/null
 +++ b/board/zte/zxhn-e2631/e2631net.c
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,301 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * ZTE ZXHN E2631 (Sanechips ZX279128S) network reference clock and SerDes
@@ -313,6 +315,17 @@ index 00000000..6a5d686d
 +	val &= ~0x00000007;
 +	val |= 3;
 +	e2631_writel(val, E2631_TOP_CRM_PLL0);
++
++	/*
++	 * 0x94000054: the vendor clears bit27, sets bit26, clears bit25 and
++	 * bit24, and only then writes (current & 0xff000000) | 0x004fdf3b.
++	 * That last write keeps the high byte, so bit26 has to be set here;
++	 * dropping it leaves the fractional PLL field unchanged from reset.
++	 */
++	frac = e2631_readl(E2631_TOP_CRM_PLL1);
++	frac &= ~(BIT(27) | BIT(25) | BIT(24));
++	frac |= BIT(26);
++	e2631_writel(frac, E2631_TOP_CRM_PLL1);
 +
 +	frac = e2631_readl(E2631_TOP_CRM_PLL1);
 +	e2631_writel((frac & 0xff000000) | 0x004fdf3b, E2631_TOP_CRM_PLL1);
