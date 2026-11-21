@@ -489,3 +489,15 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   sha256 `e3c52ba4132910b1807708eadfc8a6f7c7b9740782e84df6afa6d2e7a861ecf2`、mtd0 镜像
   sha256 `367b8fa63364d302bc13ade4dd6f9edcd2a49a706a906207fb33e9dc8ced8b41`、env 块 `6eee153b…` 未变；
   详见 [evidence/uboot-a5-20261122.md](../evidence/uboot-a5-20261122.md)。
+
+- 2026-11-22（A6，patch 0013）：在 0012 的 `e2631_pinmux_gpio_init()` 之后补厂商 `zte_gpio_init()` 的
+两段尾部特例（`0x47f2f61c` 索引 0x33→pin 2、`0x47f2f66c` 索引 0x32→pin 51，无视表值 0 置 1），
+修掉 A5 会话残留的 PCIe endpoint 缺失（只有 root port、没有 `14c3:7906`/`14c3:790a`）。重钉结果 tree
+`cc39ae59a999f0f19a4c419465bedf1585007345`（13 个 patch），patch sha256
+`7dc49eb987e7e17a7f75d73ca9d4f82fa2e4ad7f891e92134c6c6fe54e957175`。设计见
+[a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)；CI run `44934077401`（head `d546664`）
+ SUCCESS：banner `g6620d6e97d78`、`u-boot.bin` 450,936 B sha256
+`7117fd88920b8f45c68e4f4114e38001ca216d0da465f32921c2a8ae41ff3bc0`、mtd0 镜像 sha256
+`4851345cff0d838216e448ae67ab3fa00b8e46825f88a9a82afb3b4b0717829a`、装配后 header sha256
+`508c325cbc59b22e4cd78f43d3b51a05926f4725fc1f4bbe0ec7536905d303e9`、env 块 `6eee153b…` 未变；
+详见 [evidence/uboot-a6-20261122.md](../evidence/uboot-a6-20261122.md)。
