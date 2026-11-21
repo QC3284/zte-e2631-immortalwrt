@@ -27,6 +27,8 @@
 | [../evidence/r-verify4-parity-20261115.md](../evidence/r-verify4-parity-20261115.md) | R-验4：RUN5 merge 候选 parity（PASS-REVIEWED-DIFFS、kernel merge-class 归因、RUN4 失败记录） |
 | [../evidence/c-plan-parity-20261121.md](../evidence/c-plan-parity-20261121.md) | C-验1：RUN6（方案 C，target 改名 zx279128）对 RUN5 的 parity 验收（RUN6 v3 PASS-REVIEWED-DIFFS，expected 23 / allowed 13 / unexpected 0，kernel STAMP-ONLY，含首轮 5 条归因与负对照） |
 | [../evidence/t38/](../evidence/t38/) | task-38 验收附件：verify-task38.sh、终稿策略、端到端日志、比较器/kernel-deep/verify_img 报告、负对照 |
+| [../evidence/p2-oob-recon-20261121.md](../evidence/p2-oob-recon-20261121.md) | P2-P1：mtd0 OOB 只读取证（512 页表、normal/RAW 全 FF、跨分区对照、ECC 布局未证实、READID 推断、U-Boot 区界核对） |
+| [../evidence/p2-oob/](../evidence/p2-oob/) | task-42 取证附件：OOB 表/二进制、headblock/env/secondboot hex、会话日志、工具源码与 sha256 清单 |
 
 
 | 文件 | 内容 |

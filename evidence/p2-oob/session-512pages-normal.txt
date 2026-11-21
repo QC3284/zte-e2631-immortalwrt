@@ -1,0 +1,91 @@
+== IDENTITY ==
+SSH_OK
+Sat Nov 21 12:44:47 CST 2026
+Linux ImmortalWrt 6.18.60 #0 SMP Fri Nov 20 20:46:22 2026 armv7l GNU/Linux
+DISTRIB_ID='ImmortalWrt'
+DISTRIB_RELEASE='SNAPSHOT'
+DISTRIB_REVISION='r0-86cddb7'
+DISTRIB_TARGET='zx279128/generic'
+DISTRIB_ARCH='arm_cortex-a9'
+-- cpuinfo --
+processor	: 0
+model name	: ARMv7 Processor rev 1 (v7l)
+BogoMIPS	: 1000.00
+Features	: half thumb fastmult edsp tls 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x4
+CPU part	: 0xc09
+CPU revision	: 1
+
+processor	: 1
+model name	: ARMv7 Processor rev 1 (v7l)
+BogoMIPS	: 1000.00
+Features	: half thumb fastmult edsp tls 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x4
+CPU part	: 0xc09
+CPU revision	: 1
+
+Hardware	: ZTE zx279128s (Device Tree)
+Revision	: 0000
+Serial		: 0000000000000000
+-- proc/mtd --
+dev:    size   erasesize  name
+mtd0: 00100000 00020000 "bootloader"
+mtd1: 00100000 00020000 "tag"
+mtd2: 00100000 00020000 "wifi"
+mtd3: 00200000 00020000 "usercfg"
+mtd4: 00200000 00020000 "defcfg"
+mtd5: 01c00000 00020000 "slot0"
+mtd6: 01c00000 00020000 "slot1"
+mtd7: 01100000 00020000 "rootfs"
+mtd8: 004a0000 00020000 "rootfs_data"
+mtd9: 00020000 00020000 "slot1-header"
+mtd10: 02f00000 00020000 "userdata"
+-- mtd0 sysfs --
+name=bootloader
+type=nand
+size=1048576
+erasesize=131072
+writesize=2048
+oobsize=64
+ecc_step_size=512
+ecc_strength=1
+ecc_failures=0
+oobavail=62
+bbt_blocks=0
+bad_blocks=0
+
+-- devices/tools --
+crw-------    1 root     root       90,   0 Jan  1  1970 /dev/mtd0
+crw-------    1 root     root       90,   1 Jan  1  1970 /dev/mtd0ro
+brw-------    1 root     root       31,   0 Jan  1  1970 /dev/mtdblock0
+nanddump=missing
+nandwrite=missing
+mtd_debug=missing
+mtdinfo=missing
+-- dmesg spi-nand --
+[    0.074398] spi-nand spi0.0: FORESEE SPI NAND was found.
+[    0.074456] spi-nand spi0.0: 128 MiB, block size: 128 KiB, page size: 2048, OOB size: 64
+== HASHES ==
+mtd0_full=de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f  -
+secondboot_0x0_0x20000=540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd  -
+uboot_area_0x20000_0xC0000=3b49d4fb50875ddf635704875c9b67878a643bfd993a6b5c9aebb75f22e32222  -
+headblock_0x20000_0x20800=19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510  -
+envhead_0xC0000_0xC0220=9e4d86e043c4be04f127e983a54739601e37773b983471f3b7169cdaf4af6607  -
+== OOB DUMP ==
+sysfs /sys/class/mtd/mtd0 name="bootloader" size=1048576 erasesize=131072 writesize=2048 oobsize=64 ecc_step_size=512 ecc_strength=1
+mode=64 wrote 32768 bytes (512 pages x 64 B OOB) to /tmp/mtd0-oob.bin
+-rw-r--r--    1 root     root       1048576 Nov 21 12:44 /tmp/mtd0-before.bin
+-rw-r--r--    1 root     root          2048 Nov 21 12:44 /tmp/mtd0-envpage.bin
+-rw-r--r--    1 root     root         32768 Nov 21 12:44 /tmp/mtd0-oob.bin
+-rw-r--r--    1 root     root        655360 Nov 21 12:44 /tmp/mtd0-uboot-area.bin
+2d864c0b789a43214eee8524d3182075125e5ca2cd527f3582ec87ffd94076bc  /tmp/mtd0-oob.bin
+de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f  /tmp/mtd0-before.bin
+3b49d4fb50875ddf635704875c9b67878a643bfd993a6b5c9aebb75f22e32222  /tmp/mtd0-uboot-area.bin
+6adfe6f3be05eca7421dae810cf8634eaab41bd553f2b1ef14b3dce0a6d8bb69  /tmp/mtd0-envpage.bin
+== STREAM TAR (fd3) ==
+== CLEANUP ==
+CLEANED

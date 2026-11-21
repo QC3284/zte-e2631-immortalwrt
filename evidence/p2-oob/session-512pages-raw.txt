@@ -1,0 +1,22 @@
+== RAW-MODE OOB SESSION (MTDFILEMODE=_IO(M,19)) ==
+Sat Nov 21 12:49:01 CST 2026
+6.18.60
+-- ecc_stats before --
+*=NA
+-- 1 page normal --
+fileMode=normal ioctl=64 wrote 64 bytes (1 pages x 64 B OOB) to /tmp/oob-1p-normal.bin
+-- 1 page raw --
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 64 bytes (1 pages x 64 B OOB) to /tmp/oob-1p-raw.bin
+-- 512 pages raw --
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 32768 bytes (512 pages x 64 B OOB) to /tmp/mtd0-oob-raw.bin
+-rw-r--r--    1 root     root         32768 Nov 21 12:49 /tmp/mtd0-oob-raw.bin
+2d864c0b789a43214eee8524d3182075125e5ca2cd527f3582ec87ffd94076bc  /tmp/mtd0-oob-raw.bin
+-- ecc_stats after --
+*=NA
+[   59.701425] br-lan: port 5(phy1-ap0) entered blocking state
+[   59.701452] br-lan: port 5(phy1-ap0) entered forwarding state
+[   84.009752] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off
+== STREAM TAR ==
+CLEANED

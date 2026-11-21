@@ -1,0 +1,43 @@
+== CROSS-CHECK v2 ==
+Sat Nov 21 12:49:51 CST 2026
+crw-------    1 root     root       90,  21 Jan  1  1970 /dev/mtd10ro
+crw-------    1 root     root       90,  11 Jan  1  1970 /dev/mtd5ro
+crw-------    1 root     root       90,  15 Jan  1  1970 /dev/mtd7ro
+crw-------    1 root     root       90,  17 Jan  1  1970 /dev/mtd8ro
+-- mtd7 --
+fileMode=normal ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd7-normal.bin
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd7-raw.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd7-normal.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd7-raw.bin
+-- mtd5 --
+fileMode=normal ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd5-normal.bin
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd5-raw.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd5-normal.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd5-raw.bin
+-- mtd10 --
+fileMode=normal ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd10-normal.bin
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd10-raw.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd10-normal.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd10-raw.bin
+-- mtd8 --
+fileMode=normal ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd8-normal.bin
+MTDFILEMODE set to MTD_FILE_MODE_RAW (ECC engine disabled for this fd)
+fileMode=raw ioctl=64 wrote 256 bytes (4 pages x 64 B OOB) to /tmp/oob-mtd8-raw.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd8-normal.bin
+3d6876a0146de8576eb2395a858de1213d1b92c65b779df3a331cfd5a4584546  /tmp/oob-mtd8-raw.bin
+-rw-r--r--    1 root     root          2048 Nov 21 12:49 /tmp/main-mtd10.bin
+-rw-r--r--    1 root     root          2048 Nov 21 12:49 /tmp/main-mtd5.bin
+-rw-r--r--    1 root     root          2048 Nov 21 12:49 /tmp/main-mtd7.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd10-normal.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd10-raw.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd5-normal.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd5-raw.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd7-normal.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd7-raw.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd8-normal.bin
+-rw-r--r--    1 root     root           256 Nov 21 12:49 /tmp/oob-mtd8-raw.bin
+== STREAM TAR ==
+CLEANED
