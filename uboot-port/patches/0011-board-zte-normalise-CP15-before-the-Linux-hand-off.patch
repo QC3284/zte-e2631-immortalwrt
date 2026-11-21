@@ -1,0 +1,379 @@
+From 059c9b7f58fca29d812de7ba24fba1bb5d350c5a Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 23:36:37 +0800
+Subject: [PATCH] board: zte: normalise CP15 before the Linux hand-off
+
+The flash-boot chain reaches this U-Boot from secondboot instead of from
+the vendor U-Boot, so it inherits whatever CP15/cache state the BootROM
+left behind. The vendor loader normalises that state twice (measured from
+evidence/p2-oob/vendor-uboot-ram.bin): cpu_init_cp15/cpu_init_crit on
+entry, and cleanup_before_linux() before its final jump. This port built
+with CONFIG_SKIP_LOWLEVEL_INIT and CONFIG_SYS_*CACHE_OFF skipped the entry
+pass, and bootm's cleanup degraded to invalidate-only stubs: if secondboot
+left the D-cache on, the loaded kernel and ATAGS stay dirty in L1,
+invalidation drops them without writing back, and the kernel dies before
+its first console line (C1b-1). The RAM chain worked because the vendor
+cleanup had run before go.
+
+Turn the standard entry normalisation back on (CONFIG_SKIP_LOWLEVEL_INIT
+off; the generic lowlevel_init/s_init stubs stay empty - no clock, DRAM or
+UART work), and add e2631_soc_prepare_linux(): the vendor pre-jump CP15
+order, plain inline assembly that does not depend on the cache stubs
+(I-cache off, ICIALLU+BPIALL+DSB+ISB, clean+invalidate the L1 D-cache by
+set/way while it is enabled, clear SCTLR.M/C, invalidate the L1 D-cache by
+set/way).
+
+The vendor performs no PL310, SCU, ACTLR or clock programming before the
+kernel (full linear disassembly,
+evidence/p2-flashboot-kernel-hang-20261121.md section 7), so this patch
+deliberately does none either; PL310/SCU registers are only read for the
+report.
+
+e2631boot calls it as the very last step before bootm. The new e2631soc
+command runs the same function from the prompt, prints SCTLR (with M/C/I
+decoded), CLIDR, TTBR0, VBAR, ACTLR, DACR and CCSIDR plus the read-only
+PL310/SCU registers before and after the cleanup - md cannot read CP15 -
+and returns to "=>" without booting. No flash write and no environment
+write happen on either path.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile              |   1 +
+ board/zte/zxhn-e2631/e2631boot.c           |  10 +
+ board/zte/zxhn-e2631/e2631soc.c            | 254 +++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631soc.h            |  13 ++
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   1 -
+ 5 files changed, 278 insertions(+), 1 deletion(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631soc.c
+ create mode 100644 board/zte/zxhn-e2631/e2631soc.h
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index ad4b542f..f6d5cd48 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -3,4 +3,5 @@
+ # ZTE ZXHN E2631 board (Sanechips ZX279128S)
+ 
+ obj-y += e2631boot.o
++obj-y += e2631soc.o
+ obj-y += zxhn-e2631.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 3d012bca..5418a8c9 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -40,6 +40,8 @@
+ #include <stdio.h>
+ #include <u-boot/crc.h>
+ 
++#include "e2631soc.h"
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ #define E2631_MTD_DEV			"spi-nand0"
+@@ -327,6 +329,14 @@ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	snprintf(cmd, sizeof(cmd), "bootm 0x%lx",
+ 		 addr + E2631_MARKER_SIZE);
+ 
++	/*
++	 * Last step before the jump: normalise the CPU/L2/SCU state the flash
++	 * chain inherited from secondboot, exactly like the vendor bootloader
++	 * does in cleanup_before_linux(). The RAM chain never needed this
++	 * because the vendor U-Boot had already cleaned up before go.
++	 */
++	e2631_soc_prepare_linux();
++
+ 	return run_command(cmd, 0) ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
+ }
+ 
+diff --git a/board/zte/zxhn-e2631/e2631soc.c b/board/zte/zxhn-e2631/e2631soc.c
+new file mode 100644
+index 00000000..72a1862b
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631soc.c
+@@ -0,0 +1,254 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S) CP15 state normalisation before Linux
++ *
++ * The flash-boot chain reaches this U-Boot from secondboot instead of from the
++ * vendor U-Boot, so it inherits whatever CP15/cache state the BootROM left
++ * behind. The vendor loader normalises that state twice (measured from
++ * evidence/p2-oob/vendor-uboot-ram.bin):
++ *
++ *   - on entry, cpu_init_cp15/cpu_init_crit at 0x47f0021c invalidates the L1
++ *     I/D caches, the TLBs and the branch predictor, turns the I-cache on and
++ *     leaves the D-cache and MMU off;
++ *   - in cleanup_before_linux() at 0x47f00534, before its final jump: I-cache
++ *     off, ICIALLU+BPIALL+DSB+ISB, clean+invalidate the L1 D-cache by set/way
++ *     while it is enabled, clear SCTLR.M and SCTLR.C, then invalidate the L1
++ *     D-cache by set/way.
++ *
++ * This port used to build with CONFIG_SKIP_LOWLEVEL_INIT and
++ * CONFIG_SYS_ICACHE_OFF/CONFIG_SYS_DCACHE_OFF/CONFIG_SYS_L2CACHE_OFF, so the
++ * entry normalisation was skipped and bootm's cleanup degraded to
++ * invalidate-only stubs. If secondboot hands over with the D-cache enabled,
++ * the loaded kernel at 0x40008000 and the ATAGS at 0x40000100 sit in dirty L1
++ * lines; invalidating without flushing leaves stale DRAM behind and the
++ * kernel dies before its first console line - the C1b-1 flash boot. The RAM
++ * chain worked only because the vendor U-Boot had already run this cleanup
++ * before its "go".
++ *
++ * The vendor performs no PL310, SCU, ACTLR or clock programming before the
++ * kernel (full linear disassembly, evidence/p2-flashboot-kernel-hang-20261121.md
++ * section 7), so this file deliberately does none either. The load-bearing
++ * part is the unconditional CP15 cleanup below; it is plain inline assembly
++ * and does not depend on the CONFIG_SYS_*CACHE_OFF stubs.
++ *
++ * e2631boot calls e2631_soc_prepare_linux() as the last step before bootm.
++ * The e2631soc command runs the very same function from the prompt and prints
++ * the CP15 state before and after the cleanup (md cannot read CP15), then
++ * returns to "=>" without booting. Neither path writes flash, and the
++ * environment stays read-only.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <command.h>
++#include <linux/bitops.h>
++#include <linux/types.h>
++#include <stdio.h>
++#include <asm/barriers.h>
++#include <asm/io.h>
++
++/*
++ * Read-only PL310 / SCU registers for the e2631soc report. Same addresses as
++ * the kernel SoC description (target/linux/zx279128/patches-6.18/026):
++ * l2cc 0x00c00000, A9 SCU 0x00800000. Only reads happen here.
++ */
++#define E2631_L2C_BASE			0x00c00000
++#define E2631_L2C_CTRL			0x100
++#define E2631_L2C_AUX			0x104
++#define E2631_SCU_BASE			0x00800000
++#define E2631_SCU_CTRL			0x000
++
++/* SCTLR bits we report and clear */
++#define E2631_SCTLR_M			BIT(0)
++#define E2631_SCTLR_C			BIT(2)
++#define E2631_SCTLR_I			BIT(12)
++
++static u32 e2631_read_sctlr(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c1, c0, 0" : "=r" (val));
++
++	return val;
++}
++
++static u32 e2631_read_clidr(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 1, %0, c0, c0, 1" : "=r" (val));
++
++	return val;
++}
++
++static u32 e2631_read_ttbr0(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c2, c0, 0" : "=r" (val));
++
++	return val;
++}
++
++static u32 e2631_read_vbar(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c12, c0, 0" : "=r" (val));
++
++	return val;
++}
++
++static u32 e2631_read_actlr(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (val));
++
++	return val;
++}
++
++static u32 e2631_read_dacr(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c3, c0, 0" : "=r" (val));
++
++	return val;
++}
++
++/*
++ * CCSIDR depends on the CSSELR selection. Point CSSELR at the L1 data cache
++ * (level 0, data/unified) so both dumps describe the same cache.
++ */
++static u32 e2631_read_ccsidr(void)
++{
++	u32 val;
++
++	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (0));
++	isb();
++	asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (val));
++
++	return val;
++}
++
++static void e2631_write_sctlr(u32 val)
++{
++	asm volatile ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
++	isb();
++}
++
++/*
++ * Walk the L1 data cache by set/way. CSSELR selects level 0 (L1 data cache);
++ * CCSIDR then gives the geometry. The set/way operand layout is the ARMv7
++ * one: way in bits 31:30, set index in bits 14:5.
++ */
++static void e2631_l1_dcache_maint_all(bool clean)
++{
++	u32 ccsidr, ways, sets, way, set, sw;
++
++	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (0));
++	isb();
++	asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (ccsidr));
++
++	ways = ((ccsidr >> 3) & 0x3ff) + 1;
++	sets = ((ccsidr >> 13) & 0x7fff) + 1;
++
++	for (way = 0; way < ways; way++) {
++		for (set = 0; set < sets; set++) {
++			sw = (way << 30) | (set << 5);
++			if (clean)
++				asm volatile ("mcr p15, 0, %0, c7, c14, 2"
++					      : : "r" (sw));
++			else
++				asm volatile ("mcr p15, 0, %0, c7, c6, 2"
++					      : : "r" (sw));
++		}
++	}
++
++	dsb();
++	isb();
++}
++
++/*
++ * The vendor cleanup_before_linux() order at 0x47f00534, instruction for
++ * instruction in effect: I-cache off, ICIALLU+BPIALL+DSB+ISB, clean+invalidate
++ * the L1 D-cache if it is on, drop SCTLR.M and SCTLR.C, invalidate the L1
++ * D-cache again. No TLB operation: the vendor does not do one there either
++ * (cpu_init_cp15 already invalidated the TLBs on entry), and the kernel
++ * reloads them anyway.
++ */
++static void e2631_cp15_cleanup(void)
++{
++	u32 sctlr = e2631_read_sctlr();
++
++	if (sctlr & E2631_SCTLR_I) {
++		sctlr &= ~E2631_SCTLR_I;
++		e2631_write_sctlr(sctlr);
++	}
++
++	asm volatile ("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
++	asm volatile ("mcr p15, 0, %0, c7, c5, 6" : : "r" (0));
++	dsb();
++	isb();
++
++	if (sctlr & E2631_SCTLR_C) {
++		e2631_l1_dcache_maint_all(true);
++		sctlr &= ~(E2631_SCTLR_M | E2631_SCTLR_C);
++		e2631_write_sctlr(sctlr);
++	}
++
++	e2631_l1_dcache_maint_all(false);
++	dsb();
++}
++
++static void e2631_dump_cp15(const char *tag)
++{
++	u32 sctlr = e2631_read_sctlr();
++
++	printf("e2631soc: %-7s SCTLR=0x%08x (M=%d C=%d I=%d) CLIDR=0x%08x TTBR0=0x%08x VBAR=0x%08x ACTLR=0x%08x DACR=0x%08x CCSIDR=0x%08x\n",
++	       tag, sctlr, !!(sctlr & E2631_SCTLR_M),
++	       !!(sctlr & E2631_SCTLR_C), !!(sctlr & E2631_SCTLR_I),
++	       e2631_read_clidr(), e2631_read_ttbr0(),
++	       e2631_read_vbar(), e2631_read_actlr(),
++	       e2631_read_dacr(), e2631_read_ccsidr());
++}
++
++static void e2631_dump_l2_scu(void)
++{
++	printf("e2631soc: read-only L2/SCU: PL310 0x%08x ctrl=0x%08x aux=0x%08x SCU 0x%08x ctrl=0x%08x\n",
++	       E2631_L2C_BASE,
++	       readl((void __iomem *)(ulong)(E2631_L2C_BASE + E2631_L2C_CTRL)),
++	       readl((void __iomem *)(ulong)(E2631_L2C_BASE + E2631_L2C_AUX)),
++	       E2631_SCU_BASE,
++	       readl((void __iomem *)(ulong)(E2631_SCU_BASE + E2631_SCU_CTRL)));
++}
++
++void e2631_soc_prepare_linux(void)
++{
++	e2631_dump_cp15("before");
++
++	printf("e2631soc: running vendor-order CP15 cleanup\n");
++	e2631_cp15_cleanup();
++
++	e2631_dump_cp15("after");
++	e2631_dump_l2_scu();
++}
++
++static int do_e2631soc(struct cmd_tbl *cmdtp, int flag, int argc,
++		       char *const argv[])
++{
++	if (argc != 1)
++		return CMD_RET_USAGE;
++
++	e2631_soc_prepare_linux();
++	printf("e2631soc: back at the prompt, nothing was booted\n");
++
++	return CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631soc, 1, 1, do_e2631soc,
++	   "print the CP15 state, run the vendor-order cleanup, do not boot",
++	   "  - dumps SCTLR/CLIDR/TTBR0/VBAR/ACTLR before and after the same\n"
++	   "    cleanup e2631boot runs before bootm, then returns to the prompt\n");
+diff --git a/board/zte/zxhn-e2631/e2631soc.h b/board/zte/zxhn-e2631/e2631soc.h
+new file mode 100644
+index 00000000..e161f897
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631soc.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S) SoC state normalisation before Linux.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __ZXHN_E2631_SOC_H__
++#define __ZXHN_E2631_SOC_H__
++
++void e2631_soc_prepare_linux(void);
++
++#endif /* __ZXHN_E2631_SOC_H__ */
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 48cdef48..da35b78e 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -1,5 +1,4 @@
+ CONFIG_ARM=y
+-CONFIG_SKIP_LOWLEVEL_INIT=y
+ CONFIG_SYS_ICACHE_OFF=y
+ CONFIG_SYS_DCACHE_OFF=y
+ CONFIG_SYS_L2CACHE_OFF=y
+-- 
+2.56.1
+
