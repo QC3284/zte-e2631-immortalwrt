@@ -61,8 +61,10 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0008 sha256 | `d75f809f91f7cfcca08de5b04a6ec4c77e77df6f64c14a9f73544515a7c20748` |
 | patch 0009 | `uboot-port/patches/0009-env-keep-the-location-name-when-saveenv-is-disabled.patch`（env 名称诊断，独立可回退） |
 | patch 0009 sha256 | `4bf75d5afe821f0e58dce01c88fa326a3adf4a33c708f5d7c4712d243ad14e91` |
-| am 之后 tree | `aed6c5b700f2a7e405088572c216e2ca23a04996`（与机器无关，9 个 patch） |
-| TEXT_BASE | `0x43000000` |
+| patch 0010 | `uboot-port/patches/0010-zx279128s-link-the-image-at-the-0x47F00000-boot-entry.patch`（task-55：链接到产品入口 `0x47F00000`） |
+| patch 0010 sha256 | `57ce9d808cc771854bb68b03020d9da854d24b0bd621b5971b882e342ff079a0` |
+| am 之后 tree | `1444b0319baa9a850389e6573f4d2d7a24d9a025`（与机器无关，10 个 patch） |
+| TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
 以上值同 [uboot-port/commits.env](commits.env)；CI 必须按"commit → 每个 patch sha256 → 结果 tree"三段校验，
@@ -77,7 +79,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = aed6c5b700f2a7e405088572c216e2ca23a04996
+test "$(git rev-parse HEAD^{tree})" = 1444b0319baa9a850389e6573f4d2d7a24d9a025
 ```
 
 ## 2. 新增/修改的文件
@@ -151,7 +153,7 @@ ATAGS 只需 44 字节（CORE + 一个 MEM tag + END，`CONFIG_SETUP_MEMORY_TAGS
 
 | 项 | 值 / 决定 | 说明 |
 | --- | --- | --- |
-| `TEXT_BASE` | `0x43000000` | **只用于 A1/A2 RAM 链**：厂商 U-Boot `tftp 0x43000000` + `go 0x43000000`。产品/A3 仍由 secondboot 装到 `0x47F00000`，那时改 TEXT_BASE 后重编 |
+| `TEXT_BASE` | `0x47F00000` | 产品入口：secondboot 把载荷 memcpy 到 `0x47F00000` 后 `blx` 跳入（逆向证据 [evidence/uboot-re-20261115.md](../evidence/uboot-re-20261115.md)）。A1/A2/A3 RAM 链也使用这个地址（厂商 U-Boot 已把自己重定位到 DRAM 顶部，其链接区空闲，见 §5）。移植**不是位置无关**（`CONFIG_POSITION_INDEPENDENT` 未开，`relocate.S` 的修正量假设运行地址 == 链接地址），所以入口必须等于链接地址，改地址必须重编 |
 | 初始栈 | `CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000` | 256 MiB DRAM 中段，远离镜像与重定位目标（重定位在 DRAM 顶部附近） |
 | DRAM | `0x40000000` + 256 MiB | secondboot 完成 DDR 初始化；板级只知道大小，不做 DDR init |
 | UART0 | ZTE 变体 PL011 @ `0x94404000`，115200 8N1 | compatible `zte,zx29-uart` 选择 ZTE 偏移表（DR 0x04 / FR 0x14 / LCRH 0x30 / CR 0x34；IBRD/FBRD 0x24/0x28 与标准相同）。`CFG_PL011_CLOCK=0`：输入时钟未知，**跳过 IBRD/FBRD 设置**，沿用 secondboot 的 115200；DT 里故意不写 `clock` 属性 |
@@ -169,8 +171,8 @@ ATAGS 只需 44 字节（CORE + 一个 MEM tag + END，`CONFIG_SETUP_MEMORY_TAGS
 ### 启动流程（A1）
 
 1. BootROM 读 secondboot；secondboot 初始化 DDR/时钟/串口/SPI-NAND，停 CPU1，然后加载厂商 U-Boot。
-2. 厂商 U-Boot 控制台（串口 115200）执行 `tftp 0x43000000 u-boot.bin`、`go 0x43000000`。
-3. 自定义 U-Boot 从 `0x43000000` 起步（`_start` 向量表第一条就是 `b reset`），打印 banner，
+2. 厂商 U-Boot 控制台（串口 115200）执行 `tftp 0x47F00000 u-boot.bin`、`go 0x47F00000`。
+3. 自定义 U-Boot 从 `0x47F00000` 起步（`_start` 向量表第一条就是 `b reset`），打印 banner，
    从内嵌 DTB 取 256 MiB DRAM，PL011 沿用 115200，timer 用 500 MHz global timer。
 4. `bdinfo` 应显示 DRAM 256 MiB、入口/重定位信息；`md.l 0x94404000 4` 可读 PL011 寄存器；
    `mtest` 可在镜像与栈之外的区间跑内存测试。
@@ -192,16 +194,16 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `aed6c5b700f2a7e405088572c216e2ca23a04996`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 9）。
+1. `git rev-parse HEAD^{tree}` == `1444b0319baa9a850389e6573f4d2d7a24d9a025`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 10）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
-   `CONFIG_TEXT_BASE=0x43000000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
+   `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
    `CONFIG_SPI=y`、`CONFIG_DM_SPI=y`、`CONFIG_SPI_ZX=y`、`CONFIG_MTD=y`、`CONFIG_DM_MTD=y`、
    `CONFIG_MTD_SPI_NAND=y`、`CONFIG_CMD_MTD=y`。
 3. 镜像尺寸：`size=$(stat -c%s build/u-boot.bin); test "$size" -le 653312`
    （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。
-4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x43000000`。
+4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
    `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 7 reviewed warnings**。
@@ -227,8 +229,10 @@ A1 会话只允许 `tftp`/`go`/`md`/`mtest`/`reset` 一类命令；**禁止任�
 `upgrade`、`saveenv`**（这些是刷写阶段才讨论的写通道）。
 
 1. 在主机上起 TFTP 服务，把 CI 的 `u-boot.bin` 放到根目录。
-2. 厂商控制台：`tftp 0x43000000 u-boot.bin`（确认 "Bytes transferred" 与文件大小一致）。
-3. `go 0x43000000`。
+2. 厂商控制台：`tftp 0x47F00000 u-boot.bin`（确认 "Bytes transferred" 与文件大小一致）。
+   厂商 U-Boot 启动后已把自己重定位到 DRAM 顶部，`0x47F00000` 处是它放弃的链接映像，
+   因此向该地址下载不会破坏正在运行的厂商代码（`bdinfo` 的 relocation offset 可佐证）。
+3. `go 0x47F00000`。
 4. 预期串口出现 U-Boot banner（版本 v2027.01-rc2 代）、`Model: ZTE ZXHN E2631 (ZX279128S)`、
    `DRAM: 256 MiB`、`Core: ARMv7`，随后是 `=>` 提示符（defconfig 的 `CONFIG_SYS_PROMPT`）与
    `bdinfo` 输出。
@@ -243,7 +247,7 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 
 ### A2 真机读路径检查（后续会话，需用户批准；只读、不写 flash）
 
-装载方式与 A1 相同（`tftp 0x43000000 u-boot.bin` + `go 0x43000000`），之后**只允许读命令**：
+装载方式与 A1 相同（`tftp 0x47F00000 u-boot.bin` + `go 0x47F00000`），之后**只允许读命令**：
 
 1. `mtd list`：应出现 `spi-nand0`，大小 128 MiB、页 2048、OOB 64。
 2. `mtd read spi-nand0 0x42000000 0 0x800`，再 `md.b 0x42000000 0x40`，与已知 mtd0 头 dump 逐字节对比。
@@ -255,7 +259,7 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 
 ### A3 只读验收（本次交付；需用户批准；只读、不写 flash）
 
-装载方式同 A1/A2（`tftp 0x43000000 u-boot.bin` + `go 0x43000000`）。启动后 `board_late_init()` 会把
+装载方式同 A1/A2（`tftp 0x47F00000 u-boot.bin` + `go 0x47F00000`）。启动后 `board_late_init()` 会把
 `bootcmd` 指向 `e2631boot`，3 s 后自动执行；也可在提示符下手动跑只读子命令：
 
 1. `e2631boot info`：打印两槽的版本头偏移、serial、version，以及 `cspboot would boot slotN`。当前
@@ -293,6 +297,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   详见 [a2-spi-nand-design.md](a2-spi-nand-design.md) §9。
 - **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
   厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，后续阶段再补复位路径。
+- **入口必须等于链接地址（非 PIE）**：`TEXT_BASE=0x47F00000` 对齐 secondboot 的固定入口；
+  U-Boot 未开 `CONFIG_POSITION_INDEPENDENT`，`relocate.S` 的修正量假设运行地址 == 链接地址，
+  从其它地址进入会在 banner 之前挂死或 data abort；改地址只能改 defconfig 后重编，不能只改 `go`。
 - **载荷 0x9F800**：刷写阶段封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在
   刷写阶段必须原样保留。
 - **checkpatch**：本系列 0 errors、7 reviewed warnings（0008/0009 各自 0 errors / 0 warnings），均为已核对的已知项——4 条 "does MAINTAINERS
@@ -309,8 +316,8 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 
 - **A2**：SPIFC + SPI-NAND 只读路径已由 patch 0005 交付（RAM 链内 `mtd list`/`mtd read`）。芯片 ID
   实测为 `0xCD/0x71`，用现成 FORESEE `F35SQA001G` 条目（若出现 `0xC9` 再加 heyangtek 条目）。
-- **A3**：槽位感知启动已由 patch 0006/0007 交付（`e2631boot` + 只读 env）。剩下的 `TEXT_BASE` 改回
-  secondboot 装载地址 `0x47F00000`、env 持久化（B1）、按活动槽位切换根文件系统放在后续会话。
+- **A3**：槽位感知启动已由 patch 0006/0007 交付（`e2631boot` + 只读 env）。`TEXT_BASE` 已在 task-55 对齐 secondboot 入口 `0x47F00000`；
+  剩下的 env 持久化（B1）、按活动槽位切换根文件系统放在后续会话。
 - **刷写阶段（原计划的 A3，重命名为 A4/路径 C）**：写 mtd0 U-Boot 区/写槽位；需要 OOB/ECC 取证、
   写通道验证、回滚演练与用户批准。在此之前，A1/A2/A3 都不写 flash。
 - **A1 真机会话**在 task-44 的 CI 产物可用之后进行（用户已批准 RAM 链 POC）。
@@ -353,3 +360,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `mtd0` sha256 前后一致（`887a7f6c…0fa9f`）。记录见
   [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §0.1/§11.4（kit 提交
   `5817fb5`，check.yml run `44896218551` 绿）。C1b（写 mtd0）仍冻结，等 Lead 与用户最终 go。
+- 2026-11-21（task-55）：新增 patch 0010（defconfig 的 `CONFIG_TEXT_BASE` 从 `0x43000000` 改为
+  `0x47F00000`，对齐 secondboot 的 `blx 0x47F00000` 产品入口；不写源补丁、不开
+  `CONFIG_POSITION_INDEPENDENT`）。重钉结果 tree 为
+  `1444b0319baa9a850389e6573f4d2d7a24d9a025`（10 个 patch）；RAM 链文档地址全部改为
+  `0x47F00000`。旧 `0x43000000` 的 A1/A2/A3/C1a 证据只对应旧产物；新产物的验收是 C1b-0
+  会话（装 `0x47F00000` → `go` → banner → autoboot → Linux）。

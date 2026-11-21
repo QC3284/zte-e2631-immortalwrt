@@ -19,7 +19,7 @@
   解锁块），这是探测的一部分，不是 flash 写入。
 - **不做（留给后续阶段）**：env（B1 单独设计）、网络 `tftp`、DMA、中断、独立时钟/复位驱动、
   SPI-NOR、`mtd write/erase` 的用户接口。
-- **全程 RAM**：厂商 U-Boot 控制台 `tftp 0x43000000` + `go 0x43000000` 装载；断电即恢复，
+- **全程 RAM**：厂商 U-Boot 控制台 `tftp 0x47F00000` + `go 0x47F00000` 装载；断电即恢复，
   **不写 flash**。
 
 ## 2. 现成件与缺口
@@ -149,7 +149,7 @@ defconfig 增加：`CONFIG_SPI=y`、`CONFIG_DM_SPI=y`、`CONFIG_SPI_ZX=y`、`CON
 - CI（`.github/workflows/uboot-build.yml`）按 pin 校验 patch 链后在 ubuntu-24.04 上交叉编译，
   新增门：`CONFIG_SPI_ZX=y`、`CONFIG_DM_SPI=y`、`CONFIG_MTD_SPI_NAND=y`、`CONFIG_CMD_MTD=y`、
   内嵌 DTB 含 `zte,zx279128s-spifc` 与 `spi-nand`、载荷 ≤ `E2631_UBOOT_PAYLOAD_MAX`；
-  现有 entry=0x43000000 门不变。
+  现有 entry 门改为 `0x47F00000`（task-55）。
 - 本地不做全量编译（本机弱），只做静态检查：`git am` 链后的 tree hash、`dtc`、defconfig 符号、
   `scripts/checkpatch.pl`。
 

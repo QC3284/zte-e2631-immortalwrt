@@ -13,7 +13,7 @@
 
 - **目标**：在自定义 U-Boot 里复刻 cspboot 的槽位选择（magic + CRC1 + serial），把胜出槽位的
   legacy uImage 内核读入 RAM，`bootm` 启动。同一份二进制既可用于 A1/A2 的 RAM 链
-  （厂商 U-Boot `tftp 0x43000000` + `go 0x43000000`），也可用于将来 secondboot 的固化入口。
+  （RAM 链：厂商 U-Boot `tftp 0x47F00000` + `go 0x47F00000`；task-55 起与 secondboot 的固化入口 `0x47F00000` 是同一个链接地址）。
 - **只读**：A3 不写 flash、不 `saveenv`、不碰 mtd0，也不执行任何 erase/program。env 只从厂商块
   `0xC0000` 读入（失败回退默认 env）；env 的持久化策略属于 B1（需用户批准）。
 - **不做**：写 mtd0/写槽位（刷写阶段）、网络、DMA/中断、根文件系统槽位选择（内核 slotpart 的职责）、
@@ -23,8 +23,8 @@
 
 | 路径 | 进入方式 | TEXT_BASE | 说明 |
 | --- | --- | --- | --- |
-| RAM 链（A1/A2/A3 验收） | 厂商 U-Boot `tftp 0x43000000` + `go 0x43000000` | `0x43000000` | 断电即恢复，零砖风险 |
-| 固化入口（后续，需用户批准） | secondboot 装到 `0x47F00000` | 届时改为 `0x47F00000` | A3 代码不依赖进入地址 |
+| RAM 链（A1/A2/A3 验收） | 厂商 U-Boot `tftp 0x47F00000` + `go 0x47F00000` | `0x47F00000` | 断电即恢复，零砖风险 |
+| 固化入口（后续，需用户批准） | secondboot 装到 `0x47F00000` 后 `blx` | `0x47F00000`（task-55 起与 RAM 链一致） | A3 代码不依赖进入地址；非 PIE，入口必须等于链接地址 |
 
 两种路径共享同一份 `u-boot.bin`，差别只是 TEXT_BASE（入口）与谁把镜像放进 RAM。A3 的槽位代码
 只依赖 secondboot 已完成的 DRAM/UART/SPI-NAND 初始化，不读进入地址，所以 TEXT_BASE 变化不影响逻辑。
