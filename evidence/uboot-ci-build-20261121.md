@@ -296,7 +296,9 @@ task-51 的 A3 代码落地（kit `b90a0de` + `265c818`，patch 0005/0006/0007�
 - 9 文件，`sha256sum -c SHA256SUMS` **6/6 成功**；
 - `e2631-uboot-mtd0.bin` = 655,360 B（0xA0000），sha256
   `7cac2d399cf8cf6c678bdfcea3fe6669bbb8a2e0af1b72a9b93e348a5b8aa8c8`；
-  header 块 sha256 `19a9d546...`；payload 长度 `0x6d648`（448,072 B），
+  装配后首 0x800 字节 header sha256 `c05b6e6aecaf9069fe1bf48960ae3a28e2521980289e331c7ad754ef8d0e7015`；
+  payload 长度 `0x6d648`（448,072 B）（+0x14 长度字段已重写、payload@0x800 起与 `u-boot.bin` 逐字节相同；
+  UBOOT-INFO 里的 `19a9d546…` 是厂商 header 模板输入的哈希，不是镜像首 0x800 的哈希），
   payload 末端 `0x20800 + 0x6d648 = 0x8de48`，距 env `0xC0000` 余量 209,080 B；
 - `u-boot.bin` = 448,072 B，sha256 `adc00a8f08d5bde6584fcb7e4f63e117fd99c5189cc53122affb64aec32b5cd0`；
 - `e2631-env-block.bin` = 131,072 B，sha256 `6eee153b...`；
