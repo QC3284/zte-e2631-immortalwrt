@@ -36,7 +36,8 @@
 | u-boot.bin sha256 | `bef0d841bc26e2dc9db4484e26285d23d8d3bf9e1a63ad81f080c28b026206f4` |
 | mtd0 镜像 sha256 | `83457522357bc4d55f4a36d3dd912ff9184c31dad754cec3dff3a9d1f7c2412e`（655,360 B） |
 | mtd0 载荷长度 | 0x6dad8（449,240 B），边界 0x20000..0xC0000 |
-| mtd0 头块 | 0x800 B，sha256 `19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510` |
+| mtd0 头块（装配后镜像前 0x800 B） | sha256 `703463fc0868840e5cdc5bf70c88ffb1f13b5527b4c500da7280855271d812b1` |
+| vendor 头模板（重写 +0x14 长度前的输入块） | sha256 `19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510` |
 | env 块 | `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（与前三份产物逐字节一致） |
 | entry point | 0x47f00000 |
 | 工具链 | arm-none-eabi-gcc 13.2.1 20231009 |
@@ -45,6 +46,10 @@
   `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000`、
   `# CONFIG_POSITION_INDEPENDENT is not set`、`CONFIG_ENV_IS_IN_MTD=y`、`# CONFIG_CMD_SAVEENV is not set`。
 - 二进制串：`e2631boot`（18 处）、`e2631soc`（5 处）、`spi-nand0`、`zte,zx29-uart` 均在。
+
+> 勘误（2026-11-21）：`UBOOT-INFO.txt` 里 `mtd0 image header` 那一行的 sha256 是 **vendor 模板输入块**
+> （`19a9d546…`），重写 `+0x14` 长度字段之前的字节；装配后镜像头块实际哈希是 `703463fc…`。两者只差
+> 4 字节长度字段，镜像本身正确。本记录按装配后值引用。
 - checkpatch：0 errors / 9 warnings（全部为已知项：MAINTAINERS 路径检查 5、livetree 2、new command 2）；
   其中 0011 自身 0 errors / 2 warnings。
 
