@@ -19,8 +19,6 @@ jobs:
     # main chain and it has no publish step.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    env:
-      UBOOT_DIR: ${{ runner.temp }}/u-boot
     steps:
       - uses: actions/checkout@v5
       - name: Load the U-Boot pins from uboot-port/commits.env
@@ -48,6 +46,7 @@ jobs:
             fi
             printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
           done
+          printf 'UBOOT_DIR=%s\n' "$RUNNER_TEMP/u-boot" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
       - name: Install the ARM cross toolchain and U-Boot build dependencies
         run: |
