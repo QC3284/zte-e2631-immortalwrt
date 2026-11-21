@@ -41,6 +41,7 @@
 | [../evidence/c1b0-entry/](../evidence/c1b0-entry/) | C1b-0 附件：驱动、results/preflight、串口/驱动/health 日志、artifact UBOOT-INFO/SHA256SUMS/config、sha256 清单 |
 | [../evidence/c1b1a-write-rehearsal-20261121.md](../evidence/c1b1a-write-rehearsal-20261121.md) | P2-C1b-1a：写通道 dress rehearsal GREEN（run-1 冷启动：loadx 128 B/1 KiB、mtd write/read/cmp/erase 0x7F00000 块全 clean；run-2 SSH warm reboot：reverse go → vendor Press-1 → 密码 → `=>` → version → reset → stock Linux；零越界写入，mtd0 前后 887a7f6c… 不变） |
 | [../evidence/c1b1a-write-rehearsal/](../evidence/c1b1a-write-rehearsal/) | C1b-1a 附件：两次 run 的 results/preflight/驱动日志、串口选段（scratch 写/擦、vendor 控制台/reset）、驱动源码、sha256 清单 |
+| [../evidence/p2-flashboot-kernel-hang-20261121.md](../evidence/p2-flashboot-kernel-hang-20261121.md) | A-研0：闪存链内核静默挂起的厂商 U-Boot 早期初始化差异静态分析——厂商不做 PL310/SCU/ACTLR/时钟初始化，只做入口 cpu_init_crit 与跳前 cleanup 两次 CP15 归一；我们的 SKIP_LOWLEVEL_INIT + SYS_*CACHE_OFF 把两条通道都关掉；含 bootk/cspstart 调用图、排序候选、排除项（载荷同哈希、bootpara 被 zImage 解压器页表覆盖）、修复/验证建议 |
 
 
 | 文件 | 内容 |
