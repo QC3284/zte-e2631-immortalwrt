@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       checkpatch:
-        description: 'Run scripts/checkpatch.pl on the two port patches (informational; the series is expected to report 0 errors and 3 known warnings)'
+        description: 'Run scripts/checkpatch.pl on the port patches (informational; the series reports 0 errors and four reviewed warnings)'
         type: boolean
         default: true
 run-name: E2631 A1 U-Boot - ${{ github.ref_name }} - run ${{ github.run_number }}
@@ -179,9 +179,9 @@ jobs:
           out=$(scripts/checkpatch.pl --no-tree --terse "$out_dir"/*.patch 2>&1) || true
           printf '%s\n' "$out" > "$UBOOT_DIR/build/checkpatch.txt"
           printf '%s\n' "$out" | tail -20
-          errors=$(printf '%s\n' "$out" | grep -c '^ERROR:' || true)
-          warnings=$(printf '%s\n' "$out" | grep -c '^WARNING:' || true)
-          echo "checkpatch: errors=$errors warnings=$warnings (expected 0 / 3 known)"
+          errors=$(printf '%s\n' "$out" | grep -c ': ERROR:' || true)
+          warnings=$(printf '%s\n' "$out" | grep -c ': WARNING:' || true)
+          echo "checkpatch: errors=$errors warnings=$warnings (0 errors expected; warnings are reviewed and informational)"
           if [ "$errors" -gt 0 ]; then
             echo "::warning::checkpatch reported $errors error(s); inspect the artifact"
           fi
@@ -194,13 +194,14 @@ jobs:
           mkdir -p artifacts
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
+          patch_shas=$(env | sed -n 's/^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=//p' | sort | tr '\n' ' ')
           {
             echo "E2631 A1 custom U-Boot (pure RAM chain, no flash writes)"
             echo "Repository: $E2631_UBOOT_REPO"
             echo "Branch: $E2631_UBOOT_BRANCH"
             echo "Baseline commit: $E2631_UBOOT_SHA"
             echo "Baseline tree: $E2631_UBOOT_BASE_TREE_SHA"
-            echo "Port patches sha256: $E2631_UBOOT_PATCH_SHA256_0001 $E2631_UBOOT_PATCH_SHA256_0002"
+            echo "Port patches sha256: $patch_shas"
             echo "Post-am tree: $E2631_UBOOT_TREE_SHA"
             echo "Defconfig: zx279128s_zte_zxhn-e2631_defconfig"
             echo "Toolchain: $(arm-none-eabi-gcc --version | head -1)"
@@ -225,5 +226,6 @@ jobs:
         with:
           name: e2631-uboot-a1-${{ github.run_id }}
           path: ${{ runner.temp }}/u-boot/artifacts/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14

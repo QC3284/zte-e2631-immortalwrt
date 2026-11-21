@@ -1,6 +1,7 @@
 # E2631 自定义 U-Boot：A1 最小 RAM 链移植（kit 侧交付物）
 
-本目录是 task-43（P2-P3 A1 最小 U-Boot 移植代码）的产物：对 U-Boot 主线的两个 patch、pin 文件，
+本目录是 task-43/task-44 的产物：对 U-Boot 主线的 patch 系列（0001/0002 为 A1 移植，0003 为首个
+CI 构建暴露的链接修复）、pin 文件，
 以及供 task-44（CI 构建）和后续真机 A1 会话使用的说明。**只含代码与文档；A1 阶段不写 flash。**
 
 依据：[evidence/p2-uboot-research-20261121.md](../evidence/p2-uboot-research-20261121.md) §2（路径 A 分阶段）、
@@ -125,7 +126,7 @@ make O=build -j"$(nproc)"
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x43000000`。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 3 known warnings**。
+   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 4 reviewed warnings**。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -157,10 +158,11 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 - **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
   厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，A2/A3 再补复位路径。
 - **载荷 0x9F800**：A3 封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在 A3 必须原样保留。
-- **checkpatch**：本系列 0 errors、3 warnings，均为已核对的已知项——1 条 "does MAINTAINERS need updating?"
-  （U-Boot 走板级 MAINTAINERS，新目录已带；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+
-  2 条 "Use the livetree API"（板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是
-  U-Boot 板级读 /memory 的常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）。自用 fork，不提交上游。
+- **checkpatch**：本系列 0 errors、4 reviewed warnings，均为已核对的已知项——2 条 "does MAINTAINERS
+  need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`
+  各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
+  （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
+  常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
