@@ -37,6 +37,8 @@
 | [../evidence/b1-env-session/](../evidence/b1-env-session/) | B1 会话附件：两段驱动脚本、results/回读 JSON、预测与实读 env 块、串口/驱动/health 日志、sha256 清单 |
 | [../evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) | P2-C1a：A3 U-Boot bootm 干跑（预闪写门禁）——首跑 RED（boot_prep_linux 构造 ATAGS 时 data abort，bi_boot_params 未初始化，内核未启动）→ task-53 修复后重跑 PASS（bootm 启动生产内核、用户态起来；零写入，mtd0 sha256 前后一致；恢复 stock 链健康）；含 §11.4 重跑证据与 C1b 冻结结论 |
 | [../evidence/c1a-bootm/](../evidence/c1a-bootm/) | C1a 附件：首跑驱动/results/预检、abort 原文、恢复验证与 health；`run-2/` 为重跑 PASS 附件（postcheck、恢复段、驱动、sha256 清单） |
+| [../evidence/c1b0-entry-20261121.md](../evidence/c1b0-entry-20261121.md) | P2-C1b-0：0x47F00000 产品入口 RAM 链干跑 GREEN（新 banner g2797f3dd3860、xmodem 448,112 B、md 抽查、env MTD 只读、e2631boot→bootm→内核/用户态；零 flash 写入以 mtd0 sha256 前后一致实证；SSH reboot 恢复 stock 链；含 C1b-1 写通道计划变更记录） |
+| [../evidence/c1b0-entry/](../evidence/c1b0-entry/) | C1b-0 附件：驱动、results/preflight、串口/驱动/health 日志、artifact UBOOT-INFO/SHA256SUMS/config、sha256 清单 |
 
 
 | 文件 | 内容 |

@@ -1,0 +1,27 @@
+19:25:36 capture paused: {"supervisor_pids": [1220393], "bootwatch_pids": [1220560], "tty_holders": [1220446], "tty_holders_after": [], "free": true}
+19:25:37 serial hub started pid=1590485 log=/home/qc233/zte/e2631-p3/c1b0-entry/run-1/serial.log
+19:25:37 READY FOR USER POWER CYCLE (C1a: cold boot into the vendor console)
+19:28:52 cold-boot prompt caught; sending 1
+19:28:52 vendor password attempt 1 -> autoboot
+19:28:53 vendor console ready; stock U-Boot confirmed
+19:29:35 xmodem done: {"ok": true, "mode": "crc", "file_size": 448112, "block_size": 1024, "blocks": 438, "pad": 400, "bytes_sent": 448112, "elapsed_s": 41.9, "eot_acked": true, "tail_b64": "PT4g", "attempt": 1}
+19:29:35 md spot-check start: OK addr=0x47f00000 gaps=0 tail=90 e5 00 00 9d e5    ..O.............  47f000e0: 04 d0 8d e2 48 d0 4d e2 ff 1f 8d e8 b4 20 1f e5    ....H.M...... ..  47f000f0: 0c 00 92 e8 48 00 8d e2 34 50 8d e2 0e 10 a0 e1    ....H...4P......  => 
+19:29:35 md spot-check tail: OK addr=0x47f6d570 gaps=0 tail=f6 47 17 00 00 00    ...G.......G....  47f6d650: f8 1e f6 47 17 00 00 00 40 1f f6 47 17 00 00 00    ...G....@..G....  47f6d660: 50 1f f6 47 17 00 00 00 54 1f f6 47 17 00 00 00    P..G....T..G....  => 
+19:29:35 md spot-check banner: OK addr=0x47f5cf90 gaps=0 tail=68 6e 2d 65 32 36    ....zte,zxhn-e26  47f5d070: 33 31 00 7a 74 65 2c 7a 78 32 37 39 31 32 38 73    31.zte,zx279128s  47f5d080: 00 00 00 00 00 00 00 03 00 00 00 04 00 00 00 11    ................  => 
+19:29:35 go: jumping to 0x47f00000; no further input will be sent
+19:29:35 OUR BANNER SEEN (A3 U-Boot running from RAM)
+19:29:36 env loaded from MTD (patch 0009 env-name fix live)
+19:29:40 e2631boot: slot decision line seen
+19:29:44 e2631boot: load done, CRCs good; bootm next
+19:29:44 KERNEL STARTED (bootm handed off)
+19:29:59 LINUX MARKER SEEN (userspace coming up)
+19:29:59 monitor done: {"banner": true, "slot_line": true, "boot_line": true, "kernel_start": true, "linux_marker": true, "panic": null}
+19:30:05 capture restore: {"restore_rc": 0, "supervisor_pids": [1608845], "bootwatch_pids": [1608907], "tty_holders": [1608859], "events_tail": "2026-11-21T18:25:45+08:00 reader-start pid=1220393\n2026-11-21T19:30:01+08:00 reader-start pid=1608845", "ok": true}
+19:30:05 ROUTE TRAP: reconnecting the USB NIC
+19:30:36 route fix attempt 1 failed; retrying
+19:30:41 ROUTE TRAP: reconnecting the USB NIC
+19:30:47 HEALTH rc=0
+19:31:24 ROUTE TRAP: reconnecting the USB NIC
+19:32:01 ROUTE TRAP: reconnecting the USB NIC
+19:32:07 HEALTH-STOCK rc=0
+19:32:07 VERDICT GREEN (results in /home/qc233/zte/e2631-p3/c1b0-entry/run-1/session-results.json)
