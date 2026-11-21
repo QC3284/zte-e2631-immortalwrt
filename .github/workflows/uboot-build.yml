@@ -1,4 +1,4 @@
-name: Build the E2631 A1/A2/A3 U-Boot (RAM chain)
+name: Build and package the E2631 A1/A2/A3 U-Boot (RAM chain)
 on:
   workflow_dispatch:
     inputs:
@@ -229,16 +229,100 @@ jobs:
           if [ "$errors" -gt 0 ]; then
             echo "::warning::checkpatch reported $errors error(s); inspect the artifact"
           fi
+      - name: Package the flashable mtd0 image
+        # The P0 tools (task-41) turn the freshly built payload into the mtd0
+        # 0x20000..0xC0000 image area: the 0x800-byte header block is copied from
+        # the vendor image and only +0x14 (payload length) changes; the payload
+        # follows at 0x20800; the env area starts at 0xC0000 and is NOT written.
+        # The vendor header block comes from the tracked extraction in
+        # evidence/p2-oob/, and the vendor env block is rebuilt byte-identically
+        # from the tracked live-env text (P0 round-trip evidence). Produce only:
+        # nothing here touches a device.
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          work="$RUNNER_TEMP/mtd0"
+          mkdir -p "$work" artifacts
+          node - "$GITHUB_WORKSPACE/evidence/p2-oob/headblock-0x20000-0x20800.hex" \
+                 "$work/uboot-header.bin" <<'NODE'
+          const fs = require('node:fs');
+          const [hexPath, outPath] = process.argv.slice(2);
+          const tokens = fs.readFileSync(hexPath, 'utf8').trim().split(/\s+/);
+          const header = Buffer.from(tokens.map((t) => parseInt(t, 16)));
+          if (header.length !== 0x800) throw new Error('vendor U-Boot header block is ' + header.length + ' bytes, expected 0x800');
+          if (header.subarray(0x10, 0x14).toString('latin1') !== '128s') throw new Error('vendor header block lost its 128s magic');
+          fs.writeFileSync(outPath, header);
+          console.log('vendor U-Boot header block: 0x' + header.length.toString(16) + ' bytes');
+          NODE
+          node "$GITHUB_WORKSPACE/tools/e2631-env.mjs" build \
+            --in "$GITHUB_WORKSPACE/evidence/b1-env-current-20261121.txt" \
+            --out "$work/e2631-env-block.bin"
+          node - "$work/uboot-header.bin" "$work/e2631-env-block.bin" "$work/mtd0-template.bin" <<'NODE'
+          const fs = require('node:fs');
+          const [headerPath, envPath, outPath] = process.argv.slice(2);
+          const header = fs.readFileSync(headerPath);
+          const env = fs.readFileSync(envPath);
+          if (header.length !== 0x800) throw new Error('header block size');
+          if (env.length !== 0x20000) throw new Error('env block is ' + env.length + ' bytes, expected 0x20000');
+          const template = Buffer.alloc(0x100000, 0xFF);
+          header.copy(template, 0x20000);
+          env.copy(template, 0xC0000);
+          fs.writeFileSync(outPath, template);
+          console.log('mtd0 template: vendor header @0x20000, vendor env @0xC0000');
+          NODE
+          node "$GITHUB_WORKSPACE/tools/mkuboot-image.mjs" build \
+            --dump "$work/mtd0-template.bin" --payload build/u-boot.bin \
+            --out artifacts/e2631-uboot-mtd0.bin --full-mtd0 "$work/mtd0-full.bin" --json
+          cp "$work/e2631-env-block.bin" artifacts/e2631-env-block.bin
+      - name: Verify the mtd0 image against the P0 gates
+        # task-41's offline gates, now applied to the CI-built image: unpack/build
+        # round-trip, env CRC32 round-trip, and the verify-mtd0 sha256 read-back
+        # gate, plus the structural bounds (0xA0000 area, vendor header verbatim,
+        # payload byte-identical to u-boot.bin, everything after it erased, env
+        # block starting at 0xC0000 untouched).
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          work="$RUNNER_TEMP/mtd0"
+          node "$GITHUB_WORKSPACE/tools/mkuboot-image.mjs" check --dump "$work/mtd0-full.bin"
+          node "$GITHUB_WORKSPACE/tools/e2631-env.mjs" check --dump "$work/mtd0-full.bin"
+          mtd0_sha=$(sha256sum artifacts/e2631-uboot-mtd0.bin | awk '{print $1}')
+          node "$GITHUB_WORKSPACE/tools/verify-mtd0.mjs" --file artifacts/e2631-uboot-mtd0.bin --sha256 "$mtd0_sha"
+          node - "$GITHUB_WORKSPACE/evidence/p2-oob/headblock-0x20000-0x20800.hex" \
+                 artifacts/e2631-uboot-mtd0.bin build/u-boot.bin <<'NODE'
+          const fs = require('node:fs');
+          const [hexPath, imagePath, payloadPath] = process.argv.slice(2);
+          const tokens = fs.readFileSync(hexPath, 'utf8').trim().split(/\s+/);
+          const vendorHeader = Buffer.from(tokens.map((t) => parseInt(t, 16)));
+          const image = fs.readFileSync(imagePath);
+          const payload = fs.readFileSync(payloadPath);
+          const payloadEnd = 0x800 + payload.length;
+          if (image.length !== 0xA0000) throw new Error('mtd0 image is ' + image.length + ' bytes, expected 0xa0000');
+          for (let i = 0; i < 0x800; i++) {
+            if (i >= 0x14 && i < 0x18) continue; // +0x14 is the payload length, rewritten on purpose
+            if (image[i] !== vendorHeader[i]) throw new Error('mtd0 image header block differs from the vendor block at +0x' + i.toString(16));
+          }
+          if (image.readUInt32LE(0x14) !== payload.length) throw new Error('header length field ' + image.readUInt32LE(0x14) + ' != u-boot.bin ' + payload.length);
+          if (!image.subarray(0x800, payloadEnd).equals(payload)) throw new Error('mtd0 payload is not byte-identical to u-boot.bin');
+          if (!image.subarray(payloadEnd).every((b) => b === 0xFF)) throw new Error('mtd0 image has non-erased bytes after the payload');
+          if (payloadEnd > 0xA0000) throw new Error('payload end 0x' + payloadEnd.toString(16) + ' crosses the env at mtd0 0xC0000');
+          console.log('mtd0 image: 0xa0000 bytes, vendor header + ' + payload.length + ' payload bytes (payload end 0x' + payloadEnd.toString(16) + '), erased tail, env @0xC0000 untouched');
+          NODE
       - name: Stage the artifact and record provenance
         run: |
           set -euo pipefail
           cd "$UBOOT_DIR"
           size=$(stat -c%s build/u-boot.bin)
           entry=$(readelf -h build/u-boot | sed -n 's/.*Entry point address:[[:space:]]*//p')
+          mtd0_sha=$(sha256sum artifacts/e2631-uboot-mtd0.bin | awk '{print $1}')
+          mtd0_size=$(stat -c%s artifacts/e2631-uboot-mtd0.bin)
+          header_sha=$(sha256sum "$RUNNER_TEMP/mtd0/uboot-header.bin" | awk '{print $1}')
+          env_sha=$(sha256sum artifacts/e2631-env-block.bin | awk '{print $1}')
+          payload_len=$(stat -c%s build/u-boot.bin)
           mkdir -p artifacts
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
-          patch_shas=$(env | sed -n 's/^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=//p' | sort | tr '\n' ' ')
+          patch_shas=$(env | grep '^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=' | sort | sed 's/^[^=]*=//' | tr '\n' ' ')
           {
             echo "E2631 A1/A2/A3 custom U-Boot (slot boot from RAM chain, read-only)"
             echo "Repository: $E2631_UBOOT_REPO"
@@ -251,10 +335,15 @@ jobs:
             echo "Toolchain: $(arm-none-eabi-gcc --version | head -1)"
             echo "u-boot.bin size: $size bytes (limit $E2631_UBOOT_PAYLOAD_MAX = $((E2631_UBOOT_PAYLOAD_MAX)) bytes)"
             echo "Entry point: $entry"
+            echo "mtd0 image: e2631-uboot-mtd0.bin, mtd0 0x20000..0xC0000 ($mtd0_size bytes), sha256 $mtd0_sha"
+            echo "mtd0 image header: 0x800 bytes copied from the vendor U-Boot header block, sha256 $header_sha"
+            echo "mtd0 payload length: $payload_len bytes (0x$(printf '%x' "$payload_len")); mtd0 image bounds 0x20000..0xC0000, env starts at 0xC0000"
+            echo "vendor env block (read-only, not written by this image): e2631-env-block.bin, mtd0 0xC0000, 0x20000 bytes, sha256 $env_sha"
+            echo "mtd0 image inputs: vendor header block evidence/p2-oob/headblock-0x20000-0x20800.hex, vendor env rebuild evidence/b1-env-current-20261121.txt"
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
-          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt > SHA256SUMS)
+          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin > SHA256SUMS)
           cat artifacts/SHA256SUMS
           {
             echo "### E2631 A1/A2/A3 U-Boot build"
@@ -263,7 +352,9 @@ jobs:
             echo "- post-am tree: $E2631_UBOOT_TREE_SHA"
             echo "- u-boot.bin: $size bytes (limit $((E2631_UBOOT_PAYLOAD_MAX)))"
             echo "- entry point: $entry"
-            echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM"
+            echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
+            echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
+            echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM; the image asset is for the future, user-approved flash stage"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the A1/A2/A3 U-Boot artifact
         uses: actions/upload-artifact@v4
