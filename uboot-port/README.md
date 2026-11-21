@@ -365,4 +365,10 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `CONFIG_POSITION_INDEPENDENT`）。重钉结果 tree 为
   `1444b0319baa9a850389e6573f4d2d7a24d9a025`（10 个 patch）；RAM 链文档地址全部改为
   `0x47F00000`。旧 `0x43000000` 的 A1/A2/A3/C1a 证据只对应旧产物；新产物的验收是 C1b-0
-  会话（装 `0x47F00000` → `go` → banner → autoboot → Linux）。
+  会话（装 `0x47F00000` → `go` → banner → autoboot → Linux）。CI run `44898534408`
+  （head `7835289`）绿：10 patches / tree 校验通过、checkpatch 0 errors / 7 reviewed
+  warnings、`u-boot.bin` 448,112 B、entry `0x47f00000`、banner
+  `U-Boot 2027.01-rc2-g2797f3dd3860`；artifact `e2631-uboot-44898534408`，`u-boot.bin`
+  sha256 `010379fde3496fdcbbe835c249cff2bd79234f946918266721e098dd64479f75`，mtd0 镜像
+  sha256 `baf28b6da4d6ca1b356389951b9d49765382b35dd382bc81c8a0a589c09464dd`。证据见
+  [evidence/uboot-47f-20261121.md](../evidence/uboot-47f-20261121.md)。
