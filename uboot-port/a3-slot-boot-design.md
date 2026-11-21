@@ -133,8 +133,9 @@ append-dtb（`ARM_APPENDED_DTB=y`、`ATAG_DTB_COMPAT` 关、`CMDLINE_FORCE=y`）
 
 ## 6. 大小预算
 
-A2 镜像 `u-boot.bin` 为 444152 B（上限 653312 = `0x9F800`，余量 209160 B = 204 KiB）。
-patch 0006 新增约 250 行 C（text+字符串估计 3–5 KiB），patch 0007 约 3 行；CI 仍按
+A2 镜像 `u-boot.bin` 为 444152 B；A3 + task-53（patch 0006–0009）CI 实测 448096 B（上限
+653312 = `0x9F800`，余量 205216 B ≈ 200 KiB）。patch 0006 新增约 250 行 C，0007 约 3 行，
+0008 约 20 行（ATAGS 赋值 + 两条 `static_assert`，只加 24 B），0009 约 5 行；CI 仍按
 `<= 653312` 卡住。
 
 ## 7. 风险与回退

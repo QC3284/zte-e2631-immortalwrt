@@ -341,4 +341,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `gd->bd->bi_boot_params = 0x40000100` + 两条编译期边界断言）与 patch 0009（`ENV_NAME` 无条件定义，
   env 日志从 `<NULL>` 变为 `MTD`）；重钉结果 tree 为
   `aed6c5b700f2a7e405088572c216e2ca23a04996`（9 个 patch）。C1a 重跑清单见
-  [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。
+  [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。CI run
+  `44892376502`（head `67d7eda`）绿：post-am 9 commits / tree 校验通过、checkpatch 0 errors /
+  7 reviewed warnings、`u-boot.bin` 448,096 B（上限 653,312）、entry `0x43000000`、artifact
+  `e2631-uboot-44892376502`；`u-boot.bin` sha256
+  `2c90fc558dd8e35f50c887040cd25e00f98325e13e35422de1bc52d056de3eb3`，mtd0 镜像 sha256
+  `f1021b9d64e0ba79bcfc0f89383bebe84980c482b165398b773961e871ba4617`。
