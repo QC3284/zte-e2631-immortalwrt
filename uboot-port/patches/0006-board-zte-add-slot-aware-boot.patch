@@ -1,0 +1,411 @@
+From f3dbdcb0a7b5b7fa44942c412c1e84c6c8b028a7 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 15:16:30 +0800
+Subject: [PATCH 1/2] board: zte: add slot-aware boot for the ZXHN E2631
+
+The vendor boot chain (cspboot) boots the firmware slot with the higher
+upgrade serial. Each slot carries a 512-byte version header with a
+16-byte inner magic, a CRC1 over the first 0xa4 bytes and a serial
+number; the header is always erase block aligned, but ours sits at
+slot+0x150000 while the vendor one sits at slot+0x156000, so cspboot
+scans every 128 KiB block instead of using a fixed delta.
+
+Reimplement that selection in a new e2631boot command: scan both
+slots, pick the slot the way cspboot does, validate the legacy uImage
+at slot+0x20 (magic, type, OS, compression, header and data CRCs),
+load marker and image to CONFIG_SYS_LOAD_ADDR and boot it with bootm.
+The command also has read-only "info" and "load" subcommands for the
+A3 acceptance session.
+
+bootm needs the ATAGS path here: the kernel carries an appended DTB
+and CONFIG_CMDLINE_FORCE, so it must be started exactly like the
+vendor bootloader starts it today. Enable CONFIG_SUPPORT_PASSING_ATAGS
+for that and keep CONFIG_BOOTCOMMAND in sync with the command.
+
+board_late_init() points bootcmd at e2631boot in RAM only. The
+environment still belongs to the vendor bootloader at this stage; the
+read-only environment block is wired up by the next patch and the
+persistent policy is a later decision. Nothing in this patch writes
+flash: A3 boots from the slots but only reads them.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile              |   1 +
+ board/zte/zxhn-e2631/e2631boot.c           | 330 +++++++++++++++++++++
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   4 +-
+ 3 files changed, 334 insertions(+), 1 deletion(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631boot.c
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index 04ddd557..ad4b542f 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -2,4 +2,5 @@
+ #
+ # ZTE ZXHN E2631 board (Sanechips ZX279128S)
+ 
++obj-y += e2631boot.o
+ obj-y += zxhn-e2631.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+new file mode 100644
+index 00000000..630c8992
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -0,0 +1,330 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 slot-aware boot (A3)
++ *
++ * The vendor boot chain (cspboot) boots the firmware slot with the higher
++ * upgrade serial: each slot carries a 512-byte version header with the
++ * 16-byte inner magic, a CRC1 over the first 0xa4 bytes and a serial
++ * number. Reimplement that selection here and boot the legacy uImage from
++ * the winning slot with bootm, so the same U-Boot binary can be started
++ * from RAM (A1/A2 chain) and, later, from the secondboot entry.
++ *
++ * Layout of a slot (see uboot-port/a3-slot-boot-design.md):
++ *   0x000000  32-byte slot marker
++ *   0x000020  legacy uImage (zImage with appended DTB), load/entry 0x40008000
++ *   0x400000  root filesystem (not used at this stage)
++ *   0x150000  version header block (0x20000 bytes), first 0x200 parsed here
++ *
++ * Our header sits at slot+0x150000 and the vendor one at slot+0x156000;
++ * both are erase block aligned, so the slot is scanned every erase block
++ * exactly like cspboot does.
++ *
++ * Read-only: this file never writes flash and never saves the environment.
++ * The persistent environment policy belongs to a later (B1) stage.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <command.h>
++#include <env.h>
++#include <image.h>
++#include <init.h>
++#include <linux/errno.h>
++#include <linux/mtd/mtd.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <mtd.h>
++#include <stdio.h>
++#include <u-boot/crc.h>
++
++#define E2631_MTD_DEV			"spi-nand0"
++
++#define E2631_SLOT_COUNT		2
++#define E2631_SLOT0_BASE		0x00700000
++#define E2631_SLOT1_BASE		0x02300000
++#define E2631_SLOT_SIZE			0x01c00000
++
++#define E2631_MARKER_SIZE		0x20
++#define E2631_VERHDR_SIZE		0x200
++#define E2631_VERHDR_VERSION_OFS	0x10
++#define E2631_VERSION_LEN		32
++#define E2631_VERHDR_CRC_OFS		0xa4
++#define E2631_VERHDR_CRC_COVER		0xa4
++#define E2631_VERHDR_MAGIC_OFS		0xf4
++#define E2631_VERHDR_SERIAL_OFS		0x1f4
++
++/* The kernel window ends where the root filesystem starts. */
++#define E2631_KERNEL_MAX		(0x00400000U - E2631_MARKER_SIZE)
++
++#define E2631_BOOTARGS \
++	"console=ttyAMA0,115200n8 earlycon root=/dev/mtdblock7 " \
++	"rootfstype=squashfs ro rootwait"
++
++static const u8 e2631_inner_magic[16] = {
++	0x33, 0x33, 0x33, 0x33, 0x66, 0x66, 0x66, 0x66,
++	0x99, 0x99, 0x99, 0x99, 0xcc, 0xcc, 0xcc, 0xcc,
++};
++
++/**
++ * struct e2631_slot - decoded state of one firmware slot
++ * @valid: a version header with a good CRC1 was found
++ * @base: absolute flash offset of the slot
++ * @hdr: absolute flash offset of the version header block
++ * @serial: upgrade serial from the version header, 0 when unset
++ * @version: human readable firmware version string
++ */
++struct e2631_slot {
++	bool valid;
++	u32 base;
++	u32 hdr;
++	u32 serial;
++	char version[E2631_VERSION_LEN + 1];
++};
++
++static u32 e2631_le32(const u8 *p)
++{
++	return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
++	       ((u32)p[3] << 24);
++}
++
++/*
++ * A version header is valid when both the inner magic and CRC1 match.
++ * cspboot checks exactly this much; CRC2 (which covers the serial) is not
++ * verified there either.
++ */
++static bool e2631_verhdr_valid(const u8 *hdr)
++{
++	if (memcmp(hdr + E2631_VERHDR_MAGIC_OFS, e2631_inner_magic,
++		   sizeof(e2631_inner_magic)))
++		return false;
++
++	return crc32(0, hdr, E2631_VERHDR_CRC_COVER) ==
++	       e2631_le32(hdr + E2631_VERHDR_CRC_OFS);
++}
++
++static int e2631_scan_slot(struct mtd_info *mtd, u32 base,
++			   struct e2631_slot *slot)
++{
++	u8 hdr[E2631_VERHDR_SIZE];
++	size_t retlen;
++	u32 ofs;
++
++	slot->valid = false;
++	slot->base = base;
++	slot->hdr = 0;
++	slot->serial = 0;
++	slot->version[0] = '\0';
++
++	if (!mtd->erasesize)
++		return -EINVAL;
++
++	for (ofs = 0; ofs + sizeof(hdr) <= E2631_SLOT_SIZE;
++	     ofs += mtd->erasesize) {
++		/* A bad block cannot hold the header; skip it like cspboot. */
++		if (mtd_block_isbad(mtd, base + ofs) > 0)
++			continue;
++
++		if (mtd_read(mtd, base + ofs, sizeof(hdr), &retlen, hdr))
++			continue;
++		if (retlen != sizeof(hdr))
++			continue;
++		if (!e2631_verhdr_valid(hdr))
++			continue;
++
++		slot->valid = true;
++		slot->hdr = base + ofs;
++		slot->serial = e2631_le32(hdr + E2631_VERHDR_SERIAL_OFS);
++		memcpy(slot->version, hdr + E2631_VERHDR_VERSION_OFS,
++		       E2631_VERSION_LEN);
++		slot->version[E2631_VERSION_LEN] = '\0';
++
++		return 0;
++	}
++
++	return -ENOENT;
++}
++
++/*
++ * Slot selection, copied from cspboot: the bigger serial wins, a zero
++ * serial on slot0 counts as the smaller one, and equal serials keep slot0.
++ * There is no automatic fallback to the other slot.
++ */
++static int e2631_pick_slot(const struct e2631_slot slots[E2631_SLOT_COUNT])
++{
++	if (!slots[0].valid && !slots[1].valid)
++		return -1;
++
++	if (slots[0].valid && slots[1].valid) {
++		if (slots[0].serial < slots[1].serial || !slots[0].serial)
++			return 1;
++		return 0;
++	}
++
++	return slots[0].valid ? 0 : 1;
++}
++
++static int e2631_load_kernel(struct mtd_info *mtd,
++			     const struct e2631_slot *slot,
++			     struct legacy_img_hdr **hdrp, ulong *addrp,
++			     size_t *sizep)
++{
++	u8 head[E2631_MARKER_SIZE + sizeof(struct legacy_img_hdr)];
++	struct legacy_img_hdr *hdr;
++	ulong addr = CONFIG_SYS_LOAD_ADDR;
++	size_t retlen, total;
++	u32 size;
++	int ret;
++
++	/* The slot marker is followed by the legacy uImage header. */
++	ret = mtd_read(mtd, slot->base, sizeof(head), &retlen, head);
++	if (ret || retlen != sizeof(head)) {
++		printf("e2631boot: cannot read the uImage header of slot 0x%08x\n",
++		       slot->base);
++		return -EIO;
++	}
++
++	hdr = (struct legacy_img_hdr *)(head + E2631_MARKER_SIZE);
++	if (!image_check_magic(hdr) ||
++	    !image_check_type(hdr, IH_TYPE_KERNEL) ||
++	    !image_check_os(hdr, IH_OS_LINUX) ||
++	    image_get_comp(hdr) != IH_COMP_NONE) {
++		printf("e2631boot: slot 0x%08x holds no plain Linux uImage\n",
++		       slot->base);
++		return -EINVAL;
++	}
++
++	if (!image_check_hcrc(hdr)) {
++		printf("e2631boot: bad uImage header CRC in slot 0x%08x\n",
++		       slot->base);
++		return -EINVAL;
++	}
++
++	size = image_get_size(hdr);
++	if (!size || size > E2631_KERNEL_MAX) {
++		printf("e2631boot: uImage size %u is outside the kernel window\n",
++		       size);
++		return -EINVAL;
++	}
++
++	total = E2631_MARKER_SIZE + image_get_image_size(hdr);
++	ret = mtd_read(mtd, slot->base, total, &retlen, (void *)addr);
++	if (ret || retlen != total) {
++		printf("e2631boot: short kernel read (%zu of %zu bytes)\n",
++		       retlen, total);
++		return -EIO;
++	}
++
++	hdr = (struct legacy_img_hdr *)(addr + E2631_MARKER_SIZE);
++	if (!image_check_dcrc(hdr)) {
++		printf("e2631boot: bad uImage data CRC, the slot is corrupt\n");
++		return -EINVAL;
++	}
++
++	*hdrp = hdr;
++	*addrp = addr;
++	*sizep = total;
++
++	return 0;
++}
++
++static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
++			char *const argv[])
++{
++	struct e2631_slot slots[E2631_SLOT_COUNT];
++	struct legacy_img_hdr *hdr;
++	struct mtd_info *mtd;
++	bool boot = true, load = true;
++	size_t size;
++	ulong addr;
++	int active, ret, i;
++	char cmd[64];
++
++	if (argc > 2)
++		return CMD_RET_USAGE;
++
++	if (argc == 2) {
++		if (!strcmp(argv[1], "info")) {
++			load = false;
++			boot = false;
++		} else if (!strcmp(argv[1], "load")) {
++			boot = false;
++		} else if (strcmp(argv[1], "boot")) {
++			return CMD_RET_USAGE;
++		}
++	}
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_MTD_DEV);
++	if (!mtd) {
++		printf("e2631boot: %s is not available\n", E2631_MTD_DEV);
++		return CMD_RET_FAILURE;
++	}
++
++	e2631_scan_slot(mtd, E2631_SLOT0_BASE, &slots[0]);
++	e2631_scan_slot(mtd, E2631_SLOT1_BASE, &slots[1]);
++
++	for (i = 0; i < E2631_SLOT_COUNT; i++) {
++		if (!slots[i].valid) {
++			printf("e2631boot: slot%d at 0x%08x has no valid version header\n",
++			       i, slots[i].base);
++			continue;
++		}
++		printf("e2631boot: slot%d at 0x%08x: serial %u, version \"%s\", header 0x%08x\n",
++		       i, slots[i].base, slots[i].serial, slots[i].version,
++		       slots[i].hdr);
++	}
++
++	active = e2631_pick_slot(slots);
++	if (active < 0) {
++		printf("e2631boot: no bootable slot; cspboot would not boot either\n");
++		put_mtd_device(mtd);
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631boot: cspboot would boot slot%d\n", active);
++
++	if (!load) {
++		put_mtd_device(mtd);
++		return CMD_RET_SUCCESS;
++	}
++
++	ret = e2631_load_kernel(mtd, &slots[active], &hdr, &addr, &size);
++	put_mtd_device(mtd);
++	if (ret)
++		return CMD_RET_FAILURE;
++
++	printf("e2631boot: uImage \"%s\": load 0x%08x entry 0x%08x, %zu bytes at 0x%08lx\n",
++	       image_get_name(hdr), image_get_load(hdr), image_get_ep(hdr),
++	       size, addr);
++	printf("e2631boot: header and data CRCs are good\n");
++
++	if (!boot)
++		return CMD_RET_SUCCESS;
++
++	env_set("bootargs", E2631_BOOTARGS);
++	snprintf(cmd, sizeof(cmd), "bootm 0x%lx",
++		 addr + E2631_MARKER_SIZE);
++
++	return run_command(cmd, 0) ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631boot, 2, 1, do_e2631boot,
++	   "boot the active ZXHN E2631 firmware slot",
++	   "       - pick the slot cspboot would boot, load and boot it\n"
++	   "e2631boot info - print both slot headers and the decision only\n"
++	   "e2631boot load - pick and load the kernel, verify it, do not boot\n");
++
++/*
++ * The environment is loaded read-only from the vendor block at 0xC0000 and
++ * its bootcmd belongs to the vendor bootloader. Replace it in RAM only:
++ * this stage never writes flash, and the persistent environment policy is
++ * a later (B1) decision. printenv still shows the loaded vendor values.
++ */
++int board_late_init(void)
++{
++	if (env_set("bootcmd", "e2631boot"))
++		printf("e2631boot: cannot override bootcmd\n");
++
++	return 0;
++}
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 0bde5241..318ab544 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -4,6 +4,7 @@ CONFIG_SYS_ICACHE_OFF=y
+ CONFIG_SYS_DCACHE_OFF=y
+ CONFIG_SYS_L2CACHE_OFF=y
+ CONFIG_ARCH_ZX279128=y
++CONFIG_SUPPORT_PASSING_ATAGS=y
+ CONFIG_TEXT_BASE=0x43000000
+ CONFIG_SYS_MALLOC_F_LEN=0x800
+ CONFIG_NR_DRAM_BANKS=1
+@@ -14,9 +15,10 @@ CONFIG_SYS_LOAD_ADDR=0x42000000
+ CONFIG_TARGET_ZXHN_E2631=y
+ CONFIG_BOOTDELAY=3
+ CONFIG_USE_BOOTCOMMAND=y
+-CONFIG_BOOTCOMMAND="bdinfo"
++CONFIG_BOOTCOMMAND="e2631boot"
+ # CONFIG_DISPLAY_CPUINFO is not set
+ # CONFIG_BOARD_INIT is not set
++CONFIG_BOARD_LATE_INIT=y
+ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+ CONFIG_OF_CONTROL=y
+-- 
+2.56.1
+

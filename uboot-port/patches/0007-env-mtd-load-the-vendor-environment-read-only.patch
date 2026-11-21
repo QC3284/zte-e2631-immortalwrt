@@ -1,0 +1,80 @@
+From 4d24b0fe2e85a677607db8d4dcfd0f83adffa1f0 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 15:16:53 +0800
+Subject: [PATCH 2/2] env: mtd: load the vendor environment block read-only
+
+Enable ENV_IS_IN_MTD for the ZXHN E2631. The vendor bootloader keeps
+the environment at 0xC0000 in spi-nand0 as a plain env_t (crc32 over
+0x1FFFC bytes), which is exactly what the MTD environment driver
+expects, so the environment can be loaded without touching flash.
+CONFIG_ENV_SIZE becomes 0x20000 and CONFIG_ENV_OFFSET 0xc0000, both
+erase block aligned, and CONFIG_CMD_SAVEENV is disabled because this
+stage must not write the environment. The persistent policy (bootdelay,
+bypass variables) is a later decision.
+
+While reviewing the load path, fix an uninitialised pointer:
+env_mtd_load() jumps to the out label with mtd_env never set when
+setup_mtd_device() fails, and put_mtd_device() has no NULL check, so
+a missing or unprobeable SPI-NAND would dereference a garbage stack
+pointer before the prompt. Initialise mtd_env to NULL and only drop
+the reference when it was obtained.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 5 +++++
+ env/mtd.c                                  | 5 +++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 318ab544..5bc3adb8 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -10,6 +10,8 @@ CONFIG_SYS_MALLOC_F_LEN=0x800
+ CONFIG_NR_DRAM_BANKS=1
+ CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
+ CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000
++CONFIG_ENV_SIZE=0x20000
++CONFIG_ENV_OFFSET=0xc0000
+ CONFIG_DEFAULT_DEVICE_TREE="zx279128s-zte-zxhn-e2631"
+ CONFIG_SYS_LOAD_ADDR=0x42000000
+ CONFIG_TARGET_ZXHN_E2631=y
+@@ -19,10 +21,13 @@ CONFIG_BOOTCOMMAND="e2631boot"
+ # CONFIG_DISPLAY_CPUINFO is not set
+ # CONFIG_BOARD_INIT is not set
+ CONFIG_BOARD_LATE_INIT=y
++# CONFIG_CMD_SAVEENV is not set
+ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+ CONFIG_OF_CONTROL=y
+ CONFIG_OF_EMBED=y
++CONFIG_ENV_IS_IN_MTD=y
++CONFIG_ENV_MTD_DEV="spi-nand0"
+ CONFIG_CLK=y
+ CONFIG_MTD=y
+ CONFIG_DM_MTD=y
+diff --git a/env/mtd.c b/env/mtd.c
+index b26ee809..4b3886c0 100644
+--- a/env/mtd.c
++++ b/env/mtd.c
+@@ -141,7 +141,7 @@ done:
+ 
+ static int env_mtd_load(void)
+ {
+-	struct mtd_info *mtd_env;
++	struct mtd_info *mtd_env = NULL;
+ 	char *buf, *tmp;
+ 	size_t ret_len;
+ 	int remaining;
+@@ -190,7 +190,8 @@ static int env_mtd_load(void)
+ 		gd->env_valid = ENV_VALID;
+ 
+ out:
+-	put_mtd_device(mtd_env);
++	if (mtd_env)
++		put_mtd_device(mtd_env);
+ 
+ 	free(buf);
+ 
+-- 
+2.56.1
+
