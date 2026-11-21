@@ -1,0 +1,16 @@
+## Starting application at 0x43000000 ...
+E2631 UART probe ZTE-ZX29 (combined-v4)
+SAVED_CR=0x00000301 SAVED_LCRH=0x00000070
+ZTE_FR=0x00000130 ZTE_CR=0x00000301 ZTE_LCRH=0x00000070 IBRD=0x0000000d FBRD=0x00000024
+ZTE-PROBE-DONE
+STD-MARKER-BEGIN
+þSTD-MARKER-END
+COMBINED-DONE
+## Application terminated, rc = 0xA
+=> 
+=> version
+
+U-Boot 2013.04 (Aug 28 2023 - 18:40:22)
+arm-buildroot-linux-uclibcgnueabi-gcc (Buildroot 2015.08.1-svn1486) 4.9.3
+GNU ld (GNU Binutils) 2.24
+=> 

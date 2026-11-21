@@ -1,0 +1,4 @@
+E2631 UART probe STD-PL011
+FR=0x00000090 CR=0x00000301 LCRH=0x00000070 IBRD=0x00000000 FBRD=0x00000000
+PROBE-DONE
+qemu-system-arm: terminating on signal 15 from pid 19721 (timeout)

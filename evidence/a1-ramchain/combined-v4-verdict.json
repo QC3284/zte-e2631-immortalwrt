@@ -1,0 +1,32 @@
+{
+ "stub": "stub/combined_stub_v4.bin",
+ "stub_size": 3184,
+ "stub_sha256": "097c9af67500dad4171863fe768eeb3b12f85090b8b0b043c8aae19465a9e6cd",
+ "stub_sha256_expected": "097c9af67500dad4171863fe768eeb3b12f85090b8b0b043c8aae19465a9e6cd",
+ "sha_ok": true,
+ "xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 3184,
+  "block_size": 1024,
+  "blocks": 4,
+  "pad": 912,
+  "bytes_sent": 3184,
+  "elapsed_s": 4.4,
+  "eot_acked": true
+ },
+ "ram_cmp_ok": true,
+ "go": {
+  "zte_probe_printed": true,
+  "zte_probe_done": true,
+  "marker_begin": true,
+  "std_probe_visible": false,
+  "marker_end": true,
+  "combined_done": true,
+  "application_terminated": true,
+  "saved_regs": "SAVED_CR=0x00000301 SAVED_LCRH=0x00000070",
+  "prompt_back": true,
+  "version_ok": true
+ },
+ "ok": true
+}

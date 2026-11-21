@@ -1,0 +1,29 @@
+{
+ "stub": "/home/qc233/zte/e2631-p3/stub/stub-zte-ret.bin",
+ "stub_size": 1668,
+ "xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 1668,
+  "block_size": 1024,
+  "blocks": 2,
+  "pad": 380,
+  "bytes_sent": 1668,
+  "elapsed_s": 4.7,
+  "eot_acked": true
+ },
+ "ram": {
+  "cmp_ok": true,
+  "expected_size": 1668,
+  "got_size": 1668
+ },
+ "go": {
+  "probe_printed": true,
+  "probe_done": true,
+  "application_terminated": true,
+  "prompt_back": false,
+  "regs": "FR=0x00000130 CR=0x00000301 LCRH=0x00000070 IBRD=0x0000000d FBRD=0x00000024",
+  "raw_tail": "go 0x43000000\r\n## Starting application at 0x43000000 ...\r\nE2631 UART probe ZTE-ZX29\nFR=0x00000130 CR=0x00000301 LCRH=0x00000070 IBRD=0x0000000d FBRD=0x00000024\nPROBE-DONE\n## Application terminated, rc = 0xA\r\n"
+ },
+ "ok": false
+}
