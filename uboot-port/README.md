@@ -180,4 +180,8 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 - 2026-11-21（task-44）：新增 patch 0003（链接修复：reset_cpu/print_cpuinfo/board_init），
   重钉结果 tree 为 `abab1858bfee030bfdbc18bc227189a6e8ba5d83`；CI workflow `uboot-build.yml`；
   TEXT_BASE=0x43000000（RAM 链）、PL011 `CFG_PL011_CLOCK=0`、A9 global timer fixed-clock、
-  载荷上限按修正后的 0x9F800 记录。
+  载荷上限按修正后的 0x9F800 记录；
+- 2026-11-21（task-44 收口）：CI run `44869143179` 绿（head `f1bd383`，12/12 步），artifact
+  `e2631-uboot-a1-44869143179`（7 文件，含 `.config`），u-boot.bin sha256
+  `a3771aca6144879701d5336ae032a6d242fab3e1c90a80dbea0710a6816679b3`、347,640 B；
+  证据见 [evidence/uboot-ci-build-20261121.md](../evidence/uboot-ci-build-20261121.md)。
