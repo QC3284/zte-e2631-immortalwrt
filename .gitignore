@@ -10,11 +10,18 @@ payload/
 # conclusion in docs/, and they are tiny, so they are the one exception above.
 !board/ser-*.log
 
-# The one binary here that is an input rather than a build product: the 532-byte
+# Two binaries here are inputs rather than build products.  First, the 532-byte
 # version-header template that packing reads its upgradeKey1/2, product string and
 # slot geometry out of (seed/README.md says where it came from and proves it is
 # byte-equivalent to a full vendor package for `pack`).
 !seed/vendor-verhdr-8b8.bin
+
+# Second, the 426,048-byte vendor U-Boot RAM payload used as the post-C1b rescue
+# input: extracted from the pinned mtd0 dump with a documented dd command and a
+# pinned sha256 (evidence/p2-c1b-rescue-prep-20261121.md §2).  The 655 KB
+# companion region file stays local and is regenerated from the fresh pre-flash
+# mtd0 backup.
+!evidence/p2-oob/vendor-uboot-ram.bin
 
 # Vendor evidence that must not leave this disk: the 356 MB system harvest, the
 # mtd/ko dumps, the scraped web app, and config18.xml (a vendor config export full
