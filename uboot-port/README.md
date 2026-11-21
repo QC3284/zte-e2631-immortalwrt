@@ -14,7 +14,7 @@
 - **不做**：SPI 控制器、SPI-NAND、env、mtd、网络、bootm、CPU1/SMP 交接（secondboot 已完成停车）、
   DDR/时钟初始化（secondboot 已完成）。这些都留给 A2/A3。
 - 引导链：BootROM → secondboot（闭源，已完成 DDR/时钟/串口/SPI-NAND/CPU1 停车）→ 厂商 U-Boot 2013.04
-  →（A1 用 tftp+go）自定义 U-Boot。A3 才把自定义 U-Boot 写进 mtd0 0x20000..0xA0000。
+  →（A1 用 tftp+go）自定义 U-Boot。A3 才把自定义 U-Boot 写进 mtd0 0x20000..0xC0000（镜像区 0xA0000 字节）。
 
 **载荷预算（2026-11-21 Lead 修正）**：secondboot 从 mtd0 0x20800 按封装头 +0x14 的长度拷贝载荷，
 载荷区可一直用到 0xBFFFF，env 区从 0xC0000 开始。因此镜像上限为 **0x9F800 字节 = 653312 = 638 KiB**。
