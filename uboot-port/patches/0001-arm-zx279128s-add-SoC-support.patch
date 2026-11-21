@@ -1,0 +1,110 @@
+From 919d9530525de1aea3360df41ab514509ec443a7 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 12:43:32 +0800
+Subject: [PATCH 1/2] arm: zx279128s: add ZTE/Sanechips ZX279128S SoC support
+
+Add the ZX279128S SoC option and an (almost) empty machine directory.
+The closed secondboot stage on this platform already brings up DRAM,
+clocks, UART0 and SPI-NAND before loading U-Boot, so the minimal A1
+port does not need DDR or clock code: only the machine directory hook
+and the CPU selection are required.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ arch/arm/Kconfig                 | 14 ++++++++++++++
+ arch/arm/Makefile                |  1 +
+ arch/arm/mach-zx279128s/Kconfig  | 24 ++++++++++++++++++++++++
+ arch/arm/mach-zx279128s/Makefile |  6 ++++++
+ 4 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/mach-zx279128s/Kconfig
+ create mode 100644 arch/arm/mach-zx279128s/Makefile
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 93a0c663..56b95bd8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1448,6 +1448,18 @@ config ARCH_ZYNQMP
+ 	imply DM_USB_GADGET
+ 	imply ZYNQMP_GPIO_MODEPIN if DM_GPIO && USB
+ 
++config ARCH_ZX279128
++	bool "ZTE/Sanechips ZX279128S SoC"
++	select CPU_V7A
++	help
++	  Support for the ZTE/Sanechips ZX279128S SoC (dual Cortex-A9,
++	  256 MiB DDR3, 128 MiB SPI-NAND) as used in the ZTE ZXHN E2631
++	  and ZXHN H3600 routers.
++
++	  The closed secondboot stage initialises DRAM, clocks, UART0 and
++	  SPI-NAND before loading U-Boot. Only the A1 RAM-chain port is
++	  supported so far: PL011 console, Cortex-A9 global timer and DRAM.
++
+ config ARCH_TEGRA
+ 	bool "NVIDIA Tegra"
+ 	select GPIO_EXTRA_HEADER
+@@ -2461,6 +2473,8 @@ source "arch/arm/mach-versal-net/Kconfig"
+ 
+ source "arch/arm/mach-zynqmp-r5/Kconfig"
+ 
++source "arch/arm/mach-zx279128s/Kconfig"
++
+ source "arch/arm/cpu/armv7/Kconfig"
+ 
+ source "arch/arm/cpu/armv8/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index de975fc9..c70f3d77 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -98,6 +98,7 @@ machine-$(CONFIG_ARCH_VERSAL_NET)	+= versal-net
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ machine-$(CONFIG_ARCH_ZYNQMP)		+= zynqmp
+ machine-$(CONFIG_ARCH_ZYNQMP_R5)	+= zynqmp-r5
++machine-$(CONFIG_ARCH_ZX279128)		+= zx279128s
+ 
+ machine-$(CONFIG_MACH_IMX)		+= imx
+ 
+diff --git a/arch/arm/mach-zx279128s/Kconfig b/arch/arm/mach-zx279128s/Kconfig
+new file mode 100644
+index 00000000..81dd017e
+--- /dev/null
++++ b/arch/arm/mach-zx279128s/Kconfig
+@@ -0,0 +1,24 @@
++# SPDX-License-Identifier: GPL-2.0+
++#
++# ZTE/Sanechips ZX279128S SoC family
++
++if ARCH_ZX279128
++
++config SYS_SOC
++	default "zx279128s"
++
++config TARGET_ZXHN_E2631
++	bool "ZTE ZXHN E2631"
++	help
++	  ZTE ZXHN E2631 router based on the Sanechips ZX279128S SoC
++	  (dual Cortex-A9, 256 MiB DDR3, 128 MiB SPI-NAND).
++
++	  Only the A1 RAM-chain port is supported so far: the closed
++	  secondboot stage has already initialised DRAM, clocks, UART0
++	  and SPI-NAND, so U-Boot only needs a PL011 console, the A9
++	  global timer and the DRAM size. There is no SPI, NAND, env or
++	  network support in this stage yet.
++
++source "board/zte/zxhn-e2631/Kconfig"
++
++endif
+diff --git a/arch/arm/mach-zx279128s/Makefile b/arch/arm/mach-zx279128s/Makefile
+new file mode 100644
+index 00000000..a90863d5
+--- /dev/null
++++ b/arch/arm/mach-zx279128s/Makefile
+@@ -0,0 +1,6 @@
++# SPDX-License-Identifier: GPL-2.0+
++#
++# ZTE/Sanechips ZX279128S SoC family
++#
++# No SoC-specific code is needed for the A1 RAM-chain port: DRAM,
++# clocks and the console are set up by the closed secondboot stage.
+-- 
+2.56.1
+

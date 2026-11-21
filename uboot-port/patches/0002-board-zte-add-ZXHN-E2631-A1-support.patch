@@ -1,0 +1,263 @@
+From 8cc53c0f7bfbaf6444e6e5c19232ec4a82d9e054 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 12:43:32 +0800
+Subject: [PATCH 2/2] board: zte: add ZXHN E2631 A1 RAM-chain support
+
+Add the minimal board port for the ZTE ZXHN E2631 router (Sanechips
+ZX279128S, dual Cortex-A9, 256 MiB DDR3, 128 MiB SPI-NAND).
+
+This is the A1 stage: the image is loaded into RAM from the vendor
+bootloader (tftp + go) and never written to flash. It provides:
+
+  - DRAM sizing from the embedded device tree (256 MiB at 0x40000000)
+  - a PL011 console at 0x94404000 with secondboot's 115200 8N1 setup
+    kept intact (CFG_PL011_CLOCK is 0, so no baud rate programming)
+  - the Cortex-A9 global timer, driven by a fixed 500 MHz a9_periph
+    clock (CPU clock / 2)
+  - TEXT_BASE 0x43000000 for the RAM chain; caches and MMU code stay
+    off while the secondboot hand-off state is unknown
+  - no SPI, NAND, environment or network support yet
+
+The payload size budget for the later flash stages is 0x9F800 bytes:
+secondboot copies the header length from mtd0 0x20800 and the payload
+may run up to 0xBFFFF, with the environment area starting at 0xC0000.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ arch/arm/dts/Makefile                      |  2 +
+ arch/arm/dts/zx279128s-zte-zxhn-e2631.dts  | 57 ++++++++++++++++++++++
+ board/zte/zxhn-e2631/Kconfig               | 16 ++++++
+ board/zte/zxhn-e2631/MAINTAINERS           |  8 +++
+ board/zte/zxhn-e2631/Makefile              |  5 ++
+ board/zte/zxhn-e2631/zxhn-e2631.c          | 22 +++++++++
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 25 ++++++++++
+ include/configs/zx279128s_zte_zxhn-e2631.h | 29 +++++++++++
+ 8 files changed, 164 insertions(+)
+ create mode 100644 arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+ create mode 100644 board/zte/zxhn-e2631/Kconfig
+ create mode 100644 board/zte/zxhn-e2631/MAINTAINERS
+ create mode 100644 board/zte/zxhn-e2631/Makefile
+ create mode 100644 board/zte/zxhn-e2631/zxhn-e2631.c
+ create mode 100644 configs/zx279128s_zte_zxhn-e2631_defconfig
+ create mode 100644 include/configs/zx279128s_zte_zxhn-e2631.h
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index 22f10c8e..92af39e7 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -1154,6 +1154,8 @@ dtb-$(CONFIG_TARGET_CORSTONE1000) += corstone1000-mps3.dtb \
+ 
+ dtb-$(CONFIG_TARGET_COREPRIMEVELTE) += pxa1908-samsung-coreprimevelte.dtb
+ 
++dtb-$(CONFIG_TARGET_ZXHN_E2631) += zx279128s-zte-zxhn-e2631.dtb
++
+ include $(srctree)/scripts/Makefile.dts
+ 
+ # Add any required device tree compiler flags here
+diff --git a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+new file mode 100644
+index 00000000..98427892
+--- /dev/null
++++ b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+@@ -0,0 +1,57 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S), A1 RAM-chain device tree
++ *
++ * Only the pieces the A1 port uses are described: DRAM, the PL011 console
++ * and the Cortex-A9 global timer. SPI-NAND, Ethernet and CPU1 hand-off are
++ * intentionally left out until the A2 stage.
++ */
++
++/dts-v1/;
++
++/ {
++	model = "ZTE ZXHN E2631 (ZX279128S)";
++	compatible = "zte,zxhn-e2631", "zte,zx279128s";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	/* 256 MiB DDR3, initialised by secondboot */
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x40000000 0x10000000>;
++	};
++
++	/*
++	 * a9_periph runs at CPU clock / 2. The A9 cluster is clocked at
++	 * 1 GHz, so the global timer ticks at 500 MHz.
++	 */
++	a9_periph: clock-a9-periph {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <500000000>;
++	};
++
++	timer@800200 {
++		compatible = "arm,cortex-a9-global-timer";
++		reg = <0x800200 0x20>;
++		clocks = <&a9_periph>;
++	};
++
++	/*
++	 * No "clock" property on purpose: CFG_PL011_CLOCK is 0, so the
++	 * driver keeps secondboot's 115200 8N1 setup instead of dividing
++	 * an unknown clock rate.
++	 */
++	uart0: serial@94404000 {
++		compatible = "arm,pl011";
++		reg = <0x94404000 0x1000>;
++	};
++};
+diff --git a/board/zte/zxhn-e2631/Kconfig b/board/zte/zxhn-e2631/Kconfig
+new file mode 100644
+index 00000000..3be2bb77
+--- /dev/null
++++ b/board/zte/zxhn-e2631/Kconfig
+@@ -0,0 +1,16 @@
++# SPDX-License-Identifier: GPL-2.0+
++#
++# ZTE ZXHN E2631 board (Sanechips ZX279128S)
++
++if TARGET_ZXHN_E2631
++
++config SYS_BOARD
++	default "zxhn-e2631"
++
++config SYS_VENDOR
++	default "zte"
++
++config SYS_CONFIG_NAME
++	default "zx279128s_zte_zxhn-e2631"
++
++endif
+diff --git a/board/zte/zxhn-e2631/MAINTAINERS b/board/zte/zxhn-e2631/MAINTAINERS
+new file mode 100644
+index 00000000..cb316429
+--- /dev/null
++++ b/board/zte/zxhn-e2631/MAINTAINERS
+@@ -0,0 +1,8 @@
++ZTE ZXHN E2631 BOARD
++M:	QC3284 <2078725082@qq.com>
++S:	Maintained
++F:	board/zte/zxhn-e2631/
++F:	include/configs/zx279128s_zte_zxhn-e2631.h
++F:	configs/zx279128s_zte_zxhn-e2631_defconfig
++F:	arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
++F:	arch/arm/mach-zx279128s/
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+new file mode 100644
+index 00000000..04ddd557
+--- /dev/null
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -0,0 +1,5 @@
++# SPDX-License-Identifier: GPL-2.0+
++#
++# ZTE ZXHN E2631 board (Sanechips ZX279128S)
++
++obj-y += zxhn-e2631.o
+diff --git a/board/zte/zxhn-e2631/zxhn-e2631.c b/board/zte/zxhn-e2631/zxhn-e2631.c
+new file mode 100644
+index 00000000..ab7f072a
+--- /dev/null
++++ b/board/zte/zxhn-e2631/zxhn-e2631.c
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 board (Sanechips ZX279128S)
++ *
++ * A1 RAM-chain port. The closed secondboot stage has already initialised
++ * DRAM, clocks and UART0, so the board code only has to hand the DRAM
++ * layout from the embedded device tree to U-Boot.
++ */
++
++#include <config.h>
++#include <fdtdec.h>
++#include <init.h>
++
++int dram_init(void)
++{
++	return fdtdec_setup_mem_size_base();
++}
++
++int dram_init_banksize(void)
++{
++	return fdtdec_setup_memory_banksize();
++}
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+new file mode 100644
+index 00000000..4b5b00d7
+--- /dev/null
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -0,0 +1,25 @@
++CONFIG_ARM=y
++CONFIG_SKIP_LOWLEVEL_INIT=y
++CONFIG_SYS_ICACHE_OFF=y
++CONFIG_SYS_DCACHE_OFF=y
++CONFIG_SYS_L2CACHE_OFF=y
++CONFIG_ARCH_ZX279128=y
++CONFIG_TEXT_BASE=0x43000000
++CONFIG_SYS_MALLOC_F_LEN=0x800
++CONFIG_NR_DRAM_BANKS=1
++CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
++CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x48000000
++CONFIG_DEFAULT_DEVICE_TREE="zx279128s-zte-zxhn-e2631"
++CONFIG_SYS_LOAD_ADDR=0x42000000
++CONFIG_TARGET_ZXHN_E2631=y
++CONFIG_BOOTDELAY=3
++CONFIG_USE_BOOTCOMMAND=y
++CONFIG_BOOTCOMMAND="bdinfo"
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_OF_EMBED=y
++CONFIG_CLK=y
++CONFIG_DM_SERIAL=y
++CONFIG_PL01X_SERIAL=y
++CONFIG_TIMER=y
++CONFIG_ARM_GLOBAL_TIMER=y
+diff --git a/include/configs/zx279128s_zte_zxhn-e2631.h b/include/configs/zx279128s_zte_zxhn-e2631.h
+new file mode 100644
+index 00000000..61767e81
+--- /dev/null
++++ b/include/configs/zx279128s_zte_zxhn-e2631.h
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Configuration for the ZTE ZXHN E2631 (Sanechips ZX279128S)
++ *
++ * The closed secondboot stage leaves DRAM, clocks and UART0 (115200 8N1)
++ * initialised. The A1 RAM-chain port therefore only needs the memory map
++ * and deliberately keeps caches off while the hand-off state is unknown.
++ */
++
++#ifndef __ZX279128S_ZTE_ZXHN_E2631_H
++#define __ZX279128S_ZTE_ZXHN_E2631_H
++
++/* 256 MiB DDR3 at 0x40000000, initialised by secondboot */
++#define CFG_SYS_SDRAM_BASE		0x40000000
++
++/*
++ * UART0 is a PL011 at 0x94404000. Its input clock is not known yet and
++ * secondboot has already programmed 115200 8N1, so do not reprogram the
++ * baud rate: a clock of 0 makes the PL011 driver skip the IBRD/FBRD setup.
++ */
++#define CFG_PL011_CLOCK			0
++
++/*
++ * Fallback rate of the A9 global timer if the DT clock lookup fails.
++ * a9_periph is CPU clock / 2, i.e. 500 MHz with the 1 GHz A9 cluster.
++ */
++#define CFG_SYS_HZ_CLOCK		500000000
++
++#endif /* __ZX279128S_ZTE_ZXHN_E2631_H */
+-- 
+2.56.1
+
