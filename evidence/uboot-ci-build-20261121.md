@@ -189,3 +189,55 @@ gh run download <run_id> --repo QC3284/zte-e2631-immortalwrt -D <dir>
 | kit check.yml（f1bd383） | https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/44869141981 |
 | workflow | `.github/workflows/uboot-build.yml` |
 | 钉点/说明 | `uboot-port/commits.env`、`uboot-port/README.md` |
+
+## 10. patch 0004（ZTE UART map）重建（task-48，2026-11-21）
+
+task-47 落地串口修复后（kit 提交 `a9dbd6e` "uboot: fix the A1 console with the ZTE UART
+register map"）按 task-48 重新构建并验收。**这是同一 workflow 的第四次运行，workflow 代码未改
+（只随 task-47 提交多了 embedded-DTB 门禁），pins 由 `uboot-port/commits.env` 驱动自动更新。**
+
+### 10.1 新的钉点
+
+| 项 | 值 |
+| --- | --- |
+| patch 数量 | 4（0001/0002/0003/0004） |
+| patch 0004 sha256 | `ce6a01ef5b0c1c47f213a79a30bc3bb13f0b8cdeec10ebb4395ce988b5e746ca`（ZTE-variant PL011 寄存器映射，341 行） |
+| post-am tree | `418ae89f09b34238daf37d0db78b4485001ffc2c`（原 0003 时代为 `abab1858`） |
+| 基线/上限/入口 | 不变：`c1958b5f` / base tree `62f07967` / payload max `0x9F800` / TEXT_BASE `0x43000000` |
+
+workflow 同时新增 embedded-DTB 门禁：`grep -aq 'zte,zx29-uart' build/u-boot.bin`，验证
+`CONFIG_OF_EMBED` 的 DTB 确实使用 ZTE UART compatible（A1 串口在 stock-ARM 偏移下静默，
+task-45 双偏移探针已硬件证实差异；见 `evidence/a1-ramchain-poc-20261121.md`）。
+
+### 10.2 构建结果
+
+- run **44875722425**（head `a9dbd6e`，workflow_dispatch，checkpatch=true）：
+  2026-11-21T06:28:45Z → 06:30:36Z（约 1m51s），**12/12 步 success**；
+- 门禁原始输出：
+  - `u-boot.bin: 347824 bytes, limit 653312 bytes`
+  - `entry point: 0x43000000`
+  - `.config` 9 个验收符号全过；`# CONFIG_DISPLAY_CPUINFO is not set`、`# CONFIG_BOARD_INIT is not set` 仍在；
+  - embedded-DTB 门禁通过（离线复核 `grep -ac 'zte,zx29-uart' u-boot.bin` = 2，strings 含
+    `zte,zx279128s` / `zte,zx29-uart` / `zte,zxhn-e2631`）；
+  - `checkpatch: errors=0 warnings=4`（仍为 0001 MAINTAINERS、0002 MAINTAINERS + 2 livetree，patch 0004 自身无告警）。
+- kit `check.yml` 在 `a9dbd6e` 上的 run **44875548158** = SUCCESS（重建前已核）。
+
+### 10.3 产物（已归档）
+
+- artifact id **14694824928**，name `e2631-uboot-a1-44875722425`，zip 284,949 B，
+  zip SHA256 `e323fb049078ebfff498e5301d746780970ecb4ace87e0de9dcdd6f4f4f6288f`；
+- 7 文件，`sha256sum -c SHA256SUMS` **4/4 成功**；
+- `u-boot.bin` = **347,824 B**（比 task-44 的 347,640 多 184 B，来自 UART map 代码），
+  sha256 = `5310f998824a4c52dd46a18315ac0b989f2545f632477a5769ad5f2e5b4dc742`，
+  距上限余量 305,488 B；
+- `u-boot.map` 入口仍为 `0x43000000`；`UBOOT-INFO.txt` 记录 4 个 patch sha、post-am tree
+  `418ae89f`、工具链同上、`Hardware tested: NO`；
+- banner 串：`U-Boot 2027.01-rc2-g4910ee2045bd (Nov 21 2026 - 06:30:06 +0000)` —— 设备侧的
+  banner 验收应核对 post-am 短哈希 **4910ee2045bd**（task-44 时代为 7c42c3f6b431）；
+- 本机归档：`/home/qc233/zte/e2631-t5-artifacts/uboot-a1-fix-44875722425/`
+  （`artifact.zip`、`artifact-id.txt`、`files/`）。
+
+### 10.4 边界
+
+未 publish、未创建 Release/tag；`firmware.yml`/`check.yml` 未改；kit main 未动；真机未碰
+（A1 串口/banner 复测由 Lead 另排批准任务）。
