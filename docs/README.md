@@ -33,6 +33,8 @@
 | [../evidence/a1-banner-acceptance/](../evidence/a1-banner-acceptance/) | task-49 验收附件：驱动脚本、session/a2 results JSON、驱动与 health 日志、串口选段 |
 | [../evidence/a3-ramchain-20261121.md](../evidence/a3-ramchain-20261121.md) | P2-A3：slot-aware 启动 RAM 链只读验收（banner g8a9d1f7eecfa、md.b 448,072 B 0 差异、info 0.81 s 决策 slot1、load 4.61 s 3,491,146 B CRC 通过不 boot、4 个 mtd 切片 0 差异、mtd0 sha256 前后一致、reset no-op 需断电；含解析器缺陷与主机路由陷阱记录） |
 | [../evidence/a3-ramchain/](../evidence/a3-ramchain/) | A3 验收附件：驱动/health 脚本、两次 session results JSON、驱动日志、串口选段、参考切片、零写入证据 |
+| [../evidence/b1-env-session-20261121.md](../evidence/b1-env-session-20261121.md) | P2-B1：vendor U-Boot env 定制真机会话（一次 saveenv 持久化 4 条旁路变量；修正为字母序插入预测 CRC 0xF95A816E / env 块 sha 6e2c01da…；回读 byte-identical、mtd0 差异 462 B 全在 env 块内、bootcmd/bootdelay 未变、设备健康；含第一段中止零写入与工具缺陷记录） |
+| [../evidence/b1-env-session/](../evidence/b1-env-session/) | B1 会话附件：两段驱动脚本、results/回读 JSON、预测与实读 env 块、串口/驱动/health 日志、sha256 清单 |
 
 
 | 文件 | 内容 |

@@ -1,0 +1,273 @@
+{
+ "mode": "attach-resume",
+ "started": "2026-11-21T16:47:01+0800",
+ "capture_before": {
+  "supervisor_pids": [
+   156720
+  ],
+  "bootwatch_pids": [
+   156729
+  ],
+  "tty_holders": [
+   156726
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 226232,
+ "attach_version_tail": "version\r\n\r\nU-Boot 2013.04 (Aug 28 2023 - 18:40:22)\r\narm-buildroot-linux-uclibcgnueabi-gcc (Buildroot 2015.08.1-svn1486) 4.9.3\r\nGNU ld (GNU Binutils) 2.24\r\n=>",
+ "pre_printenv": {
+  "entries": {
+   "baudrate": "115200",
+   "bootcmd": "setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;",
+   "bootdelay": "3",
+   "bootfile": "uboot.bin",
+   "bootloaderfile": "bootloader.bin",
+   "console": "ttyAMA0,115200n8",
+   "e2631_flashboot": "reset",
+   "e2631_netboot": "tftp 0x42000000 e2631-netboot.uImage",
+   "e2631_pocgo": "go 0x43000000",
+   "e2631_pocload": "tftp 0x43000000 u-boot.bin",
+   "ethact": "eth0",
+   "ethaddr": "00:41:71:00:00:50",
+   "fullfile": "upgrade.bin",
+   "gatewayip": "192.168.1.1",
+   "hostname": "unknown",
+   "ipaddr": "192.168.1.1",
+   "linuzfile": "vmlinuz.bin",
+   "loadaddr": "0x42000000",
+   "memsize": "256M",
+   "netmask": "255.255.255.0",
+   "netretry": "5",
+   "serverip": "192.168.1.100",
+   "stderr": "serial",
+   "stdin": "serial",
+   "stdout": "serial",
+   "versioninfo": "U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00"
+  },
+  "order": [
+   "baudrate",
+   "bootcmd",
+   "bootdelay",
+   "bootfile",
+   "bootloaderfile",
+   "console",
+   "e2631_flashboot",
+   "e2631_netboot",
+   "e2631_pocgo",
+   "e2631_pocload",
+   "ethact",
+   "ethaddr",
+   "fullfile",
+   "gatewayip",
+   "hostname",
+   "ipaddr",
+   "linuzfile",
+   "loadaddr",
+   "memsize",
+   "netmask",
+   "netretry",
+   "serverip",
+   "stderr",
+   "stdin",
+   "stdout",
+   "versioninfo"
+  ],
+  "checks": {
+   "count": 26,
+   "entries_match": true,
+   "order_sorted": true,
+   "bootdelay": "3",
+   "bootcmd_unchanged": true,
+   "versioninfo_unchanged": true
+  },
+  "raw_tail": "printenv\r\nbaudrate=115200\r\nbootcmd=setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\ne2631_flashboot=reset\r\ne2631_netboot=tftp 0x42000000 e2631-netboot.uImage\r\ne2631_pocgo=go 0x43000000\r\ne2631_pocload=tftp 0x43000000 u-boot.bin\r\nethact=eth0\r\nethaddr=00:41:71:00:00:50\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial\r\nstdin=serial\r\nstdout=serial\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 733/131068 bytes\r\n=>"
+ },
+ "prediction": {
+  "env_crc": "0xf95a816e",
+  "env_sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "full_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "diff_bytes": 462,
+  "diff_outside_env": 0,
+  "order": [
+   "baudrate",
+   "bootcmd",
+   "bootdelay",
+   "bootfile",
+   "bootloaderfile",
+   "console",
+   "e2631_flashboot",
+   "e2631_netboot",
+   "e2631_pocgo",
+   "e2631_pocload",
+   "ethact",
+   "ethaddr",
+   "fullfile",
+   "gatewayip",
+   "hostname",
+   "ipaddr",
+   "linuzfile",
+   "loadaddr",
+   "memsize",
+   "netmask",
+   "netretry",
+   "serverip",
+   "stderr",
+   "stdin",
+   "stdout",
+   "versioninfo"
+  ],
+  "matches_approved": true
+ },
+ "saveenv": {
+  "ok": true,
+  "raw_tail": "saveenv\r\nSaving Environment to NAND...\r\nErasing 0xc0000 - 0xe0000:<nand_erase_skip_bad_,609>!mtdpart=0x1,start=0x0,mtdpartoffset=0xc0000,mtdPartsize=0x40000,length=0x20000\r\n\t\t[Done]\r\nWriting to Nand:<nand_write_skip_bad_,504>!mtdpart=0x1,offset=0x0,mtdpartoffset=0xc0000,mtdPartsize=0x40000,length=0x20000\r\n\t\t[Done]\r\n=>"
+ },
+ "post_printenv": {
+  "entries": {
+   "baudrate": "115200",
+   "bootcmd": "setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;",
+   "bootdelay": "3",
+   "bootfile": "uboot.bin",
+   "bootloaderfile": "bootloader.bin",
+   "console": "ttyAMA0,115200n8",
+   "e2631_flashboot": "reset",
+   "e2631_netboot": "tftp 0x42000000 e2631-netboot.uImage",
+   "e2631_pocgo": "go 0x43000000",
+   "e2631_pocload": "tftp 0x43000000 u-boot.bin",
+   "ethact": "eth0",
+   "ethaddr": "00:41:71:00:00:50",
+   "fullfile": "upgrade.bin",
+   "gatewayip": "192.168.1.1",
+   "hostname": "unknown",
+   "ipaddr": "192.168.1.1",
+   "linuzfile": "vmlinuz.bin",
+   "loadaddr": "0x42000000",
+   "memsize": "256M",
+   "netmask": "255.255.255.0",
+   "netretry": "5",
+   "serverip": "192.168.1.100",
+   "stderr": "serial",
+   "stdin": "serial",
+   "stdout": "serial",
+   "versioninfo": "U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00"
+  },
+  "order": [
+   "baudrate",
+   "bootcmd",
+   "bootdelay",
+   "bootfile",
+   "bootloaderfile",
+   "console",
+   "e2631_flashboot",
+   "e2631_netboot",
+   "e2631_pocgo",
+   "e2631_pocload",
+   "ethact",
+   "ethaddr",
+   "fullfile",
+   "gatewayip",
+   "hostname",
+   "ipaddr",
+   "linuzfile",
+   "loadaddr",
+   "memsize",
+   "netmask",
+   "netretry",
+   "serverip",
+   "stderr",
+   "stdin",
+   "stdout",
+   "versioninfo"
+  ],
+  "exact": true,
+  "raw_tail": "printenv\r\nbaudrate=115200\r\nbootcmd=setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\ne2631_flashboot=reset\r\ne2631_netboot=tftp 0x42000000 e2631-netboot.uImage\r\ne2631_pocgo=go 0x43000000\r\ne2631_pocload=tftp 0x43000000 u-boot.bin\r\nethact=eth0\r\nethaddr=00:41:71:00:00:50\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial\r\nstdin=serial\r\nstdout=serial\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 733/131068 bytes\r\n=>"
+ },
+ "reboot": {
+  "reset_rebooted": true,
+  "tail": "\r\nbackup header!!\r\nJump\r\n\r\n\r\nU-Boot 2013.04 (Aug 28 2023 - 18:40:22)\r\n\r\nCPU  : ZX279128S@A9,1000MHZ\r\nBoard: ZTE zx279128sevb\r\nI2C:   ready\r\n5DRAM:  256 MiB\r\n5,10000000,50000000\r\nproduct_vid = 31\r\nvid=31-E1630\r\ninput gpio:5\r\ninput gpio:15\r\ninput gpio:62\r\ninput gpio:61\r\ninput gpio:43\r\ninput gpio:47\r\ninput gpio:46\r\ninput gpio:45\r\noutput gpio:8,value:1\r\noutput gpio:40,value:1\r\noutput gpio:60,value:0\r\n"
+ },
+ "linux": {
+  "ok": true,
+  "marker": true
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   226285
+  ],
+  "bootwatch_pids": [
+   226320
+  ],
+  "tty_holders": [
+   226291
+  ],
+  "events_tail": "2026-11-21T16:38:34+08:00 reader-start pid=156720\n2026-11-21T16:47:14+08:00 reader-start pid=226285",
+  "ok": true
+ },
+ "route_fix": {
+  "ok": true,
+  "action": "direct route after boot (USB NIC enp0s20u1u4u2c2)",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "readback": {
+  "ssh_rc": 0,
+  "ssh_err_tail": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "full_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "full_sha_match": true,
+  "outside_env_hashes": {
+   "pre": "9e647df44854c1bfa905616476ada0b3ba4452f3c1f8225aa2daee4db0a354bf",
+   "post": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260"
+  },
+  "outside_env_ok": true,
+  "block_size": 131072,
+  "env_crc": "0xf95a816e",
+  "env_sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "entry_count": 26,
+  "actual_order": [
+   "baudrate",
+   "bootcmd",
+   "bootdelay",
+   "bootfile",
+   "bootloaderfile",
+   "console",
+   "e2631_flashboot",
+   "e2631_netboot",
+   "e2631_pocgo",
+   "e2631_pocload",
+   "ethact",
+   "ethaddr",
+   "fullfile",
+   "gatewayip",
+   "hostname",
+   "ipaddr",
+   "linuzfile",
+   "loadaddr",
+   "memsize",
+   "netmask",
+   "netretry",
+   "serverip",
+   "stderr",
+   "stdin",
+   "stdout",
+   "versioninfo"
+  ],
+  "crc_ok": true,
+  "env_byte_identical": true,
+  "entries_ok": true,
+  "ok": true
+ },
+ "uptime_wait": {
+  "ok": true,
+  "uptime": 96
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2003ms\nrtt min/avg/max/mdev = 1.966/1.991/2.020/0.022 ms\n== ssh identity (retries) ==\n  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n  VERSION=ImmortalWrt v1.10.0\n  UPTIME=99\n  MTD0=mtd0: 00100000 00020000 \"bootloader\"\n  PANICS=0\n  MT7916=1\n  WIFIBOOT=[ 54.158989] e2631-wifi-boot: automatic Wi-Fi initialization complete\n== done ==",
+ "verdict": "GREEN",
+ "finished": "2026-11-21T16:57:37+0800",
+ "readback_note": "first readback attempt at 16:47:49 hit the home-LAN route trap (SSH connection refused); retried after the direct USB-NIC route came up: all checks true",
+ "health_retry": {
+  "rc": 0,
+  "out": "== route ==\n192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2002ms\nrtt min/avg/max/mdev = 1.967/2.047/2.095/0.057 ms\n== ssh identity (retries) ==\n  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n  VERSION=ImmortalWrt v1.10.0\n  UPTIME=623\n  MTD0=mtd0: 00100000 00020000 \"bootloader\"\n  PANICS=0\n  MT7916=1\n  WIFIBOOT=[ 54.158989] e2631-wifi-boot: automatic Wi-Fi initialization complete\n== done =="
+ }
+}

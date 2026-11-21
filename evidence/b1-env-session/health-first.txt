@@ -1,0 +1,16 @@
+== route ==
+192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 
+== ping wait (up to 90s) ==
+ping ok after attempt 0
+== ping stats ==
+已发送 3 个包， 已接收 3 个包, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 1.966/1.991/2.020/0.022 ms
+== ssh identity (retries) ==
+  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.
+  VERSION=ImmortalWrt v1.10.0
+  UPTIME=99
+  MTD0=mtd0: 00100000 00020000 "bootloader"
+  PANICS=0
+  MT7916=1
+  WIFIBOOT=[ 54.158989] e2631-wifi-boot: automatic Wi-Fi initialization complete
+== done ==

@@ -1,0 +1,15 @@
+16:47:02 capture paused: {"supervisor_pids": [156720], "bootwatch_pids": [156729], "tty_holders": [156726], "tty_holders_after": [], "free": true}
+16:47:02 serial hub started pid=226232 log=/home/qc233/zte/e2631-p3/b1-env-session/resume-1/serial.log
+16:47:02 ATTACHED vendor console (version banner read back)
+16:47:03 PRE-ENTRIES-OK count=26 sorted=True bootdelay=3 bootcmd_unchanged=True
+16:47:03 PREDICTION-OK crc=0xf95a816e env_sha=6e2c01da4084ea9e... full_sha=887a7f6c9b407abc... diff=462 outside_env=0
+16:47:03 SAVEENV-OK
+16:47:03 POST-SAVEENV-OK 26 entries exact
+16:47:03 REBOOT: sending reset
+16:47:05 RESET-REBOOTED
+16:47:12 LINUX-BOOTING marker=True
+16:47:18 capture restore: {"restore_rc": 0, "supervisor_pids": [226285], "bootwatch_pids": [226320], "tty_holders": [226291], "events_tail": "2026-11-21T16:38:34+08:00 reader-start pid=156720\n2026-11-21T16:47:14+08:00 reader-start pid=226285", "ok": true}
+16:47:18 ROUTE TRAP: reconnecting the USB NIC
+16:47:49 READBACK {"ok": false, "env_byte_identical": null, "full_sha_match": null, "crc_ok": null, "entries_ok": null, "outside_env_ok": null}
+16:48:52 HEALTH rc=0
+16:48:52 VERDICT FAIL (results in /home/qc233/zte/e2631-p3/b1-env-session/resume-1/session-results.json)

@@ -1,0 +1,2 @@
+# Preserve the raw CRLF bytes of the serial/console log attachments.
+*.txt -text

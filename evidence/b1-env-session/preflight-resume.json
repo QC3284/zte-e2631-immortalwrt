@@ -1,0 +1,35 @@
+{
+ "mode": "preflight",
+ "capture_chain": {
+  "supervisor_pids": [
+   156720
+  ],
+  "bootwatch_pids": [
+   156729
+  ],
+  "tty_holders": [
+   156726
+  ]
+ },
+ "baseline_dump_sha": "de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f",
+ "baseline_dump_ok": true,
+ "expected_entries": 26,
+ "new_vars": {
+  "e2631_pocload": "tftp 0x43000000 u-boot.bin",
+  "e2631_pocgo": "go 0x43000000",
+  "e2631_netboot": "tftp 0x42000000 e2631-netboot.uImage",
+  "e2631_flashboot": "reset"
+ },
+ "hub": true,
+ "restore": true,
+ "health": true,
+ "askpass_mode": "0o700",
+ "artifacts_exist": true,
+ "approved": {
+  "env_crc": 4183458158,
+  "env_sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "full_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "diff_bytes": 462
+ },
+ "ok": true
+}

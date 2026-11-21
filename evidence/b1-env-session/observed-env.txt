@@ -1,0 +1,26 @@
+baudrate=115200
+bootcmd=setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;
+bootdelay=3
+bootfile=uboot.bin
+bootloaderfile=bootloader.bin
+console=ttyAMA0,115200n8
+e2631_flashboot=reset
+e2631_netboot=tftp 0x42000000 e2631-netboot.uImage
+e2631_pocgo=go 0x43000000
+e2631_pocload=tftp 0x43000000 u-boot.bin
+ethact=eth0
+ethaddr=00:41:71:00:00:50
+fullfile=upgrade.bin
+gatewayip=192.168.1.1
+hostname=unknown
+ipaddr=192.168.1.1
+linuzfile=vmlinuz.bin
+loadaddr=0x42000000
+memsize=256M
+netmask=255.255.255.0
+netretry=5
+serverip=192.168.1.100
+stderr=serial
+stdin=serial
+stdout=serial
+versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00

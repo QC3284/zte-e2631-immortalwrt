@@ -1,0 +1,105 @@
+{
+ "mode": "preflight",
+ "ts": "2026-11-21T16:36:29+0800",
+ "current_txt": {
+  "sha256": "9f5aa9a93a6ded3055db4699c1c94b3ecdd5605f35a0e4e3840c1d85a8ad8d76",
+  "entries": 22,
+  "bootdelay": "3",
+  "has_side_vars": []
+ },
+ "dump": {
+  "sha256": "de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f",
+  "size": 1048576,
+  "env_crc": 2952588350
+ },
+ "pred": {
+  "ok": true,
+  "cmd_rc": 0,
+  "stdout_tail": "env: 26 entries, CRC 0xc41396ba\nwrote /home/qc233/zte/e2631-p3/b1-env-session/run-1/target-env-block.bin (0x20000 bytes, sha256 00d4177d8d0173b2536848d1e769929832e11a7c0055903e278fe0db88f07d3c)\nwrote /home/qc233/zte/e2631-p3/b1-env-session/run-1/target-mtd0.bin (full mtd0, sha256 f452d4c0f646af9f28177d4acf91ce0f193e38ce57d33f7e02189caffc78c77c)",
+  "stderr_tail": "",
+  "target_txt": "/home/qc233/zte/e2631-p3/b1-env-session/run-1/target-env.txt",
+  "block": "/home/qc233/zte/e2631-p3/b1-env-session/run-1/target-env-block.bin",
+  "full": "/home/qc233/zte/e2631-p3/b1-env-session/run-1/target-mtd0.bin",
+  "env_crc": 3289618106,
+  "env_crc_recomputed": 3289618106,
+  "env_sha256": "00d4177d8d0173b2536848d1e769929832e11a7c0055903e278fe0db88f07d3c",
+  "full_sha256": "f452d4c0f646af9f28177d4acf91ce0f193e38ce57d33f7e02189caffc78c77c",
+  "size": 131072,
+  "diff_bytes": 140,
+  "diff_outside_env": 0,
+  "entries": {
+   "baudrate": "115200",
+   "bootcmd": "setenv bootargs console=$(console) root=/dev/mtdblock8 ro rootfstype=squashfs  mem=$(memsize) ;",
+   "bootdelay": "3",
+   "bootfile": "uboot.bin",
+   "bootloaderfile": "bootloader.bin",
+   "console": "ttyAMA0,115200n8",
+   "ethact": "eth0",
+   "ethaddr": "00:41:71:00:00:50",
+   "fullfile": "upgrade.bin",
+   "gatewayip": "192.168.1.1",
+   "hostname": "unknown",
+   "ipaddr": "192.168.1.1",
+   "linuzfile": "vmlinuz.bin",
+   "loadaddr": "0x42000000",
+   "memsize": "256M",
+   "netmask": "255.255.255.0",
+   "netretry": "5",
+   "serverip": "192.168.1.100",
+   "stderr": "serial",
+   "stdin": "serial",
+   "stdout": "serial",
+   "versioninfo": "U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00",
+   "e2631_pocload": "tftp 0x43000000 u-boot.bin",
+   "e2631_pocgo": "go 0x43000000",
+   "e2631_netboot": "tftp 0x42000000 e2631-netboot.uImage",
+   "e2631_flashboot": "reset"
+  },
+  "target_order": [],
+  "expected_crc_ok": true,
+  "expected_env_sha_ok": true,
+  "expected_full_sha_ok": true,
+  "entries_ok": true
+ },
+ "capture_chain": {
+  "supervisor_pids": [
+   110586
+  ],
+  "bootwatch_pids": [
+   110594
+  ],
+  "tty_holders": [
+   110592
+  ]
+ },
+ "route": {
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000",
+  "direct": true
+ },
+ "vendor_pw": {
+  "exists": true,
+  "mode": "0o600"
+ },
+ "scripts": {
+  "/home/qc233/zte/e2631-p3/serialhub.py": true,
+  "/home/qc233/zte/e2631-p3/restore_capture.sh": true,
+  "/home/qc233/zte/e2631-p3/a1_banner_health.sh": true,
+  "/home/qc233/zte/e2631-p3/vendor_pw.txt": true
+ },
+ "vendor_help_evidence": {
+  "saveenv_mentions": "5",
+  "setenv_mentions": "5",
+  "note": "design doc section 2.4: 43-command list includes setenv and saveenv; in-session help assert before any setenv"
+ },
+ "checks": {
+  "current_txt_sha": true,
+  "current_22_bootdelay3": true,
+  "dump_baseline": true,
+  "prediction": true,
+  "capture": true,
+  "route_direct": true,
+  "vendor_pw": true,
+  "scripts": true
+ },
+ "ok": true
+}

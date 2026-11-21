@@ -1,0 +1,16 @@
+16:36:42 capture paused: {"supervisor_pids": [110586], "bootwatch_pids": [110594], "tty_holders": [110592], "tty_holders_after": [], "free": true}
+16:36:42 serial hub started pid=119367 log=/home/qc233/zte/e2631-p3/b1-env-session/run-1/serial.log
+16:36:42 READY FOR USER POWER CYCLE (cold boot, B1 env session); waiting up to 600s
+16:38:29 cold-boot prompt caught; sending 1
+16:38:29 vendor password attempt 1 -> autoboot
+16:38:29 console entered (vendor U-Boot 2013.04, stock banner)
+16:38:30 help precheck: setenv=True saveenv=True
+16:38:30 baseline printenv: 22 entries, match_baseline=True, bootdelay=3
+16:38:30 setenv e2631_pocload: OK
+16:38:31 setenv e2631_pocgo: OK
+16:38:31 setenv e2631_netboot: OK
+16:38:31 setenv e2631_flashboot: OK
+16:38:31 pre-saveenv printenv: 26 entries, exact_target=False, bootcmd_unchanged=True
+16:38:31 SESSION ERROR: combined env does not match the target; refusing to saveenv
+16:38:38 capture restore: {"restore_rc": 0, "supervisor_pids": [156720], "bootwatch_pids": [156729], "tty_holders": [156726], "events_tail": "2026-11-21T16:23:23+08:00 reader-start pid=110586\n2026-11-21T16:38:34+08:00 reader-start pid=156720", "ok": true}
+16:38:38 ROUTE TRAP: reconnecting the USB NIC
