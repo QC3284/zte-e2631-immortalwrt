@@ -431,6 +431,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   从其它地址进入会在 banner 之前挂死或 data abort；改地址只能改 defconfig 后重编，不能只改 `go`。
 - **载荷 0x9F800**：刷写阶段封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在
   刷写阶段必须原样保留。
+- **0016 的回退路径尚未真机演练**：源码/二进制字符串门禁只证明 class-1 回退代码确实编进镜像；运行期证明需要
+  人为破坏选中槽的 uImage（写 slot 区，需单独批准）或等真实坏槽事件。健康路径不受影响：选槽规则、版本头校验与
+  uImage 校验顺序都与 0006 相同，回退只在选中槽失败时才发生，且不改任何持久状态。
 - **U-Boot 自更新有变砖风险**：`e2631flash` 直接擦写 mtd0 的 U-Boot 区（0x20000..0xC0000），写入期间掉电会留下
   半写镜像，只能靠串口 + 厂商/第二级引导链路恢复。因此每次写前写后记录 mtd0 sha256、先零写入核对暂存镜像的
   payload CRC32、单独一次写入并读回比较；没有串口恢复手段时不执行。命令只写用户给定范围，明确拒绝 secondboot
@@ -538,3 +541,13 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 - 2026-11-22（A6，patch 0013）：在 0012 的 `e2631_pinmux_gpio_init()` 之后补厂商 `zte_gpio_init()` 的两段尾部特例（`0x47f2f61c` 索引 0x33→pin 2、`0x47f2f66c` 索引 0x32→pin 51，无视表值 0 置 1），并保留厂商在 loop B 之前的 4 ms 间隔（pin 2 → `mdelay(4)` → pin 51），修掉 A5 会话残留的 PCIe endpoint 缺失（只有 root port、没有 `14c3:7906`/`14c3:790a`）。v3 重钉结果 tree `f04e5ed9525c87bddc329b24a311dfa4a302b750`（13 个 patch），patch sha256 `f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c`。设计见 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)；CI run `44935007253`（head `c6a89a8`）SUCCESS：banner `g85c7367a3106`、`u-boot.bin` 450,936 B sha256 `3bf182f148226b6f64696a05bba5d75ca59426747f87eee3f13c5d2b0269423a`、mtd0 镜像 sha256 `f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42`、装配后 header sha256 `508c325cbc59b22e4cd78f43d3b51a05926f4725fc1f4bbe0ec7536905d303e9`、env 块 `6eee153b…` 未变；详见 [evidence/uboot-a6-20261122.md](../evidence/uboot-a6-20261122.md)。A6 真机零写入会话（verify-docs）GREEN：`0x94407014`=0xdb2c、`0x944070d4`=0xe028，两条 `PCIe Gen.1 x1 link up` 与 endpoint `14c3:7906`/`14c3:790a` 出现，`mt7915e`/MT7916 就绪、eth 四 PHY 保持、mtd0 未变；详见 [uboot-a6-device-session-20261122.md](../evidence/uboot-a6-device-session-20261122.md)。
 
 - 2026-11-22（D-U1，patch 0014/0015）：新增 `board/zte/zxhn-e2631/e2631flash.c`（`e2631flash` 块对齐擦除→FF 校验→写入→读回比较、RAM 或 NAND 偏移两种来源、1 MiB bounce buffer、payload/readback CRC32、DO NOT POWER OFF；`e2631verify` 只读 CRC32；`e2631slot` 复用 `e2631boot` 扫描函数）并新增 `CONFIG_CMD_MTD_WRITE`（默认 y，本 defconfig 关闭，把原始 `mtd write/erase` 子命令编掉，使 `e2631flash` 成为镜像里唯一的 MTD 写入口）。重钉结果 tree `31843b38628ccf9c3e0b542ec4db014b6612755d`（15 个 patch；0014 sha256 `0bfb4302…943110`、0015 sha256 `84bfc65f…c8f3b`）。设计见 [a7-self-flash-design.md](a7-self-flash-design.md)；CI run `44943940449`（head `0d53ccc`）SUCCESS：banner `g85df6772a444`、`u-boot.bin` 456,416 B sha256 `21b0d804483c7cbb82e2ca92968b6706ed0f740429e6e6c935bf34e16a881af8`、mtd0 镜像 sha256 `b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a`、装配后 header sha256 `95b7a80a46f38933178f06542c9df24183b8c0cdb441aabfb5e6a70699ec8ee7`、env 块 `6eee153b…` 未变、checkpatch 0 errors / 20 warnings；详见 [evidence/uboot-du1-20261122.md](../evidence/uboot-du1-20261122.md)。真机零写入验收与写入会话均待用户批准。
+- 2026-11-22（U-0016，patch 0016，class-1 跨槽回退）：`e2631boot` 拆出 `e2631_try_boot_slot()`，选中槽的 uImage 任一级校验失败时打印
+  `slot%d unusable (<reason>), falling back to slot%d (cspboot class-1 parity)` 并改试另一槽一次；两槽都失败时打印逐槽诊断表并回控制台，
+  不调用 `bootm`。回退无状态（不改版本头/serial、不计数、不写 flash、不碰 env，只影响本次启动），健康路径与 `e2631slot` 代码不变。
+  重钉结果 tree `13c92c68921fa781634beb50d0eaffd50e9a7648`（16 个 patch；0016 sha256
+  `7838e8a22dd46996c9ccb31f9fe116e194641d2a26f548e9854548bfefc62461`）。CI uboot-build run `44945090940`（head `8811a5b`）SUCCESS：
+  banner `g61456c131301`、`u-boot.bin` 457,680 B sha256 `31d2b6d858a9df1660bceb6390f731f03e457d3cad84b82144d53bf20f659977`、
+  mtd0 镜像 sha256 `869866d4239219975ea90a310697ecbccdd77181a00c314dd97bdec36fdc58ea`、装配后 header sha256
+  `4d3176d1f5be903274161b134af37d0b666c5cdfb4f5d3c75a2d974e97aeadbb`、env 块 `6eee153b…` 未变、checkpatch 0 errors / 20 warnings（0016 本身 0/0）；
+  新增 CI 门禁（源码 `e2631_try_boot_slot`/两条日志串 + 二进制 `falling back to slot`）；详见
+  [evidence/uboot-class1-fallback-20261122.md](../evidence/uboot-class1-fallback-20261122.md)。
