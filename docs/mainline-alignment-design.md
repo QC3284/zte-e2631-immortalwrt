@@ -141,6 +141,6 @@
   双频 AP "E2631" 正常 / apk 公钥=钉定钥 / zte-mesh+luci-app-zte-mesh 在镜像。
   遗留: mount_root 'failed to sync jffs2 overlay' 仍出现 1 次 (fstools 204 未完全
   消除, 化妆级, 入修复队列); 冷启动采样待用户配合 (见验收 4)。
-- 验收标准: 1 ✓ 2 ✓ 3 ✓ 4 部分(七项复验过, 冷启动待采) 5 ✓(docs/architecture.md
+- 验收标准: 1 ✓ 2 ✓ 3 ✓ 4 ✓ (2026-11-21, 6/6 冷启动成功, evidence/cold-boot-sampling-20261121.md) 5 ✓(docs/architecture.md
   /updates.md 已改 zx279128; 历史文档按豁免) 6 ✓。
 
