@@ -19,7 +19,7 @@
 
 一句话：**patch 0013 修复确认**。GPIO 两根线在两个方向上与厂商完全一致（残差字归零），
 内核枚举到两个 MT7916 端点，以太网四个 PHY 全部 1 Gbps，Wi-Fi 双频最终起来并转发；
-全程零 flash 写入。Wi-Fi 就绪比厂商链慢（176 s vs 54 s），单独作为观察项记录（§5），不阻塞 A6。
+全程零 flash 写入。Wi-Fi 本轮 ready 176 s vs 厂商链 54 s，已归因（上一 boot 遗留 pending 标记的设计性 120 s 重试，见 §5），非缺陷、不阻塞 A6。
 
 ## 1. 产物与输入
 
@@ -106,10 +106,14 @@ e2631refclk: after CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=0051
 [  176.035575] e2631-wifi-boot: MT7916 ready
 ```
 
-PCIe 端点在 0.6 s 就枚举完成，所以这不是端点缺失；更像 wifi-boot 首次尝试在 mt7915e 绑定前就放弃、
-按 120 s 重试才把驱动/firmware 拉起来。厂商链（2026-11-22 00:40 会话）是 54 s ready。
-该差异**不影响** A6 判据（最终 ready + 双频转发都成立），但它是自定义链与厂商链之间尚未解释的行为差，
-留作后续任务（需要时对比 wifi-boot 脚本两条路径的触发时机与 mt7915e 模块加载顺序）。
+这个问题已有归因（base-builder 2026-11-22 02:46，见 [uboot-a6-20261122.md](uboot-a6-20261122.md) §5）：这是 wifi-boot 的**设计行为**——
+正常情况下 START=95 启动 procd 实例、sleep DEFER=25 s、置 pending 标记、等 phy 最多 30 s 后绑定（≈54 s，即厂商链数值）；
+若上一次尝试被内核挂起/断电打断，overlay 里会留下 `/etc/e2631-wifi-boot-pending`，下一次启动看到它就打印
+`previous initialization unfinished; retrying in 120s`、删标记、sleep 120 s，再走正常的 25 s defer。
+本次数字完全对上：29.6 s 日志 + 120 s 重试 + 25 s defer ≈ 175.8 s 绑定，与 PCIe 无关。
+会话后只读核对：当前系统的 `/etc/e2631-wifi-boot-pending` 已不存在（本 boot 已清掉），**无需改代码**；
+该延迟是之前多次被打断的会话留下的 pending 标记造成的，干净 overlay 的首启应按 ~54 s 行为。
+该差异**不影响** A6 判据（最终 ready + 双频转发都成立），Session C 冷启动时顺带确认无该日志行即可。
 
 ## 6. 工具缺陷与修正（产品判定不受影响）
 
@@ -137,7 +141,7 @@ PCIe 端点在 0.6 s 就枚举完成，所以这不是端点缺失；更像 wifi
 1. **Session B**：env 恢复（`0xC0000` 块回到 `6e2c01da...`）+ 新 mtd0 镜像刷写梯（v3 的 `e2631-uboot-mtd0.bin`，
    sha256 `f6d179da...`），每步断言 readback；本会话只验证了 RAM 链，flash 链尚未写入。
 2. **Session C**：物理断电冷启动，验证 BootROM → secondboot → 我们 flash U-Boot → e2631boot → 内核 + 网络 + Wi-Fi。
-3. 观察项跟进：Wi-Fi ready latency 176 s vs 54 s（§5），以及在 flash 链上复测端点/双频。
+3. Wi-Fi latency 已归因（§5：上一 boot 遗留 pending 标记的设计性 120 s 重试，无需改代码）；Session C 冷启动确认无 `previous initialization unfinished` 行，并复测端点/双频。
 
 ## 9. 附件（[uboot-a6-session/](uboot-a6-session/)）
 
