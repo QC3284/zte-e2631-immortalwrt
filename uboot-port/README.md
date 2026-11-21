@@ -405,4 +405,7 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 - 2026-11-21（C1b-1 修复，patch 0011）：新增 `board/zte/zxhn-e2631/e2631soc.c|.h`（厂商顺序 CP15 清理、
   CP15 前后 dumps、`e2631soc` 命令）并从 defconfig 移除 `CONFIG_SKIP_LOWLEVEL_INIT`；重钉结果 tree 为
   `c8914654a4787fdc67c30bea44de5d70d39e8fdc`（11 个 patch）。设计见
-  [a4-soc-state-design.md](a4-soc-state-design.md)；CI run/artifact 与 `e2631soc` 输出契约在后续提交补全。
+  [a4-soc-state-design.md](a4-soc-state-design.md)。CI run `44921033410`（head `270707b`）SUCCESS：banner
+  `g6f5036fa039d`、`u-boot.bin` 449,240 B sha256 `bef0d841bc26e2dc9db4484e26285d23d8d3bf9e1a63ad81f080c28b026206f4`、
+  mtd0 镜像 sha256 `83457522357bc4d55f4a36d3dd912ff9184c31dad754cec3dff3a9d1f7c2412e`、env 块 `6eee153b…` 未变；
+  详见 [evidence/uboot-cp15-cleanup-20261121.md](../evidence/uboot-cp15-cleanup-20261121.md)。

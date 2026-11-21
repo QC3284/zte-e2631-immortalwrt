@@ -98,6 +98,16 @@ e2631soc: back at the prompt, nothing was booted
 4. mtd0/env 零写审计：本次改动的两条路径都不写 flash；env 块由 CI 从跟踪文本重建，sha256 应与上一产物
    一致（CI 输出记录）。
 
+### 6.1 本轮 CI 结果（2026-11-21）
+
+- `uboot-build.yml` run `44921033410`（head `270707b`）SUCCESS：banner token `g6f5036fa039d`，
+  `u-boot.bin` 449,240 B sha256 `bef0d841…`，mtd0 镜像 sha256 `83457522…`，entry `0x47f00000`。
+- env 块 sha256 `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`，与上一产物逐字节一致。
+- `.config`：`# CONFIG_SKIP_LOWLEVEL_INIT is not set` 已生效；checkpatch 0 errors / 9 warnings（0011 自身 0/2）。
+- kit `check.yml` run `44921032701` SUCCESS；详细值与产物清单见
+  [evidence/uboot-cp15-cleanup-20261121.md](../evidence/uboot-cp15-cleanup-20261121.md)。
+- 首次 dispatch run `44920790242` 因 commits.env 头注释越出注释块而失败，`270707b` 修复。
+
 ## 7. 边界与风险
 
 - 入口配置改动影响所有链：RAM 链（厂商 `go`）也会跑标准入口归一化；必须先做第 6.2 的 RAM 链 A/B。
@@ -113,6 +123,7 @@ e2631soc: back at the prompt, nothing was booted
 - [evidence/p2-flashboot-kernel-hang-20261121.md](../evidence/p2-flashboot-kernel-hang-20261121.md)（iwrt-baseline，厂商逆向 §3-§8）
 - [evidence/uboot-re-20261115.md](../evidence/uboot-re-20261115.md)（mtd0 布局/入口）
 - [evidence/c1b1a-write-rehearsal-20261121.md](../evidence/c1b1a-write-rehearsal-20261121.md)（写通道演练）
+- [evidence/uboot-cp15-cleanup-20261121.md](../evidence/uboot-cp15-cleanup-20261121.md)（本轮 CI 构建与 e2631soc 契约）
 - [README.md](README.md)（pin、CI 断言、A1/A2/A3 步骤）
 - 内核侧地址来源：`target/linux/zx279128/patches-6.18/026-ARM-dts-zte-Add-ZX279128S-SoC-description.patch`
   （l2cc `0x00c00000`、SCU `0x00800000`、GIC `0x00801000`）
