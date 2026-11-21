@@ -249,6 +249,25 @@ jobs:
             echo "::error::the late PCIe reset-line drives are missing from e2631net.c"
             exit 1
           fi
+          # U-0016: the class-1 cross-slot fallback must stay in the source and
+          # in the linked image. cspboot boots the other slot when the selected
+          # slot uImage is unusable; the log string is the runtime proof that
+          # the retry path survived compilation and the --gc-sections link.
+          if ! grep -q "e2631_try_boot_slot" board/zte/zxhn-e2631/e2631boot.c; then
+            echo "::error::e2631_try_boot_slot() is missing from e2631boot.c"
+            exit 1
+          fi
+          for fb_marker in "falling back to slot" "cspboot class-1 parity"; do
+            if ! grep -q "$fb_marker" board/zte/zxhn-e2631/e2631boot.c; then
+              echo "::error::the class-1 fallback log line is missing: $fb_marker"
+              exit 1
+            fi
+          done
+          if ! grep -aq "falling back to slot" build/u-boot.bin; then
+            echo "::error::u-boot.bin is missing the class-1 fallback log string"
+            exit 1
+          fi
+          echo "class-1 slot fallback: source and image present"
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"

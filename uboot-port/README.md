@@ -4,7 +4,7 @@
 （0001/0002 为 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC +
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
-的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口））、
+的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env））、
 pin 文件、六份设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -79,7 +79,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0014 sha256 | `0bfb4302fec14b6d0d2549cebe4a1ddf311bd50f044849d0bdaf09c1ed943110` |
 | patch 0015 | `uboot-port/patches/0015-cmd-mtd-gate-write-and-erase-behind-CMD_MTD_WRITE.patch`（`CONFIG_CMD_MTD_WRITE` 默认 y，本 defconfig 关闭；原始 `mtd write/erase` 子命令编掉） |
 | patch 0015 sha256 | `84bfc65f5bb335d5a6d33b93ccfb8e367e210d0af155ddc6ab82eb14fa6c8f3b` |
-| am 之后 tree | `31843b38628ccf9c3e0b542ec4db014b6612755d`（与机器无关，15 个 patch） |
+| patch 0016 | `uboot-port/patches/0016-board-zte-fall-back-to-the-other-slot-on-a-bad-uImage.patch`（class-1 跨槽回退：选中槽 uImage 任一级校验失败时改启另一槽一次） |
+| patch 0016 sha256 | `7838e8a22dd46996c9ccb31f9fe116e194641d2a26f548e9854548bfefc62461` |
+| am 之后 tree | `13c92c68921fa781634beb50d0eaffd50e9a7648`（与机器无关，16 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -95,7 +97,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = 31843b38628ccf9c3e0b542ec4db014b6612755d
+test "$(git rev-parse HEAD^{tree})" = 13c92c68921fa781634beb50d0eaffd50e9a7648
 ```
 
 ## 2. 新增/修改的文件
@@ -108,7 +110,7 @@ test "$(git rev-parse HEAD^{tree})" = 31843b38628ccf9c3e0b542ec4db014b6612755d
 | `arch/arm/mach-zx279128s/Makefile` | A1 无 SoC 私有代码（secondboot 已完成初始化），只留占位说明 |
 | `board/zte/zxhn-e2631/Kconfig` | `SYS_BOARD`/`SYS_VENDOR`/`SYS_CONFIG_NAME` |
 | `board/zte/zxhn-e2631/Makefile` | 编译 `zxhn-e2631.o`、`e2631boot.o`（A3）、`e2631soc.o`（C1b）、`e2631net.o`（A5）与 `e2631flash.o`（D-U1） |
-| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()` |
+| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()`；U-0016：选中槽 uImage 失败时经 `e2631_try_boot_slot()` 改试另一槽一次（class-1 回退，无 flash/env 写） |
 | `board/zte/zxhn-e2631/e2631soc.c` | C1b：厂商顺序的 CP15 清理 + `e2631soc` 只读报告命令（SCTLR/CLIDR/TTBR0/VBAR/ACTLR 前后值；不启动、不写 flash/env） |
 | `board/zte/zxhn-e2631/e2631soc.h` | `e2631_soc_prepare_linux()` 原型（`e2631boot.c` 与 `e2631soc.c` 共用一条代码路径） |
 | `board/zte/zxhn-e2631/e2631net.c` | A5：厂商 `board_eth_init()` 的参考时钟/SerDes/CRM2/管脚序列（pinmux 六个整字、只驱动八个输出、`0x9400000C` 的 `bits[21:20]` 时钟选择）+ `e2631refclk` 前后 dump 命令（不启动、不写 flash/env） |
@@ -211,6 +213,16 @@ endpoint（`14c3:7906`/`14c3:790a` 缺失，`mt7915e` 无法绑定），厂商�
 
 补丁 0015（2026-11-22，D-U1 写入口收口）：上游 `CONFIG_CMD_MTD` 会编译 `mtd write/erase` 子命令，与 `e2631flash` 并存等于多一条无保护写入口。新增 `CONFIG_CMD_MTD_WRITE`（bool，默认 y，保持上游语义），把 `cmd/mtd.c` 的 write/erase 子命令表项、`do_mtd_io` 写分支、整个 `do_mtd_erase()` 与 `mtd_special_write_oob()` 放到 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 后；本 defconfig 写 `# CONFIG_CMD_MTD_WRITE is not set`，read/dump 不受影响。`env/mtd.c` 的 save/erase 在 `# CONFIG_CMD_SAVEENV is not set` 下由 `ENV_SAVE_PTR`/`ENV_ERASE_PTR` 变为 NULL，且 ARM 链接的 `--gc-sections` 会丢掉未引用段，不构成第二条写路径；CI 用调用点白名单证明镜像里 `mtd_write()`/`mtd_erase()` 的调用只出现在 e2631flash 代码内。
 
+补丁 0016（2026-11-22，U-0016，class-1 跨槽回退）：厂商 cspboot 在选中槽的内核 CRC 不合格时会自动改启另一个
+合法槽（`pdt_getreal_kernelfs` 的 `csp_crc` 路径，日志 `not found vaild fs!! -> Total found 2 firmwares(valid:1)`），
+而我们的 `e2631boot`（0006）在任一 uImage 校验失败时直接返回。0016 把“启动一个槽”拆成 `e2631_try_boot_slot()`：
+先按 cspboot 的 serial 规则选槽并校验其 uImage（头读取、magic/type/OS/压缩、header CRC、大小窗口、短读、
+data CRC），任一失败则打印 `slot%d unusable (<reason>), falling back to slot%d (cspboot class-1 parity)` 并
+改试另一槽一次；两槽都失败时打印逐槽诊断表（base/serial/version/失败原因）并返回控制台，不调用 `bootm`。
+回退无状态：不改版本头/serial、不写“上次启动失败”标志、不计数、不写 flash、不碰 env，且只影响本次启动
+（下次仍按 serial 规则选）。健康路径与 `e2631slot` 的扫描/选择代码完全不变。设计依据见
+[docs/U-Boot-env写回与启动计数设计-2026-11-22.md](../docs/U-Boot-env写回与启动计数设计-2026-11-22.md) §6.3/§7。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
@@ -225,6 +237,7 @@ endpoint（`14c3:7906`/`14c3:790a` 缺失，`mt7915e` 无法绑定），厂商�
 | 跳转前 CP15 清理 | `e2631_soc_prepare_linux()`（0011） | `e2631boot` 在 `bootm` 前调用；执行厂商 `cleanup_before_linux()`（`0x47f00534`）的顺序：I-cache 关、ICIALLU+BPIALL+DSB+ISB、D clean+invalidate by set/way（若 SCTLR.C 开）、清 SCTLR.M/C、D invalidate by set/way。纯内联汇编，不依赖 `SYS_*CACHE_OFF` 桩；厂商不做 PL310/SCU/ACTLR 初始化，本实现也不写这些寄存器。`e2631soc` 跑同一函数并打印 SCTLR/CLIDR/TTBR0/VBAR/ACTLR/DACR/CCSIDR 前后值（md 读不到 CP15）与只读的 PL310/SCU 状态，不启动 |
 | env | `ENV_IS_IN_MTD`（只读） | A3 从厂商块 `0xC0000`/`0x20000` 只读载入（格式与 `env_t` 逐字节兼容）；`saveenv` 编掉；持久化策略（bootdelay/旁路变量）留给 B1；0009 起日志名称显示为 `MTD`（此前 `<NULL>` 只是 `CMD_SAVEENV` 关闭后 `.name` 没定义，不代表未生效） |
 | 槽位启动 | `e2631boot`（A3） | 扫描两槽每 128 KiB 块找版本头（内层 magic + CRC1），serial 大者胜出（`slot0.serial==0` 也按小处理）；从 `slot+0x20` 读 uImage 到 `0x42000000` 后 `bootm`；ATAGS + 内核 append-dtb |
+| class-1 跨槽回退 | `e2631_try_boot_slot()` + 一次重试（0016） | cspboot 在选中槽 uImage 坏时改启另一槽；0016 补齐该语义：失败日志 `falling back to slot%d (cspboot class-1 parity)`，两槽都坏时打印诊断表并回控制台；无状态、只影响本次启动、不写 flash/env，serial 选择规则与 `e2631slot` 共用代码不变 |
 | ATAGS 缓冲区 | `CFG_SYS_SDRAM_BASE + 0x100`（= `0x40000100`） | 0008 在 `board_late_init()` 设置 `gd->bd->bi_boot_params`；`static_assert` 保证 > DRAM base 且 +0x100 ≤ 内核 load `0x40008000`；本配置 `SYS_MALLOC_BOOTPARAMS` 关闭，没有其它代码分配该缓冲区 |
 | 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；后续再考虑分离/追加格式 |
 | SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
@@ -263,8 +276,8 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `31843b38628ccf9c3e0b542ec4db014b6612755d`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 15）。
+1. `git rev-parse HEAD^{tree}` == `13c92c68921fa781634beb50d0eaffd50e9a7648`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 16）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -277,7 +290,7 @@ make O=build -j"$(nproc)"
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
    `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 20 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
-   0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings：新建文件缺 MAINTAINERS 更新、
+   0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0：新建文件缺 MAINTAINERS 更新、
    新增自用板级命令、以及 0015 的 5 条 PREFER_IF——这些 `#if CONFIG_IS_ENABLED()` 必须在编译期生效才能把写入口编掉，
    运行期 `if` 达不到目的，均为已核对项）。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
@@ -298,7 +311,9 @@ make O=build -j"$(nproc)"
     `grep -q 'mcr p15' board/zte/zxhn-e2631/e2631soc.c`、
     `grep -q 'e2631_net_refclk_init' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'E2631_GPIO_PCIE_RST0' board/zte/zxhn-e2631/e2631net.c`、
-    `grep -q 'e2631_stage_source' board/zte/zxhn-e2631/e2631flash.c`（0014 的 bounce staging），且 `e2631net.c` 仍含厂商值
+    `grep -q 'e2631_stage_source' board/zte/zxhn-e2631/e2631flash.c`（0014 的 bounce staging）、
+    `grep -q 'e2631_try_boot_slot' board/zte/zxhn-e2631/e2631boot.c` 且源码与二进制都含 `falling back to slot`
+    （0016 的 class-1 回退确实编进镜像），且 `e2631net.c` 仍含厂商值
     `0x004fdf3b`、`0x003c0040`、`0x0001381b`、板级 pinmux 字 `0x0f3ffffa`、`0x003dbf85` 与 `0x9400000C` 的 `0x00100000`。形状断言只防回归；编译由 CI 保证，运行期
     （bootm 进内核、env 日志显示 MTD、CP15 前后差值、网络时钟前后差值）由 C1a/C1b 重跑与 Session A 的
     `e2631soc`/`e2631refclk` 输出保证。
@@ -421,7 +436,7 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   payload CRC32、单独一次写入并读回比较；没有串口恢复手段时不执行。命令只写用户给定范围，明确拒绝 secondboot
   （0x00000..0x20000）与 env（0xC0000..0xE0000）。
 - **checkpatch**：本系列 0 errors、20 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
-  0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings），均为已核对的已知项——6 条 "does MAINTAINERS
+  0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0），均为已核对的已知项——6 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
   patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c`、
   patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h` 各一条；checkpatch 按单 patch 看不到
@@ -438,7 +453,8 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 
 - **A2**：SPIFC + SPI-NAND 只读路径已由 patch 0005 交付（RAM 链内 `mtd list`/`mtd read`）。芯片 ID
   实测为 `0xCD/0x71`，用现成 FORESEE `F35SQA001G` 条目（若出现 `0xC9` 再加 heyangtek 条目）。
-- **A3**：槽位感知启动已由 patch 0006/0007 交付（`e2631boot` + 只读 env）。`TEXT_BASE` 已在 task-55 对齐
+- **A3**：槽位感知启动已由 patch 0006/0007 交付（`e2631boot` + 只读 env）；class-1 跨槽回退由 0016 交付
+  （选中槽 uImage 坏时改启另一槽一次，无状态、不写 flash/env，见 §2 补丁 0016）。`TEXT_BASE` 已在 task-55 对齐
   secondboot 入口 `0x47F00000`；C1b 的 CP15 归一化由 0011 交付（`e2631soc` + bootm 钩子）。剩下的 env
   持久化（B1）、按活动槽位切换根文件系统放在后续会话。
 - **A5**：厂商 `board_eth_init()` 的参考时钟/SerDes/管脚初始化由 patch 0012 交付（`e2631refclk` 前后 dump +
