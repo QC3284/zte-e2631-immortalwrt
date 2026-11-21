@@ -1,0 +1,196 @@
+4306c630: 34 0e 06 43 17 00 00 00 3c 0e 06 43 17 00 00 00    4..C....<..C....
+4306c640: 40 0e 06 43 17 00 00 00 48 0e 06 43 17 00 00 00    @..C....H..C....
+4306c650: 4c 0e 06 43 17 00 00 00 7c 0e 06 43 17 00 00 00    L..C....|..C....
+4306c660: 94 0e 06 43 17 00 00 00 c4 0e 06 43 17 00 00 00    ...C.......C....
+4306c670: 0c 0f 06 43 17 00 00 00 54 0f 06 43 17 00 00 00    ...C....T..C....
+4306c680: 9c 0f 06 43 17 00 00 00 e4 0f 06 43 17 00 00 00    ...C.......C....
+4306c690: f8 0f 06 43 17 00 00 00 fc 0f 06 43 17 00 00 00    ...C.......C....
+4306c6a0: 2c 10 06 43 17 00 00 00 34 10 06 43 17 00 00 00    ,..C....4..C....
+4306c6b0: 74 10 06 43 17 00 00 00 7c 10 06 43 17 00 00 00    t..C....|..C....
+4306c6c0: 88 10 06 43 17 00 00 00 90 10 06 43 17 00 00 00    ...C.......C....
+4306c6d0: 94 10 06 43 17 00 00 00 bc 10 06 43 17 00 00 00    ...C.......C....
+4306c6e0: 04 11 06 43 17 00 00 00 14 11 06 43 17 00 00 00    ...C.......C....
+4306c6f0: 18 11 06 43 17 00 00 00                            ...C....
+=> go 0x43000000
+## Starting application at 0x43000000 ...
+
+
+U-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from nowhere...Loading Environment from nowhere... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 2[2KHit any key to stop autoboot: 1[2KHit any key to stop autoboot: 0
+boot_params = 0x00000000
+DRAM bank   = 0x00000000
+-> start    = 0x40000000
+-> size     = 0x10000000
+flashstart  = 0x00000000
+flashsize   = 0x00000000
+flashoffset = 0x00000000
+baudrate    = 115200 bps
+relocaddr   = 0x4ff95000
+reloc off   = 0x0cf95000
+Build       = 32-bit
+current eth = unknown
+eth-1addr   = (not set)
+IP addr     = <NULL>
+fdt_blob    = 0x4fff11d0
+lmb_dump_all:
+ memory.count = 0x1
+ memory[0]	[0x40000000-0x4fffffff], 0x10000000 bytes, flags: none
+ reserved.count = 0x2
+ reserved[0]	[0x4eb72000-0x4eb74fff], 0x3000 bytes, flags: no-notify, no-overwrite
+ reserved[1]	[0x4eb75eb0-0x4fffffff], 0x148a150 bytes, flags: no-overwrite
+devicetree  = embed
+serial addr = 0x94404000
+ width      = 0x00000004
+ shift      = 0x00000002
+ offset     = 0x00000000
+ clock      = 0x00000000
+arch_number = 0x00000000
+irq_sp      = 0x4fb75ec0
+sp start    = 0x4fb75eb0
+Early malloc usage: 194 / 800
+=> 
+=> help
+?         - alias for 'help'
+base      - print or set address offset
+bdinfo    - print Board Info structure
+blkcache  - block cache diagnostics and control
+boot      - boot default, i.e., run 'bootcmd'
+bootd     - boot default, i.e., run 'bootcmd'
+bootefi   - Boots an EFI payload from memory
+bootelf   - Boot from an ELF image in memory
+bootflow  - Boot flows
+bootm     - boot application image from memory
+bootp     - boot image via network using BOOTP/TFTP protocol
+bootvx    - Boot vxWorks from an ELF image
+cmp       - memory compare
+coninfo   - print console devices and information
+cp        - memory copy
+crc32     - checksum calculation
+echo      - echo args to console
+editenv   - edit environment variable
+eficonfig - provide menu-driven UEFI variable maintenance interface
+env       - environment handling commands
+fdt       - flattened device tree utility commands
+go        - start application at address 'addr'
+help      - print command description/usage
+iminfo    - print header information for application image
+imxtract  - extract a part of a multi-image
+itest     - return true/false on integer compare
+loadb     - load binary file over serial line (kermit mode)
+loads     - load S-Record file over serial line
+loadx     - load binary file over serial line (xmodem mode)
+loady     - load binary file over serial line (ymodem mode)
+loop      - infinite loop on address range
+md        - memory display
+mm        - memory modify (auto-incrementing address)
+mtd       - MTD utils
+mtest     - simple RAM read/write test
+mw        - memory write (fill)
+net       - NET sub-system
+nm        - memory modify (constant address)
+panic     - Panic with optional message
+printenv  - print environment variables
+random    - fill memory with random pattern
+reset     - Perform RESET of the CPU
+run       - run commands in an environment variable
+setenv    - set environment variables
+setexpr   - set environment variable as the result of eval expression
+sleep     - delay execution for some time
+source    - run script from memory
+tftpboot  - load file via network using TFTP protocol
+version   - print monitor, compiler and linker version
+=> version
+U-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> echo A1-PROMPT-ALIVE
+A1-PROMPT-ALIVE
+=> crc32 0x43000000 0x100
+CRC32 for 43000000 ... 430000ff ==> 660a59e8
+=> help
+?         - alias for 'help'
+base      - print or set address offset
+bdinfo    - print Board Info structure
+blkcache  - block cache diagnostics and control
+boot      - boot default, i.e., run 'bootcmd'
+bootd     - boot default, i.e., run 'bootcmd'
+bootefi   - Boots an EFI payload from memory
+bootelf   - Boot from an ELF image in memory
+bootflow  - Boot flows
+bootm     - boot application image from memory
+bootp     - boot image via network using BOOTP/TFTP protocol
+bootvx    - Boot vxWorks from an ELF image
+cmp       - memory compare
+coninfo   - print console devices and information
+cp        - memory copy
+crc32     - checksum calculation
+echo      - echo args to console
+editenv   - edit environment variable
+eficonfig - provide menu-driven UEFI variable maintenance interface
+env       - environment handling commands
+fdt       - flattened device tree utility commands
+go        - start application at address 'addr'
+help      - print command description/usage
+iminfo    - print header information for application image
+imxtract  - extract a part of a multi-image
+itest     - return true/false on integer compare
+loadb     - load binary file over serial line (kermit mode)
+loads     - load S-Record file over serial line
+loadx     - load binary file over serial line (xmodem mode)
+loady     - load binary file over serial line (ymodem mode)
+loop      - infinite loop on address range
+md        - memory display
+mm        - memory modify (auto-incrementing address)
+mtd       - MTD utils
+mtest     - simple RAM read/write test
+mw        - memory write (fill)
+net       - NET sub-system
+nm        - memory modify (constant address)
+panic     - Panic with optional message
+printenv  - print environment variables
+random    - fill memory with random pattern
+reset     - Perform RESET of the CPU
+run       - run commands in an environment variable
+setenv    - set environment variables
+setexpr   - set environment variable as the result of eval expression
+sleep     - delay execution for some time
+source    - run script from memory
+tftpboot  - load file via network using TFTP protocol
+version   - print monitor, compiler and linker version
+=> mtd list
+List of MTD devices:
+* spi-nand0
+  - device: flash@0
+  - parent: spi@94406000
+  - driver: spi_nand
+  - path: /spi@94406000/flash@0
+  - type: NAND flash
+  - block size: 0x20000 bytes
+  - min I/O: 0x800 bytes
+  - OOB size: 64 bytes
+  - OOB available: 62 bytes
+  - ECC strength: 1 bits
+  - ECC step size: 512 bytes
+  - bitflip threshold: 1 bits
+  - 0x000000000000-0x000008000000 : "spi-nand0"
+=> mtd read spi-nand0 0x4C000000 0x20000 0x2000
+Reading 8192 byte(s) (4 page(s)) at offset 0x00020000
+=> md.b 0x4C000000 0x2000
+4c000000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+4c000010: 31 32 38 73 00 80 06 00 00 00 00 00 00 00 00 00  128s............
+4c000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+4c000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+4c000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+4c000050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................

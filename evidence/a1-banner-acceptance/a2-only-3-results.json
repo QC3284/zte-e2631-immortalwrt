@@ -1,0 +1,458 @@
+{
+ "mode": "a2-only",
+ "started": "2026-11-21T15:37:46+0800",
+ "capture_before": {
+  "supervisor_pids": [
+   94995
+  ],
+  "bootwatch_pids": [
+   95002
+  ],
+  "tty_holders": [
+   95001
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "attach": {
+  "ok": true,
+  "tail": "<INTERRUPT>\r\n=>"
+ },
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a2-44877441503/e2631-uboot-44877441503/u-boot.bin",
+  "size": 444152,
+  "size_ok": true,
+  "sha256": "a1df51f360eb70d9f4622f2f417a75726819c8661531ab24f62415a63ba2a626",
+  "sha_ok": true,
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_offset": 377199,
+  "banner_token": "U-Boot 2027.01-rc2-g38bee433d177",
+  "crc32": "5428b85b",
+  "crc32_hex": "5428b85b",
+  "expected_sha": "a1df51f360eb70d9f4622f2f417a75726819c8661531ab24f62415a63ba2a626",
+  "expected_size": 444152,
+  "expected_token": "U-Boot 2027.01-rc2-g38bee433d177",
+  "expected_token_ok": true
+ },
+ "stage": {
+  "name": "a2",
+  "artifact": {
+   "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a2-44877441503/e2631-uboot-44877441503/u-boot.bin",
+   "size": 444152,
+   "size_ok": true,
+   "sha256": "a1df51f360eb70d9f4622f2f417a75726819c8661531ab24f62415a63ba2a626",
+   "sha_ok": true,
+   "entry_bytes": "b80000ea14f09fe5",
+   "banner_offset": 377199,
+   "banner_token": "U-Boot 2027.01-rc2-g38bee433d177",
+   "crc32": "5428b85b",
+   "crc32_hex": "5428b85b",
+   "expected_sha": "a1df51f360eb70d9f4622f2f417a75726819c8661531ab24f62415a63ba2a626",
+   "expected_size": 444152,
+   "expected_token": "U-Boot 2027.01-rc2-g38bee433d177",
+   "expected_token_ok": true
+  },
+  "xmodem": {
+   "ok": true,
+   "mode": "crc",
+   "file_size": 444152,
+   "block_size": 1024,
+   "blocks": 434,
+   "pad": 264,
+   "bytes_sent": 444152,
+   "elapsed_s": 41.5,
+   "eot_acked": true,
+   "tail_b64": "PT4g",
+   "attempt": 1
+  },
+  "crc32": {
+   "available": false,
+   "device_crc32": null,
+   "host_crc32": "5428b85b",
+   "ok": false,
+   "raw": "crc32 0x43000000 0x6C6F8\r\nUnknown command 'crc32' - try 'help'\r\n=>"
+  },
+  "crc32_skipped": true,
+  "md_compare": {
+   "ok": true,
+   "bytes_compared": 444152,
+   "mismatches": 0,
+   "first_mismatch_offset": null,
+   "gaps": 0,
+   "retries": 0,
+   "chunks": [
+    {
+     "offset": 0,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 16384,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 32768,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 10.4,
+     "attempt": 1
+    },
+    {
+     "offset": 49152,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 8.4,
+     "attempt": 1
+    },
+    {
+     "offset": 65536,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 81920,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 98304,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 114688,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 131072,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 147456,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 163840,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 180224,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 196608,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.4,
+     "attempt": 1
+    },
+    {
+     "offset": 212992,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 229376,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 245760,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 262144,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 278528,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 294912,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 311296,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 327680,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 344064,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 360448,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 376832,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.7,
+     "attempt": 1
+    },
+    {
+     "offset": 393216,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 409600,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 425984,
+     "size": 16384,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 7.1,
+     "attempt": 1
+    },
+    {
+     "offset": 442368,
+     "size": 1784,
+     "mismatches": 0,
+     "gaps": 0,
+     "elapsed_s": 0.8,
+     "attempt": 1
+    }
+   ]
+  },
+  "go": {
+   "banner_token_seen": true,
+   "prompt_seen": true,
+   "banner_line": "U-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)",
+   "raw_tail": "go 0x43000000\r\n## Starting application at 0x43000000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\n"
+  },
+  "prompt_alive": {
+   "bare_cr_prompt": true,
+   "help": {
+    "ok": true,
+    "unknown": false,
+    "tail": "ill)\r\nnet       - NET sub-system\r\nnm        - memory modify (constant address)\r\npanic     - Panic with optional message\r\nprintenv  - print environment variables\r\nrandom    - fill memory with random pattern\r\nreset     - Perform RESET of the CPU\r\nrun       - run commands in an environment variable\r\nsetenv    - set environment variables\r\nsetexpr   - set environment variable as the result of eval expression\r\nsleep     - delay execution for some time\r\nsource    - run script from memory\r\ntftpboot  - load file via network using TFTP protocol\r\nversion   - print monitor, compiler and linker version\r\n=>"
+   },
+   "version": {
+    "ok": true,
+    "unknown": false,
+    "tail": "version\r\nU-Boot 2027.01-rc2-g38bee433d177 (Nov 21 2026 - 06:51:40 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=>"
+   },
+   "echo A1-PROMPT-ALIVE": {
+    "ok": true,
+    "unknown": false,
+    "tail": "echo A1-PROMPT-ALIVE\r\nA1-PROMPT-ALIVE\r\n=>"
+   },
+   "crc32 0x43000000 0x100": {
+    "ok": true,
+    "unknown": false,
+    "tail": "crc32 0x43000000 0x100\r\nCRC32 for 43000000 ... 430000ff ==>"
+   },
+   "alive": true
+  },
+  "help_text": "help\r\n?         - alias for 'help'\r\nbase      - print or set address offset\r\nbdinfo    - print Board Info structure\r\nblkcache  - block cache diagnostics and control\r\nboot      - boot default, i.e., run 'bootcmd'\r\nbootd     - boot default, i.e., run 'bootcmd'\r\nbootefi   - Boots an EFI payload from memory\r\nbootelf   - Boot from an ELF image in memory\r\nbootflow  - Boot flows\r\nbootm     - boot application image from memory\r\nbootp     - boot image via network using BOOTP/TFTP protocol\r\nbootvx    - Boot vxWorks from an ELF image\r\ncmp       - memory compare\r\nconinfo   - print console devices and information\r\ncp        - memory copy\r\ncrc32     - checksum calculation\r\necho      - echo args to console\r\neditenv   - edit environment variable\r\neficonfig - provide menu-driven UEFI variable maintenance interface\r\nenv       - environment handling commands\r\nfdt       - flattened device tree utility commands\r\ngo        - start application at address 'addr'\r\nhelp      - print command description/usage\r\niminfo    - print header information for application image\r\nimxtract  - extract a part of a multi-image\r\nitest     - return true/false on integer compare\r\nloadb     - load binary file over serial line (kermit mode)\r\nloads     - load S-Record file over serial line\r\nloadx     - load binary file over serial line (xmodem mode)\r\nloady     - load binary file over serial line (ymodem mode)\r\nloop      - infinite loop on address range\r\nmd        - memory display\r\nmm        - memory modify (auto-incrementing address)\r\nmtd       - MTD utils\r\nmtest     - simple RAM read/write test\r\nmw        - memory write (fill)\r\nnet       - NET sub-system\r\nnm        - memory modify (constant address)\r\npanic     - Panic with optional message\r\nprintenv  - print environment variables\r\nrandom    - fill memory with random pattern\r\nreset     - Perform RESET of the CPU\r\nrun       - run commands in an environment variable\r\nsetenv    - set environment variables\r\nsetexpr   - set environment variable as the result of eval expression\r\nsleep     - delay execution for some time\r\nsource    - run script from memory\r\ntftpboot  - load file via network using TFTP protocol\r\nversion   - print monitor, compiler and linker version\r\n=>",
+  "help_has_reset": true,
+  "help_has_mtd": true,
+  "ok": true,
+  "mtd": {
+   "device": "spi-nand0",
+   "read_size": 8192,
+   "reads": [
+    {
+     "label": "u-boot-header",
+     "offset": 131072,
+     "ram": 1275068416,
+     "size": 8192,
+     "read_cmd": "mtd read spi-nand0 0x4C000000 0x20000 0x2000",
+     "read_error": false,
+     "read_tail": "mtd read spi-nand0 0x4C000000 0x20000 0x2000\r\nReading 8192 byte(s) (4 page(s)) at offset 0x00020000\r\n=>",
+     "mismatches": 0,
+     "first_mismatch": null,
+     "gaps": 0,
+     "ok": true
+    },
+    {
+     "label": "u-boot-env",
+     "offset": 786432,
+     "ram": 1276116992,
+     "size": 8192,
+     "read_cmd": "mtd read spi-nand0 0x4C100000 0xC0000 0x2000",
+     "read_error": false,
+     "read_tail": "mtd read spi-nand0 0x4C100000 0xC0000 0x2000\r\nReading 8192 byte(s) (4 page(s)) at offset 0x000c0000\r\n=>",
+     "mismatches": 0,
+     "first_mismatch": null,
+     "gaps": 0,
+     "ok": true
+    }
+   ],
+   "list_tail": "mtd list\r\nList of MTD devices:\r\n* spi-nand0\r\n  - device: flash@0\r\n  - parent: spi@94406000\r\n  - driver: spi_nand\r\n  - path: /spi@94406000/flash@0\r\n  - type: NAND flash\r\n  - block size: 0x20000 bytes\r\n  - min I/O: 0x800 bytes\r\n  - OOB size: 64 bytes\r\n  - OOB available: 62 bytes\r\n  - ECC strength: 1 bits\r\n  - ECC step size: 512 bytes\r\n  - bitflip threshold: 1 bits\r\n  - 0x000000000000-0x000008000000 : \"spi-nand0\"\r\n=>",
+   "list_checks": {
+    "header": true,
+    "spi_nand": true,
+    "block_size": true,
+    "min_io": true,
+    "oob_size": true
+   },
+   "list_ok": true,
+   "ok": true
+  }
+ },
+ "mtd": {
+  "device": "spi-nand0",
+  "read_size": 8192,
+  "reads": [
+   {
+    "label": "u-boot-header",
+    "offset": 131072,
+    "ram": 1275068416,
+    "size": 8192,
+    "read_cmd": "mtd read spi-nand0 0x4C000000 0x20000 0x2000",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C000000 0x20000 0x2000\r\nReading 8192 byte(s) (4 page(s)) at offset 0x00020000\r\n=>",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "gaps": 0,
+    "ok": true
+   },
+   {
+    "label": "u-boot-env",
+    "offset": 786432,
+    "ram": 1276116992,
+    "size": 8192,
+    "read_cmd": "mtd read spi-nand0 0x4C100000 0xC0000 0x2000",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C100000 0xC0000 0x2000\r\nReading 8192 byte(s) (4 page(s)) at offset 0x000c0000\r\n=>",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "gaps": 0,
+    "ok": true
+   }
+  ],
+  "list_tail": "mtd list\r\nList of MTD devices:\r\n* spi-nand0\r\n  - device: flash@0\r\n  - parent: spi@94406000\r\n  - driver: spi_nand\r\n  - path: /spi@94406000/flash@0\r\n  - type: NAND flash\r\n  - block size: 0x20000 bytes\r\n  - min I/O: 0x800 bytes\r\n  - OOB size: 64 bytes\r\n  - OOB available: 62 bytes\r\n  - ECC strength: 1 bits\r\n  - ECC step size: 512 bytes\r\n  - bitflip threshold: 1 bits\r\n  - 0x000000000000-0x000008000000 : \"spi-nand0\"\r\n=>",
+  "list_checks": {
+   "header": true,
+   "spi_nand": true,
+   "block_size": true,
+   "min_io": true,
+   "oob_size": true
+  },
+  "list_ok": true,
+  "ok": true
+ },
+ "ok": true,
+ "recovery": {
+  "method": "power-cycle",
+  "reset_in_help": true,
+  "reset_rebooted": false,
+  "linux": {
+   "ok": true,
+   "marker": true
+  }
+ },
+ "transcript": "serial.log",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   96223
+  ],
+  "bootwatch_pids": [
+   96230
+  ],
+  "tty_holders": [
+   96229
+  ],
+  "events_tail": "2026-11-21T15:37:28+08:00 reader-start pid=94995\n2026-11-21T15:43:38+08:00 reader-start pid=96223",
+  "ok": true
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2060ms\nrtt min/avg/max/mdev = 0.766/0.845/0.898/0.056 ms\n== ssh identity (retries) ==\n  ssh attempt 0 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n  ssh attempt 1 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n  ssh attempt 2 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n== done ==",
+ "finished": "2026-11-21T15:44:14+0800",
+ "verdict": "FAIL"
+}

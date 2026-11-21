@@ -29,6 +29,8 @@
 | [../evidence/t38/](../evidence/t38/) | task-38 验收附件：verify-task38.sh、终稿策略、端到端日志、比较器/kernel-deep/verify_img 报告、负对照 |
 | [../evidence/p2-oob-recon-20261121.md](../evidence/p2-oob-recon-20261121.md) | P2-P1：mtd0 OOB 只读取证（512 页表、normal/RAW 全 FF、跨分区对照、ECC 布局未证实、READID 推断、U-Boot 区界核对） |
 | [../evidence/p2-oob/](../evidence/p2-oob/) | task-42 取证附件：OOB 表/二进制、headblock/env/secondboot hex、会话日志、工具源码与 sha256 清单 |
+| [../evidence/a1-banner-acceptance-20261121.md](../evidence/a1-banner-acceptance-20261121.md) | task-49/task-50 设备段：A1/A2 u-boot.bin 经 vendor xmodem 装入 RAM 并 go 的 banner/prompt 验收（A1 4910ee2045bd、A2 38bee433d177；mtd list + 两次只读读回；零 flash 写入以 mtd0 sha256 前后一致实证；含工具缺陷修复与主机路由陷阱记录） |
+| [../evidence/a1-banner-acceptance/](../evidence/a1-banner-acceptance/) | task-49 验收附件：驱动脚本、session/a2 results JSON、驱动与 health 日志、串口选段 |
 
 
 | 文件 | 内容 |

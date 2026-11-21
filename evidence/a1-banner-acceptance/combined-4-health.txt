@@ -1,0 +1,12 @@
+== route ==
+192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 
+== ping wait (up to 90s) ==
+ping ok after attempt 0
+== ping stats ==
+已发送 3 个包， 已接收 3 个包, 0% packet loss, time 2040ms
+rtt min/avg/max/mdev = 0.512/0.675/0.762/0.115 ms
+== ssh identity (retries) ==
+  ssh attempt 0 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused
+  ssh attempt 1 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused
+  ssh attempt 2 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused
+== done ==

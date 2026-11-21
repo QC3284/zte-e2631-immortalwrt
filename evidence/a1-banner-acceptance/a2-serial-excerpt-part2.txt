@@ -1,0 +1,21 @@
+4c001f90: 1c 90 93 e5 d0 20 00 eb 06 10 a0 e1 40 20 9f e5  ..... ......@ ..
+4c001fa0: 09 00 a0 e1 09 87 00 eb 38 30 9f e5 07 00 a0 e1  ........80......
+4c001fb0: a0 20 a0 e3 00 30 93 e5 34 40 88 e5 08 10 a0 e1  . ...0..4@......
+4c001fc0: 44 50 88 e5 04 40 63 e0 48 40 88 e5 f0 42 bd e8  DP...@c.H@...B..
+4c001fd0: 28 8f 00 ea 4c 00 f0 47 95 68 f3 47 e0 fc f3 47  (...L..G.h.G...G
+4c001fe0: a4 68 f3 47 8a c1 f3 47 40 00 f0 47 10 20 9f e5  .h.G...G@..G. ..
+4c001ff0: 00 00 a0 e3 40 30 98 e5 08 30 83 e2 00 30 82 e5  ....@0...0...0..
+=> mtd read spi-nand0 0x4C100000 0xC0000 0x2000
+Reading 8192 byte(s) (4 page(s)) at offset 0x000c0000
+=> md.b 0x4C100000 0x2000
+4c100000: 3e ec fc af 62 61 75 64 72 61 74 65 3d 31 31 35  >...baudrate=115
+4c100010: 32 30 30 00 62 6f 6f 74 63 6d 64 3d 73 65 74 65  200.bootcmd=sete
+4c100020: 6e 76 20 62 6f 6f 74 61 72 67 73 20 63 6f 6e 73  nv bootargs cons
+4c100030: 6f 6c 65 3d 24 28 63 6f 6e 73 6f 6c 65 29 20 72  ole=$(console) r
+4c100040: 6f 6f 74 3d 2f 64 65 76 2f 6d 74 64 62 6c 6f 63  oot=/dev/mtdbloc
+4c100050: 6b 38 20 72 6f 20 72 6f 6f 74 66 73 74 79 70 65  k8 ro rootfstype
+4c100060: 3d 73 71 75 61 73 68 66 73 20 20 6d 65 6d 3d 24  =squashfs  mem=$
+4c100070: 28 6d 65 6d 73 69 7a 65 29 20 3b 00 62 6f 6f 74  (memsize) ;.boot
+4c100080: 64 65 6c 61 79 3d 33 00 62 6f 6f 74 66 69 6c 65  delay=3.bootfile
+4c100090: 3d 75 62 6f 6f 74 2e 62 69 6e 00 62 6f 6f 74 6c  =uboot.bin.bootl
+4c1000a0: 6f 61 64 65 72 66 69 6c 65 3d 62 6f 6f 74 6c 6f  oaderfile=bootlo
