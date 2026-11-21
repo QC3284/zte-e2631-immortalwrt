@@ -89,7 +89,7 @@ e2631soc: back at the prompt, nothing was booted
 
 ## 7. 设备会话（Session A）命令契约
 
-零 flash 写入的 A/B（等待用户/Lead 排期，本轮不执行）：
+零 flash 写入的 A/B（已执行，2026-11-21 23:58，实测见 §7.1）：
 
 1. 从当前已烧入的旧 U-Boot（sha `010379fd…`，banner `g2797f3dd3860`）进入命令行；
 2. 把新 `u-boot.bin` 载到 `0x47F00000`（`loadx`/`xmodem`），`go 0x47F00000`；
@@ -99,6 +99,35 @@ e2631soc: back at the prompt, nothing was booted
 6. 全程不执行 `mtd`/`erase`/`saveenv`。
 
 每个步骤的串口记录由 verify-docs 落盘；本文件只定义命令与期望字符串，不替代实测证据。
+
+### 7.1 Session A 实测结果（2026-11-21 23:58，verify-docs）
+
+- 环境：旧 flash U-Boot（sha `010379fd…`，banner `g2797f3dd3860`）→ `loadx` 449,240 B 到 `0x47F00000` →
+  `go` → 新 banner `g6f5036fa039d`；`e2631soc` 5 行 + `e2631boot` 前 4 行；mtd0 未写。
+- 原始值（before == after）：`SCTLR=0x08c50878 (M=0 C=0 I=0)`、`CLIDR=0x09200003`、`TTBR0=0x5fafefdb`、
+  `VBAR=0x4ff94000`、`ACTLR=0x00000000`、`DACR=0x67deafef`、`CCSIDR=0x701fe019`。
+- L2/SCU：PL310 基址 `0x00c00000` 的 ctrl=0、aux=0x02030000；SCU ctrl=0；md 探针 type=0x410000c9、
+  latency=0x00000111、SCU cfg=0x00000501。
+- 判读：`I=0` 由 `SYS_ICACHE_OFF` 设计（`cpu_init_crit` 清 I 位）；`TTBR0`/`DACR` 是 MMU 关闭下的残留，
+  内核 head.S 会重置；`ACTLR=0` 与厂商一致；`CCSIDR` 解出 32 KB、4 路、32 B line、256 组 L1 D 几何；
+  PL310/SCU 都处于禁用状态，aux 不是 stock 的 `0x76430001`，与厂商逆向结论一致——没有 L2/SCU 写需求。
+- 结论：内核启动、无 panic/abort；patch 0011 对 RAM 链无回归，bootm 前清理幂等。但该链在 `e2631soc`
+  之前已被入口归一化（以及旧 U-Boot 的清理）置为 M=C=0，before==after **不能**证明 C1b 的脏缓存机制；
+  决定性验证仍是 Session C（secondboot → 我们的 U-Boot → 内核）。
+
+### 7.2 网络异常（Session A 新发现，待归因）
+
+- 内核日志：`zx279128s-eth ... port 0: PHY connect failed`（-ENODEV，2.70 s）与
+  `RTNL: assertion failed at drivers/net/phy/phylink.c (2716)`；`/sys/class/net` 只有 lo/br-lan，br-lan DOWN；
+  `MT7916 initialization failed`（152 s）。
+- patch 0011 只改 CP15（`e2631soc.c`、`e2631boot.c` 一处调用、defconfig 一行），没有 clock/reset/GPIO/
+  pinmux/PCIe/DTS 代码，不能通过寄存器写把 PHY 或 MT7916 置于复位状态。
+- 关键环境差异：本次是第一条**厂商 U-Boot 板级初始化没有运行**的链（secondboot → 我们的 U-Boot → 内核）；
+  C1a 的 WiFi 成功运行是从厂商控制台 `go` 启动，厂商板级初始化已经跑过。
+- 假设：自定义 bootloader 链缺少内核/DT 依赖的厂商板级外设初始化（GMAC/MDIO clock/reset、PCIe/MT7916），
+  或应改在内核 DT/时钟依赖侧解决。
+- 下一步：采集 dmesg/clk_summary/PCIe 设备/net operstate；逆向厂商 U-Boot 板级初始化（DRAM/UART 之外的
+  clock/reset/PCIe/GMAC/GPIO/pinmux 写）；在归因前不进行 Session B 的 flash 写。
 
 ## 8. 零写审计与安全性
 
@@ -118,4 +147,5 @@ e2631soc: back at the prompt, nothing was booted
 - [p2-flashboot-kernel-hang-20261121.md](p2-flashboot-kernel-hang-20261121.md)（厂商逆向与根因候选）
 - [uboot-port/a4-soc-state-design.md](../uboot-port/a4-soc-state-design.md)（修复设计、契约、验收）
 - [uboot-port/README.md](../uboot-port/README.md)（pin、CI 断言、A1/A2/A3 步骤）
+- Session A 原始串口记录与网络异常取证由 verify-docs 落盘（kit `evidence/` 目录）；本文件只引用数值。
 - [c1b1a-write-rehearsal-20261121.md](c1b1a-write-rehearsal-20261121.md)（写通道演练）
