@@ -1,0 +1,210 @@
+From 433139f99c2ed590998dab48669e5fb1665d26a7 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 04:09:45 +0800
+Subject: [PATCH] board: zte: fall back to the other slot on a bad uImage
+
+cspboot validates the kernel of the slot it selected and, when that
+uImage is unusable, boots the other slot instead. Our e2631boot stopped
+at the first failure, so a corrupt active slot left the board at the
+prompt even though the other slot was intact.
+
+Split the per-slot load into e2631_try_boot_slot() and retry the other
+slot exactly once when the selected slot fails any uImage-level check:
+header read, magic/type/OS/compression, header CRC, size window, short
+read or data CRC. The retry is stateless and lasts for this boot only:
+slot selection, the version headers and the environment are untouched
+and nothing is written to flash. When both slots fail the command
+prints a diagnostic table and drops to the console instead of bootm.
+
+The healthy path is unchanged: the cspboot serial rule still picks the
+slot and e2631slot keeps sharing the same scan and pick code. This
+closes the class-1 parity gap noted in patch 0006.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631boot.c | 93 +++++++++++++++++++++++++++-----
+ 1 file changed, 81 insertions(+), 12 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 4054f4a5..67b2aa4e 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -172,7 +172,8 @@ static int e2631_scan_slot(struct mtd_info *mtd, u32 base,
+ /*
+  * Slot selection, copied from cspboot: the bigger serial wins, a zero
+  * serial on slot0 counts as the smaller one, and equal serials keep slot0.
+- * There is no automatic fallback to the other slot.
++ * This keeps the selection rule identical to cspboot; the class-1 retry
++ * for an unusable uImage happens above it in do_e2631boot().
+  */
+ static int e2631_pick_slot(const struct e2631_slot slots[E2631_SLOT_COUNT])
+ {
+@@ -188,10 +189,14 @@ static int e2631_pick_slot(const struct e2631_slot slots[E2631_SLOT_COUNT])
+ 	return slots[0].valid ? 0 : 1;
+ }
+ 
++/*
++ * Load and verify one slot's kernel. On failure *whyp names the failed
++ * check so the caller can log the attempt and decide about the fallback.
++ */
+ static int e2631_load_kernel(struct mtd_info *mtd,
+ 			     const struct e2631_slot *slot,
+ 			     struct legacy_img_hdr **hdrp, ulong *addrp,
+-			     size_t *sizep)
++			     size_t *sizep, const char **whyp)
+ {
+ 	u8 head[E2631_MARKER_SIZE + sizeof(struct legacy_img_hdr)];
+ 	struct legacy_img_hdr *hdr;
+@@ -200,9 +205,12 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 	u32 size;
+ 	int ret;
+ 
++	*whyp = NULL;
++
+ 	/* The slot marker is followed by the legacy uImage header. */
+ 	ret = mtd_read(mtd, slot->base, sizeof(head), &retlen, head);
+ 	if (ret || retlen != sizeof(head)) {
++		*whyp = "unreadable uImage header";
+ 		printf("e2631boot: cannot read the uImage header of slot 0x%08x\n",
+ 		       slot->base);
+ 		return -EIO;
+@@ -213,12 +221,14 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 	    !image_check_type(hdr, IH_TYPE_KERNEL) ||
+ 	    !image_check_os(hdr, IH_OS_LINUX) ||
+ 	    image_get_comp(hdr) != IH_COMP_NONE) {
++		*whyp = "no plain Linux uImage";
+ 		printf("e2631boot: slot 0x%08x holds no plain Linux uImage\n",
+ 		       slot->base);
+ 		return -EINVAL;
+ 	}
+ 
+ 	if (!image_check_hcrc(hdr)) {
++		*whyp = "bad uImage header CRC";
+ 		printf("e2631boot: bad uImage header CRC in slot 0x%08x\n",
+ 		       slot->base);
+ 		return -EINVAL;
+@@ -226,6 +236,7 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 
+ 	size = image_get_size(hdr);
+ 	if (!size || size > E2631_KERNEL_MAX) {
++		*whyp = "uImage size outside the kernel window";
+ 		printf("e2631boot: uImage size %u is outside the kernel window\n",
+ 		       size);
+ 		return -EINVAL;
+@@ -234,6 +245,7 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 	total = E2631_MARKER_SIZE + image_get_image_size(hdr);
+ 	ret = mtd_read(mtd, slot->base, total, &retlen, (void *)addr);
+ 	if (ret || retlen != total) {
++		*whyp = "short kernel read";
+ 		printf("e2631boot: short kernel read (%zu of %zu bytes)\n",
+ 		       retlen, total);
+ 		return -EIO;
+@@ -241,6 +253,7 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 
+ 	hdr = (struct legacy_img_hdr *)(addr + E2631_MARKER_SIZE);
+ 	if (!image_check_dcrc(hdr)) {
++		*whyp = "bad uImage data CRC";
+ 		printf("e2631boot: bad uImage data CRC, the slot is corrupt\n");
+ 		return -EINVAL;
+ 	}
+@@ -252,16 +265,31 @@ static int e2631_load_kernel(struct mtd_info *mtd,
+ 	return 0;
+ }
+ 
++static int e2631_try_boot_slot(struct mtd_info *mtd,
++			       const struct e2631_slot *slot,
++			       struct legacy_img_hdr **hdrp, ulong *addrp,
++			       size_t *sizep, const char **whyp)
++{
++	if (!slot->valid) {
++		*whyp = "no valid version header";
++		return -ENOENT;
++	}
++
++	return e2631_load_kernel(mtd, slot, hdrp, addrp, sizep, whyp);
++}
++
+ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 			char *const argv[])
+ {
+ 	struct e2631_slot slots[E2631_SLOT_COUNT];
+-	struct legacy_img_hdr *hdr;
++	const char *reason[E2631_SLOT_COUNT] = { NULL, NULL };
++	const char *why = NULL;
++	struct legacy_img_hdr *hdr = NULL;
+ 	struct mtd_info *mtd;
+ 	bool boot = true, load = true;
+-	size_t size;
+-	ulong addr;
+-	int active, ret, i;
++	size_t size = 0;
++	ulong addr = 0;
++	int active, other, ret, i;
+ 	char cmd[64];
+ 
+ 	if (argc > 2)
+@@ -323,14 +351,55 @@ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		return CMD_RET_SUCCESS;
+ 	}
+ 
+-	ret = e2631_load_kernel(mtd, &slots[active], &hdr, &addr, &size);
++	/*
++	 * cspboot validates the kernel of the slot it selected and, when the
++	 * uImage is unusable, boots the other slot instead (class-1 parity).
++	 * Retry the other slot exactly once. The retry is stateless: the
++	 * selection rule, the version headers and the environment stay
++	 * untouched and nothing is written to flash.
++	 */
++	other = active ^ 1;
++	ret = e2631_try_boot_slot(mtd, &slots[active], &hdr, &addr, &size,
++				  &why);
++	if (ret) {
++		reason[active] = why;
++		if (slots[other].valid) {
++			printf("e2631boot: slot%d unusable (%s), falling back to slot%d (cspboot class-1 parity)\n",
++			       active, why, other);
++		} else {
++			printf("e2631boot: slot%d unusable (%s), slot%d has no valid version header\n",
++			       active, why, other);
++		}
++
++		ret = e2631_try_boot_slot(mtd, &slots[other], &hdr, &addr,
++					  &size, &why);
++		if (ret) {
++			reason[other] = why;
++			printf("e2631boot: slot%d unusable (%s) as well\n",
++			       other, why);
++			printf("e2631boot: neither slot is bootable (class-1 check):\n");
++			for (i = 0; i < E2631_SLOT_COUNT; i++) {
++				if (!reason[i])
++					reason[i] = "no valid version header";
++				printf("e2631boot:   slot%d base 0x%08x: serial %u, version \"%s\": %s\n",
++				       i, slots[i].base, slots[i].serial,
++				       slots[i].version, reason[i]);
++			}
++			printf("e2631boot: dropping to the console, nothing was booted\n");
++			put_mtd_device(mtd);
++			return CMD_RET_FAILURE;
++		}
++
++		printf("e2631boot: booting slot%d from the fallback (this boot only)\n",
++		       other);
++		active = other;
++	}
++
+ 	put_mtd_device(mtd);
+-	if (ret)
+-		return CMD_RET_FAILURE;
+ 
+-	printf("e2631boot: uImage \"%s\": load 0x%08x entry 0x%08x, %zu bytes at 0x%08lx\n",
+-	       image_get_name(hdr), image_get_load(hdr), image_get_ep(hdr),
+-	       size, addr);
++	printf("e2631boot: slot%d uImage \"%s\": load 0x%08x entry 0x%08x, %zu bytes at 0x%08lx\n",
++	       active, image_get_name(hdr), image_get_load(hdr),
++	       image_get_ep(hdr), size, addr);
+ 	printf("e2631boot: header and data CRCs are good\n");
+ 
+ 	if (!boot)
+-- 
+2.56.1
+
