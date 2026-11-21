@@ -354,3 +354,14 @@ versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00
 ```
 
 （`0x2AB–0x1FFFF` 全 0；完整 0x20000 块用 §4.2 命令重建。）
+
+
+---
+
+## Lead 裁决 (2026-11-21)
+
+- **bootdelay 维持 3,不改 0**(关 Q4): 正常启动的 "Press 1" 3 s 窗口硬编码于 0x47f13e7c,与 env 无关 → bootdelay 0 对启动速度零收益;而 boot-mode shell 的等待语义未实测,改 0 有伤控制台进入的风险。零收益+非零风险 → 不做。B1 会话可含**可选实时探针**: setenv bootdelay 0 观察→立即 setenv bootdelay 3 恢复→**不 saveenv**(纯 RAM 观察,不落盘)。
+- **Q1**(tftp autoload 语义): 会话内只读验证。
+- **Q3**(自动回退脚本): 推迟到 ';' 探针之后。
+- B1 目标 env = 现网 env + 4 个辅助变量 (e2631_pocload/e2631_pocgo/e2631_netboot/e2631_flashboot),bootcmd/bootargs/memsize/versioninfo 保持逐字节不变 (zteboot_do_settings 会重写它们,改动无效)。
+- 设备会话排在 A1 之后;saveenv 属写分区,执行前须用户明确批准 (项目长期规则)。
