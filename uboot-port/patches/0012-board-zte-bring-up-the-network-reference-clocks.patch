@@ -1,0 +1,410 @@
+From f1762376983f7638e89db0db5baf2e9042cf596d Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 00:36:06 +0800
+Subject: [PATCH] board: zte: bring up the network reference clocks and SerDes
+
+The flash chain reaches this U-Boot from secondboot, so the vendor
+bootloader's board_eth_init() never runs. That helper brings up the
+reference clock for the four internal Ethernet PHYs and the SerDes,
+and the kernel never touches those registers: it assumes the loader
+did. The result is a kernel that boots with the MDIO bus clocked but
+all four PHYs silent and both PCIe links down.
+
+Replay the vendor sequence in its exact order:
+
+  - the fractional PLL on top CRM 0x94000050/0x94000054 (FBDIV 0x5d,
+    PD1 5, PD2 3, FRAC 0x004fdf3b, bits[25:18] = 1);
+  - top CRM 0x94000008: clear bit5/bit4, delay, set bit5, delay;
+  - the 24 SerDes/analog registers at 0x9fe00000 (0x40 written twice);
+  - top CRM 0x94000008 bit4;
+  - CRM2 0x94100010: clear bit11, bits[9:6] from the strap register;
+  - top CRM 0x9400004c low nine bits, then LSP1 0x9a100004;
+  - top CRM 0x9400000c bits[21:20] = 0b01, the mux the vendor
+    Ethernet probe selects right after board_eth_init.
+
+The same vendor board init also sets the pin mux and the default GPIO
+outputs. zte_gpio_init() ORs three bits and then writes six whole pin
+mux words from the board table, so replay both steps; an OR-only replay
+leaves the mux different. Of the 18 GPIO entries the table enables,
+only the eight outputs need a write - the ten inputs are already clear
+out of reset - and the values are the board-table ones. Flat 53, the
+H3600 guess behind our pcie0 reset-gpios, is deliberately left alone.
+
+The register set was trimmed against a pre/post dump of the two chains
+(vendor chain versus ours): every kept register differs between the two
+states or cannot be read before the setup; the GPIO input entries and
+the CRM2 writes that are already identical on our chain were dropped.
+Vendor pins 2 and 51 read high at the vendor prompt although the table
+says 0, but that happens after board init, so the table value is kept.
+
+e2631boot runs the setup before it loads the kernel. The e2631refclk
+command runs the very same function from the prompt, prints the seven
+clock registers before and after, and returns without booting. No path
+writes flash; the environment stays read-only.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile    |   1 +
+ board/zte/zxhn-e2631/e2631boot.c |  11 ++
+ board/zte/zxhn-e2631/e2631net.c  | 290 +++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631net.h  |  14 ++
+ 4 files changed, 316 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631net.c
+ create mode 100644 board/zte/zxhn-e2631/e2631net.h
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index f6d5cd48..a503efa6 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -3,5 +3,6 @@
+ # ZTE ZXHN E2631 board (Sanechips ZX279128S)
+ 
+ obj-y += e2631boot.o
++obj-y += e2631net.o
+ obj-y += e2631soc.o
+ obj-y += zxhn-e2631.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 5418a8c9..b94d2839 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -40,6 +40,7 @@
+ #include <stdio.h>
+ #include <u-boot/crc.h>
+ 
++#include "e2631net.h"
+ #include "e2631soc.h"
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+@@ -277,6 +278,16 @@ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		}
+ 	}
+ 
++	/*
++	 * The vendor bootloader brings the Ethernet PHY and SerDes reference
++	 * clocks up in its board_eth_init() before anything is booted. The
++	 * flash chain never runs that code, so the kernel finds the MDIO bus
++	 * clocked but the four PHYs and both PCIe links dead. Do it before the
++	 * kernel load; the e2631refclk command runs the same function.
++	 */
++	if (load)
++		e2631_net_refclk_init();
++
+ 	mtd_probe_devices();
+ 	mtd = get_mtd_device_nm(E2631_MTD_DEV);
+ 	if (!mtd) {
+diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
+new file mode 100644
+index 00000000..6a5d686d
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631net.c
+@@ -0,0 +1,290 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S) network reference clock and SerDes
++ * setup, replicated from the vendor bootloader's board_eth_init() path.
++ *
++ * The vendor loader brings the reference clock for the four internal
++ * Ethernet PHYs and for the SerDes up in its board_eth_init() helper at
++ * 0x47f00850, before its console is usable. The RAM chain (vendor U-Boot
++ * first) inherits that state; the flash chain (secondboot -> this U-Boot)
++ * does not, and the kernel then finds the MDIO bus clocked but all four
++ * PHYs silent and both PCIe links down. No kernel driver touches these
++ * registers (evidence/p2-vendorless-network-gap-20261122.md section 3),
++ * so the loader has to do it.
++ *
++ * Register sequence, in the vendor's order:
++ *   - fractional PLL on top CRM 0x94000050/0x94000054: FBDIV 0x5D,
++ *     PD1 5, PD2 3, FRAC 0x004fdf3b, field bits[25:18] = 1;
++ *   - top CRM 0x94000008: clear bit5 and bit4, delay, set bit5, delay;
++ *   - 24 writes to the SerDes/analog block at 0x9fe00000 (0x40 written
++ *     twice), then 0x94000008 bit4 set;
++ *   - CRM2 0x94100010: clear bit11, bits[9:6] = strap bits 27..24 of
++ *     0x9a107008;
++ *   - 0x9400004c: low nine bits set; delay; 0x9a100004 = 0x0001381b.
++ *
++ * The pin mux and the board's default GPIO outputs come from the same
++ * vendor board init (zte_gpio_init, 0x47f2f314): it first ORs three bits
++ * into the mux registers and then writes six whole words straight from the
++ * board table for product id 31 (E1630 V1.0.0), so a replay that only ORs
++ * the three bits leaves the mux different. This file writes the same six
++ * table words. Of the 18 GPIO entries the table enables, only the eight
++ * outputs are driven here; the ten inputs already have their direction
++ * bits clear after the SoC reset, so the vendor's clear of those bits is a
++ * no-op on our chain. Flat 53 (the H3600 guess behind our pcie0
++ * reset-gpios) is not touched.
++ *
++ * The vendor Ethernet driver's own probe (0x47f1f6xx, runs after
++ * board_eth_init) also selects bits[21:20] = 0b01 in TOP CRM 0x9400000c.
++ * The pre/post register dump of the two chains shows that mux differ
++ * (0x00417800 -> 0x00517800), so the same field write is replayed at the
++ * end. The other clock registers that probe touches (CRM2 0x94100008 and
++ * 0x94100018, 0x94100024) are either already identical on our chain or
++ * were not captured; they are deliberately not written here.
++ *
++ * e2631boot runs e2631_net_refclk_init() before it loads the kernel; the
++ * e2631refclk command runs the same function from the prompt, prints the
++ * state of the six clock registers before and after, and returns without
++ * booting. Neither path writes flash and the environment stays read-only.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <command.h>
++#include <linux/bitops.h>
++#include <linux/delay.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <asm/io.h>
++#include <stdio.h>
++
++#include "e2631net.h"
++
++/* Top CRM: system clock selection, gates, PLLs and resets. */
++#define E2631_TOP_CRM			0x94000000
++#define E2631_TOP_CRM_CTRL8		(E2631_TOP_CRM + 0x008)
++#define E2631_TOP_CRM_CTRL0C		(E2631_TOP_CRM + 0x00c)
++#define E2631_TOP_CRM_CTRL4C		(E2631_TOP_CRM + 0x04c)
++#define E2631_TOP_CRM_PLL0		(E2631_TOP_CRM + 0x050)
++#define E2631_TOP_CRM_PLL1		(E2631_TOP_CRM + 0x054)
++
++/* CRM2 and the LSP1 CRM: PCIe and MDIO clock gates. */
++#define E2631_CRM2			0x94100000
++#define E2631_CRM2_CTRL10		(E2631_CRM2 + 0x010)
++#define E2631_LSP1_CRM			0x9a100000
++#define E2631_LSP1_PERIPH0		(E2631_LSP1_CRM + 0x004)
++#define E2631_LSP1_STRAP8		(E2631_LSP1_CRM + 0x7008)
++
++/* Pin mux, GPIO banks (16 lines per bank, 0x40 apart) and the SerDes block. */
++#define E2631_PINMUX			0x94200000
++#define E2631_GPIO_BASE			0x94407000
++#define E2631_GPIO_BANK_SIZE		0x40
++#define E2631_GPIO_DIR			0x00
++#define E2631_GPIO_SET			0x18
++#define E2631_GPIO_CLR			0x1c
++#define E2631_SERDES			0x9fe00000
++
++struct e2631_reg_write {
++	u32 offset;
++	u32 value;
++};
++
++/*
++ * The SerDes/analog block. Vendor helper 0x47f2fc58 writes these in this
++ * order; 0x40 is written twice (0x003c0000 then 0x003c0040), hence the
++ * duplicate entry.
++ */
++static const struct e2631_reg_write e2631_serdes_writes[] = {
++	{ 0x00, 0x800010a7 }, { 0x04, 0x0000000f },
++	{ 0x08, 0x00000540 }, { 0x0c, 0x00000004 },
++	{ 0x10, 0x00000000 }, { 0x14, 0x018a6400 },
++	{ 0x18, 0x08b50140 }, { 0x1c, 0x01216000 },
++	{ 0x20, 0x40000000 }, { 0x24, 0x0b570001 },
++	{ 0x28, 0x00000000 }, { 0x2c, 0x00000000 },
++	{ 0x30, 0x20242000 }, { 0x34, 0xc0593d44 },
++	{ 0x38, 0x0000042f }, { 0x3c, 0x00000000 },
++	{ 0x40, 0x003c0000 }, { 0x40, 0x003c0040 },
++	{ 0x44, 0xeac0a013 }, { 0x48, 0x101038ca },
++	{ 0x4c, 0x0005a000 }, { 0x50, 0x33333333 },
++	{ 0x54, 0x33333333 }, { 0x58, 0x03e23333 },
++	{ 0x5c, 0x00040244 },
++};
++
++struct e2631_gpio_init {
++	u8 pin;
++	u8 value;
++};
++
++/*
++ * The output entries of the vendor board table for this product id, in the
++ * vendor's order: the three LEDs, then five unknown low outputs. The table
++ * also enables ten inputs (the eight strap pins and the two keys), but all
++ * their direction bits are already clear out of reset, which is exactly the
++ * state the vendor code puts them in, so they need no write.
++ *
++ * Values are the board-table values. The vendor chain shows pins 2 and 51
++ * driven high at its prompt although the table says 0; that happens after
++ * board init (the vendor boot tool drives them), so the table value is used
++ * here and the difference is recorded in the design note.
++ */
++static const struct e2631_gpio_init e2631_gpios[] = {
++	{ 8, 1 }, { 40, 1 }, { 60, 0 }, { 55, 0 },
++	{ 52, 0 }, { 54, 0 }, { 51, 0 }, { 2, 0 },
++};
++
++static inline u32 e2631_readl(ulong addr)
++{
++	return readl((void __iomem *)addr);
++}
++
++static inline void e2631_writel(u32 value, ulong addr)
++{
++	writel(value, (void __iomem *)addr);
++}
++
++static void e2631_gpio_set_dir(unsigned int pin, int out)
++{
++	ulong dir = E2631_GPIO_BASE + (pin >> 4) * E2631_GPIO_BANK_SIZE +
++		    E2631_GPIO_DIR;
++	u32 line = BIT(pin & 0xf);
++	u32 val = e2631_readl(dir);
++
++	e2631_writel(out ? val | line : val & ~line, dir);
++}
++
++static void e2631_gpio_drive(unsigned int pin, int value)
++{
++	ulong bank = E2631_GPIO_BASE + (pin >> 4) * E2631_GPIO_BANK_SIZE;
++
++	e2631_gpio_set_dir(pin, 1);
++	e2631_writel(BIT(pin & 0xf),
++		     bank + (value ? E2631_GPIO_SET : E2631_GPIO_CLR));
++}
++
++/*
++ * The six pin mux words the vendor board table carries for product id 31.
++ * zte_gpio_init() ORs three bits first and then writes these words whole
++ * (loop 0x47f2f458: ldr r1,[entry+0x40+i*4]; str r1,[0x94200000+i*4]).
++ */
++static const u32 e2631_pinmux[] = {
++	0x0f3ffffa, 0x00effeff, 0x0555ffff, 0x003dbf85, 0x00000000, 0x00000000,
++};
++
++static void e2631_pinmux_gpio_init(void)
++{
++	unsigned int i;
++
++	/* The three ORs zte_gpio_init() does before the table write. */
++	e2631_writel(e2631_readl(E2631_PINMUX + 0x00) | 0x00000c00,
++		     E2631_PINMUX + 0x00);
++	e2631_writel(e2631_readl(E2631_PINMUX + 0x04) | 0x000000c0,
++		     E2631_PINMUX + 0x04);
++	e2631_writel(e2631_readl(E2631_PINMUX + 0x0c) | 0x00180e80,
++		     E2631_PINMUX + 0x0c);
++
++	for (i = 0; i < ARRAY_SIZE(e2631_pinmux); i++)
++		e2631_writel(e2631_pinmux[i], E2631_PINMUX + i * 4);
++
++	for (i = 0; i < ARRAY_SIZE(e2631_gpios); i++)
++		e2631_gpio_drive(e2631_gpios[i].pin, e2631_gpios[i].value);
++}
++
++/*
++ * The vendor ref_clk_set(0) fractional PLL programming on 0x94000050/0x94000054.
++ * Field layout is the one the kernel clock driver documents: FBDIV bits[17:6],
++ * PD1 bits[5:3], PD2 bits[2:0], FRAC in the second register bits[23:0].
++ */
++void e2631_net_refclk_init(void)
++{
++	unsigned int i;
++	u32 val, frac, strap;
++
++	e2631_pinmux_gpio_init();
++
++	val = e2631_readl(E2631_TOP_CRM_PLL0);
++	val |= BIT(31);
++	val &= ~(BIT(27) | BIT(24));
++	val &= ~0x00fc0000;
++	val |= 1 << 18;
++	val &= ~0x0003ffc0;
++	val |= (0x5d << 6) & 0x0003ffc0;
++	val &= ~0x00000038;
++	val |= 5 << 3;
++	val &= ~0x00000007;
++	val |= 3;
++	e2631_writel(val, E2631_TOP_CRM_PLL0);
++
++	frac = e2631_readl(E2631_TOP_CRM_PLL1);
++	e2631_writel((frac & 0xff000000) | 0x004fdf3b, E2631_TOP_CRM_PLL1);
++
++	mdelay(100);
++	e2631_writel(e2631_readl(E2631_TOP_CRM_PLL0) & ~BIT(31),
++		     E2631_TOP_CRM_PLL0);
++	mdelay(50);
++
++	val = e2631_readl(E2631_TOP_CRM_CTRL8);
++	e2631_writel(val & ~(BIT(5) | BIT(4)), E2631_TOP_CRM_CTRL8);
++	mdelay(100);
++	e2631_writel(e2631_readl(E2631_TOP_CRM_CTRL8) | BIT(5),
++		     E2631_TOP_CRM_CTRL8);
++	mdelay(100);
++
++	for (i = 0; i < ARRAY_SIZE(e2631_serdes_writes); i++)
++		e2631_writel(e2631_serdes_writes[i].value,
++			     E2631_SERDES + e2631_serdes_writes[i].offset);
++
++	e2631_writel(e2631_readl(E2631_TOP_CRM_CTRL8) | BIT(4),
++		     E2631_TOP_CRM_CTRL8);
++
++	strap = e2631_readl(E2631_LSP1_STRAP8);
++	val = e2631_readl(E2631_CRM2_CTRL10);
++	val &= ~BIT(11);
++	val &= ~0x000003c0;
++	val |= ((strap >> 24) & 0xf) << 6;
++	e2631_writel(val, E2631_CRM2_CTRL10);
++
++	val = e2631_readl(E2631_TOP_CRM_CTRL4C);
++	e2631_writel((val & ~0x1ff) | 0x1ff, E2631_TOP_CRM_CTRL4C);
++	mdelay(200);
++	e2631_writel(0x0001381b, E2631_LSP1_PERIPH0);
++	mdelay(200);
++
++	/* Vendor Ethernet probe: bits[21:20] of TOP CRM 0x9400000c = 0b01. */
++	val = e2631_readl(E2631_TOP_CRM_CTRL0C);
++	val &= ~0x00300000;
++	val |= 0x00100000;
++	e2631_writel(val, E2631_TOP_CRM_CTRL0C);
++}
++
++static void e2631_refclk_dump(const char *tag)
++{
++	printf("e2631refclk: %s PLL0=%08x PLL1=%08x CTRL8=%08x\n",
++	       tag, e2631_readl(E2631_TOP_CRM_PLL0),
++	       e2631_readl(E2631_TOP_CRM_PLL1),
++	       e2631_readl(E2631_TOP_CRM_CTRL8));
++	printf("e2631refclk: %s CRM2_10=%08x CTRL4C=%08x LSP1_04=%08x CTRL0C=%08x\n",
++	       tag, e2631_readl(E2631_CRM2_CTRL10),
++	       e2631_readl(E2631_TOP_CRM_CTRL4C),
++	       e2631_readl(E2631_LSP1_PERIPH0),
++	       e2631_readl(E2631_TOP_CRM_CTRL0C));
++}
++
++static int do_e2631refclk(struct cmd_tbl *cmdtp, int flag, int argc,
++			  char *const argv[])
++{
++	if (argc != 1)
++		return CMD_RET_USAGE;
++
++	e2631_refclk_dump("before");
++	printf("e2631refclk: running the vendor network reference-clock and SerDes sequence\n");
++	e2631_net_refclk_init();
++	e2631_refclk_dump("after");
++	printf("e2631refclk: back at the prompt, nothing was booted\n");
++
++	return CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631refclk, 1, 1, do_e2631refclk,
++	   "run the network reference-clock/SerDes setup, do not boot",
++	   "  - prints the six clock registers before and after the same\n"
++	   "    sequence e2631boot runs before it loads the kernel\n");
+diff --git a/board/zte/zxhn-e2631/e2631net.h b/board/zte/zxhn-e2631/e2631net.h
+new file mode 100644
+index 00000000..1a6a4f06
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631net.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S) network reference clock and SerDes
++ * setup, replicated from the vendor bootloader.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __ZXHN_E2631_NET_H__
++#define __ZXHN_E2631_NET_H__
++
++void e2631_net_refclk_init(void);
++
++#endif /* __ZXHN_E2631_NET_H__ */

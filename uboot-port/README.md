@@ -3,9 +3,11 @@
 本目录是 task-43/task-44/task-47/task-50/task-51/task-53 与 C1b 修复的产物：对 U-Boot 主线的 patch 系列
 （0001/0002 为 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC +
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
-env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化）、pin 文件、三份设计说明
+env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
+的网络参考时钟/SerDes/管脚补齐）、pin 文件、四份设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
-[a4-soc-state-design.md](a4-soc-state-design.md)），以及供 CI 构建和后续真机 A1/A2/A3/C1b 会话使用的说明。
+[a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)），
+以及供 CI 构建和后续真机 A1/A2/A3/C1b 会话使用的说明。
 **只含代码与文档；A1/A2/A3 阶段都不写 flash。**
 
 依据：[evidence/p2-uboot-research-20261121.md](../evidence/p2-uboot-research-20261121.md) §2（路径 A 分阶段）、
@@ -25,9 +27,10 @@ env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 
   [a3-slot-boot-design.md](a3-slot-boot-design.md)。C1a 真机干跑暴露了 `bootm` 缺 ATAGS 缓冲区
   （`boot_prep_linux` data abort），patch 0008 修复、0009 修正 env 日志名称；重跑清单见
   [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。
-- **不做（后续阶段）**：写 mtd0/写槽位（刷写阶段，需用户批准）、网络、CPU1/SMP 交接（secondboot 已
-  完成停车）、DDR/时钟初始化（secondboot 已完成）、时钟/复位驱动（依赖 secondboot 的控制器状态）、
-  env 持久化（B1）、按活动槽位切换根文件系统。
+- **不做（后续阶段）**：写 mtd0/写槽位（刷写阶段，需用户批准）、网络协议栈/网络引导（A5 只补
+  PHY/SerDes 参考时钟与管脚初始化，让内核能自己接管网口与 PCIe；引导仍用厂商 U-Boot 的 tftp）、
+  CPU1/SMP 交接（secondboot 已完成停车）、DDR/时钟初始化（secondboot 已完成）、时钟/复位驱动
+  （依赖 secondboot 的控制器状态）、env 持久化（B1）、按活动槽位切换根文件系统。
 - 引导链：BootROM → secondboot（闭源，已完成 DDR/时钟/串口/SPI-NAND/CPU1 停车）→ 厂商 U-Boot 2013.04
   →（A1/A2/A3 用 tftp+go）自定义 U-Boot。把自定义 U-Boot 写进 mtd0 0x20000..0xC0000（镜像区 0xA0000
   字节）属于之后的刷写阶段。
@@ -65,7 +68,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0010 sha256 | `57ce9d808cc771854bb68b03020d9da854d24b0bd621b5971b882e342ff079a0` |
 | patch 0011 | `uboot-port/patches/0011-board-zte-normalise-CP15-before-the-Linux-hand-off.patch`（C1b-1：入口归一化 + 跳转前 CP15 清理 + `e2631soc` 只读报告） |
 | patch 0011 sha256 | `98aa4b3914ff1741e0621116b4d630ab43f448d7d0ca31496c2001e815b51095` |
-| am 之后 tree | `c8914654a4787fdc67c30bea44de5d70d39e8fdc`（与机器无关，11 个 patch） |
+| patch 0012 | `uboot-port/patches/0012-board-zte-bring-up-the-network-reference-clocks.patch`（A5：厂商 board_eth_init 的参考时钟/SerDes/管脚序列，按两链 pre/post 寄存器差分裁剪 + `e2631refclk` 前后 dump） |
+| patch 0012 sha256 | `62ca7afa4d6b4614fcd53b457db1f5475b94b9ef08f975395cd71992b982b24d` |
+| am 之后 tree | `5de49c199b0515b95fc0ea21264b3f0bb3418eed`（与机器无关，12 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -81,7 +86,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = c8914654a4787fdc67c30bea44de5d70d39e8fdc
+test "$(git rev-parse HEAD^{tree})" = 5de49c199b0515b95fc0ea21264b3f0bb3418eed
 ```
 
 ## 2. 新增/修改的文件
@@ -93,10 +98,12 @@ test "$(git rev-parse HEAD^{tree})" = c8914654a4787fdc67c30bea44de5d70d39e8fdc
 | `arch/arm/mach-zx279128s/Kconfig` | `SYS_SOC="zx279128s"`、`TARGET_ZXHN_E2631`、source 板级 Kconfig |
 | `arch/arm/mach-zx279128s/Makefile` | A1 无 SoC 私有代码（secondboot 已完成初始化），只留占位说明 |
 | `board/zte/zxhn-e2631/Kconfig` | `SYS_BOARD`/`SYS_VENDOR`/`SYS_CONFIG_NAME` |
-| `board/zte/zxhn-e2631/Makefile` | 编译 `zxhn-e2631.o`、`e2631boot.o`（A3）与 `e2631soc.o`（C1b） |
-| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()` |
+| `board/zte/zxhn-e2631/Makefile` | 编译 `zxhn-e2631.o`、`e2631boot.o`（A3）、`e2631soc.o`（C1b）与 `e2631net.o`（A5） |
+| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()` |
 | `board/zte/zxhn-e2631/e2631soc.c` | C1b：厂商顺序的 CP15 清理 + `e2631soc` 只读报告命令（SCTLR/CLIDR/TTBR0/VBAR/ACTLR 前后值；不启动、不写 flash/env） |
 | `board/zte/zxhn-e2631/e2631soc.h` | `e2631_soc_prepare_linux()` 原型（`e2631boot.c` 与 `e2631soc.c` 共用一条代码路径） |
+| `board/zte/zxhn-e2631/e2631net.c` | A5：厂商 `board_eth_init()` 的参考时钟/SerDes/CRM2/管脚序列（pinmux 六个整字、只驱动八个输出、`0x9400000C` 的 `bits[21:20]` 时钟选择）+ `e2631refclk` 前后 dump 命令（不启动、不写 flash/env） |
+| `board/zte/zxhn-e2631/e2631net.h` | `e2631_net_refclk_init()` 原型（`e2631boot.c` 与 `e2631net.c` 共用一条代码路径） |
 | `board/zte/zxhn-e2631/zxhn-e2631.c` | `dram_init`/`dram_init_banksize` 从内嵌 DT 读 256 MiB |
 | `board/zte/zxhn-e2631/MAINTAINERS` | 维护者与文件范围 |
 | `include/configs/zx279128s_zte_zxhn-e2631.h` | `CFG_SYS_SDRAM_BASE=0x40000000`、`CFG_PL011_CLOCK=0`、`CFG_SYS_HZ_CLOCK=500000000` |
@@ -167,6 +174,19 @@ ATAGS 只需 44 字节（CORE + 一个 MEM tag + END，`CONFIG_SETUP_MEMORY_TAGS
 [a4-soc-state-design.md](a4-soc-state-design.md) 与
 [evidence/p2-flashboot-kernel-hang-20261121.md](../evidence/p2-flashboot-kernel-hang-20261121.md)。
 
+补丁 0012（2026-11-22，A5，C1b-1 之后的第二个 flash 链缺口）：新增 `board/zte/zxhn-e2631/e2631net.c|.h`，
+在 `e2631boot` 解析完参数、真正要 `bootm` 前调用 `e2631_net_refclk_init()`，按厂商 `board_eth_init()`
+（`0x47f00850`）的逐字段顺序补齐闪存链从未执行的板级初始化：分数 PLL（`0x94000050/0x54`）、
+`0x94000008` 的 bit4/bit5 时序、`0x9FE00000` 的 25 次 SerDes 表写、CRM2 `0x94100010` 的参考时钟选择、
+`0x9400004C` + `0x9A100004`、`0x9400000C` 的 `bits[21:20]=0b01`（厂商以太网 probe 选择的时钟 mux），
+以及 `0x94200000` pinmux 与 GPIO 输出。寄存器集按两链 pre/post 差分裁剪过：pinmux 不只做三处 `|=`，
+而是按厂商 `zte_gpio_init` 的顺序先 OR 再写入板级表的六个整字（`0x0f3ffffa`、`0x00effeff`、`0x0555ffff`、
+`0x003dbf85`、0、0）；18 项 GPIO 里十个输入在复位后 DIR 已为 0、与厂商写入结果相同，故只驱动八个输出
+（8=1、40=1、60=0、55=0、52=0、54=0、51=0、2=0）。`e2631refclk` 命令跑同一函数，打印 7 个寄存器的前后值后返回提示符，不启动、不写 flash/env。厂商不做的事（网络协议栈、PCIe host、
+PHY 驱动）仍归内核；flat GPIO 53（H3600 时期的 `pcie0 reset-gpios` 猜测）不在厂商表里，故意不驱动。
+设计与真机验收签名见 [a5-net-refclk-design.md](a5-net-refclk-design.md) 与
+[evidence/p2-vendorless-network-gap-20261122.md](../evidence/p2-vendorless-network-gap-20261122.md)。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
@@ -184,7 +204,9 @@ ATAGS 只需 44 字节（CORE + 一个 MEM tag + END，`CONFIG_SETUP_MEMORY_TAGS
 | ATAGS 缓冲区 | `CFG_SYS_SDRAM_BASE + 0x100`（= `0x40000100`） | 0008 在 `board_late_init()` 设置 `gd->bd->bi_boot_params`；`static_assert` 保证 > DRAM base 且 +0x100 ≤ 内核 load `0x40008000`；本配置 `SYS_MALLOC_BOOTPARAMS` 关闭，没有其它代码分配该缓冲区 |
 | 设备树 | `OF_EMBED` | DTB 内嵌进 `u-boot.bin`，`go` 跳转无需外部 DTB；后续再考虑分离/追加格式 |
 | SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
-| 网络 | 无 | 网络引导仍用厂商 U-Boot 的 tftp |
+| 网络参考时钟/SerDes | `e2631_net_refclk_init()`（0012） | 厂商 `board_eth_init()` 的逐字段重放：分数 PLL `0x94000050/0x54`、`0x94000008` bit4/bit5、`0x9FE00000` SerDes 25 写、CRM2 `0x94100010`、`0x9400004C`→`0x9A100004`、`0x9400000C` 的 `bits[21:20]=0b01`（厂商以太网 probe 的时钟 mux，两链 dump 证明不同）；内核 clk 驱动假设 bootloader 已完成该初始化，且无内核驱动碰这些寄存器（DTS 无法描述）。`e2631refclk` 打印前后 7 个寄存器，不启动 |
+| Pinmux / GPIO | `0x94200000` + 厂商板级表（0012） | pinmux 先三处 |= 厂商值，再按厂商顺序写入板级表六个整字；GPIO 只驱动八个输出（8=1/40=1/60=0 三色 LED、55/52/54/51/2=0），十个输入（strap 5/15/62/61/43/47/46/45、按键 18/20）复位后 DIR 已为 0，无需写；不驱动 flat 53。全部为板上外设的“回到厂商上电状态”，幂等 |
+| 网络协议栈 | 无 | 网络引导仍用厂商 U-Boot 的 tftp；A5 只让内核能自己接管 PHY/PCIe |
 | 刷写 | 不做 | A3 只读；写 mtd0/槽位属于之后的刷写阶段（需用户批准） |
 | CPU1/SRAM | 不碰 | secondboot 已把 CPU1 停在 `wfe` → SRAM `0x200800` 循环；内核 platsmp 依赖该约定，U-Boot 不得改写 SRAM |
 
@@ -214,8 +236,8 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `c8914654a4787fdc67c30bea44de5d70d39e8fdc`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 11）。
+1. `git rev-parse HEAD^{tree}` == `5de49c199b0515b95fc0ea21264b3f0bb3418eed`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 12）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -227,8 +249,8 @@ make O=build -j"$(nproc)"
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 9 reviewed warnings**（0011 自身 0 errors /
-   2 warnings：新建文件缺 MAINTAINERS 更新、新增自用板级命令，均为已核对项）。
+   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 11 reviewed warnings**（0011 与 0012 各
+   0 errors / 2 warnings：新建文件缺 MAINTAINERS 更新、新增自用板级命令，均为已核对项）。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
    （OF_EMBED 把 DTB 打进镜像）。少了这条，构建会通过但 A1 串口仍然静默，正是 task-45 的故障模式。
 8. 内嵌 DTB 的 SPI 节点：`grep -aq 'zte,zx279128s-spifc' build/u-boot.bin` 且
@@ -238,13 +260,20 @@ make O=build -j"$(nproc)"
    `CONFIG_SETUP_MEMORY_TAGS=y`、`CONFIG_BOOTCOMMAND="e2631boot"`、`CONFIG_ENV_IS_IN_MTD=y`、
    `CONFIG_ENV_MTD_DEV="spi-nand0"`、`CONFIG_ENV_OFFSET=0xc0000`、`CONFIG_ENV_SIZE=0x20000`；
    并且 `# CONFIG_CMD_SAVEENV is not set`（A3 不能写 env）、`CONFIG_ENV_IS_NOWHERE` 未启用。
-10. A3/C1b 二进制：`grep -aq 'e2631boot' build/u-boot.bin`、`grep -aq 'e2631soc' build/u-boot.bin` 且
-    `grep -aq 'spi-nand0' build/u-boot.bin`（槽位命令、CP15 报告命令与 env 设备名确实链接进镜像）。
-11. A3/C1a/C1b 修复（0008/0009/0011）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`、
+10. A3/C1b/A5 二进制：`grep -aq 'e2631boot' build/u-boot.bin`、`grep -aq 'e2631soc' build/u-boot.bin`、
+    `grep -aq 'e2631refclk' build/u-boot.bin` 且 `grep -aq 'spi-nand0' build/u-boot.bin`（槽位命令、
+    CP15 报告命令、网络时钟报告命令与 env 设备名确实链接进镜像）。
+11. A3/C1a/C1b/A5 修复（0008/0009/0011/0012）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h`、
-    `grep -q 'e2631_soc_prepare_linux' board/zte/zxhn-e2631/e2631boot.c` 且
-    `grep -q 'mcr p15' board/zte/zxhn-e2631/e2631soc.c`。形状断言只防回归；编译由 CI 保证，运行期
-    （bootm 进内核、env 日志显示 MTD、CP15 前后差值）由 C1a/C1b 重跑与 Session A 的 `e2631soc` 输出保证。
+    `grep -q 'e2631_soc_prepare_linux' board/zte/zxhn-e2631/e2631boot.c`、
+    `grep -q 'mcr p15' board/zte/zxhn-e2631/e2631soc.c`、
+    `grep -q 'e2631_net_refclk_init' board/zte/zxhn-e2631/e2631boot.c`，且 `e2631net.c` 仍含厂商值
+    `0x004fdf3b`、`0x003c0040`、`0x0001381b`、板级 pinmux 字 `0x0f3ffffa`、`0x003dbf85` 与 `0x9400000C` 的 `0x00100000`。形状断言只防回归；编译由 CI 保证，运行期
+    （bootm 进内核、env 日志显示 MTD、CP15 前后差值、网络时钟前后差值）由 C1a/C1b 重跑与 Session A 的
+    `e2631soc`/`e2631refclk` 输出保证。
+12. A5 内核侧成功签名（真机会话记录，不是 CI 断言）：MDIO 地址 10-13 的四个 PHY 出现且 link up；
+    `lspci` 出现 `14c3:7906`（bus0）与 `14c3:790a`（bus1）；`br-lan` 有 PHY。详见
+    [a5-net-refclk-design.md](a5-net-refclk-design.md) §5。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -289,6 +318,9 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 0. 先在提示符跑 `e2631soc`（0011 起）：一次运行打印 before/after 的 SCTLR（含 M/C/I 位）、CLIDR、TTBR0、
    VBAR、ACTLR、DACR、CCSIDR 与只读的 PL310/SCU 状态（md 读不到 CP15）；它不启动、不写 flash，也不写 env。
    C1b-1 的现场判定以这组前后差值为准，随后 `e2631boot` 会走同一函数（幂等）。
+0.1 再跑 `e2631refclk`（0012 起）：两行 before、两行 after，覆盖 `0x94000050/0x54`、`0x94000008`、
+   `0x94100010`、`0x9400004C`、`0x9A100004` 与 `0x9400000C`；记录前后差值（真机 A5 验收的第一手数据），
+   它同样不启动、不写 flash/env，随后 `e2631boot` 会走同一函数（幂等）。
 1. `e2631boot info`：打印两槽的版本头偏移、serial、version，以及 `cspboot would boot slotN`。当前
    设备应显示 slot0（serial 7、`V1.0.0.7B5.8000`、头在 `0x1C60000`）与 slot1（serial 12、头在
    `0x1500000`，C1a 实测值），结论 slot1。
@@ -326,19 +358,30 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   详见 [a2-spi-nand-design.md](a2-spi-nand-design.md) §9。
 - **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
   厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，后续阶段再补复位路径。
+- **A5 网络时钟是“重放厂商值”，不是自己配时钟**：0012 写 `0x94000050/0x54`、`0x94000008`、`0x94100010`、
+  `0x9400004C`、`0x9A100004`、`0x9FE00000`、pinmux 六个整字与 GPIO 输出，全部逐字段等于厂商
+  `board_eth_init()`/`zte_gpio_init()`；`0x9400000C` 的 `bits[21:20]` 来自厂商以太网 probe（board_eth_init
+  之后），两链 dump 显示它确实不同，所以也一并重放。寄存器集按两链 pre/post 差分裁剪：留下“值确实不同或
+  pre 状态不可读”的项，丢掉输入 GPIO 与两链已经相同的 CRM2 写；未 dump 到的 `0x94100024` 等不写。
+  内核 clk 驱动不会重编程这些 PLL，因此值必须保持厂商语义。若真机 PHY 仍不应答或 PCIe 不枚举，先在 U-Boot
+  里跑 `e2631refclk` 看 7 个寄存器的 before/after，再与厂商日志（`Net: enter ref_clk_set..` 到 `eth0`）
+  对照；回退只需删掉 `e2631boot.c` 里那一行调用（不影响启动链其余部分）。风险面只在 E2631 板型，
+  0012 不碰 SoC 通用代码。
 - **入口必须等于链接地址（非 PIE）**：`TEXT_BASE=0x47F00000` 对齐 secondboot 的固定入口；
   U-Boot 未开 `CONFIG_POSITION_INDEPENDENT`，`relocate.S` 的修正量假设运行地址 == 链接地址，
   从其它地址进入会在 banner 之前挂死或 data abort；改地址只能改 defconfig 后重编，不能只改 `go`。
 - **载荷 0x9F800**：刷写阶段封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在
   刷写阶段必须原样保留。
-- **checkpatch**：本系列 0 errors、9 reviewed warnings（0008/0009 各自 0 errors / 0 warnings；0011 为 0 errors / 2 warnings），均为已核对的已知项——5 条 "does MAINTAINERS
+- **checkpatch**：本系列 0 errors、11 reviewed warnings（0008/0009 各自 0 errors / 0 warnings；0011 与
+  0012 各 0 errors / 2 warnings），均为已核对的已知项——6 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
-  patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c` 各一条；
-  checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
+  patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c`、
+  patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h` 各一条；checkpatch 按单 patch 看不到
+  后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
   （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
-  常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 1 条 "Possible new command - make sure you
-  add a test"（`e2631boot` 是自用板级命令，U-Boot 树里没有对应 DM 测试；A3 验收是只读子命令 + 真机
-  会话，不新增测试目录）。自用 fork，不提交上游。
+  常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 3 条 "Possible new command - make sure you
+  add a test"（`e2631boot`/`e2631soc`/`e2631refclk` 是自用板级命令，U-Boot 树里没有对应 DM 测试；
+  验收是只读子命令 + 真机会话，不新增测试目录）。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
@@ -348,6 +391,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 - **A3**：槽位感知启动已由 patch 0006/0007 交付（`e2631boot` + 只读 env）。`TEXT_BASE` 已在 task-55 对齐
   secondboot 入口 `0x47F00000`；C1b 的 CP15 归一化由 0011 交付（`e2631soc` + bootm 钩子）。剩下的 env
   持久化（B1）、按活动槽位切换根文件系统放在后续会话。
+- **A5**：厂商 `board_eth_init()` 的参考时钟/SerDes/管脚初始化由 patch 0012 交付（`e2631refclk` 前后 dump +
+  `e2631boot` 钩子）。内核侧签名（PHY 10-13 + PCIe `14c3:7906`/`14c3:790a`）由下一次零写入真机会话记录；
+  网络协议栈/网络引导不在本阶段。
 - **刷写阶段（原计划的 A3，重命名为 A4/路径 C）**：写 mtd0 U-Boot 区/写槽位；需要 OOB/ECC 取证、
   写通道验证、回滚演练与用户批准。在此之前，A1/A2/A3 都不写 flash。
 - **A1 真机会话**在 task-44 的 CI 产物可用之后进行（用户已批准 RAM 链 POC）。
@@ -409,3 +455,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   `g6f5036fa039d`、`u-boot.bin` 449,240 B sha256 `bef0d841bc26e2dc9db4484e26285d23d8d3bf9e1a63ad81f080c28b026206f4`、
   mtd0 镜像 sha256 `83457522357bc4d55f4a36d3dd912ff9184c31dad754cec3dff3a9d1f7c2412e`、env 块 `6eee153b…` 未变；
   详见 [evidence/uboot-cp15-cleanup-20261121.md](../evidence/uboot-cp15-cleanup-20261121.md)。
+- 2026-11-22（A5，patch 0012）：新增 `board/zte/zxhn-e2631/e2631net.c|.h` 与 `e2631refclk` 命令，按厂商
+  `board_eth_init()` 重放参考时钟/SerDes/CRM2/管脚序列，并在 `e2631boot` 的 `bootm` 前调用；寄存器集按 verify-docs 两链 pre/post 寄存器差分裁剪（pinmux 六个整字、只驱动 GPIO 输出、补 `0x9400000C`），重钉结果 tree 为
+  `5de49c199b0515b95fc0ea21264b3f0bb3418eed`（12 个 patch）。设计见
+  [a5-net-refclk-design.md](a5-net-refclk-design.md)；厂商逆向证据见
+  [evidence/p2-vendorless-network-gap-20261122.md](../evidence/p2-vendorless-network-gap-20261122.md)。
+  CI 构建与 artifact 数值随后补入本节。

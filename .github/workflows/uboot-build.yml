@@ -186,7 +186,7 @@ jobs:
           done
           # A3: the slot boot command and the env device name must be linked
           # into the image, and saveenv must be compiled out (read-only stage).
-          for binary_string in e2631boot e2631soc spi-nand0; do
+          for binary_string in e2631boot e2631soc e2631refclk spi-nand0; do
             if ! grep -aq "$binary_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing $binary_string"
               exit 1
@@ -221,6 +221,19 @@ jobs:
             echo "::error::the CP15 cleanup is not implemented in e2631soc.c"
             exit 1
           fi
+          # A5: the flash chain must run the vendor board_eth_init() clock/SerDes
+          # sequence before bootm, and the exact vendor values must stay in the
+          # table (a silent kernel network regression is otherwise easy to miss).
+          if ! grep -q 'e2631_net_refclk_init' board/zte/zxhn-e2631/e2631boot.c; then
+            echo "::error::e2631boot does not run the network reference-clock init before bootm"
+            exit 1
+          fi
+          for net_marker in 0x004fdf3b 0x003c0040 0x0001381b 0x0f3ffffa 0x003dbf85 0x00100000; do
+            if ! grep -qi "$net_marker" board/zte/zxhn-e2631/e2631net.c; then
+              echo "::error::e2631net.c is missing the vendor value $net_marker"
+              exit 1
+            fi
+          done
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"
