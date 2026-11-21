@@ -1,0 +1,25 @@
+{
+ "mode": "c1a-recovery-stock-chain",
+ "ssh_rc": 0,
+ "facts": [
+  "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f  /dev/mtd0",
+  "426",
+  "ImmortalWrt v1.10.0",
+  "6.18.60",
+  "0",
+  "19"
+ ],
+ "serial_segment_ok": true,
+ "serial_segment_bytes": 28159,
+ "serial_markers": {
+  "Boot SPI NAND": true,
+  "start read bootheader": true,
+  "U-Boot 2013.04": true,
+  "cspboot: pdt_getimg": false,
+  "VFS: Mounted root": true,
+  "e2631-wifi-boot: MT7916 ready": true
+ },
+ "mtd0_after_recovery": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "stock_chain_confirmed": true,
+ "wifi_ready": true
+}

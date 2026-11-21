@@ -1,0 +1,67 @@
+{
+ "mode": "c1a-postcheck",
+ "postcheck_utc": "2026-11-21T18:31:20+0800",
+ "mtd0_before": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "mtd0_after": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "mtd0_unchanged": true,
+ "write_command_audit": {
+  "nand write": 0,
+  "nand erase": 0,
+  "mtd write": 0,
+  "mtd erase": 0,
+  "saveenv": 0,
+  "Erasing": 0,
+  "Writing to Nand": 0
+ },
+ "write_commands_total": 0,
+ "abort_patterns": {
+  "data abort": 0,
+  "prefetch abort": 0,
+  "undefined instruction": 0,
+  "Resetting CPU": 0
+ },
+ "boot_markers": {
+  "U-Boot 2027.01-rc2": true,
+  "Loading Environment from MTD... OK": true,
+  "e2631boot: slot1 at": true,
+  "e2631boot: cspboot would boot slot1": true,
+  "e2631boot: header and data CRCs are good": true,
+  "## Booting kernel from Legacy Image": true,
+  "Loading Kernel Image to 40008000": true,
+  "Starting kernel ...": true,
+  "e2631-wifi-boot: automatic Wi-Fi initialization complete": false,
+  "Please press Enter": true
+ },
+ "monitor": {
+  "banner": true,
+  "slot_line": true,
+  "boot_line": true,
+  "kernel_start": true,
+  "linux_marker": true,
+  "panic": null,
+  "env_ok": true,
+  "env_null": false,
+  "boot_lines": [
+   "e2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000",
+   "e2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000",
+   "e2631boot: cspboot would boot slot1",
+   "e2631boot: uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000",
+   "e2631boot: header and data CRCs are good"
+  ],
+  "accum_bytes": 14096
+ },
+ "health_rc": 0,
+ "health_ok": true,
+ "health_lines": [
+  "VERSION=ImmortalWrt v1.10.0",
+  "UPTIME=240",
+  "MTD0=mtd0: 00100000 00020000 \"bootloader\"",
+  "PANICS=0",
+  "MT7916=1",
+  "WIFIBOOT=[ 53.785717] e2631-wifi-boot: automatic Wi-Fi initialization complete"
+ ],
+ "serial_log_sha256": "25e4889c650c986e03b2840f26bbd87469e5a9328e53401714674ae14346e4d2",
+ "serial_log_bytes": 19998,
+ "product_verdict": "PASS",
+ "note": "The driver verdict FAIL was a host route-trap ordering artifact: device_facts() ran before the health script self-healed the route, so mtd0_unchanged was computed from an empty readback. This postcheck re-read mtd0 read-only after recovery and confirms it is byte-identical."
+}

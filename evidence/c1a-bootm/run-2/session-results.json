@@ -1,0 +1,136 @@
+{
+ "mode": "c1a-bootm-dryrun",
+ "started": "2026-11-21T18:20:46+0800",
+ "outdir": "/home/qc233/zte/e2631-p3/c1a-bootm/run-2",
+ "tag": "c1a",
+ "ready_for_user_power_cycle": true,
+ "pre_mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-c1a-fix-44892376502/u-boot.bin",
+  "size": 448096,
+  "size_ok": true,
+  "sha256": "2c90fc558dd8e35f50c887040cd25e00f98325e13e35422de1bc52d056de3eb3",
+  "sha_ok": true,
+  "first_bytes": "b80000ea14f09fe514f09fe514f09fe5",
+  "banner_offset": 380806,
+  "banner_present": true,
+  "crc32": "3ff9bda5"
+ },
+ "capture_before": {
+  "supervisor_pids": [
+   383559
+  ],
+  "bootwatch_pids": [
+   383567
+  ],
+  "tty_holders": [
+   383566
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 1132649,
+ "vendor_entry": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 448096,
+  "block_size": 1024,
+  "blocks": 438,
+  "pad": 416,
+  "bytes_sent": 448096,
+  "elapsed_s": 42.1,
+  "eot_acked": true,
+  "tail_b64": "PT4g",
+  "attempt": 1
+ },
+ "md_checks": [
+  {
+   "label": "start",
+   "addr": "0x43000000",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "71750d197168f09355bb98565e3af00295a4eeb450dca8c2779be693e906f45b",
+   "got_sha256": "71750d197168f09355bb98565e3af00295a4eeb450dca8c2779be693e906f45b",
+   "tail": "e2 00 00 8d e5 90 00 1f e5 00 e0 80 e5    ..M.............\r\n430000d0: 00 e0 4f e1 04 e0 80 e5 00 e0 90 e5 00 00 9d e5    ..O.............\r\n430000e0: 04 d0 8d e2 48 d0 4d e2 ff 1f 8d e8 b4 20 1f e5    ....H.M...... ..\r\n430000f0: 0c 00 92 e8 48 00 8d e2 34 50 8d e2 0e 10 a0 e1    ....H...4P......\r\n=> "
+  },
+  {
+   "label": "tail",
+   "addr": "0x4306d560",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "5df9b59652b154a005a85ce0c22189292dbffd47aadbddc7ec4327a2226a0d81",
+   "got_sha256": "5df9b59652b154a005a85ce0c22189292dbffd47aadbddc7ec4327a2226a0d81",
+   "tail": "43 17 00 00 00 b4 1e 06 43 17 00 00 00    ...C.......C....\r\n4306d630: bc 1e 06 43 17 00 00 00 c0 1e 06 43 17 00 00 00    ...C.......C....\r\n4306d640: e8 1e 06 43 17 00 00 00 30 1f 06 43 17 00 00 00    ...C....0..C....\r\n4306d650: 40 1f 06 43 17 00 00 00 44 1f 06 43 17 00 00 00    @..C....D..C....\r\n=> "
+  },
+  {
+   "label": "banner",
+   "addr": "0x4305cf80",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "9546e779aad04325a6c5a60b0b66c836c7ecb6464934e2b5eef378a09ba2f4f6",
+   "got_sha256": "9546e779aad04325a6c5a60b0b66c836c7ecb6464934e2b5eef378a09ba2f4f6",
+   "tail": "38 53 29 00 00 00 00 00 03 00 00 00 1d    9128S)..........\r\n4305d050: 00 00 00 06 7a 74 65 2c 7a 78 68 6e 2d 65 32 36    ....zte,zxhn-e26\r\n4305d060: 33 31 00 7a 74 65 2c 7a 78 32 37 39 31 32 38 73    31.zte,zx279128s\r\n4305d070: 00 00 00 00 00 00 00 03 00 00 00 04 00 00 00 11    ................\r\n=> "
+  }
+ ],
+ "go_sent": true,
+ "monitor": {
+  "banner": true,
+  "slot_line": true,
+  "boot_line": true,
+  "kernel_start": true,
+  "linux_marker": true,
+  "panic": null,
+  "env_ok": true,
+  "env_null": false,
+  "boot_lines": [
+   "e2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000",
+   "e2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000",
+   "e2631boot: cspboot would boot slot1",
+   "e2631boot: uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000",
+   "e2631boot: header and data CRCs are good"
+  ],
+  "accum_bytes": 14096
+ },
+ "serial_tail": "bi0: background thread \"ubi_bgt0d\" started, PID 567\r\n[   11.069882] UBIFS (ubi0:0): Mounting in unauthenticated mode\r\n[   11.070092] UBIFS (ubi0:0): background thread \"ubifs_bgt0_0\" started, PID 581\r\n[   11.150674] UBIFS (ubi0:0): UBIFS: mounted UBI device 0, volume 0, name \"userdata\"\r\n[   11.150694] UBIFS (ubi0:0): LEB size: 126976 bytes (124 KiB), min./max. I/O unit sizes: 2048 bytes/2048 bytes\r\n[   11.150704] UBIFS (ubi0:0): FS size: 43425792 bytes (41 MiB, 342 LEBs), max 352 LEBs, journal size 2158592 bytes (2 MiB, 17 LEBs)\r\n[   11.150715] UBIFS (ubi0:0): reserved for root: 2051106 bytes (2003 KiB)\r\n[   11.150723] UBIFS (ubi0:0): media format: w5/r0 (latest is w5/r0), UUID EF108A35-2AE3-40C9-AD44-60730B8D1F91, small LPT model\r\n[   11.183309] UBIFS (ubi0:0): un-mount UBI device 0\r\n[   11.183345] UBIFS (ubi0:0): background thread \"ubifs_bgt0_0\" stops\r\ne2631-userdata: refusing the extroot: the formatted volume has no snapshot marker (it was provisioned by an older image)\r\n[   11.463424] mount_root: loading kmods from internal overlay\r\n[   11.478676] kmodloader: loading kernel modules from //etc/modules-boot.d/*\r\n[   11.483745] kmodloader: done loading kernel modules from //etc/modules-boot.d/*\r\n[   11.586784] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.626824] block: attempting to load /etc/config/fstab\r\n[   11.685956] block: extroot: not configured\r\n[   11.686272] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes\r\n[   11.747415] jffs2: notice: (604) jffs2_build_xattr_subsystem: complete building xattr subsystem, 33 of xdatum (0 unchecked, 18 orphan) and 42 of xref (21 dead, 0 orphan) found.\r\n[   11.764723] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab\r\n[   11.765832] block: extroot: not configured\r\n[   11.777186] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes\r\n[   11.838241] jffs2: notice: (602) jffs2_build_xattr_subsystem: complete building xattr subsystem, 33 of xdatum (0 unchecked, 18 orphan) and 42 of xref (21 dead, 0 orphan) found.\r\n[   11.841881] mount_root: loading kmods from internal overlay\r\n[   11.857905] kmodloader: loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*\r\n[   11.861706] kmodloader: done loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*\r\n[   11.876364] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.914797] block: attempting to load /tmp/overlay/upper/etc/config/fstab\r\n[   11.915897] block: extroot: not configured\r\n[   11.916334] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab\r\n[   11.916791] block: extroot: not configured\r\n[   11.918531] mount_root: switching to jffs2 overlay\r\n[   11.927254] overlayfs: upper fs does not support tmpfile.\r\n[   11.930609] urandom-seed: Seeding with /etc/urandom.seed\r\n[   12.045634] zx279128s-eth 92000000.ethernet lan1: Link is Down\r\n[   12.058073] procd: - early -\r\n[   12.195211] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.260455] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.325495] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.391274] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.456164] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.521595] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.587329] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.623875] procd: - ubus -\r\n[   12.657634] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.854335] procd: - init -\r\nPlease press Enter to activate this console.\r\n",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   1220393
+  ],
+  "bootwatch_pids": [
+   1220560
+  ],
+  "tty_holders": [
+   1220446
+  ],
+  "events_tail": "2026-11-21T17:17:37+08:00 reader-start pid=383559\n2026-11-21T18:25:45+08:00 reader-start pid=1220393",
+  "ok": true
+ },
+ "route_fix": {
+  "ok": false,
+  "action": "failed",
+  "raw": "192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000"
+ },
+ "uptime_wait": {
+  "ok": false,
+  "uptime": null
+ },
+ "device_after": {
+  "ssh_rc": 255,
+  "ssh_err_tail": "ssh: connect to host 192.168.1.1 port 22: Connection refused\n",
+  "raw_head": []
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 \nROUTE_FIX: trying to restore the direct link\n192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2002ms\nrtt min/avg/max/mdev = 2.001/2.017/2.040/0.016 ms\n== ssh identity (retries) ==\n  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n  VERSION=ImmortalWrt v1.10.0\n  UPTIME=240\n  MTD0=mtd0: 00100000 00020000 \"bootloader\"\n  PANICS=0\n  MT7916=1\n  WIFIBOOT=[ 53.785717] e2631-wifi-boot: automatic Wi-Fi initialization complete\n== done ==",
+ "mtd0_unchanged": false,
+ "verdict": "FAIL",
+ "finished": "2026-11-21T18:29:29+0800"
+}

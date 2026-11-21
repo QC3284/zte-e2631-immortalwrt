@@ -1,0 +1,189 @@
+21 2026 - 10:03:26 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 2[2KHit any key to stop autoboot: 1[2KHit any key to stop autoboot: 0
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+## Booting kernel from Legacy Image at 42000020 ...
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+Working FDT set to 0
+   Loading Kernel Image to 40008000
+
+Starting kernel ...
+
+[    0.153461] printk: console [ttyAMA0] enabled
+[    0.157854] printk: legacy bootconsole [pl11] disabled
+[    0.164912] 94405000.serial: ttyAMA1 at MMIO 0x94405000 (irq = 27, base_baud = 0) is a PL011 rev1
+[    0.172395] zx279128s-pcie f000000.pcie: host bridge /soc/pcie@f000000 ranges:
+[    0.172440] zx279128s-pcie f000000.pcie:      MEM 0x0010000000..0x0017ffffff -> 0x0010000000
+[    0.172467] zx279128s-pcie f000000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000
+[    0.489745] zx279128s-pcie f000000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G
+[    0.589346] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
+[    0.589584] zx279128s-pcie f000000.pcie: PCI host bridge to bus 0000:00
+[    0.589601] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.589612] pci_bus 0000:00: root bus resource [mem 0x10000000-0x17ffffff]
+[    0.589649] pci 0000:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port
+[    0.589676] pci 0000:00:00.0: BAR 0 [mem 0x00000000-0x000fffff]
+[    0.589685] pci 0000:00:00.0: BAR 1 [mem 0x00000000-0x000fffff]
+[    0.589694] pci 0000:00:00.0: PCI bridge to [bus 01-ff]
+[    0.589705] pci 0000:00:00.0:   bridge window [io  0x0000-0x0fff]
+[    0.589713] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff]
+[    0.589724] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff pref]
+[    0.589778] pci 0000:00:00.0: supports D1
+[    0.589784] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
+[    0.590817] PCI: bus0: Fast back to back transfers disabled
+[    0.591071] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
+[    0.591445] pci 0000:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+[    0.591476] pci 0000:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+[    0.591503] pci 0000:01:00.0: BAR 4 [mem 0x00000000-0x00000fff 64bit pref]
+[    0.592108] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+[    0.592447] pci 0000:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5 GT/s PCIe x1 link at 0000:00:00.0 (capable of 8.000 Gb/s with 5.0 GT/s PCIe x2 link)
+[    0.592797] PCI: bus1: Fast back to back transfers disabled
+[    0.592832] pci 0000:00:00.0: BAR 0 [mem 0x10000000-0x100fffff]: assigned
+[    0.592847] pci 0000:00:00.0: BAR 1 [mem 0x10100000-0x101fffff]: assigned
+[    0.592857] pci 0000:00:00.0: bridge window [mem 0x10200000-0x102fffff]: assigned
+[    0.592866] pci 0000:00:00.0: bridge window [mem 0x10300000-0x104fffff pref]: assigned
+[    0.592880] pci 0000:01:00.0: BAR 0 [mem 0x10300000-0x103fffff 64bit pref]: assigned
+[    0.592959] pci 0000:01:00.0: BAR 2 [mem 0x10200000-0x10207fff 64bit]: assigned
+[    0.593036] pci 0000:01:00.0: BAR 4 [mem 0x10400000-0x10400fff 64bit pref]: assigned
+[    0.593113] pci 0000:00:00.0: PCI bridge to [bus 01-ff]
+[    0.593124] pci 0000:00:00.0:   bridge window [mem 0x10200000-0x102fffff]
+[    0.593133] pci 0000:00:00.0:   bridge window [mem 0x10300000-0x104fffff pref]
+[    0.593144] pci_bus 0000:00: resource 4 [mem 0x10000000-0x17ffffff]
+[    0.593152] pci_bus 0000:01: resource 1 [mem 0x10200000-0x102fffff]
+[    0.593160] pci_bus 0000:01: resource 2 [mem 0x10300000-0x104fffff pref]
+[    0.593554] pcieport 0000:00:00.0: PME: Signaling with IRQ 28
+[    0.594446] pcieport 0000:00:00.0: AER: enabled with IRQ 28
+[    0.596661] zx279128s-pcie f100000.pcie: host bridge /soc/pcie@f100000 ranges:
+[    0.596705] zx279128s-pcie f100000.pcie:      MEM 0x0020000000..0x0027ffffff -> 0x0020000000
+[    0.596732] zx279128s-pcie f100000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000
+[    0.597592] zx279128s-pcie f100000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G
+[    0.689347] zx279128s-pcie f100000.pcie: PCIe Gen.1 x1 link up
+[    0.689523] zx279128s-pcie f100000.pcie: PCI host bridge to bus 0001:00
+[    0.689538] pci_bus 0001:00: root bus resource [bus 00-ff]
+[    0.689577] pci_bus 0001:00: root bus resource [mem 0x20000000-0x27ffffff]
+[    0.689615] pci 0001:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port
+[    0.689642] pci 0001:00:00.0: BAR 0 [mem 0x00000000-0x000fffff]
+[    0.689651] pci 0001:00:00.0: BAR 1 [mem 0x00000000-0x000fffff]
+[    0.689659] pci 0001:00:00.0: PCI bridge to [bus 01-ff]
+[    0.689670] pci 0001:00:00.0:   bridge window [io  0x0000-0x0fff]
+[    0.689678] pci 0001:00:00.0:   bridge window [mem 0x00000000-0x000fffff]
+[    0.689688] pci 0001:00:00.0:   bridge window [mem 0x00000000-0x000fffff pref]
+[    0.689741] pci 0001:00:00.0: supports D1
+[    0.689748] pci 0001:00:00.0: PME# supported from D0 D1 D3hot
+[    0.690792] PCI: bus0: Fast back to back transfers disabled
+[    0.691049] pci 0001:01:00.0: [14c3:790a] type 00 class 0x028000 PCIe Endpoint
+[    0.691435] pci 0001:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+[    0.691467] pci 0001:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+[    0.691494] pci 0001:01:00.0: BAR 4 [mem 0x00000000-0x00000fff 64bit pref]
+[    0.692115] pci 0001:01:00.0: PME# supported from D0 D3hot D3cold
+[    0.692467] pci 0001:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5 GT/s PCIe x1 link at 0001:00:00.0 (capable of 4.000 Gb/s with 5.0 GT/s PCIe x1 link)
+[    0.692793] PCI: bus1: Fast back to back transfers disabled
+[    0.692827] pci 0001:00:00.0: BAR 0 [mem 0x20000000-0x200fffff]: assigned
+[    0.692841] pci 0001:00:00.0: BAR 1 [mem 0x20100000-0x201fffff]: assigned
+[    0.692852] pci 0001:00:00.0: bridge window [mem 0x20200000-0x202fffff]: assigned
+[    0.692861] pci 0001:00:00.0: bridge window [mem 0x20300000-0x204fffff pref]: assigned
+[    0.692875] pci 0001:01:00.0: BAR 0 [mem 0x20300000-0x203fffff 64bit pref]: assigned
+[    0.692958] pci 0001:01:00.0: BAR 2 [mem 0x20200000-0x20207fff 64bit]: assigned
+[    0.693038] pci 0001:01:00.0: BAR 4 [mem 0x20400000-0x20400fff 64bit pref]: assigned
+[    0.693117] pci 0001:00:00.0: PCI bridge to [bus 01-ff]
+[    0.693127] pci 0001:00:00.0:   bridge window [mem 0x20200000-0x202fffff]
+[    0.693136] pci 0001:00:00.0:   bridge window [mem 0x20300000-0x204fffff pref]
+[    0.693148] pci_bus 0001:00: resource 4 [mem 0x20000000-0x27ffffff]
+[    0.693156] pci_bus 0001:01: resource 1 [mem 0x20200000-0x202fffff]
+[    0.693164] pci_bus 0001:01: resource 2 [mem 0x20300000-0x204fffff pref]
+[    0.693523] pcieport 0001:00:00.0: PME: Signaling with IRQ 29
+[    0.694489] pcieport 0001:00:00.0: AER: enabled with IRQ 29
+[    0.845441] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)
+[    0.846452] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)
+[    0.847394] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)
+[    0.848353] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)
+[    0.853077] clk: Disabling unused clocks
+[    0.855486] check access for rdinit=/init failed: -2, ignoring
+[    0.855672] mtdblock: MTD device 'rootfs' is NAND, please consider using UBI block devices instead.
+[    0.861210] VFS: Mounted root (squashfs filesystem) readonly on device 31:7.
+[    0.864853] Freeing unused kernel image (initmem) memory: 1024K
+[    0.872358] Run /sbin/init as init process
+[    1.416329] init: Console is alive
+[    2.375831] kmodloader: loading kernel modules from /etc/modules-boot.d/*
+[    2.478197] gpio_button_hotplug: loading out-of-tree module taints kernel.
+[    2.482672] kmodloader: done loading kernel modules from /etc/modules-boot.d/*
+[    2.487528] init: - preinit -
+[    5.939354] random: crng init done
+[    6.468819] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode
+Press the [f] key and hit [enter] to enter failsafe mode
+Press the [1], [2], [3] or [4] key and hit [enter] to select the debug level
+[   10.639669] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+[   10.806404] ubi0: attaching mtd10
+[   10.978191] ubi0: scanning is finished
+[   11.020145] ubi0: attached mtd10 (name "userdata", size 47 MiB)
+[   11.020166] ubi0: PEB size: 131072 bytes (128 KiB), LEB size: 126976 bytes
+[   11.020174] ubi0: min./max. I/O unit sizes: 2048/2048, sub-page size 2048
+[   11.020180] ubi0: VID header offset: 2048 (aligned 2048), data offset: 4096
+[   11.020186] ubi0: good PEBs: 376, bad PEBs: 0, corrupted PEBs: 0
+[   11.020192] ubi0: user volume: 1, internal volumes: 1, max. volumes count: 128
+[   11.020199] ubi0: max/mean erase counter: 3/2, WL threshold: 4096, image sequence number: 149058542
+[   11.020206] ubi0: available PEBs: 0, total reserved PEBs: 376, PEBs reserved for bad PEB handling: 20
+[   11.020226] ubi0: background thread "ubi_bgt0d" started, PID 567
+[   11.069882] UBIFS (ubi0:0): Mounting in unauthenticated mode
+[   11.070092] UBIFS (ubi0:0): background thread "ubifs_bgt0_0" started, PID 581
+[   11.150674] UBIFS (ubi0:0): UBIFS: mounted UBI device 0, volume 0, name "userdata"
+[   11.150694] UBIFS (ubi0:0): LEB size: 126976 bytes (124 KiB), min./max. I/O unit sizes: 2048 bytes/2048 bytes
+[   11.150704] UBIFS (ubi0:0): FS size: 43425792 bytes (41 MiB, 342 LEBs), max 352 LEBs, journal size 2158592 bytes (2 MiB, 17 LEBs)
+[   11.150715] UBIFS (ubi0:0): reserved for root: 2051106 bytes (2003 KiB)
+[   11.150723] UBIFS (ubi0:0): media format: w5/r0 (latest is w5/r0), UUID EF108A35-2AE3-40C9-AD44-60730B8D1F91, small LPT model
+[   11.183309] UBIFS (ubi0:0): un-mount UBI device 0
+[   11.183345] UBIFS (ubi0:0): background thread "ubifs_bgt0_0" stops
+e2631-userdata: refusing the extroot: the formatted volume has no snapshot marker (it was provisioned by an older image)
+[   11.463424] mount_root: loading kmods from internal overlay
+[   11.478676] kmodloader: loading kernel modules from //etc/modules-boot.d/*
+[   11.483745] kmodloader: done loading kernel modules from //etc/modules-boot.d/*
+[   11.586784] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   11.626824] block: attempting to load /etc/config/fstab
+[   11.685956] block: extroot: not configured
+[   11.686272] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes
+[   11.747415] jffs2: notice: (604) jffs2_build_xattr_subsystem: complete building xattr subsystem, 33 of xdatum (0 unchecked, 18 orphan) and 42 of xref (21 dead, 0 orphan) found.
+[   11.764723] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab
+[   11.765832] block: extroot: not configured
+[   11.777186] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes
+[   11.838241] jffs2: notice: (602) jffs2_build_xattr_subsystem: complete building xattr subsystem, 33 of xdatum (0 unchecked, 18 orphan) and 42 of xref (21 dead, 0 orphan) found.
+[   11.841881] mount_root: loading kmods from internal overlay
+[   11.857905] kmodloader: loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*
+[   11.861706] kmodloader: done loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*
+[   11.876364] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   11.914797] block: attempting to load /tmp/overlay/upper/etc/config/fstab
+[   11.915897] block: extroot: not configured
+[   11.916334] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab
+[   11.916791] block: extroot: not configured
+[   11.918531] mount_root: switching to jffs2 overlay
+[   11.927254] overlayfs: upper fs does not support tmpfile.
+[   11.930609] urandom-seed: Seeding with /etc/urandom.seed
+[   12.045634] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[   12.058073] procd: - early -
+[   12.195211] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.260455] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.325495] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.391274] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.456164] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.521595] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.587329] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.623875] procd: - ubus -
+[   12.657634] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.854335] procd: - init -
+Please press Enter to activate this console.
