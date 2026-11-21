@@ -31,6 +31,8 @@
 | [../evidence/p2-oob/](../evidence/p2-oob/) | task-42 取证附件：OOB 表/二进制、headblock/env/secondboot hex、会话日志、工具源码与 sha256 清单 |
 | [../evidence/a1-banner-acceptance-20261121.md](../evidence/a1-banner-acceptance-20261121.md) | task-49/task-50 设备段：A1/A2 u-boot.bin 经 vendor xmodem 装入 RAM 并 go 的 banner/prompt 验收（A1 4910ee2045bd、A2 38bee433d177；mtd list + 两次只读读回；零 flash 写入以 mtd0 sha256 前后一致实证；含工具缺陷修复与主机路由陷阱记录） |
 | [../evidence/a1-banner-acceptance/](../evidence/a1-banner-acceptance/) | task-49 验收附件：驱动脚本、session/a2 results JSON、驱动与 health 日志、串口选段 |
+| [../evidence/a3-ramchain-20261121.md](../evidence/a3-ramchain-20261121.md) | P2-A3：slot-aware 启动 RAM 链只读验收（banner g8a9d1f7eecfa、md.b 448,072 B 0 差异、info 0.81 s 决策 slot1、load 4.61 s 3,491,146 B CRC 通过不 boot、4 个 mtd 切片 0 差异、mtd0 sha256 前后一致、reset no-op 需断电；含解析器缺陷与主机路由陷阱记录） |
+| [../evidence/a3-ramchain/](../evidence/a3-ramchain/) | A3 验收附件：驱动/health 脚本、两次 session results JSON、驱动日志、串口选段、参考切片、零写入证据 |
 
 
 | 文件 | 内容 |

@@ -1,0 +1,51 @@
+16:01:53 capture paused: {"supervisor_pids": [96223], "bootwatch_pids": [96230], "tty_holders": [96229], "tty_holders_after": [], "free": true}
+16:01:55 serial hub started pid=103586 log=/home/qc233/zte/e2631-p3/a3-ramchain/run-1/serial.log
+16:01:55 READY FOR USER POWER CYCLE (cold boot); waiting up to 600s
+16:02:36 cold-boot prompt caught; sending 1
+16:02:36 vendor password attempt 1 -> autoboot
+16:02:36 console entered (start-mode=cold)
+16:03:19 A3 xmodem: {"mode": "crc", "blocks": 438, "bytes_sent": 448072, "elapsed_s": 41.9, "eot_acked": true}
+16:03:19 A3 crc32: {"available": false, "device_crc32": null, "host_crc32": "317733b6", "ok": false, "raw": "crc32 0x43000000 0x6D648\r\nUnknown command 'crc32' - try 'help'\r\n=>"}
+16:03:26 stage a3 md compare 16384/448072, mismatches=0, 7.1s
+16:03:33 stage a3 md compare 32768/448072, mismatches=0, 7.1s
+16:03:40 stage a3 md compare 49152/448072, mismatches=0, 7.1s
+16:03:47 stage a3 md compare 65536/448072, mismatches=0, 7.1s
+16:03:54 stage a3 md compare 81920/448072, mismatches=0, 7.1s
+16:04:01 stage a3 md compare 98304/448072, mismatches=0, 7.1s
+16:04:08 stage a3 md compare 114688/448072, mismatches=0, 7.1s
+16:04:16 stage a3 md compare 131072/448072, mismatches=0, 7.1s
+16:04:23 stage a3 md compare 147456/448072, mismatches=0, 7.1s
+16:04:30 stage a3 md compare 163840/448072, mismatches=0, 7.1s
+16:04:37 stage a3 md compare 180224/448072, mismatches=0, 7.1s
+16:04:44 stage a3 md compare 196608/448072, mismatches=0, 7.1s
+16:04:51 stage a3 md compare 212992/448072, mismatches=0, 7.1s
+16:04:58 stage a3 md compare 229376/448072, mismatches=0, 7.1s
+16:05:05 stage a3 md compare 245760/448072, mismatches=0, 7.1s
+16:05:12 stage a3 md compare 262144/448072, mismatches=0, 7.1s
+16:05:19 stage a3 md compare 278528/448072, mismatches=0, 7.1s
+16:05:26 stage a3 md compare 294912/448072, mismatches=0, 7.1s
+16:05:33 stage a3 md compare 311296/448072, mismatches=0, 7.1s
+16:05:41 stage a3 md compare 327680/448072, mismatches=0, 7.1s
+16:05:48 stage a3 md compare 344064/448072, mismatches=0, 7.1s
+16:05:55 stage a3 md compare 360448/448072, mismatches=0, 7.1s
+16:06:02 stage a3 md compare 376832/448072, mismatches=0, 7.1s
+16:06:09 stage a3 md compare 393216/448072, mismatches=0, 7.1s
+16:06:17 stage a3 md compare 409600/448072, mismatches=0, 7.7s
+16:06:24 stage a3 md compare 425984/448072, mismatches=0, 7.1s
+16:06:31 stage a3 md compare 442368/448072, mismatches=0, 7.1s
+16:06:33 stage a3 md compare 448072/448072, mismatches=0, 2.5s
+16:06:33 A3 loaded: {"ok": true, "bytes_compared": 448072, "mismatches": 0, "first_mismatch_offset": null, "gaps": 0}
+16:06:33 A3 banner token seen after 0.0s
+16:06:34 A3 go: banner=True prompt=True aborts=2 autoboot_started=False
+16:06:34 A3 banner: U-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)
+16:06:36 e2631boot info elapsed=0.82s {"slot0_line": true, "slot1_line": true, "slot0_serial_7": true, "slot1_serial_11": false, "slot0_header_0x1C60000": false, "slot1_header_0x3800000": false, "slot1_version_immortalwrt": true, "decision_slot1": true, "no_boot_marker": true, "scan_under_3s": true}
+16:06:36 e2631boot info NOT clean; skipping e2631boot load
+16:06:36 A3 mtd list checks: {"header": true, "spi_nand": true, "block_size": true, "min_io": true, "oob_size": true}
+16:06:37 A3 mtd read slot1-version-header: {"chip_offset": "0x3800000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:06:38 A3 mtd read slot1-uimage-header: {"chip_offset": "0x2300000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:06:39 A3 mtd read slot0-vendor-header: {"chip_offset": "0x1c60000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:06:40 A3 mtd read u-boot-env-page: {"chip_offset": "0xc0000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:06:55 POWER CYCLE REQUIRED for recovery: unplug >=5 s, replug; waiting 900s for Linux
+16:09:47 recovery: {"method": "power-cycle", "reset_rebooted": false, "linux": {"ok": true, "marker": true}}
+16:09:53 capture restore: {"restore_rc": 0, "supervisor_pids": [106137], "bootwatch_pids": [106144], "tty_holders": [106143], "events_tail": "2026-11-21T15:43:38+08:00 reader-start pid=96223\n2026-11-21T16:09:49+08:00 reader-start pid=106137", "ok": true}
+16:10:26 VERDICT FAIL (results in /home/qc233/zte/e2631-p3/a3-ramchain/run-1/session-results.json)

@@ -1,0 +1,522 @@
+{
+ "mode": "session",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a3-44880033207/e2631-uboot-44880033207/u-boot.bin",
+  "size": 448072,
+  "size_ok": true,
+  "sha256": "4128523cfc5376e103a89b848fed0d8519004cb0330aa0ca188d548ae562f19d",
+  "sha_ok": true,
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_offset": 380790,
+  "banner_token": "U-Boot 2027.01-rc2-g8a9d1f7eecfa",
+  "crc32": "317733b6",
+  "crc32_hex": "317733b6",
+  "banner_offset_expected": 380790,
+  "banner_offset_ok": true,
+  "tree_pin": "40f52fb46d9987d8082babac151f9f8dcbdcba4a",
+  "ok": true
+ },
+ "expected_banner_token": "U-Boot 2027.01-rc2-g8a9d1f7eecfa",
+ "started": "2026-11-21T16:17:37+0800",
+ "refs": {
+  "ok": true,
+  "source": "ssh-live-linux",
+  "slices": {
+   "slot1-version-header": "d707f2c8d1f195cd3e6d5baab3875dd51370268fce795b80039e296f3e280883",
+   "slot1-uimage-header": "68765a7282f3abc848398e9dcc70eeaebbcaa883cd5bb299cfb30f02c471268c",
+   "slot0-vendor-header": "c579e3a95d30f1a552316725385121bda44e5ebec5da631dd86c7caf6d42f24f",
+   "u-boot-env-page": "6adfe6f3be05eca7421dae810cf8634eaab41bd553f2b1ef14b3dce0a6d8bb69"
+  }
+ },
+ "capture_before": {
+  "supervisor_pids": [
+   106137
+  ],
+  "bootwatch_pids": [
+   106144
+  ],
+  "tty_holders": [
+   106143
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 108771,
+ "vendor_entry": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 448072,
+  "block_size": 1024,
+  "blocks": 438,
+  "pad": 440,
+  "bytes_sent": 448072,
+  "elapsed_s": 41.9,
+  "eot_acked": true,
+  "tail_b64": "PT4g",
+  "attempt": 1
+ },
+ "crc32": {
+  "available": false,
+  "device_crc32": null,
+  "host_crc32": "317733b6",
+  "ok": false,
+  "raw": "crc32 0x43000000 0x6D648\r\nUnknown command 'crc32' - try 'help'\r\n=>"
+ },
+ "crc32_skipped": true,
+ "md_compare": {
+  "ok": true,
+  "bytes_compared": 448072,
+  "mismatches": 0,
+  "first_mismatch_offset": null,
+  "gaps": 0,
+  "retries": 0,
+  "chunks": [
+   {
+    "offset": 0,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 16384,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 32768,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 49152,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 65536,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 81920,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 98304,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 114688,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 131072,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 147456,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 163840,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 180224,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 196608,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 212992,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 229376,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 245760,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 262144,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 278528,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 294912,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 311296,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 327680,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 344064,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 360448,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 376832,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 393216,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 409600,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 7.1,
+    "attempt": 1
+   },
+   {
+    "offset": 425984,
+    "size": 16384,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 8.8,
+    "attempt": 1
+   },
+   {
+    "offset": 442368,
+    "size": 5704,
+    "mismatches": 0,
+    "gaps": 0,
+    "elapsed_s": 2.5,
+    "attempt": 1
+   }
+  ]
+ },
+ "go": {
+  "banner_token_seen": true,
+  "prompt_seen": true,
+  "abort_keys_sent": 2,
+  "autoboot_started": false,
+  "e2631boot_lines": [],
+  "env_hang_suspect": false,
+  "elapsed_s": 0.8,
+  "banner_line": "U-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)",
+  "raw_tail": "go 0x43000000\r\n## Starting application at 0x43000000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  10 devices, 8 uclasses, devicetree: embed\r\nMMC:   \r\nLoading Environment from <NULL>...\rLoading Environment from <NULL>... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   No ethernet found.\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=>  "
+ },
+ "prompt_alive": {
+  "bare_cr_prompt": true,
+  "help": {
+   "ok": true,
+   "unknown": false,
+   "tail": "th optional message\r\nprintenv  - print environment variables\r\nrandom    - fill memory with random pattern\r\nreset     - Perform RESET of the CPU\r\nrun       - run commands in an environment variable\r\nsetenv    - set environment variables\r\nsetexpr   - set environment variable as the result of eval expression\r\nsleep     - delay execution for some time\r\nsource    - run script from memory\r\ntftpboot  - load file via network using TFTP protocol\r\nversion   - print monitor, compiler and linker version\r\n=>"
+  },
+  "version": {
+   "ok": true,
+   "unknown": false,
+   "tail": "version\r\nU-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=>"
+  },
+  "echo E2631-A3-PROMPT-OK": {
+   "ok": true,
+   "unknown": false,
+   "tail": "echo E2631-A3-PROMPT-OK\r\nE2631-A3-PROMPT-OK\r\n=>"
+  },
+  "crc32 0x43000000 0x100": {
+   "ok": true,
+   "unknown": false,
+   "tail": "crc32 0x43000000 0x100\r\nCRC32 for 43000000 ... 430000ff ==>"
+  },
+  "alive": true
+ },
+ "help_checks": {
+  "saveenv_absent": true,
+  "mtd_present": true,
+  "e2631boot_present": true,
+  "reset_present": true,
+  "raw_tail": "fo    - print header information for application image\r\nimxtract  - extract a part of a multi-image\r\nitest     - return true/false on integer compare\r\nloadb     - load binary file over serial line (kermit mode)\r\nloads     - load S-Record file over serial line\r\nloadx     - load binary file over serial line (xmodem mode)\r\nloady     - load binary file over serial line (ymodem mode)\r\nloop      - infinite loop on address range\r\nmd        - memory display\r\nmm        - memory modify (auto-incrementing address)\r\nmtd       - MTD utils\r\nmtest     - simple RAM read/write test\r\nmw        - memory write (fill)\r\nnet       - NET sub-system\r\nnm        - memory modify (constant address)\r\npanic     - Panic with optional message\r\nprintenv  - print environment variables\r\nrandom    - fill memory with random pattern\r\nreset     - Perform RESET of the CPU\r\nrun       - run commands in an environment variable\r\nsetenv    - set environment variables\r\nsetexpr   - set environment variable as the result of eval expression\r\nsleep     - delay execution for some time\r\nsource    - run script from memory\r\ntftpboot  - load file via network using TFTP protocol\r\nversion   - print monitor, compiler and linker version\r\n=>",
+  "ok": true
+ },
+ "env": {
+  "bootcmd_runtime": "e2631boot",
+  "baudrate": "115200",
+  "bootdelay": "3",
+  "vendor_env_present": true,
+  "raw_tail": "printenv\r\nbaudrate=115200\r\nbootcmd=e2631boot\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\nethact=eth0\r\nethaddr=00:41:71:00:00:50\r\nfdtcontroladdr=4fff0fd0\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial@94404000\r\nstdin=serial@94404000\r\nstdout=serial@94404000\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 506/131068 bytes\r\n=>",
+  "ok": true
+ },
+ "e2631boot_info": {
+  "raw_tail": "e2631boot info\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\n=>",
+  "slot0": {
+   "part_offset": 7340032,
+   "serial": 7,
+   "version": "V1.0.0.7B5.8000",
+   "header": 29753344
+  },
+  "slot1": {
+   "part_offset": 36700160,
+   "serial": 12,
+   "version": "ImmortalWrt v1.10.0",
+   "header": 58720256
+  },
+  "decision": 1,
+  "asserts": {
+   "slot0_line": true,
+   "slot1_line": true,
+   "slot0_part_0x700000": true,
+   "slot1_part_0x2300000": true,
+   "slot0_header_0x1C60000": true,
+   "slot1_header_0x3800000": true,
+   "slot0_serial_7": true,
+   "slot0_version_vendor": true,
+   "slot1_version_immortalwrt": true,
+   "slot1_serial_gt_slot0": true,
+   "decision_slot1": true,
+   "no_boot_marker": true,
+   "scan_under_3s": true
+  },
+  "ok": true,
+  "elapsed_s": 0.81
+ },
+ "e2631boot_load": {
+  "raw_tail": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=>",
+  "name": "ARM ImmortalWrt Linux-6.18.60",
+  "load": 1073774592,
+  "entry": 1073774592,
+  "size": 3491146,
+  "dest": 1107296256,
+  "crcs_good": true,
+  "no_boot_marker": true,
+  "asserts": {
+   "uimage_line": true,
+   "name_immortalwrt": true,
+   "load_0x40008000": true,
+   "entry_0x40008000": true,
+   "dest_0x42000000": true,
+   "size_plausible": true,
+   "crcs_good": true,
+   "no_boot_marker": true
+  },
+  "ok": true,
+  "elapsed_s": 4.61
+ },
+ "mtd": {
+  "device": "spi-nand0",
+  "read_size": 2048,
+  "reads": [
+   {
+    "label": "slot1-version-header",
+    "chip_offset": "0x3800000",
+    "ram": "0x4c000000",
+    "size": 2048,
+    "read_cmd": "mtd read spi-nand0 0x4C000000 0x3800000 0x800",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C000000 0x3800000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x03800000\r\n=>",
+    "gaps": 0,
+    "ref_sha256": "d707f2c8d1f195cd3e6d5baab3875dd51370268fce795b80039e296f3e280883",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "sha256": "d707f2c8d1f195cd3e6d5baab3875dd51370268fce795b80039e296f3e280883",
+    "ok": true
+   },
+   {
+    "label": "slot1-uimage-header",
+    "chip_offset": "0x2300000",
+    "ram": "0x4c001000",
+    "size": 2048,
+    "read_cmd": "mtd read spi-nand0 0x4C001000 0x2300000 0x800",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C001000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=>",
+    "gaps": 0,
+    "ref_sha256": "68765a7282f3abc848398e9dcc70eeaebbcaa883cd5bb299cfb30f02c471268c",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "sha256": "68765a7282f3abc848398e9dcc70eeaebbcaa883cd5bb299cfb30f02c471268c",
+    "ok": true
+   },
+   {
+    "label": "slot0-vendor-header",
+    "chip_offset": "0x1c60000",
+    "ram": "0x4c002000",
+    "size": 2048,
+    "read_cmd": "mtd read spi-nand0 0x4C002000 0x1C60000 0x800",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C002000 0x1C60000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x01c60000\r\n=>",
+    "gaps": 0,
+    "ref_sha256": "c579e3a95d30f1a552316725385121bda44e5ebec5da631dd86c7caf6d42f24f",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "sha256": "c579e3a95d30f1a552316725385121bda44e5ebec5da631dd86c7caf6d42f24f",
+    "ok": true
+   },
+   {
+    "label": "u-boot-env-page",
+    "chip_offset": "0xc0000",
+    "ram": "0x4c003000",
+    "size": 2048,
+    "read_cmd": "mtd read spi-nand0 0x4C003000 0xC0000 0x800",
+    "read_error": false,
+    "read_tail": "mtd read spi-nand0 0x4C003000 0xC0000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x000c0000\r\n=>",
+    "gaps": 0,
+    "ref_sha256": "6adfe6f3be05eca7421dae810cf8634eaab41bd553f2b1ef14b3dce0a6d8bb69",
+    "mismatches": 0,
+    "first_mismatch": null,
+    "sha256": "6adfe6f3be05eca7421dae810cf8634eaab41bd553f2b1ef14b3dce0a6d8bb69",
+    "ok": true
+   }
+  ],
+  "list_tail": "mtd list\r\nList of MTD devices:\r\n* spi-nand0\r\n  - device: flash@0\r\n  - parent: spi@94406000\r\n  - driver: spi_nand\r\n  - path: /spi@94406000/flash@0\r\n  - type: NAND flash\r\n  - block size: 0x20000 bytes\r\n  - min I/O: 0x800 bytes\r\n  - OOB size: 64 bytes\r\n  - OOB available: 62 bytes\r\n  - ECC strength: 1 bits\r\n  - ECC step size: 512 bytes\r\n  - bitflip threshold: 1 bits\r\n  - 0x000000000000-0x000008000000 : \"spi-nand0\"\r\n=>",
+  "list_checks": {
+   "header": true,
+   "spi_nand": true,
+   "block_size": true,
+   "min_io": true,
+   "oob_size": true
+  },
+  "list_ok": true,
+  "ok": true
+ },
+ "recovery": {
+  "reset_in_help": true,
+  "boot_test": false,
+  "reset_rebooted": false,
+  "reset_unknown": false,
+  "method": "power-cycle",
+  "linux": {
+   "ok": true,
+   "marker": true
+  }
+ },
+ "transcript": "serial.log",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   110586
+  ],
+  "bootwatch_pids": [
+   110594
+  ],
+  "tty_holders": [
+   110592
+  ],
+  "events_tail": "2026-11-21T16:09:49+08:00 reader-start pid=106137\n2026-11-21T16:23:23+08:00 reader-start pid=110586",
+  "ok": true
+ },
+ "route_fix": {
+  "ok": true,
+  "action": "nmcli-connect-enp0s20u1u4u2c2",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2001ms\nrtt min/avg/max/mdev = 2.031/2.038/2.047/0.006 ms\n== ssh identity (retries) ==\n  Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n  VERSION=ImmortalWrt v1.10.0\n  UPTIME=39\n  MTD0=mtd0: 00100000 00020000 \"bootloader\"\n  PANICS=0\n  MT7916=0\n  WIFIBOOT=[ 27.024689] e2631-wifi-boot: waiting 25s\n== done ==",
+ "finished": "2026-11-21T16:24:02+0800",
+ "verdict": "GREEN"
+}

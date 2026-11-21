@@ -1,0 +1,22 @@
+A3 zero-write evidence (read-only session checks)
+
+Pre-session baseline: /home/qc233/zte/e2631-p2/dump2/mtd0-before.bin (1,048,576 B)
+  sha256 = de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f
+  (captured 2026-11-14 during the P2-P1 mtd0 OOB recon; the expected baseline value)
+
+Post-session read-only check on the live device (SSH, 16:24 CST):
+  $ sha256sum /dev/mtd0
+  de4ea5bdcf6b4438d04d7de9f15ade68461a6dc60672ab1d1fb2e9c2ae4d5f3f  /dev/mtd0
+  $ cat /etc/e2631-version   -> ImmortalWrt v1.10.0
+  $ dmesg | grep -ci panic    -> 0
+
+Command allowlist enforced by the driver (positive match, checked before send):
+  xmodem 0x43000000 | md.b 0xADDR 0xLEN | crc32 0xADDR 0xLEN | go 0x43000000 |
+  help | version | printenv | echo <token> | reset | mtd list |
+  mtd read spi-nand0 <ram> <chip_off> <len> | e2631boot info | e2631boot load
+Refused before transmission: mtd write/erase/bad, nand write/erase, saveenv,
+  env save/set, setenv, editenv, bare e2631boot, e2631boot boot, bootm, boot, run.
+
+Session 1: only read commands plus reset (reset prints: "reset: the A1 port has no
+  reset controller, power-cycle the board" - i.e. reset_cpu is a no-op on this SoC).
+Session 2: same; mtd0 sha256 after both sessions is identical to the baseline.

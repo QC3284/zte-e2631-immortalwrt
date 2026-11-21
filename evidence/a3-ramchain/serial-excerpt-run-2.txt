@@ -1,0 +1,52 @@
+A3 RAM-chain session 2 (run-2) serial excerpt
+source: /home/qc233/zte/e2631-p3/a3-ramchain/run-2/serial.log (2.2 MB raw log kept off-repo; only marker lines below)
+
+70:pdt_cspboot_init:883 Start to initialize cspboot...
+72:pdt_cspboot_info_init:862 memtop:42000000 entry:40008000
+73:pdt_cspboot_init:917 Cspboot initialization is done.
+74:*** Press 1 means entering boot mode***
+81:Hit any key to stop autoboot:  3  0 
+89:=> md.b 0x43000000 0x4000
+21152:43052320: 5f 33 32 00 72 65 73 65 74 74 69 6e 67 20 2e 2e    _32.resetting ..
+21169:43052430: 65 72 0a 00 65 32 36 33 31 62 6f 6f 74 3a 20 63    er..e2631boot: c
+21175:43052490: 78 0a 00 65 32 36 33 31 62 6f 6f 74 3a 20 73 6c    x..e2631boot: sl
+21185:43052530: 65 32 36 33 31 62 6f 6f 74 3a 20 73 68 6f 72 74    e2631boot: short
+21188:43052560: 00 65 32 36 33 31 62 6f 6f 74 3a 20 62 61 64 20    .e2631boot: bad 
+21191:43052590: 72 75 70 74 0a 00 65 32 36 33 31 62 6f 6f 74 3a    rupt..e2631boot:
+21222:43052780: 20 62 6f 6f 74 0a 00 72 65 73 65 74 3a 20 74 68     boot..reset: th
+21224:430527a0: 20 72 65 73 65 74 20 63 6f 6e 74 72 6f 6c 6c 65     reset controlle
+21751:43054880: 3d 20 30 78 25 6c 58 0a 00 72 65 73 65 74 00 50    = 0x%lX..reset.P
+21867:43054fc0: 20 61 6e 64 20 72 65 73 65 74 20 73 74 61 74 69     and reset stati
+22543:43057a00: 32 4b 0d 48 69 74 20 61 6e 79 20 6b 65 79 20 74    2K.Hit any key t
+23683:4305c120: 79 5d 20 72 65 73 65 74 20 64 65 66 61 75 6c 74    y] reset default
+23687:4305c160: 66 6f 72 63 69 62 6c 79 5d 20 72 65 73 65 74 20    forcibly] reset 
+28122:=> go 0x43000000
+28126:U-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)
+28138:[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+28183:reset     - Perform RESET of the CPU
+28192:U-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)
+28243:reset     - Perform RESET of the CPU
+28278:e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+28279:e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+28280:e2631boot: cspboot would boot slot1
+28282:e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+28283:e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+28284:e2631boot: cspboot would boot slot1
+28285:e2631boot: uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+28286:e2631boot: header and data CRCs are good
+28287:=> mtd list
+28303:=> mtd read spi-nand0 0x4C000000 0x3800000 0x800
+28304:Reading 2048 byte(s) (1 page(s)) at offset 0x03800000
+28434:=> mtd read spi-nand0 0x4C001000 0x2300000 0x800
+28435:Reading 2048 byte(s) (1 page(s)) at offset 0x02300000
+28565:=> mtd read spi-nand0 0x4C002000 0x1C60000 0x800
+28566:Reading 2048 byte(s) (1 page(s)) at offset 0x01c60000
+28696:=> mtd read spi-nand0 0x4C003000 0xC0000 0x800
+28697:Reading 2048 byte(s) (1 page(s)) at offset 0x000c0000
+28827:=> reset
+28828:resetting ...
+28829:reset: the A1 port has no reset controller, power-cycle the board
+28899:pdt_cspboot_init:883 Start to initialize cspboot...
+28901:pdt_cspboot_info_init:862 memtop:42000000 entry:40008000
+28902:pdt_cspboot_init:917 Cspboot initialization is done.
+28903:*** Press 1 means entering boot mode***

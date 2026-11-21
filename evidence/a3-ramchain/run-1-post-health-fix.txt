@@ -1,0 +1,18 @@
+A3 session 1 post-session health (manual re-run after restoring the direct link, 16:12 CST)
+This file records the output of /home/qc233/zte/e2631-p3/a1_banner_health.sh after
+nmcli device connect enp0s20u1u4u2c2 restored the direct path to 192.168.1.1.
+The in-session health attempt had taken the home-LAN route (via 192.168.5.1) and
+failed on SSH; see run-1-health-in-session.txt for that output.
+
+== route ==
+192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000
+== ping wait (up to 90s) ==
+ping ok after attempt 0
+== ssh identity (retries) ==
+  VERSION=ImmortalWrt v1.10.0
+  UPTIME=65
+  MTD0=mtd0: 00100000 00020000 "bootloader"
+  PANICS=0
+  MT7916=1
+  WIFIBOOT=[ 53.789942] e2631-wifi-boot: automatic Wi-Fi initialization complete
+== done ==

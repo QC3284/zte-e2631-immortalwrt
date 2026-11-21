@@ -1,0 +1,53 @@
+16:17:38 capture paused: {"supervisor_pids": [106137], "bootwatch_pids": [106144], "tty_holders": [106143], "tty_holders_after": [], "free": true}
+16:17:38 serial hub started pid=108771 log=/home/qc233/zte/e2631-p3/a3-ramchain/run-2/serial.log
+16:17:38 READY FOR USER POWER CYCLE (cold boot); waiting up to 600s
+16:18:25 cold-boot prompt caught; sending 1
+16:18:25 vendor password attempt 1 -> autoboot
+16:18:26 console entered (start-mode=cold)
+16:19:08 A3 xmodem: {"mode": "crc", "blocks": 438, "bytes_sent": 448072, "elapsed_s": 41.9, "eot_acked": true}
+16:19:08 A3 crc32: {"available": false, "device_crc32": null, "host_crc32": "317733b6", "ok": false, "raw": "crc32 0x43000000 0x6D648\r\nUnknown command 'crc32' - try 'help'\r\n=>"}
+16:19:15 stage a3 md compare 16384/448072, mismatches=0, 7.1s
+16:19:22 stage a3 md compare 32768/448072, mismatches=0, 7.1s
+16:19:29 stage a3 md compare 49152/448072, mismatches=0, 7.1s
+16:19:36 stage a3 md compare 65536/448072, mismatches=0, 7.1s
+16:19:43 stage a3 md compare 81920/448072, mismatches=0, 7.1s
+16:19:50 stage a3 md compare 98304/448072, mismatches=0, 7.1s
+16:19:58 stage a3 md compare 114688/448072, mismatches=0, 7.1s
+16:20:05 stage a3 md compare 131072/448072, mismatches=0, 7.1s
+16:20:12 stage a3 md compare 147456/448072, mismatches=0, 7.1s
+16:20:19 stage a3 md compare 163840/448072, mismatches=0, 7.1s
+16:20:26 stage a3 md compare 180224/448072, mismatches=0, 7.1s
+16:20:33 stage a3 md compare 196608/448072, mismatches=0, 7.1s
+16:20:40 stage a3 md compare 212992/448072, mismatches=0, 7.1s
+16:20:47 stage a3 md compare 229376/448072, mismatches=0, 7.1s
+16:20:54 stage a3 md compare 245760/448072, mismatches=0, 7.1s
+16:21:01 stage a3 md compare 262144/448072, mismatches=0, 7.1s
+16:21:08 stage a3 md compare 278528/448072, mismatches=0, 7.1s
+16:21:15 stage a3 md compare 294912/448072, mismatches=0, 7.1s
+16:21:22 stage a3 md compare 311296/448072, mismatches=0, 7.1s
+16:21:30 stage a3 md compare 327680/448072, mismatches=0, 7.1s
+16:21:37 stage a3 md compare 344064/448072, mismatches=0, 7.1s
+16:21:44 stage a3 md compare 360448/448072, mismatches=0, 7.1s
+16:21:51 stage a3 md compare 376832/448072, mismatches=0, 7.1s
+16:21:58 stage a3 md compare 393216/448072, mismatches=0, 7.1s
+16:22:05 stage a3 md compare 409600/448072, mismatches=0, 7.1s
+16:22:12 stage a3 md compare 425984/448072, mismatches=0, 7.1s
+16:22:21 stage a3 md compare 442368/448072, mismatches=0, 8.8s
+16:22:23 stage a3 md compare 448072/448072, mismatches=0, 2.5s
+16:22:23 A3 loaded: {"ok": true, "bytes_compared": 448072, "mismatches": 0, "first_mismatch_offset": null, "gaps": 0}
+16:22:23 A3 banner token seen after 0.0s
+16:22:24 A3 go: banner=True prompt=True aborts=2 autoboot_started=False
+16:22:24 A3 banner: U-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)
+16:22:26 e2631boot info elapsed=0.81s {"slot0_line": true, "slot1_line": true, "slot0_part_0x700000": true, "slot1_part_0x2300000": true, "slot0_header_0x1C60000": true, "slot1_header_0x3800000": true, "slot0_serial_7": true, "slot0_version_vendor": true, "slot1_version_immortalwrt": true, "slot1_serial_gt_slot0": true, "decision_slot1": true, "no_boot_marker": true, "scan_under_3s": true}
+16:22:26 e2631boot info clean: cspboot would boot slot1
+16:22:30 e2631boot load elapsed=4.61s {"uimage_line": true, "name_immortalwrt": true, "load_0x40008000": true, "entry_0x40008000": true, "dest_0x42000000": true, "size_plausible": true, "crcs_good": true, "no_boot_marker": true}
+16:22:30 A3 mtd list checks: {"header": true, "spi_nand": true, "block_size": true, "min_io": true, "oob_size": true}
+16:22:31 A3 mtd read slot1-version-header: {"chip_offset": "0x3800000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:22:32 A3 mtd read slot1-uimage-header: {"chip_offset": "0x2300000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:22:33 A3 mtd read slot0-vendor-header: {"chip_offset": "0x1c60000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:22:34 A3 mtd read u-boot-env-page: {"chip_offset": "0xc0000", "read_error": false, "mismatches": 0, "first_mismatch": null, "gaps": 0, "ok": true}
+16:22:49 POWER CYCLE REQUIRED for recovery: unplug >=5 s, replug; waiting 900s for Linux
+16:23:21 recovery: {"method": "power-cycle", "reset_rebooted": false, "linux": {"ok": true, "marker": true}}
+16:23:27 capture restore: {"restore_rc": 0, "supervisor_pids": [110586], "bootwatch_pids": [110594], "tty_holders": [110592], "events_tail": "2026-11-21T16:09:49+08:00 reader-start pid=106137\n2026-11-21T16:23:23+08:00 reader-start pid=110586", "ok": true}
+16:23:27 ROUTE TRAP: 192.168.1.1 is not direct; reconnecting the USB NIC
+16:24:02 VERDICT GREEN (results in /home/qc233/zte/e2631-p3/a3-ramchain/run-2/session-results.json)
