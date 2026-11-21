@@ -1,0 +1,10 @@
+# A5 session zero-write check, 2026-11-22 02:08 CST, read-only SSH over the direct
+# USB-NIC link (192.168.1.191 -> 192.168.1.1, ip route get has no "via").
+VERSION=ImmortalWrt v1.10.0
+KERNEL=6.18.60
+UPTIME=1202
+PANICS=0
+MTD0=mtd0: 00100000 00020000 "bootloader"
+d571b76404df1596dd58b710cff84e1ede92e6a29798abe5dcc50198d286b0f5  /dev/mtd0
+# mtd0 sha256 equals the pre-session value in preflight-run3.json, i.e. none of
+# run-1 / run-2 / run-3 / the pci probe wrote flash or env.

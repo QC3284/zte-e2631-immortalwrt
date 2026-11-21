@@ -1,0 +1,48 @@
+5586: 
+5593: [    0.171837] zx279128s-pcie f000000.pcie:      MEM 0x0010000000..0x0017ffffff -> 0x0010000000
+5594: [    0.171863] zx279128s-pcie f000000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000
+5595: [    0.489777] zx279128s-pcie f000000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G
+5596: [    0.589378] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
+5597: [    0.589621] zx279128s-pcie f000000.pcie: PCI host bridge to bus 0000:00
+5598: [    0.589638] pci_bus 0000:00: root bus resource [bus 00-ff]
+5599: [    0.589649] pci_bus 0000:00: root bus resource [mem 0x10000000-0x17ffffff]
+5600: [    0.589685] pci 0000:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port
+5601: [    0.589712] pci 0000:00:00.0: BAR 0 [mem 0x00000000-0x000fffff]
+5602: [    0.589722] pci 0000:00:00.0: BAR 1 [mem 0x00000000-0x000fffff]
+5603: [    0.589730] pci 0000:00:00.0: PCI bridge to [bus 01-ff]
+5604: [    0.589741] pci 0000:00:00.0:   bridge window [io  0x0000-0x0fff]
+5605: [    0.589749] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff]
+5606: [    0.589759] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff pref]
+5607: [    0.589812] pci 0000:00:00.0: supports D1
+5608: [    0.589819] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
+5609: [    0.590853] PCI: bus0: Fast back to back transfers disabled
+5610: [    0.591111] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
+5611: [    0.591481] pci 0000:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+5612: [    0.591512] pci 0000:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+5613: [    0.591539] pci 0000:01:00.0: BAR 4 [mem 0x00000000-0x00000fff 64bit pref]
+5647: [    0.689798] pci 0001:00:00.0: supports D1
+5648: [    0.689805] pci 0001:00:00.0: PME# supported from D0 D1 D3hot
+5649: [    0.690862] PCI: bus0: Fast back to back transfers disabled
+5650: [    0.691145] pci 0001:01:00.0: [14c3:790a] type 00 class 0x028000 PCIe Endpoint
+5651: [    0.691533] pci 0001:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+5652: [    0.691564] pci 0001:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+5677: [    0.855458] check access for rdinit=/init failed: -2, ignoring
+5678: [    0.855631] mtdblock: MTD device 'rootfs' is NAND, please consider using UBI block devices instead.
+5679: [    0.861134] VFS: Mounted root (squashfs filesystem) readonly on device 31:7.
+5680: [    0.864840] Freeing unused kernel image (initmem) memory: 1024K
+5681: [    0.872345] Run /sbin/init as init process
+5682: [    1.406381] init: Console is alive
+5796: [   54.239504] mt7915e 0000:01:00.0: WA Firmware Version: DEV_000000, Build Time: 20240823172837
+5797: [   54.371465] mt7915e 0000:01:00.0: registering led 'mt76-phy0'
+5798: [   54.395104] mt7915e 0000:01:00.0: registering led 'mt76-phy1'
+5799: [   54.486818] wifi-on: done: 7906=mt7915e 790a=
+5800: [   54.584489] e2631-wifi-boot: MT7916 ready
+5801: [   54.836899] e2631-wifi-boot: automatic Wi-Fi initialization complete
+5802: [   57.665408] br-lan: port 4(phy0-ap0) entered blocking state
+5869: [   53.140770] mt7915e 0000:01:00.0: WA Firmware Version: DEV_000000, Build Time: 20240823172837
+5870: [   53.279325] mt7915e 0000:01:00.0: registering led 'mt76-phy0'
+5871: [   53.326937] mt7915e 0000:01:00.0: registering led 'mt76-phy1'
+5872: [   53.395709] wifi-on: done: 7906=mt7915e 790a=
+5873: [   53.508222] e2631-wifi-boot: MT7916 ready
+5874: [   53.741146] e2631-wifi-boot: automatic Wi-Fi initialization complete
+5875: [   56.562131] br-lan: port 4(phy0-ap0) entered blocking state

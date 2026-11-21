@@ -1,0 +1,18 @@
+# A5 patch-0012 residual vendor-state diff (our post vs vendor post)
+
+our post words: 200, vendor words: 220, differing: 10
+
+0x94400018 our=0x0400001b vendor=0x0400081b xor=0x00000800
+0x94407014 our=0x0000db28 vendor=0x0000db2c xor=0x00000004
+0x94407020 our=0x00000100 vendor=0x00000104 xor=0x00000004
+0x944070d4 our=0x0000e020 vendor=0x0000e028 xor=0x00000008
+0x944070e0 our=0x00000000 vendor=0x00000008 xor=0x00000008
+0x9a101004 our=0x00000000 vendor=0x00008f08 xor=0x00008f08
+0x9a101008 our=0x00000000 vendor=0x00001040 xor=0x00001040
+0x9a101014 our=0x00000000 vendor=0x000019a0 xor=0x000019a0
+0x9a101018 our=0x00000000 vendor=0x000019a0 xor=0x000019a0
+0x9a10101c our=0x00000000 vendor=0x000019a0 xor=0x000019a0
+
+refclk after: {"PLL0": "0x0004176b", "PLL1": "0x144fdf3b", "CTRL8": "0x10061fff", "CRM2_10": "0x00000100", "CTRL4C": "0x000381ff", "LSP1_04": "0x0001381b", "CTRL0C": "0x00517800"}
+e2631boot refclk checks: {"PLL0": true, "PLL1": true, "CTRL8": true, "CRM2_10": true, "CTRL4C": true, "LSP1_04": true, "CTRL0C": true, "before_pre": true}
+serdes: 24/24

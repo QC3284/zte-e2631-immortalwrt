@@ -1,0 +1,13 @@
+01:34:31 capture paused: {"supervisor_pids": [3285812], "bootwatch_pids": [3285901], "tty_holders": [3285818], "tty_holders_after": [], "free": true}
+01:34:32 serial hub started pid=3299000 log=/home/qc233/zte/e2631-p3/c1b1fix/a5-refclk/run-2/serial.log
+01:34:32 ATTACH: reusing the OUR flash U-Boot prompt left by the previous attempt
+01:34:32 ATTACH OK: version
+01:34:32 COLD FINGERPRINT MATCH
+01:34:33 PRE DUMP words=200
+01:35:16 xmodem_cmd loadx 0x47f00000 block=1024 ok=True elapsed=42.3s
+01:38:26 md_check a5-uboot-in-ram: OK
+01:38:26 MILESTONE: patch-0012 U-Boot in RAM verified
+01:38:26 MILESTONE: new U-Boot banner
+01:38:26 ERROR AttributeError("'bytes' object has no attribute 'encode'")
+01:38:32 capture restore: {"restore_rc": 0, "supervisor_pids": [3309788], "bootwatch_pids": [3309859], "tty_holders": [3309798], "events_tail": "2026-11-22T01:29:49+08:00 reader-start pid=3285812\n2026-11-22T01:38:28+08:00 reader-start pid=3309788", "ok": true}
+01:38:32 VERDICT FAIL

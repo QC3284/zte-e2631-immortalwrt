@@ -1,0 +1,10 @@
+01:29:40 capture paused: {"supervisor_pids": [3171047], "bootwatch_pids": [3171100], "tty_holders": [3171077], "tty_holders_after": [], "free": true}
+01:29:41 serial hub started pid=3285408 log=/home/qc233/zte/e2631-p3/c1b1fix/a5-refclk/run-1/serial.log
+01:29:41 WAKE: current Linux shell, then reboot -f into the flash chain
+01:29:42 MILESTONE: OUR flash banner; stopping autoboot
+01:29:42 banner seen; stopping autoboot
+01:29:45 stop_autoboot: {"banner": true, "prompt": true}
+01:29:46 COLD FINGERPRINT MATCH
+01:29:46 ERROR TypeError('%x format: an integer is required, not str')
+01:29:53 capture restore: {"restore_rc": 0, "supervisor_pids": [3285812], "bootwatch_pids": [3285901], "tty_holders": [3285818], "events_tail": "2026-11-22T00:52:22+08:00 reader-start pid=3171047\n2026-11-22T01:29:49+08:00 reader-start pid=3285812", "ok": true}
+01:29:53 VERDICT FAIL

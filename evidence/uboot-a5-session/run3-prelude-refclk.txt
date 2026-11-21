@@ -1,0 +1,36 @@
+47f6e150: 7c 29 f6 47 17 00 00 00                          |).G....
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-g9a7538311376 (Nov 21 2026 - 17:20:55 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g9a7538311376 (Nov 21 2026 - 17:20:55 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> e2631refclk
+e2631refclk: before PLL0=80040faa PLL1=00353f7d CTRL8=10061fcf
+e2631refclk: before CRM2_10=00000000 CTRL4C=00038000 LSP1_04=0000081b CTRL0C=00417800
+e2631refclk: running the vendor network reference-clock and SerDes sequence
+e2631refclk: after PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff
+e2631refclk: after CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800
+e2631refclk: back at the prompt, nothing was booted
+=> md 0x94000000 0x40
+94000000: 00000000 000001fb 10061fff 00517800  .............xQ.
+94000010: 0000b114 cffffbf7 00040a09 10000000  ................
+94000020: 0004142a 10000000 000409ec 15525460  *...........`TR.
+94000030: 000409d9 10f5c28f 00000303 00000000  ................
+94000040: 000000d5 00000000 0ffedfff 000381ff  ................

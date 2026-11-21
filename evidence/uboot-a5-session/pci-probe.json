@@ -1,0 +1,61 @@
+{
+ "capture_paused": {
+  "supervisor_pids": [
+   3333888
+  ],
+  "bootwatch_pids": [
+   3333968
+  ],
+  "tty_holders": [
+   3333898
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 3336479,
+ "shell": true,
+ "commands": {
+  "dmesg_pcie_full": {
+   "cmd": "dmesg | grep -iE 'pcie|link training|link up|link down' | tail -40",
+   "out": "dmesg | grep -iE 'pcie|link training|link up|link down' | ta\r\r\nil -40\r\n[    0.170799] zx279128s-pcie f000000.pcie: host bridge /soc/pcie@f000000 ranges:\r\n[    0.170853] zx279128s-pcie f000000.pcie:      MEM 0x0010000000..0x0017ffffff -> 0x0010000000\r\n[    0.170883] zx279128s-pcie f000000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000\r\n[    0.489784] zx279128s-pcie f000000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G\r\n[    1.489381] zx279128s-pcie f000000.pcie: Device not found\r\n[    1.489619] zx279128s-pcie f000000.pcie: PCI host bridge to bus 0000:00\r\n[    1.489683] pci 0000:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port\r\n[    1.491419] pcieport 0000:00:00.0: PME: Signaling with IRQ 28\r\n[    1.492258] pcieport 0000:00:00.0: AER: enabled with IRQ 28\r\n[    1.493829] zx279128s-pcie f100000.pcie: host bridge /soc/pcie@f100000 ranges:\r\n[    1.493882] zx279128s-pcie f100000.pcie:      MEM 0x0020000000..0x0027ffffff -> 0x0020000000\r\n[    1.493911] zx279128s-pcie f100000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000\r\n[    1.494614] zx279128s-pcie f100000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G\r\n[    2.579380] zx279128s-pcie f100000.pcie: Device not found\r\n[    2.579557] zx279128s-pcie f100000.pcie: PCI host bridge to bus 0001:00\r\n[    2.579647] pci 0001:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port\r\n[    2.581439] pcieport 0001:00:00.0: PME: Signaling with IRQ 29\r\n[    2.582318] pcieport 0001:00:00.0: AER: enabled with IRQ 29\r\nroot@ImmortalWrt:~# "
+  },
+  "sysfs_pci": {
+   "cmd": "ls -l /sys/bus/pci/devices",
+   "out": "ls -l /sys/bus/pci/devices\r\nlrwxrwxrwx    1 root     root             0 Jan  1  1970 \u001b[1;36m0000:00:00.0\u001b[m -> \u001b[1;34m../../../devices/platform/soc/f000000.pcie/pci0000:00/0000:00:00.0\u001b[m\r\nlrwxrwxrwx    1 root     root             0 Jan  1  1970 \u001b[1;36m0001:00:00.0\u001b[m -> \u001b[1;34m../../../devices/platform/soc/f100000.pcie/pci0001:00/0001:00:00.0\u001b[m\r\nroot@ImmortalWrt:~# "
+  },
+  "pci_uevent": {
+   "cmd": "for d in /sys/bus/pci/devices/*; do echo $(basename $d); cat $d/uevent 2>/dev/null | head -6; done",
+   "out": "for d in /sys/bus/pci/devices/*; do echo $(basename $d); cat\r\r\n $d/uevent 2>/dev/null | head -6; done\r\n0000:00:00.0\r\nDRIVER=pcieport\r\nPCI_CLASS=60400\r\nPCI_ID=1CF2:6830\r\nPCI_SUBSYS_ID=0000:0000\r\nPCI_SLOT_NAME=0000:00:00.0\r\nMODALIAS=pci:v00001CF2d00006830sv00000000sd00000000bc06sc04i00\r\n0001:00:00.0\r\nDRIVER=pcieport\r\nPCI_CLASS=60400\r\nPCI_ID=1CF2:6830\r\nPCI_SUBSYS_ID=0000:0000\r\nPCI_SLOT_NAME=0001:00:00.0\r\nMODALIAS=pci:v00001CF2d00006830sv00000000sd00000000bc06sc04i00\r\nroot@ImmortalWrt:~# "
+  },
+  "rescan": {
+   "cmd": "echo 1 > /sys/bus/pci/rescan; sleep 3; ls -l /sys/bus/pci/devices",
+   "out": "echo 1 > /sys/bus/pci/rescan; sleep 3; ls -l /sys/bus/pci/de\r\r\nvices\r\nlrwxrwxrwx    1 root     root             0 Jan  1  1970 \u001b[1;36m0000:00:00.0\u001b[m -> \u001b[1;34m../../../devices/platform/soc/f000000.pcie/pci0000:00/0000:00:00.0\u001b[m\r\nlrwxrwxrwx    1 root     root             0 Jan  1  1970 \u001b[1;36m0001:00:00.0\u001b[m -> \u001b[1;34m../../../devices/platform/soc/f100000.pcie/pci0001:00/0001:00:00.0\u001b[m\r\nroot@ImmortalWrt:~# "
+  },
+  "dmesg_after_rescan": {
+   "cmd": "dmesg | tail -25",
+   "out": "dmesg | tail -25\r\n[   27.459891] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode\r\n[   27.461014] br-lan: port 1(lan1) entered blocking state\r\n[   27.461037] br-lan: port 1(lan1) entered disabled state\r\n[   27.461086] zx279128s-eth 92000000.ethernet lan1: entered allmulticast mode\r\n[   27.461328] zx279128s-eth 92000000.ethernet lan1: entered promiscuous mode\r\n[   27.487993] zx279128s-eth 92000000.ethernet lan2: configuring for phy/internal link mode\r\n[   27.516939] br-lan: port 2(lan2) entered blocking state\r\n[   27.516965] br-lan: port 2(lan2) entered disabled state\r\n[   27.517021] zx279128s-eth 92000000.ethernet lan2: entered allmulticast mode\r\n[   27.517262] zx279128s-eth 92000000.ethernet lan2: entered promiscuous mode\r\n[   27.549746] zx279128s-eth 92000000.ethernet lan3: configuring for phy/internal link mode\r\n[   27.551064] br-lan: port 3(lan3) entered blocking state\r\n[   27.551094] br-lan: port 3(lan3) entered disabled state\r\n[   27.551148] zx279128s-eth 92000000.ethernet lan3: entered allmulticast mode\r\n[   27.551432] zx279128s-eth 92000000.ethernet lan3: entered promiscuous mode\r\n[   27.591510] zx279128s-eth 92000000.ethernet wan: configuring for phy/internal link mode\r\n[   28.715255] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\r\n[   28.718929] zx279128s-eth 92000000.ethernet: hardware flow offload disabled\r\n[   29.139632] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\r\n[   30.559891] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off\r\n[   30.559969] br-lan: port 1(lan1) entered blocking state\r\n[   30.559986] br-lan: port 1(lan1) entered forwarding state\r\n[   31.347973] e2631-wifi-boot: previous initialization unfinished; retrying in 120s\r\n[   31.759736] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off\r\n[  151.375346] e2631-wifi-boot: waiting 25s\r\nroot@ImmortalWrt:~# "
+  },
+  "wifi_now": {
+   "cmd": "dmesg | grep -iE 'MT7916|previous initialization|automatic Wi-Fi initialization' | tail -10",
+   "out": "[  176.428828] wifi-on: waiting 0s after boot before touching the card\r\n[  176.467180] Loading modules backported from Linux version v7.2-0-g8d3ae59288f1\r\n[  176.467192] Backport generated by backports.git v5.15.58-1-198-g2580fa90cb79\r\n[  176.712408] wifi-on: done: 7906= 790a=\r\ndmesg | grep -iE 'MT7916|previous initialization|automatic W\r\r\ni-Fi initialization' | tail -10\r\n[   31.347973] e2631-wifi-boot: previous initialization unfinished; retrying in 120s\r\nroot@ImmortalWrt:~# "
+  },
+  "mt7915_drv": {
+   "cmd": "ls -l /sys/bus/pci/drivers/mt7915e 2>/dev/null | head -6",
+   "out": "ls -l /sys/bus/pci/drivers/mt7915e 2>/dev/null | head -6\r\n--w-------    1 root     root          4096 Nov 22 01:47 bind\r\nlrwxrwxrwx    1 root     root             0 Nov 22 01:47 module -> ../../../../module/mt7915e\r\n--w-------    1 root     root          4096 Nov 22 01:47 new_id\r\n--w-------    1 root     root          4096 Nov 22 01:47 remove_id\r\n--w-------    1 root     root          4096 Nov 22 01:47 uevent\r\n--w-------    1 root     root          4096 Nov 22 01:47 unbind\r\nroot@ImmortalWrt:~# "
+  }
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   3337126
+  ],
+  "bootwatch_pids": [
+   3337173
+  ],
+  "tty_holders": [
+   3337136
+  ],
+  "events_tail": "2026-11-22T01:46:46+08:00 reader-start pid=3333888\n2026-11-22T01:47:47+08:00 reader-start pid=3337126",
+  "ok": true
+ }
+}

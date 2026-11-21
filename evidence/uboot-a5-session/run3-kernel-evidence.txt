@@ -1,0 +1,18 @@
+28466:[    1.489381] zx279128s-pcie f000000.pcie: Device not found
+28491:[    2.579380] zx279128s-pcie f100000.pcie: Device not found
+28512:[    2.724984] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)
+28513:[    2.725845] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)
+28514:[    2.726680] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)
+28515:[    2.727531] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)
+28531:[   14.639693] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+28645:[   30.559891] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+28648:[   31.347973] e2631-wifi-boot: previous initialization unfinished; retrying in 120s
+28649:[   31.759736] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off
+28679:[    2.726680] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)
+28680:[    2.727531] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)
+28682:[   14.639693] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+28697:[   30.559891] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+28698:[   31.759736] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off
+28704:[    1.489381] zx279128s-pcie f000000.pcie: Device not found
+28713:[    2.579380] zx279128s-pcie f100000.pcie: Device not found
+28745:[   31.347973] e2631-wifi-boot: previous initialization unfinished; retrying in 120s

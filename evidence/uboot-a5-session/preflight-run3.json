@@ -1,0 +1,24 @@
+{
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a5-44929440623/e2631-uboot-44929440623/u-boot.bin",
+  "exists": true,
+  "size": 450904,
+  "sha256": "e3c52ba4132910b1807708eadfc8a6f7c7b9740782e84df6afa6d2e7a861ecf2",
+  "token": "U-Boot 2027.01-rc2-g9a7538311376"
+ },
+ "chain": {
+  "supervisor_pids": [
+   3309788
+  ],
+  "bootwatch_pids": [
+   3309859
+  ],
+  "tty_holders": [
+   3309798
+  ]
+ },
+ "serialhub": [],
+ "socket_exists": false,
+ "vendor_pw_mode": "0o600",
+ "ok": true
+}
