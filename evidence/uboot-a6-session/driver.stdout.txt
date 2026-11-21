@@ -1,0 +1,39 @@
+02:32:40 capture paused: {"supervisor_pids": [3479096], "bootwatch_pids": [3479181], "tty_holders": [3479102], "tty_holders_after": [], "free": true}
+02:32:40 serial hub started pid=3481820 log=c1b1fix/a6-pcie/run-3/serial.log
+02:32:40 ATTACH: reusing the OUR flash U-Boot prompt left by the previous attempt
+02:32:40 ATTACH OK: version
+02:32:41 COLD FINGERPRINT MATCH
+02:32:41 PRE DUMP words=200
+02:33:24 xmodem_cmd loadx 0x47f00000 block=1024 ok=True elapsed=42.1s
+02:36:34 md_check a5-uboot-in-ram: OK
+02:36:34 MILESTONE: patch-0013 U-Boot in RAM verified
+02:36:34 MILESTONE: new U-Boot banner
+02:36:34 banner seen; stopping autoboot
+02:36:38 stop_autoboot: {"banner": true, "prompt": true}
+02:36:38 MILESTONE: new U-Boot prompt, version ok=True
+02:36:38 STEP: e2631refclk (explicit)
+02:36:38 refclk ok=True tail= PLL1=00353f7d CTRL8=10061fcf | e2631refclk: before CRM2_10=00000000 CTRL4C=00038000 LSP1_04=0000081b CTRL0C=00417800 | e2631refclk: running the vendor network reference-clock and SerDes sequence | e2631refclk: after PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff | e2631refclk: after CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800 | e2631refclk: back at the prompt, nothing was booted | => 
+02:36:38 REFCLK AFTER {"PLL0": 268139, "PLL1": 340778811, "CTRL8": 268836863, "CRM2_10": 256, "CTRL4C": 229887, "LSP1_04": 79899, "CTRL0C": 5339136} checks={"PLL0": true, "PLL1": true, "CTRL8": true, "CRM2_10": true, "CTRL4C": true, "LSP1_04": true, "CTRL0C": true, "before_pre": true}
+02:36:38 STEP: post dump of the seven register blocks + md 0x9fe00000 24
+02:36:39 POST DUMP diffs=21 key_checks={"PLL0": true, "PLL1": true, "CTRL8": true, "CRM2_10": true, "CTRL4C": true, "LSP1_04": true, "CTRL0C": true} serdes_matches=24/24
+02:36:39 STEP: patch-0013 GPIO gate before e2631boot
+02:36:39 A6 GPIO pin2 -> 0x0000db2c (bit2 must be 1; vendor target 0000db2c)
+02:36:39 A6 GPIO pin51 -> 0x0000e028 (bit3 must be 1; vendor target 0000e028)
+02:36:39 STEP: e2631boot (bootm with the new U-Boot)
+02:36:46 kernel start marker seen (a6)
+02:37:03 linux marker seen (a6): Please press Enter
+02:37:11 monitor a6: {"kernel_start": true, "linux_marker": "Please press Enter", "panic": null}
+02:37:11 E2631BOOT REFCLK checks={"PLL0": true, "PLL1": true, "CTRL8": true, "CRM2_10": true, "CTRL4C": true, "LSP1_04": true, "CTRL0C": true, "before_pre": true}
+02:37:11 MILESTONE: kernel up; running early console probes
+02:37:27 PROBE uptime -> 75] e2631-wifi-boot: previous initialization unfinished; retrying in 120s | [   29.839745] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off | cut -d. -f1 /proc/uptime | 38 | root@ImmortalWrt:~#
+02:37:27 PROBE netdev ->              [0m[1;33me0:b6:68:ac:f3:d9 [0m<BROADCAST,MULTICAST,UP,LOWER_UP>  | [1;36mbr-lan           [0m[1;32mUP             [0m[1;33me0:b6:68:ac:f3:d8 [0m<BROADCAST,MULTICAST,UP,LOWER_UP>  | root@ImmortalWrt:~#
+02:37:27 PROBE sysnet -> ls /sys/class/net | [1;36mbr-lan[m  [1;36mlan1[m    [1;36mlan2[m    [1;36mlan3[m    [1;36mlo[m      [1;36mwan[m | root@ImmortalWrt:~#
+02:37:27 PROBE eth_speeds -> for n in lan1 lan2 lan3 wan; do printf '%s ' $n; cat /sys/cl | ass/net/$n/speed 2>/dev/null || echo NA; done | lan1 1000 | lan2 -1 | lan3 -1 | wan 1000 | root@ImmortalWrt:~#
+02:37:27 PROBE eth_operstate -> for n in lan1 lan2 lan3 wan; do echo $n $(cat /sys/class/net | /$n/operstate 2>/dev/null); done | lan1 up | lan2 down | lan3 down | wan up | root@ImmortalWrt:~#
+02:37:27 PROBE pci_ids -> vendor 2>/dev | /null); p=$(cat $d/device 2>/dev/null); echo $(basename $d) $v:$p; done | 0000:00:00.0 0x1cf2:0x6830 | 0000:01:00.0 0x14c3:0x7906 | 0001:00:00.0 0x1cf2:0x6830 | 0001:01:00.0 0x14c3:0x790a | root@ImmortalWrt:~#
+02:37:27 PROBE dmesg_eth -> nabled | [   28.720756] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off | [   29.839745] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off | root@ImmortalWrt:~#
+02:37:28 PROBE dmesg_pci -> nk at 0001:00:00.0 (capable of 4.000 Gb/s with 5.0 GT/s PCIe x1 link) | [    0.723529] pcieport 0001:00:00.0: PME: Signaling with IRQ 29 | [    0.724535] pcieport 0001:00:00.0: AER: enabled with IRQ 29 | root@ImmortalWrt:~#
+02:37:28 PROBE clk_ref -> ection_id          |                 mdio_wclk            1       1        0        2500000     0          0     50000      Y                  9a101000.mdio                   wclk                      | root@ImmortalWrt:~#
+02:37:28 ERROR KeyError('probes_late')
+02:37:35 capture restore: {"restore_rc": 0, "supervisor_pids": [3495843], "bootwatch_pids": [3495854], "tty_holders": [3495849], "events_tail": "2026-11-22T02:31:54+08:00 reader-start pid=3479096\n2026-11-22T02:37:31+08:00 reader-start pid=3495843", "ok": true}
+02:37:35 VERDICT FAIL

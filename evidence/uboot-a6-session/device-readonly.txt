@@ -1,0 +1,67 @@
+Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.
+VERSION=ImmortalWrt v1.10.0
+6.18.60
+251
+---PCI
+0000:00:00.0 0x1cf2:0x6830
+0000:01:00.0 0x14c3:0x7906
+0001:00:00.0 0x1cf2:0x6830
+0001:01:00.0 0x14c3:0x790a
+---PCIE
+[    0.609358] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
+[    0.611118] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
+[    0.719357] zx279128s-pcie f100000.pcie: PCIe Gen.1 x1 link up
+[    0.721065] pci 0001:01:00.0: [14c3:790a] type 00 class 0x028000 PCIe Endpoint
+---ETH
+[    0.875415] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)
+[    0.876382] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)
+[    0.877329] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)
+[    0.878287] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)
+[   11.769632] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+[   28.720756] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+[   29.839745] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off
+---WIFI
+[   29.608375] e2631-wifi-boot: previous initialization unfinished; retrying in 120s
+[  149.624682] e2631-wifi-boot: waiting 25s
+[  175.823633] mt7915e 0000:01:00.0: registering led 'mt76-phy0'
+[  175.887617] mt7915e 0000:01:00.0: registering led 'mt76-phy1'
+[  176.035575] e2631-wifi-boot: MT7916 ready
+[  176.267343] e2631-wifi-boot: automatic Wi-Fi initialization complete
+---NET
+br-lan
+lan1
+lan2
+lan3
+lo
+phy0-ap0
+phy1-ap0
+wan
+---IW
+phy#1
+	Interface phy1-ap0
+		ifindex 10
+		wdev 0x100000002
+		addr 82:0c:43:26:60:00
+		ssid E2631
+		type AP
+		channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+		txpower 28.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	0	0	0		0
+phy#0
+	Interface phy0-ap0
+		ifindex 9
+		wdev 0x2
+		addr 00:0c:43:26:60:00
+		ssid E2631
+		type AP
+		channel 1 (2412 MHz), width: 40 MHz, center1: 2422 MHz
+		txpower 26.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	0	0	0		0
+---PANIC
+0
+---MTD0
+d571b76404df1596dd58b710cff84e1ede92e6a29798abe5dcc50198d286b0f5  -

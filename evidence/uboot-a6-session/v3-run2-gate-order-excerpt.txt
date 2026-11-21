@@ -1,0 +1,19 @@
+02:27:53 capture paused: {"supervisor_pids": [3462858], "bootwatch_pids": [3462907], "tty_holders": [3462868], "tty_holders_after": [], "free": true}
+02:27:54 serial hub started pid=3467303 log=c1b1fix/a6-pcie/run-2/serial.log
+02:27:54 ATTACH: reusing the OUR flash U-Boot prompt left by the previous attempt
+02:27:54 ATTACH OK: version
+02:27:54 COLD FINGERPRINT MATCH
+02:27:55 PRE DUMP words=200
+02:28:38 xmodem_cmd loadx 0x47f00000 block=1024 ok=True elapsed=42.2s
+02:31:48 md_check a5-uboot-in-ram: OK
+02:31:48 MILESTONE: patch-0013 U-Boot in RAM verified
+02:31:48 MILESTONE: new U-Boot banner
+02:31:48 banner seen; stopping autoboot
+02:31:51 stop_autoboot: {"banner": true, "prompt": true}
+02:31:51 MILESTONE: new U-Boot prompt, version ok=True
+02:31:51 STEP: patch-0013 GPIO gate before e2631boot
+02:31:51 A6 GPIO pin2 -> 0x00009120 (bit2 must be 1; vendor target 0000db2c)
+02:31:51 A6 GPIO pin51 -> 0x000070a0 (bit3 must be 1; vendor target 0000e028)
+02:31:51 ERROR RuntimeError('patch-0013 GPIO gate failed: pin 2 bit2 / pin 51 bit3 not both high')
+02:31:58 capture restore: {"restore_rc": 0, "supervisor_pids": [3479096], "bootwatch_pids": [3479181], "tty_holders": [3479102], "events_tail": "2026-11-22T02:26:27+08:00 reader-start pid=3462858\n2026-11-22T02:31:54+08:00 reader-start pid=3479096", "ok": true}
+02:31:58 VERDICT FAIL

@@ -45,6 +45,8 @@
 | [../evidence/p2-vendorless-network-gap-20261122.md](../evidence/p2-vendorless-network-gap-20261122.md) | A-研1：无厂商 U-Boot 链路的网络缺失定位——厂商 board_eth_init 的 ref_clk_set/pll_cfg_fractional/SerDes（0x9FE00000）参考时钟序列没有被复刻是主因（内核侧全树无引用、时钟驱动自述 PLL 归 bootloader）；含精确 MMIO 写表、GPIO 18 条表（LED/按键/未知脚）、DTS 覆盖结论、product_vid 排除、patch 0012 建议与验证计划、Q1-Q5 未决项 |
 | [../evidence/uboot-a5-device-session-20261122.md](../evidence/uboot-a5-device-session-20261122.md) | A5 真机会话：patch 0012 网络参考时钟 / SerDes 零写入验收——e2631refclk 7 个寄存器 before/after 全契约 PASS、SerDes 24/24 读回 PASS、以太网缺口确认修复（四 PHY + 1 Gbps）、正式 run-3 PCIe/Wi-Fi 确定性 FAIL（patch 0012 把 flat GPIO 2/51 拉低、端点停在复位）；run-2 的“PCIe 成功”复核为厂商链、已更正；残余 10 字差（GPIO pin2/pin51）交 patch 0013；零 flash 写入实证 |
 | [../evidence/uboot-a5-session/](../evidence/uboot-a5-session/) | A5 附件：会话驱动与 PCIe 只读探针、run-1/2/3 驱动控制台与 results、e2631refclk 串口选段、内核证据、观察 B 捕获选行、残余差分、零写入核对、artifact 构建信息、sha256 清单 |
+| [../evidence/uboot-a6-device-session-20261122.md](../evidence/uboot-a6-device-session-20261122.md) | A6 真机会话：patch 0013 两条 PCIe 端点复位线零写入验收 GREEN——GPIO pin2 `0x94407014`=0x0000db2c（bit2）、pin51 `0x944070d4`=0x0000e028（bit3）与厂商残差逐位一致；两条 PCIe Gen.1 x1 link + 14c3:7906/790a 端点；四 PHY + lan1/wan 1 Gbps；MT7916 ready 176 s + 双频转发；mtd0 零变化；含 Wi-Fi latency 观察项与驱动 KeyError 工具缺陷记录 |
+| [../evidence/uboot-a6-session/](../evidence/uboot-a6-session/) | A6 附件：v3 驱动与修正版、独立判据脚本、results/preflight、串口/内核选段、只读 SSH 终态、前两次中止输出、postcheck、artifact 校验信息、sha256 清单 |
 
 
 | 文件 | 内容 |

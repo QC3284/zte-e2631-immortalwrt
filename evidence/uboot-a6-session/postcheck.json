@@ -1,0 +1,77 @@
+{
+ "run": "A6 v3 run-3 (attach, --with-refclk)",
+ "artifact": {
+  "sha256": "3bf182f148226b6f64696a05bba5d75ca59426747f87eee3f13c5d2b0269423a",
+  "size": 450936,
+  "banner": "U-Boot 2027.01-rc2-g85c7367a3106",
+  "ok": true
+ },
+ "gate": {
+  "pin2": {
+   "value": "0x0000db2c",
+   "vendor": "0x0000db2c",
+   "ok": true
+  },
+  "pin51": {
+   "value": "0x0000e028",
+   "vendor": "0x0000e028",
+   "ok": true
+  }
+ },
+ "refclk_checks": {
+  "PLL0": true,
+  "PLL1": true,
+  "CTRL8": true,
+  "CRM2_10": true,
+  "CTRL4C": true,
+  "LSP1_04": true,
+  "CTRL0C": true,
+  "before_pre": true
+ },
+ "refclk_after": {
+  "PLL0": 268139,
+  "PLL1": 340778811,
+  "CTRL8": 268836863,
+  "CRM2_10": 256,
+  "CTRL4C": 229887,
+  "LSP1_04": 79899,
+  "CTRL0C": 5339136
+ },
+ "wifi_latency": {
+  "first_attempt_failed_msg": "e2631-wifi-boot: previous initialization unfinished; retrying in 120s (29.6 s)",
+  "retry_wait": "e2631-wifi-boot: waiting 25s (149.6 s)",
+  "mt7915e_bind": "175.8 s",
+  "MT7916_ready": "176.0 s",
+  "wifi_complete": "176.3 s"
+ },
+ "checks": {
+  "artifact_contract": true,
+  "new_banner": true,
+  "refclk_after_ok": true,
+  "gate_pin2_bit2": true,
+  "gate_pin51_bit3": true,
+  "kernel_started": true,
+  "linux_marker": true,
+  "pcie_link_f000000": true,
+  "pcie_link_f100000": true,
+  "endpoint_7906": true,
+  "endpoint_790a": true,
+  "four_mdio_phys": true,
+  "lan1_1g": true,
+  "wan_1g": true,
+  "mt7915e_bind": true,
+  "mt7916_ready": true,
+  "wifi_forward": true,
+  "radio_phy0_ap0": true,
+  "radio_phy1_ap0": true,
+  "no_panic": true,
+  "mtd0_unchanged": true,
+  "no_write_commands": true,
+  "driver_verdict_fail_is_tooling": true
+ },
+ "write_command_hits": [],
+ "hexdump_write_strings_note": "mtd write/erase appear only as U-Boot help strings inside a memory hex dump (serial lines 24006/24011), not as issued commands",
+ "product_verdict": "GREEN",
+ "driver_verdict": "FAIL",
+ "driver_error": "KeyError('probes_late')"
+}
