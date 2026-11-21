@@ -1,0 +1,19 @@
+17:07:38 capture paused: {"supervisor_pids": [226285], "bootwatch_pids": [226320], "tty_holders": [226291], "tty_holders_after": [], "free": true}
+17:07:38 serial hub started pid=380178 log=/home/qc233/zte/e2631-p3/c1a-bootm/run-1/serial.log
+17:07:38 READY FOR USER POWER CYCLE (C1a: cold boot into the vendor console)
+17:16:47 cold-boot prompt caught; sending 1
+17:16:47 vendor password attempt 1 -> autoboot
+17:16:48 vendor console ready; stock U-Boot confirmed
+17:17:30 xmodem done: {"ok": true, "mode": "crc", "file_size": 448072, "block_size": 1024, "blocks": 438, "pad": 440, "bytes_sent": 448072, "elapsed_s": 41.9, "eot_acked": true, "tail_b64": "PT4g", "attempt": 1}
+17:17:30 md spot-check start: OK addr=0x43000000 gaps=0 tail=90 e5 00 00 9d e5    ..O.............  430000e0: 04 d0 8d e2 48 d0 4d e2 ff 1f 8d e8 b4 20 1f e5    ....H.M...... ..  430000f0: 0c 00 92 e8 48 00 8d e2 34 50 8d e2 0e 10 a0 e1    ....H...4P......  => 
+17:17:30 md spot-check tail: OK addr=0x4306d548 gaps=0 tail=06 43 17 00 00 00    ...C.......C....  4306d628: d8 1e 06 43 17 00 00 00 20 1f 06 43 17 00 00 00    ...C.... ..C....  4306d638: 30 1f 06 43 17 00 00 00 34 1f 06 43 17 00 00 00    0..C....4..C....  => 
+17:17:30 md spot-check banner: OK addr=0x4305cf70 gaps=0 tail=68 6e 2d 65 32 36    ....zte,zxhn-e26  4305d050: 33 31 00 7a 74 65 2c 7a 78 32 37 39 31 32 38 73    31.zte,zx279128s  4305d060: 00 00 00 00 00 00 00 03 00 00 00 04 00 00 00 11    ................  => 
+17:17:30 go: jumping to 0x43000000; no further input will be sent
+17:17:31 OUR BANNER SEEN (A3 U-Boot running from RAM)
+17:17:35 e2631boot: slot decision line seen
+17:17:35 LINUX MARKER SEEN (userspace coming up)
+17:17:35 monitor done: {"banner": true, "slot_line": true, "boot_line": false, "kernel_start": false, "linux_marker": true, "panic": null}
+17:17:41 capture restore: {"restore_rc": 0, "supervisor_pids": [383559], "bootwatch_pids": [383567], "tty_holders": [383566], "events_tail": "2026-11-21T16:47:14+08:00 reader-start pid=226285\n2026-11-21T17:17:37+08:00 reader-start pid=383559", "ok": true}
+17:17:41 ROUTE TRAP: reconnecting the USB NIC
+17:23:36 HEALTH rc=0
+17:23:36 VERDICT FAIL (results in /home/qc233/zte/e2631-p3/c1a-bootm/run-1/session-results.json)

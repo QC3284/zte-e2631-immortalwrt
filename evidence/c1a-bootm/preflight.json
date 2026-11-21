@@ -1,0 +1,62 @@
+{
+ "mode": "preflight",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a3-44880033207/e2631-uboot-44880033207/u-boot.bin",
+  "size": 448072,
+  "size_ok": true,
+  "sha256": "4128523cfc5376e103a89b848fed0d8519004cb0330aa0ca188d548ae562f19d",
+  "sha_ok": true,
+  "first_bytes": "b80000ea14f09fe514f09fe514f09fe5",
+  "banner_offset": 380790,
+  "banner_present": true,
+  "crc32": "317733b6"
+ },
+ "capture_chain": {
+  "supervisor_pids": [
+   226285
+  ],
+  "bootwatch_pids": [
+   226320
+  ],
+  "tty_holders": [
+   226291
+  ]
+ },
+ "route": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000",
+ "device": {
+  "ssh_rc": 0,
+  "ssh_err_tail": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "raw_head": [
+   "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f  /dev/mtd0",
+   "1101",
+   "ImmortalWrt v1.10.0",
+   "6.18.60",
+   "dev:    size   erasesize  name",
+   "mtd0: 00100000 00020000 \"bootloader\""
+  ],
+  "mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "uptime_s": "1101",
+  "e2631_version": "ImmortalWrt v1.10.0",
+  "kernel": "6.18.60"
+ },
+ "scripts": {
+  "/home/qc233/zte/e2631-p3/serialhub.py": true,
+  "/home/qc233/zte/e2631-p3/restore_capture.sh": true,
+  "/home/qc233/zte/e2631-p3/a1_banner_health.sh": true,
+  "/home/qc233/zte/e2631-p3/vendor_pw.txt": true
+ },
+ "vendor_pw_mode": "0o600",
+ "kit": "/home/qc233/zte/e2631-immortalwrt",
+ "boot_addr": "0x43000000",
+ "banner": "U-Boot 2027.01-rc2-g8a9d1f7eecfa",
+ "panic_patterns": [
+  "Kernel panic",
+  "Unable to mount root",
+  "VFS: Cannot open root device",
+  "No filesystem could mount root",
+  "FDT and ATAGS support not compiled in",
+  "Attempting to kill init",
+  "end Kernel panic"
+ ],
+ "ok": true
+}

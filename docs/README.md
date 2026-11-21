@@ -35,6 +35,8 @@
 | [../evidence/a3-ramchain/](../evidence/a3-ramchain/) | A3 验收附件：驱动/health 脚本、两次 session results JSON、驱动日志、串口选段、参考切片、零写入证据 |
 | [../evidence/b1-env-session-20261121.md](../evidence/b1-env-session-20261121.md) | P2-B1：vendor U-Boot env 定制真机会话（一次 saveenv 持久化 4 条旁路变量；修正为字母序插入预测 CRC 0xF95A816E / env 块 sha 6e2c01da…；回读 byte-identical、mtd0 差异 462 B 全在 env 块内、bootcmd/bootdelay 未变、设备健康；含第一段中止零写入与工具缺陷记录） |
 | [../evidence/b1-env-session/](../evidence/b1-env-session/) | B1 会话附件：两段驱动脚本、results/回读 JSON、预测与实读 env 块、串口/驱动/health 日志、sha256 清单 |
+| [../evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) | P2-C1a：A3 U-Boot bootm 干跑（预闪写门禁）——RED：boot_prep_linux 构造 ATAGS 时 data abort（bi_boot_params 未初始化），内核未启动；零写入（mtd0 sha256 前后一致）、断电恢复 stock 链并健康；含 C1b 阻塞结论 |
+| [../evidence/c1a-bootm/](../evidence/c1a-bootm/) | C1a 附件：驱动/results/预检、serialhub 与捕获链串口选段、abort 原文、恢复验证与 health、sha256 清单 |
 
 
 | 文件 | 内容 |

@@ -1,0 +1,132 @@
+{
+ "mode": "c1a-bootm-dryrun",
+ "started": "2026-11-21T17:07:37+0800",
+ "outdir": "/home/qc233/zte/e2631-p3/c1a-bootm/run-1",
+ "tag": "c1a",
+ "ready_for_user_power_cycle": true,
+ "pre_mtd0_sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a3-44880033207/e2631-uboot-44880033207/u-boot.bin",
+  "size": 448072,
+  "size_ok": true,
+  "sha256": "4128523cfc5376e103a89b848fed0d8519004cb0330aa0ca188d548ae562f19d",
+  "sha_ok": true,
+  "first_bytes": "b80000ea14f09fe514f09fe514f09fe5",
+  "banner_offset": 380790,
+  "banner_present": true,
+  "crc32": "317733b6"
+ },
+ "capture_before": {
+  "supervisor_pids": [
+   226285
+  ],
+  "bootwatch_pids": [
+   226320
+  ],
+  "tty_holders": [
+   226291
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 380178,
+ "vendor_entry": {
+  "ok": true,
+  "autoboot_stopped": true,
+  "stock_banner": true
+ },
+ "xmodem": {
+  "ok": true,
+  "mode": "crc",
+  "file_size": 448072,
+  "block_size": 1024,
+  "blocks": 438,
+  "pad": 440,
+  "bytes_sent": 448072,
+  "elapsed_s": 41.9,
+  "eot_acked": true,
+  "tail_b64": "PT4g",
+  "attempt": 1
+ },
+ "md_checks": [
+  {
+   "label": "start",
+   "addr": "0x43000000",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "71750d197168f09355bb98565e3af00295a4eeb450dca8c2779be693e906f45b",
+   "got_sha256": "71750d197168f09355bb98565e3af00295a4eeb450dca8c2779be693e906f45b",
+   "tail": "e2 00 00 8d e5 90 00 1f e5 00 e0 80 e5    ..M.............\r\n430000d0: 00 e0 4f e1 04 e0 80 e5 00 e0 90 e5 00 00 9d e5    ..O.............\r\n430000e0: 04 d0 8d e2 48 d0 4d e2 ff 1f 8d e8 b4 20 1f e5    ....H.M...... ..\r\n430000f0: 0c 00 92 e8 48 00 8d e2 34 50 8d e2 0e 10 a0 e1    ....H...4P......\r\n=> "
+  },
+  {
+   "label": "tail",
+   "addr": "0x4306d548",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "546dd8dcac1b8ec375d97d700c57f6bb2e2cbfc48a5b93a8fe6de429473ccf9a",
+   "got_sha256": "546dd8dcac1b8ec375d97d700c57f6bb2e2cbfc48a5b93a8fe6de429473ccf9a",
+   "tail": "43 17 00 00 00 a4 1e 06 43 17 00 00 00    ...C.......C....\r\n4306d618: ac 1e 06 43 17 00 00 00 b0 1e 06 43 17 00 00 00    ...C.......C....\r\n4306d628: d8 1e 06 43 17 00 00 00 20 1f 06 43 17 00 00 00    ...C.... ..C....\r\n4306d638: 30 1f 06 43 17 00 00 00 34 1f 06 43 17 00 00 00    0..C....4..C....\r\n=> "
+  },
+  {
+   "label": "banner",
+   "addr": "0x4305cf70",
+   "length": 256,
+   "ok": true,
+   "gaps": 0,
+   "want_sha256": "2f2f315970e05e2e4ee4825604f561bc1a3b571f570d0ced14b1fb70163bf407",
+   "got_sha256": "2f2f315970e05e2e4ee4825604f561bc1a3b571f570d0ced14b1fb70163bf407",
+   "tail": "38 53 29 00 00 00 00 00 03 00 00 00 1d    9128S)..........\r\n4305d040: 00 00 00 06 7a 74 65 2c 7a 78 68 6e 2d 65 32 36    ....zte,zxhn-e26\r\n4305d050: 33 31 00 7a 74 65 2c 7a 78 32 37 39 31 32 38 73    31.zte,zx279128s\r\n4305d060: 00 00 00 00 00 00 00 03 00 00 00 04 00 00 00 11    ................\r\n=> "
+  }
+ ],
+ "go_sent": true,
+ "monitor": {
+  "banner": true,
+  "slot_line": true,
+  "boot_line": false,
+  "kernel_start": false,
+  "linux_marker": true,
+  "panic": null,
+  "boot_lines": [
+   "e2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000",
+   "e2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000",
+   "e2631boot: cspboot would boot slot1"
+  ],
+  "accum_bytes": 805
+ },
+ "serial_tail": "go 0x43000000\r\n## Starting application at 0x43000000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g8a9d1f7eecfa (Nov 21 2026 - 07:24:45 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  10 devices, 8 uclasses, devicetree: embed\r\nMMC:   \r\nLoading Environment from <NULL>...\rLoading Environment from <NULL>... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   No ethernet found.\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 2\u001b[2K\rHit any key to stop autoboot: 1\u001b[2K\rHit any key to stop autoboot: 0\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\n",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   383559
+  ],
+  "bootwatch_pids": [
+   383567
+  ],
+  "tty_holders": [
+   383566
+  ],
+  "events_tail": "2026-11-21T16:47:14+08:00 reader-start pid=226285\n2026-11-21T17:17:37+08:00 reader-start pid=383559",
+  "ok": true
+ },
+ "route_fix": {
+  "ok": false,
+  "action": "failed",
+  "raw": "192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000"
+ },
+ "uptime_wait": {
+  "ok": false,
+  "uptime": null
+ },
+ "device_after": {
+  "ssh_rc": 255,
+  "ssh_err_tail": "ssh: connect to host 192.168.1.1 port 22: Connection refused\n",
+  "raw_head": []
+ },
+ "health_rc": 0,
+ "health": "== route ==\n192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 \nROUTE_FIX: trying to restore the direct link\n192.168.1.1 via 192.168.5.1 dev enp4s0f2 src 192.168.5.92 uid 1000 \n== ping wait (up to 90s) ==\nping ok after attempt 0\n== ping stats ==\n\u5df2\u53d1\u9001 3 \u4e2a\u5305\uff0c \u5df2\u63a5\u6536 3 \u4e2a\u5305, 0% packet loss, time 2038ms\nrtt min/avg/max/mdev = 0.636/0.798/0.933/0.122 ms\n== ssh identity (retries) ==\n  ssh attempt 0 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n  ssh attempt 1 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n  ssh attempt 2 failed: ssh: connect to host 192.168.1.1 port 22: Connection refused\n== done ==",
+ "mtd0_unchanged": false,
+ "verdict": "FAIL",
+ "finished": "2026-11-21T17:23:36+0800"
+}

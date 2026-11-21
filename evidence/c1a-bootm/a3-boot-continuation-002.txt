@@ -1,0 +1,23 @@
+e2631boot: uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+## Booting kernel from Legacy Image at 42000020 ...
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+Working FDT set to 0
+   Loading Kernel Image to 40008000
+data abort
+pc : [<4ff9578c>]	   lr : [<4ffd6edc>]
+reloc pc : [<4300178c>]	   lr : [<43042edc>]
+sp : 4fb729f8  ip : 00000000	 fp : 00800000
+r10: 00000000  r9 : 4fb73ed0	 r8 : 4ff957ec
+r7 : 00000000  r6 : 4fff607c	 r5 : 00000000  r4 : 4fff6078
+r3 : 00000000  r2 : e59ff120	 r1 : 967fc480  r0 : 54410002
+Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
+Code: e0831102 e583500c e5835010 e5841000 (e5810004) 
+Resetting CPU ...
+
+resetting ...
+reset: the A1 port has no reset controller, power-cycle the board

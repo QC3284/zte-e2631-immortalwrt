@@ -1,0 +1,5 @@
+{
+ "rc": 0,
+ "out": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f  /dev/mtd0\n296\nImmortalWrt v1.10.0\n6.18.60\n",
+ "err_tail": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+}
