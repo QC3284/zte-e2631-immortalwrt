@@ -77,7 +77,7 @@ md.l 0x944070d4 1     # bank3 DATA，bit3 应为 1（0x...008）
 3. `br-lan` 有 PHY，eth 链路不受影响（0012 的验收项保持）；
 4. 全程不写 flash、不写 env。
 
-CI（uboot-build.yml）断言：series tree `1ef8e9bc4f3dce05a46d181d57df77271194d61b`（13 个 patch）、
+CI（uboot-build.yml）断言：series tree `cc39ae59a999f0f19a4c419465bedf1585007345`（13 个 patch）、
 `E2631_GPIO_PCIE_RST0` 形状 gate。
 
 ## 7. 风险与回退

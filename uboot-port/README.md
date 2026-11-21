@@ -73,8 +73,8 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0012 | `uboot-port/patches/0012-board-zte-bring-up-the-network-reference-clocks.patch`（A5：厂商 board_eth_init 的参考时钟/SerDes/管脚序列，按两链 pre/post 寄存器差分裁剪 + `e2631refclk` 前后 dump） |
 | patch 0012 sha256 | `9c075c60f5cd6282e8b507d7ee0e02b4fc68544d0f55f4d1b4c43a8f187ed87b` |
 | patch 0013 | `uboot-port/patches/0013-board-zte-drive-the-two-late-GPIO-lines-high.patch`（A6：厂商 `zte_gpio_init()` 尾部两根特例 GPIO，pin 2 / pin 51 置 1） |
-| patch 0013 sha256 | `2c0039370ad7778d40563ea93a2d815d04037797e48ff21b9d8bfbe6ea7aa402` |
-| am 之后 tree | `1ef8e9bc4f3dce05a46d181d57df77271194d61b`（与机器无关，13 个 patch） |
+| patch 0013 sha256 | `7dc49eb987e7e17a7f75d73ca9d4f82fa2e4ad7f891e92134c6c6fe54e957175` |
+| am 之后 tree | `cc39ae59a999f0f19a4c419465bedf1585007345`（与机器无关，13 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -90,7 +90,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = 1ef8e9bc4f3dce05a46d181d57df77271194d61b
+test "$(git rev-parse HEAD^{tree})" = cc39ae59a999f0f19a4c419465bedf1585007345
 ```
 
 ## 2. 新增/修改的文件
@@ -249,7 +249,7 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `1ef8e9bc4f3dce05a46d181d57df77271194d61b`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `cc39ae59a999f0f19a4c419465bedf1585007345`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 13）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、

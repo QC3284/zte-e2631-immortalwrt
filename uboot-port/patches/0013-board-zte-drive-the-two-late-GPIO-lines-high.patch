@@ -1,4 +1,4 @@
-From f4466dbadff7b4d7eddda322cdf076cd132a0945 Mon Sep 17 00:00:00 2001
+From 67d043a1080fe61183b601dd03fdcc21b4e351c2 Mon Sep 17 00:00:00 2001
 From: QC3284 <2078725082@qq.com>
 Date: Sun, 22 Nov 2026 01:59:09 +0800
 Subject: [PATCH] board: zte: drive the two late GPIO lines the vendor drives
@@ -16,11 +16,11 @@ high right after the table replay, like the vendor does.
 
 Signed-off-by: QC3284 <2078725082@qq.com>
 ---
- board/zte/zxhn-e2631/e2631net.c | 36 ++++++++++++++++++++++++++++-----
- 1 file changed, 31 insertions(+), 5 deletions(-)
+ board/zte/zxhn-e2631/e2631net.c | 35 +++++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
 diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
-index 5a9c296b..01bc3687 100644
+index 5a9c296b..6de33d69 100644
 --- a/board/zte/zxhn-e2631/e2631net.c
 +++ b/board/zte/zxhn-e2631/e2631net.c
 @@ -33,6 +33,16 @@
@@ -70,11 +70,10 @@ index 5a9c296b..01bc3687 100644
   */
  static const struct e2631_gpio_init e2631_gpios[] = {
  	{ 8, 1 }, { 40, 1 }, { 60, 0 }, { 55, 0 },
-@@ -187,7 +205,15 @@ static void e2631_pinmux_gpio_init(void)
+@@ -187,6 +205,15 @@ static void e2631_pinmux_gpio_init(void)
  
  	for (i = 0; i < ARRAY_SIZE(e2631_gpios); i++)
  		e2631_gpio_drive(e2631_gpios[i].pin, e2631_gpios[i].value);
--}
 +
 +	/*
 +	 * The two late drives of zte_gpio_init() (0x47f2f61c/0x47f2f66c):
@@ -84,9 +83,9 @@ index 5a9c296b..01bc3687 100644
 +	 */
 +	e2631_gpio_drive(E2631_GPIO_PCIE_RST0, 1);
 +	e2631_gpio_drive(E2631_GPIO_PCIE_RST1, 1);
+ }
  
  /*
-  * The vendor ref_clk_set(0) fractional PLL programming on 0x94000050/0x94000054.
 -- 
 2.56.1
 
