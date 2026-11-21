@@ -381,6 +381,63 @@ ok('the kit no longer carries overlay/, base/ or apply.sh',
   ok('no live file references the retired overlay/apply.sh path', hits.length === 0, hits.join(', '));
 }
 
+// 13. the U-Boot port keeps its pin, its standalone CI shape and the D-U1 single-writer gate.
+// The workflow validates the chain at build time; these checks catch a missing or
+// half-updated pin before a dispatch, and prove the workflow cannot silently lose
+// the gates that the task-58 evidence recorded.
+const UBOOT_PIN_TEXT = read('uboot-port/commits.env');
+const UBOOT_WF = read('.github/workflows/uboot-build.yml');
+const uboot = {};
+for (const line of UBOOT_PIN_TEXT.split('\n')) {
+  const m = /^(E2631_UBOOT_[A-Z0-9_]+)=(.*)$/.exec(line.trim());
+  if (m) uboot[m[1]] = m[2].trim();
+}
+const ubootPatchFiles = fs.readdirSync(path.join(REPO, 'uboot-port/patches'))
+  .filter((f) => /^[0-9]{4}-.*\.patch$/.test(f)).sort();
+const ubootPatchPins = Object.keys(uboot).filter((k) => /^E2631_UBOOT_PATCH_SHA256_[0-9]{4}$/.test(k));
+const UBOOT_REQUIRED = ['E2631_UBOOT_REPO', 'E2631_UBOOT_BRANCH', 'E2631_UBOOT_SHA',
+  'E2631_UBOOT_BASE_TREE_SHA', 'E2631_UBOOT_TREE_SHA', 'E2631_UBOOT_PAYLOAD_MAX',
+  'E2631_UBOOT_TEXT_BASE'];
+ok('uboot-port/commits.env pins every port patch and the base/post-am trees',
+  UBOOT_REQUIRED.every((k) => typeof uboot[k] === 'string' && uboot[k].length > 0) &&
+  hex40(uboot.E2631_UBOOT_SHA) && hex40(uboot.E2631_UBOOT_BASE_TREE_SHA) &&
+  hex40(uboot.E2631_UBOOT_TREE_SHA) &&
+  uboot.E2631_UBOOT_PAYLOAD_MAX === '0x9F800' && uboot.E2631_UBOOT_TEXT_BASE === '0x47F00000' &&
+  ubootPatchPins.length === ubootPatchFiles.length &&
+  ubootPatchFiles.every((f) => /^[0-9a-f]{64}$/.test(uboot['E2631_UBOOT_PATCH_SHA256_' + f.slice(0, 4)] || '')),
+  ubootPatchFiles.length + ' patch files, ' + ubootPatchPins.length + ' patch pins');
+// Comments are stripped before the no-hard-coded-SHA scan; a pin belongs in
+// uboot-port/commits.env only, never in the workflow.
+const UBOOT_WF_LIVE = UBOOT_WF.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+ok('the U-Boot workflow is dispatch-only, read-only and never publishes',
+  has(UBOOT_WF, 'workflow_dispatch:') &&
+  !/^\s+(push|pull_request):\s*$/m.test(UBOOT_WF) &&
+  !/gh release|--prerelease|contents:\s*write/.test(UBOOT_WF_LIVE) &&
+  has(UBOOT_WF_LIVE, 'contents: read'));
+ok('the U-Boot workflow reads every pin from uboot-port/commits.env, hard-codes no SHA and asserts the chain',
+  has(UBOOT_WF, '. uboot-port/commits.env') &&
+  ['E2631_UBOOT_BASE_TREE_SHA', 'E2631_UBOOT_TREE_SHA', 'E2631_UBOOT_PATCH_SHA256_',
+    'E2631_UBOOT_PATCH_COUNT', 'E2631_UBOOT_PAYLOAD_MAX', 'E2631_UBOOT_TEXT_BASE']
+    .every((k) => has(UBOOT_WF, k)) &&
+  !/[0-9a-f]{40}/.test(UBOOT_WF_LIVE) &&
+  has(UBOOT_WF, "git rev-parse 'HEAD^{tree}'") && has(UBOOT_WF, 'git rev-list --count') &&
+  has(UBOOT_WF, 'sha256sum -c') && has(UBOOT_WF, 'readelf -h') &&
+  has(UBOOT_WF, 'u-boot.bin ($size bytes) exceeds the mtd0 payload budget'));
+ok('the U-Boot workflow enforces the D-U1 commands and the single-writer gate',
+  ['e2631flash', 'e2631verify', 'e2631slot'].every((c) => has(UBOOT_WF, c)) &&
+  has(UBOOT_WF, 'flash an image to SPI-NAND with erase, blank and readback checks') &&
+  has(UBOOT_WF, 'compare a RAM image with a SPI-NAND range by CRC32 (read-only)') &&
+  has(UBOOT_WF, 'print the firmware slot table') &&
+  ['e2631_write_range', 'e2631_erase_range', 'do_e2631flash'].every((f) => has(UBOOT_WF, f)) &&
+  has(UBOOT_WF, '# CONFIG_CMD_MTD_WRITE is not set') && has(UBOOT_WF, 'objdump') &&
+  has(UBOOT_WF, 'vacuous gate') && has(UBOOT_WF, 'E2631_ENV_OFF') &&
+  has(UBOOT_WF, 'DO NOT POWER OFF') && has(UBOOT_WF, 'overlaps the environment'));
+ok('the U-Boot artifact records the banner, both crc32 values and the command help dump',
+  has(UBOOT_WF, 'E2631-COMMAND-HELP.txt') && has(UBOOT_WF, 'Banner:') &&
+  has(UBOOT_WF, 'u-boot.bin crc32:') && has(UBOOT_WF, 'mtd0 image crc32:') &&
+  /sha256sum[^\n]*E2631-COMMAND-HELP\.txt/.test(UBOOT_WF) &&
+  has(UBOOT_WF, 'UBOOT-INFO.txt'));
+
 console.log('');
 console.log(fails === 0 ? 'check-workflows: OK - pins, tree-fork content, CI, artifact names and release channel agree'
   : 'check-workflows: ' + fails + ' check(s) FAILED');

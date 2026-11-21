@@ -303,6 +303,23 @@ jobs:
             exit 1
           fi
           echo "mtd writer sites: $writers, all inside e2631flash"
+          # The refusals that make that single writer safe must stay in the
+          # source: the protected secondboot/environment areas, the alignment
+          # and chip-bounds check, and the power-off banner printed before the
+          # first erase. Regressing any of them is a gate failure, not a doc nit.
+          for marker in \
+            'E2631_ENV_OFF' \
+            'E2631_BOOTLOADER_OFF' \
+            'e2631_flash_check' \
+            'DO NOT POWER OFF' \
+            'overlaps secondboot' \
+            'overlaps the environment'; do
+            if ! grep -q "$marker" board/zte/zxhn-e2631/e2631flash.c; then
+              echo "::error::e2631flash.c lost its safety marker: $marker"
+              exit 1
+            fi
+          done
+          echo "e2631flash safety guards: present"
       - name: Run checkpatch on the port series (informational)
         if: inputs.checkpatch
         run: |
@@ -415,6 +432,44 @@ jobs:
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
           patch_shas=$(env | grep '^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=' | sort | sed 's/^[^=]*=//' | tr '\n' ' ')
+          banner=$(strings -a build/u-boot.bin | grep -m1 -E '^U-Boot 20' || true)
+          if [ -z "$banner" ]; then
+            echo "::error::u-boot.bin has no U-Boot banner string"
+            exit 1
+          fi
+          crc32_of() {
+            python3 -c 'import sys, zlib; print(format(zlib.crc32(open(sys.argv[1], "rb").read()) & 0xffffffff, "08x"))' "$1"
+          }
+          payload_sha=$(sha256sum build/u-boot.bin | awk '{print $1}')
+          payload_crc=$(crc32_of build/u-boot.bin)
+          mtd0_crc=$(crc32_of artifacts/e2631-uboot-mtd0.bin)
+          # Static command-help dump: the ARM image cannot be executed on the
+          # runner, so dump the U_BOOT_CMD blocks from the post-am source and
+          # cross-check the command names against the binary strings.
+          {
+            echo "# E2631 U-Boot command help (static dump; the ARM image is not executed on the runner)"
+            echo "# Source: board/zte/zxhn-e2631/*.c at post-am tree $E2631_UBOOT_TREE_SHA"
+            echo
+            for cmd in e2631flash e2631verify e2631slot; do
+              echo "## $cmd"
+              awk -v c="$cmd" '
+                index($0, "U_BOOT_CMD(" c ",") { grab = 1 }
+                grab { print }
+                grab && /);[[:space:]]*$/ { exit }
+              ' board/zte/zxhn-e2631/*.c
+              if ! grep -aq "$cmd" build/u-boot.bin; then
+                echo "::error::u-boot.bin is missing the $cmd command"
+                exit 1
+              fi
+              echo
+            done
+            echo "## command names found in build/u-boot.bin"
+            strings -a build/u-boot.bin | grep -aE 'e2631flash|e2631verify|e2631slot|e2631boot' | sed 's/^/  /'
+          } > artifacts/E2631-COMMAND-HELP.txt
+          test -s artifacts/E2631-COMMAND-HELP.txt || {
+            echo "::error::E2631-COMMAND-HELP.txt is empty"
+            exit 1
+          }
           {
             echo "E2631 A1/A2/A3 custom U-Boot (slot boot from RAM chain, read-only)"
             echo "Repository: $E2631_UBOOT_REPO"
@@ -427,6 +482,11 @@ jobs:
             echo "Toolchain: $(arm-none-eabi-gcc --version | head -1)"
             echo "u-boot.bin size: $size bytes (limit $E2631_UBOOT_PAYLOAD_MAX = $((E2631_UBOOT_PAYLOAD_MAX)) bytes)"
             echo "Entry point: $entry"
+            echo "Banner: $banner"
+            echo "u-boot.bin crc32: $payload_crc"
+            echo "u-boot.bin sha256: $payload_sha"
+            echo "mtd0 image crc32: $mtd0_crc"
+            echo "command help: E2631-COMMAND-HELP.txt (static U_BOOT_CMD dump + binary strings)"
             echo "mtd0 image: e2631-uboot-mtd0.bin, mtd0 0x20000..0xC0000 ($mtd0_size bytes), sha256 $mtd0_sha"
             echo "mtd0 image header: 0x800 bytes copied from the vendor U-Boot header block, sha256 $header_sha"
             echo "mtd0 payload length: $payload_len bytes (0x$(printf '%x' "$payload_len")); mtd0 image bounds 0x20000..0xC0000, env starts at 0xC0000"
@@ -435,7 +495,7 @@ jobs:
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
-          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin > SHA256SUMS)
+          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin E2631-COMMAND-HELP.txt > SHA256SUMS)
           cat artifacts/SHA256SUMS
           {
             echo "### E2631 A1/A2/A3 U-Boot build"
@@ -444,6 +504,9 @@ jobs:
             echo "- post-am tree: $E2631_UBOOT_TREE_SHA"
             echo "- u-boot.bin: $size bytes (limit $((E2631_UBOOT_PAYLOAD_MAX)))"
             echo "- entry point: $entry"
+            echo "- banner: $banner"
+            echo "- crc32: u-boot.bin $payload_crc, mtd0 image $mtd0_crc"
+            echo "- command help: E2631-COMMAND-HELP.txt (static dump of the three new commands)"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
             echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM; the image asset is for the future, user-approved flash stage"
