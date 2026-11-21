@@ -35,8 +35,6 @@ jobs:
             E2631_UBOOT_SHA \
             E2631_UBOOT_BASE_TREE_SHA \
             E2631_UBOOT_TREE_SHA \
-            E2631_UBOOT_PATCH_SHA256_0001 \
-            E2631_UBOOT_PATCH_SHA256_0002 \
             E2631_UBOOT_PAYLOAD_MAX \
             E2631_UBOOT_TEXT_BASE; do
             value=${!name:-}
@@ -46,6 +44,30 @@ jobs:
             fi
             printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
           done
+          # The patch series is pin-driven: every NNNN-*.patch needs a matching
+          # E2631_UBOOT_PATCH_SHA256_NNNN pin, and the pin count must match the
+          # file count. No series length is hardcoded here.
+          patches=("$GITHUB_WORKSPACE"/uboot-port/patches/[0-9][0-9][0-9][0-9]-*.patch)
+          if [ ! -e "${patches[0]}" ]; then
+            echo "::error::no uboot-port/patches/NNNN-*.patch files"
+            exit 1
+          fi
+          for patch in "${patches[@]}"; do
+            n=$(basename "$patch" | cut -c1-4)
+            name="E2631_UBOOT_PATCH_SHA256_$n"
+            value=${!name:-}
+            if [ -z "$value" ]; then
+              echo "::error::$name is not pinned in uboot-port/commits.env"
+              exit 1
+            fi
+            printf "%s=%s\n" "$name" "$value" >> "$GITHUB_ENV"
+          done
+          pinned=$(env | grep -c "^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=" || true)
+          if [ "$pinned" != "${#patches[@]}" ]; then
+            echo "::error::$pinned patch pins in commits.env but ${#patches[@]} patch files"
+            exit 1
+          fi
+          printf "E2631_UBOOT_PATCH_COUNT=%s\n" "${#patches[@]}" >> "$GITHUB_ENV"
           printf 'UBOOT_DIR=%s\n' "$RUNNER_TEMP/u-boot" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
       - name: Install the ARM cross toolchain and U-Boot build dependencies
@@ -75,31 +97,30 @@ jobs:
             exit 1
           fi
           echo "baseline: $E2631_UBOOT_SHA tree $base_tree"
-      - name: Verify and apply the two port patches
+      - name: Verify and apply the pinned port patches
         # Triple pin: commit -> patch sha256 -> post-am tree. A patch or baseline
         # change must update uboot-port/commits.env and be re-reviewed.
         run: |
           set -euo pipefail
           cd "$UBOOT_DIR"
-          for n in 0001 0002; do
+          for patch in "$GITHUB_WORKSPACE"/uboot-port/patches/[0-9][0-9][0-9][0-9]-*.patch; do
+            n=$(basename "$patch" | cut -c1-4)
             name="E2631_UBOOT_PATCH_SHA256_$n"
             expected=${!name}
-            patch=$(ls "$GITHUB_WORKSPACE"/uboot-port/patches/"$n"-*.patch)
             echo "$expected  $patch" | sha256sum -c -
           done
           git -c user.name='E2631 CI' -c user.email='ci@localhost' am \
-            "$GITHUB_WORKSPACE"/uboot-port/patches/0001-*.patch \
-            "$GITHUB_WORKSPACE"/uboot-port/patches/0002-*.patch
+            "$GITHUB_WORKSPACE"/uboot-port/patches/*.patch
           tree=$(git rev-parse 'HEAD^{tree}')
           if [ "$tree" != "$E2631_UBOOT_TREE_SHA" ]; then
             echo "::error::post-am tree $tree != $E2631_UBOOT_TREE_SHA"
             exit 1
           fi
           commits=$(git rev-list --count "$E2631_UBOOT_SHA..HEAD")
-          test "$commits" = 2 || {
-            echo "::error::expected 2 port commits, found $commits"
+          if [ "$commits" != "$E2631_UBOOT_PATCH_COUNT" ]; then
+            echo "::error::expected $E2631_UBOOT_PATCH_COUNT port commits, found $commits"
             exit 1
-          }
+          fi
           echo "post-am: $commits commits, tree $tree"
       - name: Configure and build with the ARM cross toolchain
         run: |

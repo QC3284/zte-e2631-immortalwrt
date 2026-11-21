@@ -20,7 +20,7 @@
 载荷区可一直用到 0xBFFFF，env 区从 0xC0000 开始。因此镜像上限为 **0x9F800 字节 = 653312 = 638 KiB**。
 A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task-44 的 CI 必须提前按此上限卡住。
 
-## 1. 基线 pin（三重 pin）
+## 1. 基线 pin（commit / 每个 patch sha256 / 结果 tree）
 
 | 项 | 值 |
 | --- | --- |
@@ -31,11 +31,14 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0001 sha256 | `1e051c226bb0a5fcd44ded121c73acf03b76b7881d46aad7fd1247c19948c535` |
 | patch 0002 | `uboot-port/patches/0002-board-zte-add-ZXHN-E2631-A1-support.patch` |
 | patch 0002 sha256 | `71fdce39af5700bd440f87fbe1d50ce7fe97a1c2ab15a44e009d47af09250003` |
-| am 之后 tree | `d4714ecfb4f8808d4e752c90d487b005b9a8bd85`（与机器无关） |
+| patch 0003 | `uboot-port/patches/0003-board-zte-fix-the-A1-link.patch`（首个真实构建的链接修复） |
+| patch 0003 sha256 | `d16e7b563adc8693ea59e23900870b07a168f44136218d740c3ba49e44c7b395` |
+| am 之后 tree | `abab1858bfee030bfdbc18bc227189a6e8ba5d83`（与机器无关） |
 | TEXT_BASE | `0x43000000` |
 | 载荷上限 | `0x9F800` 字节 |
 
-以上值同 [uboot-port/commits.env](commits.env)；CI 必须按"commit → 两个 patch sha256 → 结果 tree"三段校验。
+以上值同 [uboot-port/commits.env](commits.env)；CI 必须按"commit → 每个 patch sha256 → 结果 tree"三段校验，
+补丁数量由 `uboot-port/patches/` 目录决定，不写死。
 
 最省带宽的取基线方式（只取一个 SHA）：
 
@@ -45,8 +48,8 @@ git init -q .
 git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
-git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/0001-*.patch ../uboot-port/patches/0002-*.patch
-test "$(git rev-parse HEAD^{tree})" = d4714ecfb4f8808d4e752c90d487b005b9a8bd85
+git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
+test "$(git rev-parse HEAD^{tree})" = abab1858bfee030bfdbc18bc227189a6e8ba5d83
 ```
 
 ## 2. 新增/修改的文件（12 个，209 行）
@@ -65,6 +68,11 @@ test "$(git rev-parse HEAD^{tree})" = d4714ecfb4f8808d4e752c90d487b005b9a8bd85
 | `arch/arm/dts/zx279128s-zte-zxhn-e2631.dts` | memory / PL011 / A9 global timer / 500 MHz fixed-clock |
 | `arch/arm/dts/Makefile` | `dtb-$(CONFIG_TARGET_ZXHN_E2631) += zx279128s-zte-zxhn-e2631.dtb` |
 | `configs/zx279128s_zte_zxhn-e2631_defconfig` | A1 配置（25 行，已用 `make savedefconfig` 归一） |
+
+补丁 0003（2026-11-21，task-44 首个真实构建暴露）：只改 2 个文件——defconfig 增加
+`# CONFIG_DISPLAY_CPUINFO is not set`、`# CONFIG_BOARD_INIT is not set`（A1 没有 DM CPU 驱动、
+也没有板级 chip select），板级文件补 `reset_cpu()` 占位实现（A1 无复位控制器，打印提示后返回）。
+它不改基线、不改 TEXT_BASE，也不改载荷上限。
 
 ## 3. 关键设计参数
 
@@ -107,7 +115,8 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `d4714ecfb4f8808d4e752c90d487b005b9a8bd85`；两个 patch 的 sha256 与 §1 一致。
+1. `git rev-parse HEAD^{tree}` == `abab1858bfee030bfdbc18bc227189a6e8ba5d83`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x43000000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`。
@@ -145,6 +154,8 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
   （25 MHz / 100 MHz 候选）再改 DT 或头文件。
 - **timer 500 MHz 是假设**（a9_periph = CPU/2，A9 1 GHz）；真机用 `sleep 1` 对照秒表校准，必要时修正。
 - **A1 无 env/SPI/NAND/网络/bootm**：这是有意的阶段边界，不是缺陷。
+- **A1 的 `reset` 命令不做复位**：没有复位控制器驱动，`reset` 只打印提示并返回；需要复位时用
+  厂商 U-Boot 的 `reset` 或断电。厂商控制台本身仍可正常复位，A2/A3 再补复位路径。
 - **载荷 0x9F800**：A3 封装/写 mtd0 前必须满足；secondboot 封装头其它字节（+0x2D4 摘要等）在 A3 必须原样保留。
 - **checkpatch**：本系列 0 errors、3 warnings，均为已核对的已知项——1 条 "does MAINTAINERS need updating?"
   （U-Boot 走板级 MAINTAINERS，新目录已带；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+
@@ -164,5 +175,7 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 ## 8. 变更记录
 
 - 2026-11-21（task-43）：A1 最小移植的两个 patch、三重 pin（commits.env）与本说明；
+- 2026-11-21（task-44）：新增 patch 0003（链接修复：reset_cpu/print_cpuinfo/board_init），
+  重钉结果 tree 为 `abab1858bfee030bfdbc18bc227189a6e8ba5d83`；CI workflow `uboot-build.yml`；
   TEXT_BASE=0x43000000（RAM 链）、PL011 `CFG_PL011_CLOCK=0`、A9 global timer fixed-clock、
   载荷上限按修正后的 0x9F800 记录。

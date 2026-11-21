@@ -1,0 +1,66 @@
+From 2326ed1d5efd1e174654d0aad43599950313fbf3 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 21 Nov 2026 12:57:56 +0800
+Subject: [PATCH 3/3] board: zte: fix the A1 link against the pinned U-Boot
+
+The A1 port was only tree-hash checked when it was written, so the first
+real build (CI run 44868198743) failed at link time with undefined
+references to reset_cpu, print_cpuinfo and board_init.
+
+The pinned U-Boot v2027.01-rc2 needs:
+  - reset_cpu unconditionally (arch/arm/lib/reset.c). A1 has no reset
+    controller; print the limitation and return to the prompt instead of
+    spinning forever.
+  - CONFIG_BOARD_INIT and CONFIG_DISPLAY_CPUINFO default to y for this
+    target. A1 has no board chip selects and no DM CPU driver, so the
+    display-cpuinfo helper is not compiled in (it is gated on CONFIG_CPU)
+    while the initcall still is. Disable both symbols rather than adding
+    empty stubs.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/zxhn-e2631.c          | 12 ++++++++++++
+ configs/zx279128s_zte_zxhn-e2631_defconfig |  2 ++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/zxhn-e2631.c b/board/zte/zxhn-e2631/zxhn-e2631.c
+index ab7f072a..1948dea8 100644
+--- a/board/zte/zxhn-e2631/zxhn-e2631.c
++++ b/board/zte/zxhn-e2631/zxhn-e2631.c
+@@ -9,7 +9,9 @@
+ 
+ #include <config.h>
+ #include <fdtdec.h>
++#include <cpu_func.h>
+ #include <init.h>
++#include <stdio.h>
+ 
+ int dram_init(void)
+ {
+@@ -20,3 +22,13 @@ int dram_init_banksize(void)
+ {
+ 	return fdtdec_setup_memory_banksize();
+ }
++
++/*
++ * A1 has no reset controller driver: the vendor bootloader still owns the
++ * SoC reset path. Report the limitation and return to the prompt instead of
++ * spinning forever; A2/A3 add the real reset mechanism.
++ */
++void reset_cpu(void)
++{
++	printf("reset: the A1 port has no reset controller, power-cycle the board\n");
++}
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 4b5b00d7..11ff8658 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -23,3 +23,5 @@ CONFIG_DM_SERIAL=y
+ CONFIG_PL01X_SERIAL=y
+ CONFIG_TIMER=y
+ CONFIG_ARM_GLOBAL_TIMER=y
++# CONFIG_DISPLAY_CPUINFO is not set
++# CONFIG_BOARD_INIT is not set
+-- 
+2.56.1
+
