@@ -1,0 +1,114 @@
+{
+ "host": {
+  "image": {
+   "size": 655360,
+   "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+   "crc32": "0x0721e716",
+   "sha_ok": true,
+   "size_ok": true
+  },
+  "u_boot": {
+   "size": 456416,
+   "sha256": "21b0d804483c7cbb82e2ca92968b6706ed0f740429e6e6c935bf34e16a881af8",
+   "sha_ok": true,
+   "size_ok": true,
+   "new_banner_present": true
+  },
+  "structure": {
+   "magic_128s": true,
+   "len_field": 456416,
+   "len_field_ok": true,
+   "payload_matches_uboot": true,
+   "tail_ff": true
+  },
+  "baseline": {
+   "sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+   "secondboot_expected": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "tail_expected": "e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd"
+  },
+  "expected_new_mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "note": "expected sha = current-chip outside-image bytes (verified by region sha) + new image"
+ },
+ "device": {
+  "version": "ImmortalWrt v1.10.0\n6.18.60\n2333",
+  "whole_mtd0_sha": "5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf",
+  "secondboot_sha": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "tailenv_sha": "e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd",
+  "image_area_sha": "f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42",
+  "wget_sha": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "geometry": {
+   "partitions": {
+    "0": {
+     "size": 1048576,
+     "name": "bootloader",
+     "chip_off": 0
+    },
+    "1": {
+     "size": 1048576,
+     "name": "tag",
+     "chip_off": 1048576
+    },
+    "2": {
+     "size": 1048576,
+     "name": "wifi",
+     "chip_off": 2097152
+    },
+    "3": {
+     "size": 2097152,
+     "name": "usercfg",
+     "chip_off": 3145728
+    },
+    "4": {
+     "size": 2097152,
+     "name": "defcfg",
+     "chip_off": 5242880
+    },
+    "5": {
+     "size": 29360128,
+     "name": "slot0",
+     "chip_off": 7340032
+    },
+    "6": {
+     "size": 29360128,
+     "name": "slot1",
+     "chip_off": 36700160
+    },
+    "7": {
+     "size": 17825792,
+     "name": "rootfs",
+     "chip_off": null
+    },
+    "8": {
+     "size": 4849664,
+     "name": "rootfs_data",
+     "chip_off": null
+    },
+    "9": {
+     "size": 131072,
+     "name": "slot1-header",
+     "chip_off": null
+    },
+    "10": {
+     "size": 49283072,
+     "name": "userdata",
+     "chip_off": 66060288
+    }
+   },
+   "userdata": {
+    "size": 49283072,
+    "name": "userdata",
+    "chip_off": 66060288
+   },
+   "slot0_chip_off": 7340032,
+   "slot1_chip_off": 36700160,
+   "userdata_chip_off": 66060288,
+   "chip_covered_top_level": 115343360
+  },
+  "userdata_unmounted": true,
+  "ok": true
+ },
+ "ok": true,
+ "expected_new_mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+ "image_crc32": "0x0721e716",
+ "ff_crc32": "0x804737c5"
+}

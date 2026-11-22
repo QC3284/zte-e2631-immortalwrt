@@ -1,0 +1,65 @@
+04:15:26 capture paused: {"supervisor_pids": [], "bootwatch_pids": [], "tty_holders": [], "tty_holders_after": [], "free": true}
+04:15:26 capture paused: {"supervisor_pids": [], "bootwatch_pids": [], "tty_holders": [], "tty_holders_after": [], "free": true}
+04:15:27 serial hub started pid=3779583 log=/home/qc233/zte/e2631-p3/c1b3-task61/run-1/serial.log
+04:15:27 hub pid 3779583
+04:15:28 linux cmd 1 0.07s ok=True: cat /etc/e2631-version; uname -r; cut -d. -f1 /proc/uptime
+04:15:28 linux cmd 2 0.06s ok=True: cat /proc/mtd
+04:15:28 linux cmd 3 0.04s ok=True: mount | grep -iE 'userdata|mtd10'; echo MOUNT_DONE
+04:15:28 linux cmd 4 0.11s ok=True: mtd 2>&1 | head -14
+04:15:28 linux cmd 5 0.04s ok=True: ip -4 addr show wan | head -4
+04:15:28 linux cmd 6 0.04s ok=True: dd if=/dev/mtd0 bs=4096 count=32 2>/dev/null | sha256sum
+04:15:28 linux cmd 7 0.11s ok=True: dd if=/dev/mtd0 bs=4096 skip=192 count=64 2>/dev/null | sha256sum
+04:15:29 linux cmd 8 0.25s ok=True: dd if=/dev/mtd0 bs=1M count=1 2>/dev/null | sha256sum
+04:15:29 linux cmd 9 0.15s ok=True: dd if=/dev/mtd0 bs=4096 skip=32 count=160 2>/dev/null | sha256sum
+04:15:29 linux cmd 10 0.19s ok=True: wget -O /tmp/e2631-new-mtd0.bin http://192.168.5.92:18080/uboot-0014-mtd0.bin 2>&1 | tail -2
+04:15:29 linux cmd 11 0.10s ok=True: sha256sum /tmp/e2631-new-mtd0.bin
+04:15:30 preflight ok=False expected_new_mtd0_sha=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4
+04:16:14 capture paused: {"supervisor_pids": [], "bootwatch_pids": [], "tty_holders": [], "tty_holders_after": [], "free": true}
+04:16:14 capture paused: {"supervisor_pids": [], "bootwatch_pids": [], "tty_holders": [], "tty_holders_after": [], "free": true}
+04:16:14 serial hub started pid=3782161 log=/home/qc233/zte/e2631-p3/c1b3-task61/run-1/serial.log
+04:16:14 hub pid 3782161
+04:16:16 linux cmd 1 0.05s ok=True: cat /etc/e2631-version; uname -r; cut -d. -f1 /proc/uptime
+04:16:16 linux cmd 2 0.10s ok=True: cat /proc/mtd
+04:16:16 linux cmd 3 0.04s ok=True: mount | grep -iE 'userdata|mtd10'; echo MOUNT_DONE
+04:16:16 linux cmd 4 0.10s ok=True: mtd 2>&1 | head -14
+04:16:16 linux cmd 5 0.04s ok=True: ip -4 addr show wan | head -4
+04:16:16 linux cmd 6 0.04s ok=True: dd if=/dev/mtd0 bs=4096 count=32 2>/dev/null | sha256sum
+04:16:16 linux cmd 7 0.11s ok=True: dd if=/dev/mtd0 bs=4096 skip=192 count=64 2>/dev/null | sha256sum
+04:16:16 linux cmd 8 0.19s ok=True: dd if=/dev/mtd0 bs=1M count=1 2>/dev/null | sha256sum
+04:16:16 linux cmd 9 0.11s ok=True: dd if=/dev/mtd0 bs=4096 skip=32 count=160 2>/dev/null | sha256sum
+04:16:17 linux cmd 10 0.21s ok=True: wget -O /tmp/e2631-new-mtd0.bin http://192.168.5.92:18080/uboot-0014-mtd0.bin 2>&1 | tail -2
+04:16:17 linux cmd 11 0.08s ok=True: sha256sum /tmp/e2631-new-mtd0.bin
+04:16:18 preflight ok=True expected_new_mtd0_sha=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4
+04:16:28 capture paused: {"supervisor_pids": [], "bootwatch_pids": [], "tty_holders": [], "tty_holders_after": [], "free": true}
+04:16:29 serial hub started pid=3782915 log=/home/qc233/zte/e2631-p3/c1b3-task61/run-1/serial.log
+04:16:30 linux cmd 1 0.25s ok=True: cat /etc/e2631-version; sha256sum /dev/mtd0
+04:16:30 gate: device identity and current mtd0 sha verified
+04:16:30 linux cmd 2 0.24s ok=True: wget -O /tmp/e2631-new-mtd0.bin http://192.168.5.92:18080/uboot-0014-mtd0.bin 2>&1 | tail -2
+04:16:30 linux cmd 3 0.10s ok=True: sha256sum /tmp/e2631-new-mtd0.bin
+04:16:31 linux cmd 4 0.66s ok=True: mtd erase userdata
+04:16:31 linux cmd 5 0.29s ok=True: mtd write /tmp/e2631-new-mtd0.bin userdata
+04:16:32 linux cmd 6 0.15s ok=True: dd if=/dev/mtd10 bs=4096 count=160 2>/dev/null | sha256sum
+04:16:32 linux cmd 7 0.06s ok=True: sync; echo SYNCED
+04:16:32 warn: erase output did not mention erase explicitly
+04:16:32 PHASE A GREEN: staging written and read back
+04:16:32 reboot -f sent; waiting for the old flash U-Boot banner
+04:16:33 banner seen; stopping autoboot
+04:16:36 stop_autoboot: {"banner": true, "prompt": true}
+04:16:36 ub cmd: version ok=True
+04:16:36 gate: old flash U-Boot console ready
+04:16:36 ub cmd: mtd read spi-nand0 0x44000000 0x3f00000 0xa0000 ok=True
+04:16:37 ub cmd: crc32 0x44000000 0xa0000 ok=True
+04:16:37 gate: staging crc32 == 0x0721e716
+04:16:37 ub cmd: mtd erase spi-nand0 0x20000 0xa0000 ok=True
+04:16:37 gate: image area erased (5 blocks)
+04:16:37 ub cmd: mtd read spi-nand0 0x45000000 0x20000 0xa0000 ok=True
+04:16:37 ub cmd: crc32 0x45000000 0xa0000 ok=True
+04:16:37 gate: post-erase FF sentinel crc32 ok
+04:16:38 ub cmd: mtd write spi-nand0 0x44000000 0x20000 0xa0000 ok=True
+04:16:38 gate: image area written (320 pages)
+04:16:39 ub cmd: mtd read spi-nand0 0x45000000 0x20000 0xa0000 ok=True
+04:16:39 ub cmd: crc32 0x45000000 0xa0000 ok=True
+04:16:39 WRITE VERIFIED. HOLDING. READY FOR POWER CYCLE (one announced cold boot).
+04:16:39 expected new mtd0 sha256: f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4
+04:16:45 capture restore: {"restore_rc": 0, "supervisor_pids": [3783558], "bootwatch_pids": [3783605], "tty_holders": [3783564], "events_tail": "2026-11-22T03:24:17+08:00 reader-start pid=3624544\n2026-11-22T04:16:41+08:00 reader-start pid=3783558", "ok": true}
+04:16:45 VERDICT GREEN-HOLD

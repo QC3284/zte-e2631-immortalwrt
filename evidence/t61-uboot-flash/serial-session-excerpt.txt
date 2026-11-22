@@ -1,0 +1,216 @@
+ImmortalWrt v1.10.0
+6.18.60
+1877
+dev:    size   erasesize  name
+mtd0: 00100000 00020000 "bootloader"
+mtd1: 00100000 00020000 "tag"
+mtd2: 00100000 00020000 "wifi"
+mtd3: 00200000 00020000 "usercfg"
+mtd4: 00200000 00020000 "defcfg"
+mtd5: 01c00000 00020000 "slot0"
+mtd6: 01c00000 00020000 "slot1"
+mtd7: 01100000 00020000 "rootfs"
+mtd8: 004a0000 00020000 "rootfs_data"
+mtd9: 00020000 00020000 "slot1-header"
+mtd10: 02f00000 00020000 "userdata"
+MOUNT_DONE
+Usage: mtd [<options> ...] <command> [<arguments> ...] <device>[:<device>...]
+
+The device is in the format of mtdX (eg: mtd4) or its label.
+mtd recognizes these commands:
+        dump                    dump mtd device
+        unlock                  unlock the device
+        refresh                 refresh mtd partition
+        erase                   erase all data on device
+        verify <imagefile>|-    verify <imagefile> (use - for stdin) to device
+        write <imagefile>|-     write <imagefile> (use - for stdin) to device
+        jffs2write <file>       append <file> to the jffs2 partition on the device
+Following options are available:
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+5: wan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 192.168.5.101/24 brd 192.168.5.255 scope global wan
+       valid_lft forever preferred_lft forever
+6: br-lan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 192.168.1.1/24 brd 192.168.1.255 scope global br-lan
+       valid_lft forever preferred_lft forever
+540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd  -
+ImmortalWrt v1.10.0
+6.18.60
+2285
+__T61_001__
+dev:    size   erasesize  name
+mtd0: 00100000 00020000 "bootloader"
+mtd1: 00100000 00020000 "tag"
+mtd2: 00100000 00020000 "wifi"
+mtd3: 00200000 00020000 "usercfg"
+mtd4: 00200000 00020000 "defcfg"
+mtd5: 01c00000 00020000 "slot0"
+mtd6: 01c00000 00020000 "slot1"
+mtd7: 01100000 00020000 "rootfs"
+mtd8: 004a0000 00020000 "rootfs_data"
+mtd9: 00020000 00020000 "slot1-header"
+mtd10: 02f00000 00020000 "userdata"
+__T61_002__
+MOUNT_DONE
+__T61_003__
+Usage: mtd [<options> ...] <command> [<arguments> ...] <device>[:<device>...]
+
+The device is in the format of mtdX (eg: mtd4) or its label.
+mtd recognizes these commands:
+        dump                    dump mtd device
+        unlock                  unlock the device
+        refresh                 refresh mtd partition
+        erase                   erase all data on device
+        verify <imagefile>|-    verify <imagefile> (use - for stdin) to device
+        write <imagefile>|-     write <imagefile> (use - for stdin) to device
+        jffs2write <file>       append <file> to the jffs2 partition on the device
+Following options are available:
+        -q                      quiet mode (once: no [w] on writing,
+                                           twice: no status messages)
+__T61_004__
+5: wan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 192.168.5.101/24 brd 192.168.5.255 scope global wan
+       valid_lft forever preferred_lft forever
+__T61_005__
+540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd  -
+__T61_006__
+e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd  -
+__T61_007__
+5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf  -
+__T61_008__
+f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42  -
+__T61_009__
+/tmp/e2631-new-mtd0. 100% |*******************************|   640k  0:00:00 ETA
+Download completed (655360 bytes)
+__T61_010__
+b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  /tmp/e2631-new-mtd0.bin
+__T61_011__
+ImmortalWrt v1.10.0
+6.18.60
+2333
+__T61_001__
+dev:    size   erasesize  name
+mtd0: 00100000 00020000 "bootloader"
+mtd1: 00100000 00020000 "tag"
+mtd2: 00100000 00020000 "wifi"
+mtd3: 00200000 00020000 "usercfg"
+mtd4: 00200000 00020000 "defcfg"
+mtd5: 01c00000 00020000 "slot0"
+mtd6: 01c00000 00020000 "slot1"
+mtd7: 01100000 00020000 "rootfs"
+mtd8: 004a0000 00020000 "rootfs_data"
+mtd9: 00020000 00020000 "slot1-header"
+mtd10: 02f00000 00020000 "userdata"
+__T61_002__
+MOUNT_DONE
+__T61_003__
+Usage: mtd [<options> ...] <command> [<arguments> ...] <device>[:<device>...]
+
+The device is in the format of mtdX (eg: mtd4) or its label.
+mtd recognizes these commands:
+        dump                    dump mtd device
+        unlock                  unlock the device
+        refresh                 refresh mtd partition
+        erase                   erase all data on device
+        verify <imagefile>|-    verify <imagefile> (use - for stdin) to device
+        write <imagefile>|-     write <imagefile> (use - for stdin) to device
+        jffs2write <file>       append <file> to the jffs2 partition on the device
+Following options are available:
+        -q                      quiet mode (once: no [w] on writing,
+                                           twice: no status messages)
+__T61_004__
+5: wan: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 192.168.5.101/24 brd 192.168.5.255 scope global wan
+       valid_lft forever preferred_lft forever
+__T61_005__
+540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd  -
+__T61_006__
+e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd  -
+__T61_007__
+5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf  -
+__T61_008__
+f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42  -
+__T61_009__
+/tmp/e2631-new-mtd0. 100% |*******************************|   640k  0:00:00 ETA
+Download completed (655360 bytes)
+__T61_010__
+b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  /tmp/e2631-new-mtd0.bin
+__T61_011__
+ImmortalWrt v1.10.0
+5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf  /dev/mtd0
+__T61_001__
+/tmp/e2631-new-mtd0. 100% |*******************************|   640k  0:00:00 ETA
+Download completed (655360 bytes)
+__T61_002__
+b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  /tmp/e2631-new-mtd0.bin
+__T61_003__
+__T61_004__
+__T61_005__
+b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  -
+__T61_006__
+SYNCED
+__T61_007__
+[ 2349.355696] br-lan: port 3(lan3) entered disabled state
+[ 2349.356795] br-lan: port 2(lan2) entered disabled state
+[ 2349.368262] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[ 2349.368611] br-lan: port 1(lan1) entered disabled state
+[ 2349.369383] zx279128s-eth 92000000.ethernet wan: Link is Down
+[ 2349.393957] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g85c7367a3106 (Nov 21 2026 - 18:22:13 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...*** Warning - bad CRC, using default environment
+
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g85c7367a3106 (Nov 21 2026 - 18:22:13 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x44000000 0x3f00000 0xa0000
+Reading 655360 byte(s) (320 page(s)) at offset 0x03f00000
+=> crc32 0x44000000 0xa0000
+CRC32 for 44000000 ... 4409ffff ==> 0721e716
+=> mtd erase spi-nand0 0x20000 0xa0000
+Erasing 0x00020000 ... 0x000bffff (5 eraseblock(s))
+=> mtd read spi-nand0 0x45000000 0x20000 0xa0000
+Reading 655360 byte(s) (320 page(s)) at offset 0x00020000
+=> crc32 0x45000000 0xa0000
+CRC32 for 45000000 ... 4509ffff ==> 804737c5
+=> mtd write spi-nand0 0x44000000 0x20000 0xa0000
+Writing 655360 byte(s) (320 page(s)) at offset 0x00020000
+=> mtd read spi-nand0 0x45000000 0x20000 0xa0000
+Reading 655360 byte(s) (320 page(s)) at offset 0x00020000
+=> crc32 0x45000000 0xa0000
+CRC32 for 45000000 ... 4509ffff ==> 0721e716
+=> 

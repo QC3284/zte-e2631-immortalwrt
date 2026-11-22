@@ -1,0 +1,181 @@
+{
+ "mode": "task61-noserial",
+ "started": "2026-11-22T04:16:28+0800",
+ "host": {
+  "image": {
+   "size": 655360,
+   "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+   "crc32": "0x0721e716",
+   "sha_ok": true,
+   "size_ok": true
+  },
+  "u_boot": {
+   "size": 456416,
+   "sha256": "21b0d804483c7cbb82e2ca92968b6706ed0f740429e6e6c935bf34e16a881af8",
+   "sha_ok": true,
+   "size_ok": true,
+   "new_banner_present": true
+  },
+  "structure": {
+   "magic_128s": true,
+   "len_field": 456416,
+   "len_field_ok": true,
+   "payload_matches_uboot": true,
+   "tail_ff": true
+  },
+  "baseline": {
+   "sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+   "secondboot_expected": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "tail_expected": "e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd"
+  },
+  "expected_new_mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "note": "expected sha = current-chip outside-image bytes (verified by region sha) + new image"
+ },
+ "expected_new_mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+ "image_crc32": "0x0721e716",
+ "capture_before": {
+  "supervisor_pids": [],
+  "bootwatch_pids": [],
+  "tty_holders": [],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 3782915,
+ "gate_device": {
+  "cmd": "cat /etc/e2631-version; sha256sum /dev/mtd0",
+  "ok": true,
+  "elapsed_s": 0.25,
+  "output": "ImmortalWrt v1.10.0\n5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf  /dev/mtd0\n"
+ },
+ "a_wget": {
+  "cmd": "wget -O /tmp/e2631-new-mtd0.bin http://192.168.5.92:18080/uboot-0014-mtd0.bin 2>&1 | tail -2",
+  "ok": true,
+  "elapsed_s": 0.24,
+  "output": "/tmp/e2631-new-mtd0. 100% |*******************************|   640k  0:00:00 ETA\nDownload completed (655360 bytes)\n"
+ },
+ "a_sha": {
+  "cmd": "sha256sum /tmp/e2631-new-mtd0.bin",
+  "ok": true,
+  "elapsed_s": 0.1,
+  "output": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  /tmp/e2631-new-mtd0.bin\n"
+ },
+ "a_erase": {
+  "cmd": "mtd erase userdata",
+  "ok": true,
+  "elapsed_s": 0.66,
+  "output": ""
+ },
+ "a_write": {
+  "cmd": "mtd write /tmp/e2631-new-mtd0.bin userdata",
+  "ok": true,
+  "elapsed_s": 0.29,
+  "output": ""
+ },
+ "a_readback": {
+  "cmd": "dd if=/dev/mtd10 bs=4096 count=160 2>/dev/null | sha256sum",
+  "ok": true,
+  "elapsed_s": 0.15,
+  "output": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a  -\n"
+ },
+ "a_sync": {
+  "cmd": "sync; echo SYNCED",
+  "ok": true,
+  "elapsed_s": 0.06,
+  "output": "SYNCED\n"
+ },
+ "reboot_sent": "2026-11-22T04:16:32+0800",
+ "flash_banner_seen": true,
+ "flash_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g85c7367a3106 (Nov 21 2026 - 18:22:13 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x44000000 0x3f00000 0xa0000",
+   "output": "mtd read spi-nand0 0x44000000 0x3f00000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x03f00000\r\n=> "
+  },
+  {
+   "cmd": "crc32 0x44000000 0xa0000",
+   "output": "crc32 0x44000000 0xa0000\r\nCRC32 for 44000000 ... 4409ffff ==> 0721e716\r\n=> "
+  },
+  {
+   "cmd": "mtd erase spi-nand0 0x20000 0xa0000",
+   "output": "mtd erase spi-nand0 0x20000 0xa0000\r\nErasing 0x00020000 ... 0x000bffff (5 eraseblock(s))\r\n=> "
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x45000000 0x20000 0xa0000",
+   "output": "mtd read spi-nand0 0x45000000 0x20000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> "
+  },
+  {
+   "cmd": "crc32 0x45000000 0xa0000",
+   "output": "crc32 0x45000000 0xa0000\r\nCRC32 for 45000000 ... 4509ffff ==> 804737c5\r\n=> "
+  },
+  {
+   "cmd": "mtd write spi-nand0 0x44000000 0x20000 0xa0000",
+   "output": "mtd write spi-nand0 0x44000000 0x20000 0xa0000\r\nWriting 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> "
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x45000000 0x20000 0xa0000",
+   "output": "mtd read spi-nand0 0x45000000 0x20000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> "
+  },
+  {
+   "cmd": "crc32 0x45000000 0xa0000",
+   "output": "crc32 0x45000000 0xa0000\r\nCRC32 for 45000000 ... 4509ffff ==> 0721e716\r\n=> "
+  }
+ ],
+ "flash_version_ok": true,
+ "b_read_staging": {
+  "ok": true,
+  "tail": "mtd read spi-nand0 0x44000000 0x3f00000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x03f00000\r\n=> "
+ },
+ "b_crc_staging": {
+  "got": "0x0721e716",
+  "want": "0x0721e716",
+  "ok": true
+ },
+ "b_erase": "mtd erase spi-nand0 0x20000 0xa0000\r\nErasing 0x00020000 ... 0x000bffff (5 eraseblock(s))\r\n=> ",
+ "b_erase_ok": true,
+ "b_crc_ff": {
+  "got": "0x804737c5",
+  "want": "0x804737c5",
+  "ok": true
+ },
+ "b_write": "mtd write spi-nand0 0x44000000 0x20000 0xa0000\r\nWriting 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> ",
+ "b_write_ok": true,
+ "b_crc_readback": {
+  "got": "0x0721e716",
+  "want": "0x0721e716",
+  "ok": true
+ },
+ "write_verified": true,
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   3783558
+  ],
+  "bootwatch_pids": [
+   3783605
+  ],
+  "tty_holders": [
+   3783564
+  ],
+  "events_tail": "2026-11-22T03:24:17+08:00 reader-start pid=3624544\n2026-11-22T04:16:41+08:00 reader-start pid=3783558",
+  "ok": true
+ },
+ "audit": {
+  "uboot_mtd_write": [
+   "mtd write spi-nand0 0x44000000 0x20000 0xa0000"
+  ],
+  "uboot_mtd_erase": [
+   "mtd erase spi-nand0 0x20000 0xa0000"
+  ],
+  "serial_transfer_cmds": []
+ },
+ "finished": "2026-11-22T04:16:45+0800",
+ "verdict": "GREEN-HOLD"
+}

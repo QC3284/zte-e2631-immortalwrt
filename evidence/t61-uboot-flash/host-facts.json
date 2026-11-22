@@ -1,0 +1,30 @@
+{
+ "image": {
+  "size": 655360,
+  "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "crc32": "0x0721e716",
+  "sha_ok": true,
+  "size_ok": true
+ },
+ "u_boot": {
+  "size": 456416,
+  "sha256": "21b0d804483c7cbb82e2ca92968b6706ed0f740429e6e6c935bf34e16a881af8",
+  "sha_ok": true,
+  "size_ok": true,
+  "new_banner_present": true
+ },
+ "structure": {
+  "magic_128s": true,
+  "len_field": 456416,
+  "len_field_ok": true,
+  "payload_matches_uboot": true,
+  "tail_ff": true
+ },
+ "baseline": {
+  "sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "secondboot_expected": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "tail_expected": "e84546dd5134d98a8b39ff7200f261dbf4e71326ff7280ff858e9edb79c395cd"
+ },
+ "expected_new_mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+ "note": "expected sha = current-chip outside-image bytes (verified by region sha) + new image"
+}

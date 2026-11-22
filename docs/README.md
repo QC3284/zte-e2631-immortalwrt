@@ -47,6 +47,8 @@
 | [../evidence/uboot-a5-session/](../evidence/uboot-a5-session/) | A5 附件：会话驱动与 PCIe 只读探针、run-1/2/3 驱动控制台与 results、e2631refclk 串口选段、内核证据、观察 B 捕获选行、残余差分、零写入核对、artifact 构建信息、sha256 清单 |
 | [../evidence/uboot-a6-device-session-20261122.md](../evidence/uboot-a6-device-session-20261122.md) | A6 真机会话：patch 0013 两条 PCIe 端点复位线零写入验收 GREEN——GPIO pin2 `0x94407014`=0x0000db2c（bit2）、pin51 `0x944070d4`=0x0000e028（bit3）与厂商残差逐位一致；两条 PCIe Gen.1 x1 link + 14c3:7906/790a 端点；四 PHY + lan1/wan 1 Gbps；MT7916 ready 176 s + 双频转发；mtd0 零变化；含 Wi-Fi latency 观察项与驱动 KeyError 工具缺陷记录 |
 | [../evidence/uboot-a6-session/](../evidence/uboot-a6-session/) | A6 附件：v3 驱动与修正版、独立判据脚本、results/preflight、串口/内核选段、只读 SSH 终态、前两次中止输出、postcheck、artifact 校验信息、sha256 清单 |
+| [../evidence/t61-uboot-flash-acceptance-20261122.md](../evidence/t61-uboot-flash-acceptance-20261122.md) | task-61 / D-U4 真机自持刷写验收：无串口桥接刷入 patch-0014（Linux HTTP staging + 旧 U-Boot mtd read/crc32/erase/write 桥接；CRC 链 0x0721e716→0x804737c5 全 FF→写→0x0721e716；写入审计 1 erases + 1 write；单次用户断电后新 banner g85df6772a444 从 flash 起、e2631boot→slot1→内核、PCIe 两端点/四 PHY/双频 AP 全绿；mtd0 == f9239040… 与预计算一致；旧串口路径 >5.5 min vs 1.24 s + 约 3 s） |
+| [../evidence/t61-uboot-flash/](../evidence/t61-uboot-flash/) | task-61 验收附件：会话驱动、preflight/host-facts/session-results、驱动日志、串口会话选段、断电后冷启动段、sha256 清单 |
 | [U-Boot-env写回与启动计数设计-2026-11-22.md](U-Boot-env写回与启动计数设计-2026-11-22.md) | D-U2 设计：env 写回（W1 受控写通道、厂商格式/坏块/掉电风险、0xE0000 保留）+ class-1/class-2 回退与启动计数设计、patch 0014/0015 计划与 CI 断言；证据见 [../evidence/p2-env-writeback-design-20261122.md](../evidence/p2-env-writeback-design-20261122.md) |
 
 
