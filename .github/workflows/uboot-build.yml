@@ -352,7 +352,7 @@ jobs:
           fi
           echo "$sites"
           bad=$(echo "$sites" | awk -F'|' '
-            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash|e2631_env_write_block)$/ {
+            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash|e2631_env_write_block|do_e2631env_save)$/ {
               print
             }')
           if [ -n "$bad" ]; then
@@ -365,11 +365,11 @@ jobs:
             echo "::error::expected 4 mtd_write/mtd_erase sites (2 e2631flash helpers + 2 e2631_env_write_block), found $writers"
             exit 1
           fi
-          if ! echo "$sites" | grep -q 'e2631_env_write_block'; then
-            echo "::error::no MTD writer site was found inside e2631_env_write_block"
+          if ! echo "$sites" | grep -qE 'e2631_env_write_block|do_e2631env_save'; then
+            echo "::error::no MTD writer site was found inside the e2631env writer"
             exit 1
           fi
-          echo "mtd writer sites: $writers (2 e2631flash helpers + 2 e2631_env_write_block)"
+          echo "mtd writer sites: $writers (e2631flash and the e2631env writer; -O2 inlines the static helpers)"
           # The refusals that make that single writer safe must stay in the
           # source: the protected secondboot/environment areas, the alignment
           # and chip-bounds check, and the power-off banner printed before the

@@ -354,8 +354,9 @@ make O=build -j"$(nproc)"
 
 13. D-U1/U-0017 写入口：`.config` 与 defconfig 都必须有 `# CONFIG_CMD_MTD_WRITE is not set`；对 `build/u-boot`
     反汇编做**调用点白名单**——所有 `mtd_write`/`mtd_erase`/`mtd_special_write_oob` 的 `bl` 只能落在
-    `e2631_write_range`/`e2631_erase_range`/`do_e2631flash`/`e2631_env_write_block` 内，且写调用点**恰好 4 个**
-    （e2631flash 两个 helper + `e2631_env_write_block` 两个，防止白名单空过或漏掉第三条写路径）；
+    `e2631_write_range`/`e2631_erase_range`/`do_e2631flash`/`e2631_env_write_block`/`do_e2631env_save` 内，
+    且写调用点**恰好 4 个**（`-O2` 会把只有一个调用者的 static helper 内联，所以实际符号可能是
+    `do_e2631flash` + `do_e2631env_save`；白名单同时保留 helper 名，防止内联策略变化后误报，也防止白名单空过或漏掉第三条写路径）；
     `e2631env.c` 还必须保留 `DO NOT POWER OFF DURING WRITE`、`mtd_block_isbad`、`e2631_env_vendor_names`
     与 `nothing to write` 这四个安全标记。
 
