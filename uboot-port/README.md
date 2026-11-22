@@ -600,5 +600,11 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   重钉结果 tree `fd511f1e4aff26c8f0bf3187b139eaaf45fbd5bc`（17 个 patch；0017 sha256
   `da21478e0fe7c53fdf14f59e81ea3da86733b63998926f25e84b3675f96eca0d`）。与设计稿的偏差（不 wire `.save`、
   坏 CRC 非空块拒绝重建）见
-  [docs/U-Boot-env写回与启动计数设计-2026-11-22.md](../docs/U-Boot-env写回与启动计数设计-2026-11-22.md) §12；
-  CI uboot-build 值待构建完成后补记；第一次真机 `e2631env save` 待用户批准。
+  [docs/U-Boot-env写回与启动计数设计-2026-11-22.md](../docs/U-Boot-env写回与启动计数设计-2026-11-22.md) §12。
+  CI uboot-build run `44978733720`（head `b42e44d`）SUCCESS：banner `g9a4028535269`、`u-boot.bin` 465,600 B
+  sha256 `e46f9cf0fdffe7173b7acbdcdc9f9506002c0f09fa6fbf850fa10c31255a9bee`、mtd0 镜像 sha256
+  `e2a76f753152403a42bd7f8faf01c5c3cab1c44a4b12c2744600fc4296784e16`、装配后 header sha256
+  `1bd3fa812368af4cc2eaa5c8ea5fabf82bd8f679886d378e362e491790813f91`、env 块 `6eee153b…` 未变、
+  checkpatch 0 errors / 22 warnings（0017 本身 0/2）；门禁新增 env 配置/源码顺序/静态断言/0xE0000/白名单 4 site 检查；
+  详见 [evidence/uboot-env-writeback-20261122.md](../evidence/uboot-env-writeback-20261122.md)。第一次真机
+  `e2631env save` 待用户批准。
