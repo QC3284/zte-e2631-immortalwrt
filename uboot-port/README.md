@@ -102,8 +102,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | am 之后 tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（与机器无关，22 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
+| 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
 
-以上值同 [uboot-port/commits.env](commits.env)；CI 必须按"commit → 每个 patch sha256 → 结果 tree"三段校验，
+以上 pin 值同 [uboot-port/commits.env](commits.env)（构建可复现行的两项固定写在 workflow 与 commits.env，见 §4 item 15）；CI 必须按"commit → 每个 patch sha256 → 结果 tree"三段校验，
 补丁数量由 `uboot-port/patches/` 目录决定，不写死。
 
 最省带宽的取基线方式（只取一个 SHA）：
@@ -422,6 +423,12 @@ make O=build -j"$(nproc)"
     `do_e2631flash` + `do_e2631env_save`；白名单同时保留 helper 名，防止内联策略变化后误报，也防止白名单空过或漏掉第三条写路径）；
     `e2631env.c` 还必须保留 `DO NOT POWER OFF DURING WRITE`、`mtd_block_isbad`、`e2631_env_vendor_names`
     与 `nothing to write` 这四个安全标记。
+15. 可复现构建（task-69 item d）：pin loader 必须导出 `SOURCE_DATE_EPOCH=$E2631_UBOOT_SOURCE_DATE_EPOCH`
+    （`E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`，U-Boot `Makefile:2327-2351` 用它生成 banner 时间），
+    patch 重放必须带 `git am --committer-date-is-author-date`（版本 token 只由 base+patch 决定）。因此 banner
+    固定为 `U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)`；同一 head 连续两次 dispatch 的
+    `u-boot.bin`/mtd0/`.config`/`u-boot.map` 逐字节相同，证据见
+    [evidence/uboot-reproducible-build-20261122.md](../evidence/uboot-reproducible-build-20261122.md)。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -754,3 +761,15 @@ U-Boot 网络栈。
   用构建时刻做 committer date）且编译期嵌入 `U_BOOT_DATE`/`U_BOOT_TIME`，所以同一 tree 重跑也不会字节相同；
   设备会话使用 run `44983615483` 这件 0/0 产物。若需要字节级可复现构建，可选加 `git am
   --committer-date-is-author-date` + `SOURCE_DATE_EPOCH`（evidence §6，待 Lead 决定）。
+- 2026-11-22（task-69 item d，可复现构建，option B）：`uboot-port/commits.env` 新增冻结 pin
+  `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（pinned base `c1958b5f…` 的 committer 时间
+  `2026-11-19T15:44:39Z`），workflow 把它导出为 `SOURCE_DATE_EPOCH`，patch 重放改为
+  `git am --committer-date-is-author-date`——版本 token 与 banner 时间从此只由 base+patch 决定（kit `be1e405`；
+  无代码/history 改动，22 个 patch 与 tree `c812dd86…` 均未动）。连续两次 dispatch（run `44991454540` /
+  `44991704112`，同 head `be1e405`）SUCCESS：banner 固定为
+  `U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)`；两次的 `u-boot.bin`（494,208 B sha256
+  `3cf000291b1b2d7552b4e7859204a310640dba81fbba5e60b36f99d7b89f355d`，crc32 `3ccc7333`）、mtd0 镜像（sha256
+  `18255c2cbe6b50a178e9531895e50820025f8840522276a6aafbe22f86589ce3`，crc32 `e70fb953`）、`.config`、
+  `u-boot.map`、命令帮助与 env 块（`6eee153b…`）逐字节相同，`cmp` 全部 IDENTICAL；证据见
+  [evidence/uboot-reproducible-build-20261122.md](../evidence/uboot-reproducible-build-20261122.md)。真机会话改用
+  这件可复现产物（取代 run `44983615483`）。

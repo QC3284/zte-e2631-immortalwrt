@@ -109,7 +109,10 @@ U-Boot 支持 `SOURCE_DATE_EPOCH` 固定 `U_BOOT_DATE`/`U_BOOT_TIME`（`Makefile
 3. 连发两次 uboot-build，比较 `u-boot.bin`/mtd0 的 sha256 完全一致。
 
 注意：这会把 artifact 的 banner/hash 再换一次（token 变成固定 commit 链的 SHA），但换来可重建的发布证据。
-本轮未实施，等 Lead 指示。
+**已按 option B 实施并验证**（task-69 item d，kit `be1e405`）：banner 固定为
+`U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)`，连续两次 dispatch（run `44991454540`、
+`44991704112`）的 u-boot.bin/mtd0/.config/u-boot.map 逐字节一致；记录见
+[uboot-reproducible-build-20261122.md](uboot-reproducible-build-20261122.md)。
 
 ## 7. 参考
 
