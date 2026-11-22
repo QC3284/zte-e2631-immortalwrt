@@ -1,0 +1,123 @@
+[  384.553764] br-lan: port 3(lan3) entered disabled state
+[  384.555300] br-lan: port 2(lan2) entered disabled state
+[  384.556176] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[  384.556509] br-lan: port 1(lan1) entered disabled state
+[  384.557380] zx279128s-eth 92000000.ethernet wan: Link is Down
+[  384.589367] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x47f00000 0x3f00000 0x80000
+Reading 524288 byte(s) (256 page(s)) at offset 0x03f00000
+=> crc32 0x47f00000 0x78a80
+CRC32 for 47f00000 ... 47f78a7f ==> e13c0526
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-g6bd1fbd087ba (Nov 22 2026 - 03:54:56 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  13 devices, 11 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g6bd1fbd087ba (Nov 22 2026 - 03:54:56 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> e2631net
+e2631net: lan1 switch port 2, stopped
+e2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0
+e2631net: RX queue counts 0 0 0 0 0 0 0 0
+=> mii info
+PHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+=> dhcp
+ethernet@92000000 Waiting for PHY auto negotiation to complete........ done
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+BOOTP broadcast 8
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50

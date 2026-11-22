@@ -1,0 +1,50 @@
+
+baudrate=115200
+bootcmd=e2631boot
+bootdelay=3
+bootfile=uboot.bin
+bootloaderfile=bootloader.bin
+console=ttyAMA0,115200n8
+e2631_flashboot=reset
+e2631_netboot=tftp 0x42000000 e2631-netboot.uImage
+e2631_pocgo=go 0x43000000
+e2631_pocload=tftp 0x43000000 u-boot.bin
+ethact=ethernet@92000000
+ethaddr=00:41:71:00:00:50
+fdtcontroladdr=4fff0e30
+fullfile=upgrade.bin
+gatewayip=192.168.1.1
+hostname=unknown
+ipaddr=192.168.1.1
+linuzfile=vmlinuz.bin
+loadaddr=0x42000000
+memsize=256M
+netmask=255.255.255.0
+netretry=5
+serverip=192.168.1.100
+stderr=serial@94404000
+stdin=serial@94404000
+stdout=serial@94404000
+versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00
+
+Environment size: 659/131068 bytes
+=> e2631boot
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+e2631soc: before  SCTLR=0x08c50878 (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4590404a VBAR=0x4ff8a000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: running vendor-order CP15 cleanup
+e2631soc: after   SCTLR=0x08c50878 (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4590404a VBAR=0x4ff8a000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000
+## Booting kernel from Legacy Image at 42000020 ...
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+Working FDT set to 0
+   Loading Kernel Image to 40008000
+=> 

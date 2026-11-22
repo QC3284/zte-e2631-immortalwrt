@@ -1,0 +1,60 @@
+{
+ "started": "2026-11-22T12:13:15+0800",
+ "capture_before": {
+  "supervisor_pids": [
+   893803
+  ],
+  "bootwatch_pids": [
+   893869
+  ],
+  "tty_holders": [
+   893809
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 905091,
+ "prompt": true,
+ "commands": [
+  {
+   "cmd": "version",
+   "ok": true,
+   "out": "version\r\nU-Boot 2027.01-rc2-g6bd1fbd087ba (Nov 22 2026 - 03:54:56 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  {
+   "cmd": "e2631net",
+   "ok": true,
+   "out": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: PHY 12 link up, 1000 Mbit/s full duplex\r\ne2631net: MAC ctrl 0x00bb2000, TM int 0x00007700, BMU free 0x00000111, TX done 0\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\n=> "
+  },
+  {
+   "cmd": "mii info",
+   "ok": true,
+   "out": "mii info\r\nPHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01, 1000baseT, FDX\r\nPHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01, 1000baseT, FDX\r\n=> "
+  },
+  {
+   "cmd": "md.l 0x92350068 1",
+   "ok": true,
+   "out": "md.l 0x92350068 1\r\n92350068: 00000000                             ....\r\n=> "
+  },
+  {
+   "cmd": "printenv",
+   "ok": true,
+   "out": "printenv\r\nbaudrate=115200\r\nbootcmd=e2631boot\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\ne2631_flashboot=reset\r\ne2631_netboot=tftp 0x42000000 e2631-netboot.uImage\r\ne2631_pocgo=go 0x43000000\r\ne2631_pocload=tftp 0x43000000 u-boot.bin\r\nethact=ethernet@92000000\r\nethaddr=00:41:71:00:00:50\r\nfdtcontroladdr=4fff0e30\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial@94404000\r\nstdin=serial@94404000\r\nstdout=serial@94404000\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 659/131068 bytes\r\n=> "
+  }
+ ],
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   905330
+  ],
+  "bootwatch_pids": [
+   905378
+  ],
+  "tty_holders": [
+   905336
+  ],
+  "events_tail": "2026-11-22T12:09:50+08:00 reader-start pid=893803\n2026-11-22T12:13:21+08:00 reader-start pid=905330",
+  "ok": true
+ },
+ "finished": "2026-11-22T12:13:26+0800"
+}
