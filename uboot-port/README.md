@@ -4,7 +4,7 @@
 （0001/0002 为 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC +
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
-的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1）、
+的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -95,7 +95,11 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0019 sha256 | `3e615397a428781683f753f42374a74b100d739819de64a63408616b557b4a3f` |
 | patch 0020 | `uboot-port/patches/0020-drivers-net-add-the-ZX279128S-Ethernet-driver.patch`（U-Boot 网络驱动：lan1/port 2/PHY 12、轮询 TX/RX、`e2631net`、arena guard） |
 | patch 0020 sha256 | `d8b9eb9f93125798c4d17a2fc09b621a5d9f139706263dcbd9160ba6b3e1416a` |
-| am 之后 tree | `10ade1ec0f7a3a7943783d6ba6146840fda6d4bf`（与机器无关，20 个 patch） |
+| patch 0021 | `uboot-port/patches/0021-MAINTAINERS-add-the-ZTE-ZXHN-E2631-board-and-the-ZX2.patch`（MAINTAINERS：板级 + SoC + 以太网/MDIO/SPI 驱动 + DTS + defconfig + 命令文档） |
+| patch 0021 sha256 | `c66643e1eca8c5cc2313e0136636b0ea22822f38f7207236b41786ba93ab7976` |
+| patch 0022 | `uboot-port/patches/0022-doc-add-the-e2631net-usage-page.patch`（`doc/usage/cmd/e2631net.rst`：`e2631net` 用法页） |
+| patch 0022 sha256 | `680435c34a4b6ca5154debb0ace1caea7fd7000641e5e572c6477f22b6959b72` |
+| am 之后 tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（与机器无关，22 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -364,9 +368,10 @@ make O=build -j"$(nproc)"
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 25 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
+   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 26 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
    0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
-   0018 0 errors / 2 warnings→修正后 0/1（新建文件缺 MAINTAINERS 更新）；0019 0/1（同上）；0020 0/1（新增自用命令 `e2631net`）：
+   0018 0 errors / 2 warnings→修正后 0/1（新建文件缺 MAINTAINERS 更新）；0019 0/1（同上）；0020 0/1（新增自用命令 `e2631net`）；
+   0021 0/0（MAINTAINERS 条目本身）；0022 0 errors / 1 warning（新增文档文件仍触发“MAINTAINERS need updating”——checkpatch 按单个 patch 判断，0021 的更新与 0022 不在同一个 patch 里）：
    新建文件缺 MAINTAINERS 更新、新增自用板级命令、以及 0015 的 5 条 PREFER_IF——这些 `#if CONFIG_IS_ENABLED()` 必须在编译期生效才能把写入口编掉，
    运行期 `if` 达不到目的，均为已核对项）。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
@@ -562,16 +567,16 @@ U-Boot 网络栈。
   0xE0000 保留扇区、幂等与全 FF 校验）；第一次真实 save 必须并入用户批准的设备会话，先 `e2631env diff`
   核对变化键，再写并回读；写入期间掉电同样只影响 env 块（厂商链/我们的链都会回退默认 env，且厂商
   `zteboot_do_settings` 会重建），但写前仍要记录 0xC0000 块 sha256。
-- **checkpatch**：本系列 0 errors、25 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
+- **checkpatch**：本系列 0 errors、26 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
   0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
-  0018/0019 各 0 errors / 1 warning、0020 0 errors / 1 warning），
-  均为已核对的已知项——10 条 "does MAINTAINERS
+  0018/0019 各 0 errors / 1 warning、0020 0 errors / 1 warning、0021 0/0、0022 0 errors / 1 warning），
+  均为已核对的已知项——11 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
   patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c`、
   patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h`、patch 0014 新增 `e2631flash.c`、
   patch 0017 新增 `e2631env.c|.h`、patch 0018 新增 `drivers/net/zx279128s_mdio.c`/`zx279128s_eth.h`、
-  patch 0019 新增 `drivers/net/zx279128s_eth.c` 各一条；checkpatch 按单 patch 看不到后续 patch 的
-  MAINTAINERS 更新）
+  patch 0019 新增 `drivers/net/zx279128s_eth.c`、patch 0022 新增 `doc/usage/cmd/e2631net.rst` 各一条；
+  checkpatch 按单个 patch 判断，0021 的 MAINTAINERS 更新与 0022 不在同一个 patch 里，所以这些提醒必然存在）
   + 2 条 "Use the livetree API"
   （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
   常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 8 条 "Possible new command - make sure you

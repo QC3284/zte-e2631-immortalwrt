@@ -1,0 +1,43 @@
+From aed1bc8038a9e318aa15ba043c0a0e010a54f44d Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 11:51:05 +0800
+Subject: [PATCH 21/22] MAINTAINERS: add the ZTE ZXHN E2631 board and the
+ ZX279128S drivers
+
+Cover the board directory, the SoC support code, the Ethernet, MDIO and
+SPI drivers, the defconfig, the device tree and the command docs, so that
+get_maintainer can route patches for this out-of-tree port.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ MAINTAINERS | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6edf740a..dc85489d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1916,6 +1916,20 @@ S:	Maintained
+ F:	cmd/xxd.c
+ F:	doc/usage/cmd/xxd.rst
+ 
++ZTE ZXHN E2631 (SANECHIPS ZX279128S)
++M:	QC3284 <2078725082@qq.com>
++S:	Maintained
++F:	arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
++F:	arch/arm/mach-zx279128s/
++F:	board/zte/zxhn-e2631/
++F:	configs/zx279128s_zte_zxhn-e2631_defconfig
++F:	doc/usage/cmd/e2631*.rst
++F:	drivers/net/zx279128s_eth.c
++F:	drivers/net/zx279128s_eth.h
++F:	drivers/net/zx279128s_mdio.c
++F:	drivers/spi/spi-zx.c
++F:	include/configs/zx279128s_zte_zxhn-e2631.h
++
+ THE REST
+ M:	Tom Rini <trini@konsulko.com>
+ L:	u-boot@lists.u-boot-project.org
+-- 
+2.56.1
+

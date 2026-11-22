@@ -1,0 +1,67 @@
+From 9562097163e43249682e766036073dd3aabf8c86 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 11:51:05 +0800
+Subject: [PATCH 22/22] doc: add the e2631net usage page
+
+Document the read-only e2631net command: the port and PHY it reports, the
+registers it prints and the fact that it never writes a register.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ doc/usage/cmd/e2631net.rst | 44 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 doc/usage/cmd/e2631net.rst
+
+diff --git a/doc/usage/cmd/e2631net.rst b/doc/usage/cmd/e2631net.rst
+new file mode 100644
+index 00000000..54dedd17
+--- /dev/null
++++ b/doc/usage/cmd/e2631net.rst
+@@ -0,0 +1,44 @@
++.. SPDX-License-Identifier: GPL-2.0+
++.. Copyright 2026, QC3284 <2078725082@qq.com>
++
++.. index::
++   single: e2631net (command)
++
++e2631net command
++================
++
++Synopsis
++--------
++
++::
++
++    e2631net
++
++Description
++-----------
++
++The *e2631net* command prints the state of the U-Boot Ethernet driver on the
++ZTE ZXHN E2631 (Sanechips ZX279128S).  It reports the switch port and PHY the
++driver is bound to, whether the PHY has a link and at which speed and duplex,
++the MAC control and traffic-manager interrupt registers, the number of free
++BMU buffers, the completed TX count and the occupancy of the eight RX queues.
++
++The command is read-only: it writes no register and sends no packet, so it can
++be used before *dhcp* or *tftp* to check that the cable, PHY and switch port
++are ready and to find out which switch port the link is on.
++
++The driver is built only for the ZX279128S port (``CONFIG_ETH_ZX279128S``).
++On this board it drives the port the board routes to lan1, which is switch
++port 2 and PHY 12 (MDIO address 0x0c); the same PHY can be inspected with
++*mii info* and *mii read*.
++
++Example
++-------
++
++::
++
++    => e2631net
++    e2631net: lan1 switch port 2, started
++    e2631net: PHY 12 link up, 1000 Mbit/s full duplex
++    e2631net: MAC ctrl 0x00bbe000, TM int 0x00000000, BMU free 0x0000fffe, TX done 0
++    e2631net: RX queue counts 0 0 0 0 0 0 0 0
+-- 
+2.56.1
+
