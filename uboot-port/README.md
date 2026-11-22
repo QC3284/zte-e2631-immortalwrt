@@ -701,3 +701,19 @@ U-Boot 网络栈。
   checkpatch 0 errors / 22 warnings（0017 本身 0/2）；门禁新增 env 配置/源码顺序/静态断言/0xE0000/白名单 4 site 检查；
   详见 [evidence/uboot-env-writeback-20261122.md](../evidence/uboot-env-writeback-20261122.md)。第一次真机
   `e2631env save` 待用户批准。
+- 2026-11-22（E2，patch 0018-0020，U-Boot 以太网）：新增 MDIO 控制器驱动（`drivers/net/zx279128s_mdio.c` +
+  共享头 `drivers/net/zx279128s_eth.h`）、交换机/流量管理器/DMA 初始化（`drivers/net/zx279128s_eth.c`）、
+  U-Boot `eth_ops` 驱动与 `e2631net` 状态命令；DTS 增加 `mdio@9a101000`（PHY12 = lan1）与
+  `ethernet@92000000`（`zte,switch-port = 2`）；defconfig 增加
+  `CMD_DHCP/CMD_MII/CMD_PING/NET_RANDOM_ETHADDR/ETH_ZX279128S/MDIO_ZX279128S`。`e2631flash`/`e2631verify`
+  新增 16 MiB 网络 DMA arena（`0x45000000..0x45FFFFFF`）重叠保护（编译期断言 + 运行期 `e2631_check_ram_range()`），
+  `e2631_net_refclk_init()` 改为幂等并在驱动 `start()` 中第二次调用（patch-0012 寄存器序列不变）。
+  重钉结果 tree `10ade1ec0f7a3a7943783d6ba6146840fda6d4bf`（20 个 patch；0018/0019/0020 sha256
+  `9a1e079b…`/`3e615397…`/`d8b9eb9f…`）。设计见 [e2-net-driver-design.md](e2-net-driver-design.md)，
+  真机验收命令见 §5.4。CI uboot-build run `44981256822`（head `a9c2596`）SUCCESS：banner
+  `U-Boot 2027.01-rc2-gdfcc418f2f3f`、`u-boot.bin` 494,208 B sha256
+  `842192f1713c6b63a7fe5fe49714229a45c17000abdc0bb17d6a34df533f4425`、mtd0 镜像 sha256
+  `b384cca09ebdd959f01205e68e86faa3e6911ee9718f87d547ea8c18d55700c9`、装配后 header sha256
+  `efafbd0a68b32ca2674e44040d5beca619f742f6584ce586cb31aee66949ab73`、env 块 `6eee153b…` 未变、
+  checkpatch 0 errors / 25 reviewed warnings；详见
+  [evidence/uboot-e2-20261122.md](../evidence/uboot-e2-20261122.md)。
