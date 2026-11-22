@@ -1,0 +1,128 @@
+
+
+
+BusyBox v1.38.0 (2026-05-13 02:19:59 UTC) built-in shell (ash)
+
+.___                               __         .__
+|   | _____   _____   ____________/  |______  |  |
+|   |/     \ /     \ /  _ \_  __ \   __\__  \ |  |
+|   |  Y Y  \  Y Y  (  <_> )  | \/|  |  / __ \|  |__
+|___|__|_|  /__|_|  /\____/|__|   |__| (____  /____/
+          \/      \/  BE FREE AND UNAFRAID  \/
+ -----------------------------------------------------
+ ImmortalWrt SNAPSHOT, r0-86cddb7
+ -----------------------------------------------------
+
+ === WARNING! =====================================
+ There is no root password defined on this device!
+ Use the "passwd" command to set up a new password
+ in order to prevent unauthorized SSH logins.
+ --------------------------------------------------
+
+root@ImmortalWrt:~# [   86.880015] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+[   86.880073] br-lan: port 1(lan1) entered blocking state
+[   86.880088] br-lan: port 1(lan1) entered forwarding state
+echo M1; uptime; cat /proc/cmdline; echo; grep -E "DISTRIB_(
+RELEASE|REVISION|TARGET)" /etc/openwrt_release; cat /etc/e2631-version 2>/dev/nu
+ll
+M1
+ 03:38:57 up 1 min,  load average: 0.81, 0.34, 0.12
+console=ttyAMA0,115200n8 earlycon root=/dev/mtdblock7 rootfstype=squashfs ro rootwait
+
+DISTRIB_RELEASE='SNAPSHOT'
+DISTRIB_REVISION='r0-86cddb7'
+DISTRIB_TARGET='zx279128/generic'
+ImmortalWrt v1.10.0
+root@ImmortalWrt:~# echo M2; sha256sum /dev/mtd0
+M2
+5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf  /dev/mtd0
+root@ImmortalWrt:~# echo M3; grep -E "overlay|jffs|rootfs" /proc/mounts
+M3
+/dev/mtdblock8 /overlay jffs2 rw,noatime 0 0
+overlayfs:/overlay / overlay rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work 0 0
+root@ImmortalWrt:~# echo M4; ls -l /overlay/upper/etc/shadow 2>&1; head -1 /etc/
+shadow
+M4
+-rw-------    1 root     root           304 Nov 21 04:46 [0;0m/overlay/upper/etc/shadow[m
+root:::0:99999:7:::
+root@ImmortalWrt:~# echo N1; ls /sys/bus/pci/devices/ | tr "\n" " "; echo; ip -b
+r addr | head -8; ip route | head -4
+N1
+0000:00:00.0 0000:01:00.0 0001:00:00.0 0001:01:00.0 
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+lan3             DOWN           
+lan2             DOWN           
+lan1             UP             
+wan              UP             192.168.5.101/24 fd37:d646:8038:0:e2b6:68ff:feac:f3d9/64 240e:33d:706:f700:e2b6:68ff:feac:f3d9/64 fe80::e2b6:68ff:feac:f3d9/64 
+br-lan           UP             192.168.1.1/24 fd0c:65ae:7366::1/60 fe80::e2b6:68ff:feac:f3d8/64 
+phy0-ap0         UP             
+phy1-ap0         UP             
+default via 192.168.5.1 dev wan proto static src 192.168.5.101 
+192.168.1.0/24 dev br-lan proto kernel scope link src 192.168.1.1 
+192.168.5.0/24 dev wan proto kernel scope link src 192.168.5.101 
+root@ImmortalWrt:~# echo N2; dmesg | grep -E "PCIe Gen|14c3:790|Link is Up|MT791
+6 ready|mt7915e 0000|_e2631|e2631refclk|Random: crng" | tail -14
+N2
+[   55.641254] e2631-wifi-boot: MT7916 ready
+[   58.694485] mt7915e 0000:01:00.0 phy0-ap0: entered allmulticast mode
+[   58.694739] mt7915e 0000:01:00.0 phy0-ap0: entered promiscuous mode
+[   59.131031] mt7915e 0000:01:00.0 phy1-ap0: entered allmulticast mode
+[   59.131385] mt7915e 0000:01:00.0 phy1-ap0: entered promiscuous mode
+[   59.271681] mt7915e 0000:01:00.0 phy0-ap0: left allmulticast mode
+[   59.271734] mt7915e 0000:01:00.0 phy0-ap0: left promiscuous mode
+[   59.896715] mt7915e 0000:01:00.0 phy1-ap0: left allmulticast mode
+[   59.896777] mt7915e 0000:01:00.0 phy1-ap0: left promiscuous mode
+[   60.792036] mt7915e 0000:01:00.0 phy0-ap0: entered allmulticast mode
+[   60.792315] mt7915e 0000:01:00.0 phy0-ap0: entered promiscuous mode
+[   61.413907] mt7915e 0000:01:00.0 phy1-ap0: entered allmulticast mode
+[   61.414211] mt7915e 0000:01:00.0 phy1-ap0: entered promiscuous mode
+[   86.880015] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+root@ImmortalWrt:~# echo N3; iw dev 2>/dev/null | grep -E "Interface|ssid|channe
+l" | head -12; echo; ls /sys/class/net
+N3
+	Interface phy1-ap0
+		ssid E2631
+		channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+	Interface phy0-ap0
+		ssid E2631
+		channel 1 (2412 MHz), width: 40 MHz, center1: 2422 MHz
+
+[1;36mbr-lan[m    [1;36mlan2[m      [1;36mlo[m        [1;36mphy1-ap0[m
+[1;36mlan1[m      [1;36mlan3[m      [1;36mphy0-ap0[m  [1;36mwan[m
+root@ImmortalWrt:~# echo N4; dmesg | grep -cE "panic|Oops|BUG:"; e2631-fwslot in
+fo 2>&1 | head -8
+N4
+0
+echo N5; dmesg | grep -E "PCIe Gen.1|14c3:7906|14c3:790a|zx279128s-eth.*Link is Up" | head -8
+running slot: 1
+slot 0: base 0x700000 span 0x1c00000 mtd5 header@0x1560000 serial=7 version="V1.0.0.7B5.8000"
+slot 1: base 0x2300000 span 0x1c00000 mtd6 header@0x1500000 serial=12 version="ImmortalWrt v1.10.0" [running] [next boot]
+root@ImmortalWrt:~# echo N5; dmesg | grep -E "PCIe Gen.1|14c3:7906|14c3:790a|zx2
+79128s-eth.*Link is Up" | head -8
+N5
+[    0.599389] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
+[    0.601140] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
+[    0.709389] zx279128s-pcie f100000.pcie: PCIe Gen.1 x1 link up
+[  [14c3:790a] type 00 class 0x028000 PCIe Endpoint
+[   29.780341] zx279128s-eth 92000000.ethernet wan: Link is Up - 1Gbps/Full - flow control off
+[   86.880015] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+root@ImmortalWrt:~# echo N6; ls -la /overlay/upper/etc/config/ 2>&1 | head -8; d
+f -h /overlay | tail -1; ls -l /etc/e2631-wifi-provisioned 2>&1
+N6
+drwxr-xr-x    2 root     root             0 Nov 22 02:39 .
+drwxr-xr-x    7 root     root             0 Nov 22 03:38 ..
+-rw-------    1 root     root          4505 Nov 21 04:46 adblock-fast
+-rw-r--r--    1 root     root           322 Nov 21 04:46 argon
+-rw-------    1 root     root          1193 Nov 21 04:46 dhcp
+-rw-------    1 root     root           336 Nov 21 04:46 dropbear
+-rw-r--r--    1 root     root           998 Nov 21 04:46 e2631
+-rw-r--r--    1 root     root          1571 Nov 21 04:46 e2631_ports
+/dev/mtdblock8            4.6M    524.0K      4.1M  11% /overlay
+-rw-r--r--    1 root     root             0 Nov 22 03:38 [0;0m/etc/e2631-wifi-provisioned[m
+root@ImmortalWrt:~# echo N7; e2631-fwstate 2>&1 | head -4; nft list ruleset 2>/d
+ev/null | grep -cE "wan.*(ssh|http|https)|Allow-.*WAN"; uptime
+N7
+BAR0=0x1030000c remap=0x103fe26c misc=0x103e00fc
+up=180 misc= FW_STATE=0
+up=181 misc= FW_STATE=0
+up=182 misc= FW_STATE=0

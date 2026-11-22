@@ -1,0 +1,65 @@
+{
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a6v3-44935007253/e2631-uboot-44935007253/u-boot.bin",
+  "size": 450936,
+  "sha256": "3bf182f148226b6f64696a05bba5d75ca59426747f87eee3f13c5d2b0269423a",
+  "sha_ok": true,
+  "size_ok": true,
+  "new_banner_present": true
+ },
+ "image": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-a6v3-44935007253/e2631-uboot-44935007253/e2631-uboot-mtd0.bin",
+  "size": 655360,
+  "sha256": "f6d179daa952db910afacde635f259fbe5f2eabf97f3d8aa07d2c09540979a42",
+  "sha_ok": true,
+  "is_0xa0000": true,
+  "header_magic_128s": true,
+  "header_diff_only_length": true,
+  "payload_matches_uboot": true,
+  "tail_ff": true
+ },
+ "vendor_ram": {
+  "path": "/home/qc233/zte/e2631-immortalwrt/evidence/p2-oob/vendor-uboot-ram.bin",
+  "size": 426048,
+  "sha256": "a4c640ad488d4b1956475e6613cc52b90d9c1ed453be68d3a2c54906f3dd8a30",
+  "ok": true
+ },
+ "baseline": {
+  "sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+  "ok": true,
+  "env_block_sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "env_block_ok": true
+ },
+ "old_image": {
+  "sha256": "baf28b6da4d6ca1b356389951b9d49765382b35dd382bc81c8a0a589c09464dd",
+  "ok": true
+ },
+ "expected_after": {
+  "sha256": "5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf",
+  "clean_old_image_sha256": "3c8a8c5b0f9db1953628919d650ff7af6d24e07c48e9a31d5b228881a9f36ffb"
+ },
+ "device": {
+  "mtd0_sha256": "d571b76404df1596dd58b710cff84e1ede92e6a29798abe5dcc50198d286b0f5",
+  "uptime": "1441",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "route": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000",
+ "capture_chain": {
+  "supervisor_pids": [
+   3495843
+  ],
+  "bootwatch_pids": [
+   3495854
+  ],
+  "tty_holders": [
+   3495849
+  ]
+ },
+ "vendor_pw_mode": "0o600",
+ "erase_env_cmd": "mtd erase spi-nand0 0xc0000 0x20000",
+ "write_env_cmd": "mtd write spi-nand0 0x46000000 0xc0000 0x20000",
+ "erase_image_cmd": "mtd erase spi-nand0 0x20000 0xa0000",
+ "write_image_cmd": "mtd write spi-nand0 0x44000000 0x20000 0xa0000",
+ "clean_old_image_ok": true,
+ "ok": true
+}

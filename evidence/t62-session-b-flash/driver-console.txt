@@ -1,0 +1,55 @@
+03:01:00 capture paused: {"supervisor_pids": [3495843], "bootwatch_pids": [3495854], "tty_holders": [3495849], "tty_holders_after": [], "free": true}
+03:01:00 serial hub started pid=3563272 log=/home/qc233/zte/e2631-p3/c1b2-session-b/serial.log
+03:01:01 REBOOT SENT (ssh reboot -f); waiting for the flash chain
+03:01:03 banner seen; stopping autoboot
+03:01:06 stop_autoboot: {"banner": true, "prompt": true}
+03:01:06 gate: old flash console ready
+03:01:46 xmodem_cmd loadx 0x47f00000 block=1024 ok=True elapsed=40.1s
+03:01:48 md_check vendor-ram-head: OK
+03:01:50 md_check vendor-ram-tail: OK
+03:01:50 gate: vendor U-Boot RAM image verified; go 0x47f00000
+03:01:50 sent: go 0x47f00000
+03:01:51 cold-boot prompt caught; sending 1
+03:01:51 vendor password attempt 1 -> autoboot
+03:01:51 gate: vendor console ready (stock U-Boot 2013.04)
+03:02:35 md_check v3-uboot-head: OK
+03:02:37 md_check v3-uboot-tail: OK
+03:02:37 gate: v3 u-boot.bin in RAM verified; go 0x47f00000 into our v3 console
+03:02:37 sent: go 0x47f00000
+03:02:37 banner seen; stopping autoboot
+03:02:40 stop_autoboot: {"banner": true, "prompt": true}
+03:02:40 gate: our v3 console ready (U-Boot 2027.01-rc2-g85c7367a3106)
+03:02:55 xmodem_cmd loadx 0x46000000 block=1024 ok=True elapsed=14.1s
+03:03:50 md_check env-block-in-ram: OK
+03:03:50 gate: env block in RAM verified
+03:03:50 ENV ERASE sent; ok=True
+03:03:51 read env-post-erase ok=True
+03:04:46 md_check env-post-erase-all-ff: OK
+03:04:46 gate: env post-erase ALL FF
+03:04:46 ENV WRITE sent; ok=True
+03:04:46 read env-readback ok=True
+03:05:41 md_check env-readback: OK
+03:05:41 gate: env readback SUCCESS and md == baseline env block (6e2c01da...)
+03:05:41 read pre-secondboot ok=True
+03:06:37 md_check secondboot-baseline: OK
+03:07:37 xmodem_cmd loadx 0x44000000 block=1024 ok=True elapsed=60.1s
+03:12:13 md_check new-image-in-ram: OK
+03:12:13 ENV RESTORED (mtd0 back at the clean baseline); starting the v3 image ladder
+03:12:13 IMAGE ERASE sent; ok=True
+03:12:14 read image-post-erase ok=True
+03:16:50 md_check image-post-erase-all-ff: OK
+03:16:50 gate: image post-erase ALL FF
+03:16:51 IMAGE WRITE sent; ok=True
+03:16:51 read image-readback ok=True
+03:21:29 md_check image-readback: OK
+03:21:29 gate: image readback SUCCESS and md == v3 image
+03:21:29 read post-env ok=True
+03:21:29 read post-secondboot ok=True
+03:21:29 read post-tail ok=True
+03:22:24 md_check env-after-image-write: OK
+03:23:20 md_check secondboot-after-image-write: OK
+03:24:15 md_check tail-after-image-write: OK
+03:24:15 WRITE VERIFIED. HOLDING (no reset).
+03:24:15 READY FOR POWER CYCLE (Session C): expected mtd0 sha256 5ebb5ab323bafea4a310e4cb3f78cbb77b3d219ba9fb324927bf28e8d0cc48cf
+03:24:21 capture restore: {"restore_rc": 0, "supervisor_pids": [3624544], "bootwatch_pids": [3624591], "tty_holders": [3624550], "events_tail": "2026-11-22T02:37:31+08:00 reader-start pid=3495843\n2026-11-22T03:24:17+08:00 reader-start pid=3624544", "ok": true}
+03:24:21 VERDICT B-WRITE-GREEN-HOLD
