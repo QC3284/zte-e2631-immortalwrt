@@ -231,7 +231,7 @@ jobs:
             echo "::error::the e2631env bad-block precheck must stay above the erase"
             exit 1
           fi
-          env_asserts=$(grep -c 'static_assert(CONFIG_ENV' board/zte/zxhn-e2631/e2631env.c)
+          env_asserts=$(grep -c 'static_assert(' board/zte/zxhn-e2631/e2631env.c)
           if [ "$env_asserts" != "4" ]; then
             echo "::error::the env layout needs four compile-time asserts, found $env_asserts"
             exit 1

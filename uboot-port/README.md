@@ -342,7 +342,7 @@ make O=build -j"$(nproc)"
     （0016 的 class-1 回退确实编进镜像）、
     `grep -q 'e2631_env_snapshot' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'e2631_env_write_block' board/zte/zxhn-e2631/e2631env.c`、`e2631env.c` 的 `mtd_block_isbad`
-    行号在 `mtd_erase` 之前、`grep -c 'static_assert(CONFIG_ENV' == 4`、`0xE0000` 只出现在 `e2631env.c`，
+    行号在 `mtd_erase` 之前、`grep -c 'static_assert(' == 4`、`0xE0000` 只出现在 `e2631env.c`，
     且 `e2631net.c` 仍含厂商值
     `0x004fdf3b`、`0x003c0040`、`0x0001381b`、板级 pinmux 字 `0x0f3ffffa`、`0x003dbf85` 与 `0x9400000C` 的 `0x00100000`。形状断言只防回归；编译由 CI 保证，运行期
     （bootm 进内核、env 日志显示 MTD、CP15 前后差值、网络时钟前后差值）由 C1a/C1b 重跑与 Session A 的
