@@ -36,7 +36,8 @@ jobs:
             E2631_UBOOT_BASE_TREE_SHA \
             E2631_UBOOT_TREE_SHA \
             E2631_UBOOT_PAYLOAD_MAX \
-            E2631_UBOOT_TEXT_BASE; do
+            E2631_UBOOT_TEXT_BASE \
+            E2631_UBOOT_SOURCE_DATE_EPOCH; do
             value=${!name:-}
             if [ -z "$value" ]; then
               echo "::error::uboot-port/commits.env does not define $name"
@@ -69,6 +70,10 @@ jobs:
           fi
           printf "E2631_UBOOT_PATCH_COUNT=%s\n" "${#patches[@]}" >> "$GITHUB_ENV"
           printf 'UBOOT_DIR=%s\n' "$RUNNER_TEMP/u-boot" >> "$GITHUB_ENV"
+          # Reproducible banner (task-69 item d): U-Boot embeds U_BOOT_DATE/
+          # U_BOOT_TIME from SOURCE_DATE_EPOCH when it is set (Makefile:2327-2351),
+          # so export the frozen pin here instead of letting the CI clock leak in.
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$E2631_UBOOT_SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
       - name: Install the ARM cross toolchain and U-Boot build dependencies
         run: |
@@ -109,7 +114,13 @@ jobs:
             expected=${!name}
             echo "$expected  $patch" | sha256sum -c -
           done
+          # Reproducible version token (task-69 item d): the replayed commits keep
+          # their patch author date and get it as committer date too, so the am
+          # commit SHAs (and the git-describe token in the banner) depend only on
+          # the pins.  Without this flag HEAD changes on every build and so does
+          # u-boot.bin, even for an identical tree.
           git -c user.name='E2631 CI' -c user.email='ci@localhost' am \
+            --committer-date-is-author-date \
             "$GITHUB_WORKSPACE"/uboot-port/patches/*.patch
           tree=$(git rev-parse 'HEAD^{tree}')
           if [ "$tree" != "$E2631_UBOOT_TREE_SHA" ]; then
@@ -628,6 +639,7 @@ jobs:
             echo "Baseline tree: $E2631_UBOOT_BASE_TREE_SHA"
             echo "Port patches sha256: $patch_shas"
             echo "Post-am tree: $E2631_UBOOT_TREE_SHA"
+            echo "Reproducible: git am --committer-date-is-author-date, SOURCE_DATE_EPOCH=$E2631_UBOOT_SOURCE_DATE_EPOCH"
             echo "Defconfig: zx279128s_zte_zxhn-e2631_defconfig"
             echo "Toolchain: $(arm-none-eabi-gcc --version | head -1)"
             echo "u-boot.bin size: $size bytes (limit $E2631_UBOOT_PAYLOAD_MAX = $((E2631_UBOOT_PAYLOAD_MAX)) bytes)"
