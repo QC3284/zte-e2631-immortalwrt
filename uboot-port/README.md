@@ -740,3 +740,17 @@ U-Boot 网络栈。
   checkpatch 仍为 0 errors / 26 warnings（0021 为 0/0、0022 为 0/1：checkpatch 逐 patch 独立判断，前面的
   MAINTAINERS 更新无法消掉后面的新文件提醒；CMD_TEST 也不读文档），逐条分类、源码依据与 CI 级四类豁免
   方案见 [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。
+- 2026-11-22（checkpatch CI 门禁，option A）：checkpatch 步骤改为硬门禁——`--ignore
+  FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF`（恰好四类，workflow 里逐类注释原因），ignore 列表在运行期
+  被断言为这四类，其余任何 warning 或任何 error 都使 uboot-build 失败；README §4 item 6/§6 写明门禁与原始
+  逐类统计，evidence 文件改名为
+  [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。
+  CI uboot-build run `44983615483`（head `828dc1f`）SUCCESS，checkpatch.txt 为 **0 errors / 0 warnings**；
+  banner `U-Boot 2027.01-rc2-gc7ac1db6eb7f`、`u-boot.bin` 494,208 B sha256
+  `a07f0e56862a63d1e338c9072dfa2af95ed4aaa51e5fdd28a9441c39a9f4b9f7`、crc32 `201bd325`、mtd0 镜像 sha256
+  `f7ef0bdb5471b425c6493f3d3655e09663a1e0484abcf19a3f4f0ce7c0a63bf3`、crc32 `3e070d23`、env 块 `6eee153b…`
+  未变、post-am tree 仍为 `c812dd86…`。与 run `44982672016` 相比，两份 `u-boot.bin` 只差 28 个字节（全部是
+  版本 token 与构建时间戳，见 evidence §4）——U-Boot 版本串含 `git describe` 的 HEAD token（CI 的 `git am`
+  用构建时刻做 committer date）且编译期嵌入 `U_BOOT_DATE`/`U_BOOT_TIME`，所以同一 tree 重跑也不会字节相同；
+  设备会话使用 run `44983615483` 这件 0/0 产物。若需要字节级可复现构建，可选加 `git am
+  --committer-date-is-author-date` + `SOURCE_DATE_EPOCH`（evidence §6，待 Lead 决定）。

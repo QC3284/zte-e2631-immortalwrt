@@ -1,86 +1,120 @@
-# U-Boot checkpatch 收口：MAINTAINERS 条目 + e2631net 用法页（task-66 跟进）
+# U-Boot checkpatch 门禁（四类显式豁免）与构建可复现性观察
 
 - 日期：2026-11-22
-- 触发：Lead 对 E2 系列 checkpatch 结果的要求（目标 0 errors / 0 warnings）
-- 结论：两个文档 patch 已交付并重钉、CI 构建 SUCCESS。但**仅靠内容补丁无法把整串 checkpatch 降到 0/0**——
-  checkpatch 按单个 patch 独立判断，MAINTAINERS 提醒与 “Possible new command” 都是 patch 局部规则，
-  后续 patch 无法消掉前面 patch 的提醒；LIVETREE / PREFER_IF 两类也还在。用 CI 级 `--ignore` 四个类别
-  后本地实测 0 errors / 0 warnings。是否采用该 CI 级豁免待 Lead 决定；本轮没有改代码、没有重写 0001-0020。
+- 任务：task-66 跟进（Lead 批准 option A：四类 checkpatch 豁免 + 其余 warning/error 必须失败）
+- 结论：门禁已落地并通过负向测试，CI uboot-build run `44983615483` 的 checkpatch 产物为
+  **0 errors / 0 warnings**。但“重跑后二进制哈希不变”这一预期**不成立**：同一 post-am tree、同一 22 个
+  patch 的两次构建（run `44982672016` 与 run `44983615483`）只差 **28 个字节**，全部落在版本字符串/
+  构建时间戳上——根因是 U-Boot 版本串含 `git describe` 的 HEAD token（CI 的 `git am` 用当前时间做
+  committer date，每次 HEAD SHA 不同）和编译期嵌入的 `U_BOOT_DATE`/`U_BOOT_TIME`。设备会话应使用
+  run `44983615483` 这件受门禁约束的产物；若要字节级可复现，需要另加两个 CI 固定项（见 §6）。
 
 ## 1. 交付
 
 | 项 | 值 |
 | --- | --- |
-| patch 0021 | `uboot-port/patches/0021-MAINTAINERS-add-the-ZTE-ZXHN-E2631-board-and-the-ZX2.patch`，sha256 `c66643e1eca8c5cc2313e0136636b0ea22822f38f7207236b41786ba93ab7976` |
-| patch 0022 | `uboot-port/patches/0022-doc-add-the-e2631net-usage-page.patch`，sha256 `680435c34a4b6ca5154debb0ace1caea7fd7000641e5e572c6477f22b6959b72` |
-| 22-patch post-am tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5` |
-| kit commit | `0edf1bf`（`uboot: add the MAINTAINERS entry and the e2631net usage page (task-66)`） |
+| kit commit | `828dc1f`（`ci: gate the U-Boot checkpatch step on the four reviewed classes`） |
+| 改动文件 | `.github/workflows/uboot-build.yml`、`uboot-port/README.md`、`docs/README.md`、evidence 文件改名 |
+| workflow 行为 | checkpatch 步骤从 informational 改为硬门禁；ignore 列表运行期断言为恰好四类；其余 warning 或任何 error 使 run 失败 |
+| post-am tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（22 patches，与上一轮相同） |
+| 代码/历史 | 无代码改动、无 history rewrite、patch 与 tree pin 未变 |
 
-- patch 0021：MAINTAINERS 新增一段 `ZTE ZXHN E2631 (SANECHIPS ZX279128S)`，maintainer QC3284，
-  覆盖 `arch/arm/mach-zx279128s/`、`board/zte/zxhn-e2631/`、`drivers/net/zx279128s_eth.c|.h`、
-  `drivers/net/zx279128s_mdio.c`、`drivers/spi/spi-zx.c`、DTS、defconfig、`include/configs/…h`、
-  `doc/usage/cmd/e2631*.rst`。
-- patch 0022：新增 `doc/usage/cmd/e2631net.rst`（SPDX + 命令页；Synopsis/Description/Example），
-  说明只读属性、lan1 = switch port 2 / PHY 12（MDIO 0x0c）与输出示例。`doc/usage/index.rst` 用 glob
-  包含 `cmd/*`，无需改索引。
-- 0001-0020 的 patch 文件与之前逐字节相同（sha256 未变）；post-am tree 从 `10ade1ec…` 变为
-  `c812dd86…` 仅因这两个文档 patch。
+workflow 里四类各有一行原因注释：
 
-## 2. 为什么内容补丁到不了 0/0（checkpatch 源码依据 + 实测）
+- `FILE_PATH_CHANGES`：checkpatch 每个 patch 重置 `$reported_maintainer_file`（`checkpatch.pl:2805`，
+  新文件检查在 `3560-3568` 行受其约束），所以末尾的 MAINTAINERS patch 0021 不能消掉前面 patch 的新文件提醒；
+  MAINTAINERS 条目本身已在序列里。
+- `CMD_TEST`：只匹配新增行 `do_<name>(struct cmd_tbl`（`checkpatch.pl:2670-2674`），不读文档；
+  8 个 `e2631*` 是板级自用命令，U-Boot 树里没有对应 DM 测试。
+- `LIVETREE`：patch 0002 里板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 的误报。
+- `PREFER_IF`：patch 0015 的 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效才能把原始 mtd 写路径
+  编掉，运行期 `if` 达不到目的，属于结构性豁免。
 
-- `scripts/checkpatch.pl` 的 `sub process` 为每个 patch 文件重置状态：
-  `my $reported_maintainer_file = 0;`（第 2805 行），FILE_PATH_CHANGES 只在同一 patch 内见过
-  MAINTAINERS 改动时才被抑制（第 3560-3568 行）。CI 用 `format-patch` 后把 `*.patch` 逐个传给
-  checkpatch，因此 0021 的 MAINTAINERS 更新对 0001-0020 与 0022 都无效。
-- CMD_TEST（第 2670-2674 行）只匹配新增行里的 `do_<name>(struct cmd_tbl`，**完全不读文档**；
-  新增用法页不能满足它。8 条提醒来自 8 个自用命令定义。
-- LIVETREE（2 条，patch 0002）是板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()`
-  的误报；PREFER_IF（5 条，patch 0015）的 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效，
-  否则原始 mtd 写入口编不掉——这两类同理无法用后续 patch 消除。
+门禁实现要点（`.github/workflows/uboot-build.yml` 的 checkpatch step）：
 
-实测（本地，22 个 patch，与 CI 完全同一条命令）：
+1. `ignores="FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF"`，与按字母序的 `expected` 逐项比较；
+   集合不完全相等（多、少、重复、改名）→ `::error::checkpatch ignore list is not exactly the four
+   reviewed classes` 并 `exit 1`；
+2. `checkpatch.pl --no-tree --terse --ignore "$ignores"` 后统计 `: ERROR:` / `: WARNING:`；
+   任一非零 → `::error::checkpatch reported ...; inspect the artifact` 并 `exit 1`；
+3. 输出仍写 `build/checkpatch.txt` 并随 artifact 上传（失败时也保留现场）。
 
-| 命令 | errors | warnings |
-| --- | --- | --- |
-| `scripts/checkpatch.pl --no-tree --terse /tmp/pchk-all/*.patch` | 0 | **26**（11 MAINTAINERS + 8 CMD_TEST + 5 PREFER_IF + 2 LIVETREE） |
-| 同上 + `--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF` | 0 | **0** |
+## 2. 本地负向测试（与 CI 同一段 shell）
 
-单 patch 实测：patch 0021 为 0/0；patch 0022 为 0/1（“added, moved or deleted file(s), does
-MAINTAINERS need updating?”——文档新文件在 0022 这个 patch 内没有 MAINTAINERS 改动）。
-这正好证明：再补文档 patch 只会把总数从 25 抬到 26，不会降到 0。
+| 场景 | 结果 |
+| --- | --- |
+| 恰好四类 ignore，22 patch 全串 | `errors=0 warnings=0` → GATE_PASS |
+| ignore 列表删成两类（FILE_PATH_CHANGES,CMD_TEST） | 运行期断言先拒绝：GUARD_REJECT（未跑到 checkpatch） |
+| 若绕过断言只 ignore 两类 | `warnings=7`（5 PREFER_IF + 2 LIVETREE）→ 门禁 FAIL（负向验证有效） |
 
-## 3. CI 构建（文档 patch 重钉后）
+不加 ignore 的原始统计（本机，22 patch）：`0 errors / 26 warnings` = 11 MAINTAINERS + 8 CMD_TEST +
+5 PREFER_IF + 2 LIVETREE；其中 patch 0021 为 0/0、0022 为 0 errors/1 warning（它自己新增的文档文件又触发
+新文件提醒，正好证明逐 patch 独立的判断方式）。
 
-- uboot-build run [44982672016](https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/44982672016)
-  （head `0edf1bf`）SUCCESS；kit `Upgrade safety checks` run `44982651725` SUCCESS。
-- 产物归档 `/home/qc233/zte/e2631-t5-artifacts/uboot-doc-44982672016/e2631-uboot-44982672016/`：
+## 3. CI 结果（run 29 = 门禁版）
+
+- uboot-build run [44983615483](https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/44983615483)
+  （head `828dc1f`）**SUCCESS**；kit `Upgrade safety checks` run `44983584660` SUCCESS。
+- `checkpatch.txt`（artifact 内）：`grep -c ': WARNING:'` = **0**、`grep -c ': ERROR:'` = **0**；
+  另有 3 条 `CHECK`（2 条对齐 + 1 条 else 大括号），CHECK 不是 warning，不参与门禁。
+- 产物归档 `/home/qc233/zte/e2631-t5-artifacts/uboot-gate-44983615483/e2631-uboot-44983615483/`：
 
 | 项 | 值 |
 | --- | --- |
-| banner | `U-Boot 2027.01-rc2-g6bd1fbd087ba`（2026-11-22 03:54:56 +0000） |
-| u-boot.bin | 494,208 B（0x78A80，上限 653,312）；sha256 `75ba2e66b448f08fba42fedffae4b21cd84ad082cb32de6f0d3474effc5ca11d`；crc32 `e13c0526` |
+| banner | `U-Boot 2027.01-rc2-gc7ac1db6eb7f`（2026-11-22 04:07:59 +0000） |
+| u-boot.bin | 494,208 B（0x78A80，上限 653,312）；sha256 `a07f0e56862a63d1e338c9072dfa2af95ed4aaa51e5fdd28a9441c39a9f4b9f7`；crc32 `201bd325` |
 | entry | `0x47f00000` |
-| mtd0 镜像 | 655,360 B；sha256 `9200fb3594845104ded8b32d494f1702728d9660d07512709931154b9317c739`；crc32 `6cef9a2b` |
+| mtd0 镜像 | 655,360 B；sha256 `f7ef0bdb5471b425c6493f3d3655e09663a1e0484abcf19a3f4f0ce7c0a63bf3`；crc32 `3e070d23` |
 | env 块 | sha256 `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（未变，只读） |
 | post-am tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（22 patches） |
-| CI checkpatch.txt | 0 errors / 26 warnings（与本地一致） |
 
-构建产物里没有 MAINTAINERS/文档内容，u-boot.bin 尺寸与 E2 产物相同（494,208 B），差异只在版本字符串。
+## 4. 为什么“哈希不变”不成立（实测）
 
-## 4. 待决：怎么才算 0/0
+对比上一轮 run `44982672016`（同一 tree、同一 22 个 patch pin）：
 
-- **方案 A（推荐，无代码/无历史改写）**：在 `.github/workflows/uboot-build.yml` 的 checkpatch 命令上
-  加 `--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF`，并在 workflow 注释与 README §6 写明四类
-  豁免与原因（MAINTAINERS 条目已存在、自用板级命令无上游测试、板级 fdtdec 误报、结构性 `#if`）。
-  这样 CI 输出就是 0 errors / 0 warnings；二进制/树/pin 都不用动，只需重跑一次 workflow 记录 0/0 产物
-  （设备会话用的镜像不因此改变）。
-- **方案 B**：保持 0 errors / 26 warnings（现状，README 已逐类写明）。
-- 方案 C（不做）：把 MAINTAINERS/文档折进 0001-0020 或改代码绕开规则——违反 append-only 且必须弯代码
-  （CMD_TEST/PREFER_IF 只能靠改写定义或运行期分支），Lead 已明确不要。
+| 项 | run 28（44982672016） | run 29（44983615483） |
+| --- | --- | --- |
+| post-am tree | c812dd86… | c812dd86…（相同） |
+| patch sha256 | 22 个，逐字节相同 | 同上（相同） |
+| u-boot.bin 大小 | 494,208 B | 494,208 B（相同） |
+| banner token | g6bd1fbd087ba | gc7ac1db6eb7f |
+| u-boot.bin sha256 | 75ba2e66… | a07f0e56… |
+| mtd0 sha256 | 9200fb35… | f7ef0bdb… |
 
-## 5. 参考
+`cmp -l` 结论：两个 `u-boot.bin` 只有 **28 个字节不同**（偏移 380142..421387），mtd0 也正好 28 字节；
+`strings` 差异只有两行：`2027.01-rc2-g<token>` 与完整 banner（含构建时间 `03:54:56` vs `04:07:59`）。
+其余字节全部相同。根因：
 
-- `.github/workflows/uboot-build.yml` checkpatch step（`scripts/checkpatch.pl --no-tree --terse`）
+1. U-Boot 版本串里的 `g<token>` 来自构建树的 `git describe`，而 CI 用 `git am` 现场重放 22 个 patch，
+   默认 committer date = 构建时刻 → 每次 HEAD SHA 不同 → token 不同；
+2. `include/generated/timestamp_autogenerated.h` 在编译时嵌入 `U_BOOT_DATE`/`U_BOOT_TIME`（构建日期/时间），
+   所以即使 commit SHA 固定，两次构建的镜像也不会字节相同。
+
+U-Boot 支持 `SOURCE_DATE_EPOCH` 固定 `U_BOOT_DATE`/`U_BOOT_TIME`（`Makefile:2327-2348`），但 workflow 未设置；
+`git am` 也未加 `--committer-date-is-author-date`。两者同时固定后（再加固定 epoch）才有字节级可复现性。
+
+## 5. 设备会话使用的产物
+
+- 使用 **run `44983615483`**（门禁版，checkpatch 0/0）：banner `gc7ac1db6eb7f`、u-boot.bin sha256
+  `a07f0e56862a63d1e338c9072dfa2af95ed4aaa51e5fdd28a9441c39a9f4b9f7`、mtd0 sha256
+  `f7ef0bdb5471b425c6493f3d3655e09663a1e0484abcf19a3f4f0ce7c0a63bf3`；env 块不变。
+- 与 run 28 的差异只是 §4 的 28 个版本/时间字节，post-am tree 与全部 patch pin 相同。
+
+## 6. 可复现构建（可选，待 Lead 决定）
+
+若要求“同一 tree 重跑 CI 得到同一 sha256”，需要一次 CI 配置改动 + 两次 dispatch 验证：
+
+1. `git am --committer-date-is-author-date`（让 22 个 am commit 的 SHA 只由 base+patch 决定）；
+2. 构建环境设 `SOURCE_DATE_EPOCH=<固定 epoch>`（U-Boot 用它生成 `U_BOOT_DATE`/`U_BOOT_TIME`）；
+3. 连发两次 uboot-build，比较 `u-boot.bin`/mtd0 的 sha256 完全一致。
+
+注意：这会把 artifact 的 banner/hash 再换一次（token 变成固定 commit 链的 SHA），但换来可重建的发布证据。
+本轮未实施，等 Lead 指示。
+
+## 7. 参考
+
+- `.github/workflows/uboot-build.yml` 的 checkpatch step（本文件 §1 的三条门禁逻辑）
 - `u-boot/scripts/checkpatch.pl`：2805、3560-3568、2670-2674 行
-- [uboot-port/README.md](../uboot-port/README.md) §1/§4/§6
+- U-Boot `Makefile:2327-2348`（`SOURCE_DATE_EPOCH` → `U_BOOT_DATE`/`U_BOOT_TIME`）
+- [uboot-port/README.md](../uboot-port/README.md) §4 item 6 / §6 / §8
 - [evidence/uboot-e2-20261122.md](uboot-e2-20261122.md)（E2 系列基线）
