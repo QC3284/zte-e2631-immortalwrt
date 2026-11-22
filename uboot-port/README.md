@@ -565,18 +565,19 @@ U-Boot 网络栈。
 - **checkpatch**：本系列 0 errors、25 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
   0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
   0018/0019 各 0 errors / 1 warning、0020 0 errors / 1 warning），
-  均为已核对的已知项——9 条 "does MAINTAINERS
+  均为已核对的已知项——10 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
   patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c`、
-  patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h`、patch 0017 新增 `e2631env.c|.h`、
-  patch 0018 新增 `drivers/net/zx279128s_mdio.c`/`zx279128s_eth.h`、patch 0019 新增
-  `drivers/net/zx279128s_eth.c` 各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）
+  patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h`、patch 0014 新增 `e2631flash.c`、
+  patch 0017 新增 `e2631env.c|.h`、patch 0018 新增 `drivers/net/zx279128s_mdio.c`/`zx279128s_eth.h`、
+  patch 0019 新增 `drivers/net/zx279128s_eth.c` 各一条；checkpatch 按单 patch 看不到后续 patch 的
+  MAINTAINERS 更新）
   + 2 条 "Use the livetree API"
   （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
-  常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 3 条 "Possible new command - make sure you
-  add a test"（`e2631boot`/`e2631soc`/`e2631refclk` 是自用板级命令，U-Boot 树里没有对应 DM 测试；
-  验收是只读子命令 + 真机会话，不新增测试目录），加上 0014 的 3 条 CMD_TEST + 1 条文件路径提醒、
-  0017 的 1 条 CMD_TEST（`e2631env`）+ 1 条文件路径提醒、0020 的 1 条 CMD_TEST（`e2631net`），
+  常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 8 条 "Possible new command - make sure you
+  add a test"（`e2631boot`/`e2631soc`/`e2631refclk`/`e2631flash`/`e2631verify`/`e2631slot`/
+  `e2631env`/`e2631net` 都是自用板级命令，U-Boot 树里没有对应 DM 测试；验收是只读子命令 + 真机会话，
+  不新增测试目录），
   以及 0015 的 5 条 PREFER_IF（这几处 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效才能把原始 mtd
   写入口真正编掉，运行期 `if` 达不到目的，属于结构性豁免）。E2 的六处 `mb()` 与 `extern` 提示已在
   patch 0018-0020 定稿时修掉（内存屏障加注释、MDIO 驱动改包含共享头而不是自己写原型）。自用 fork，不提交上游。
