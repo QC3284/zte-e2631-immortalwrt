@@ -4,11 +4,12 @@
 （0001/0002 为 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC +
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
-的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步）、
+的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)、
+[e2-net-driver-design.md](e2-net-driver-design.md)、
 [a7-self-flash-design.md](a7-self-flash-design.md)、
 [docs/U-Boot-env写回与启动计数设计-2026-11-22.md](../docs/U-Boot-env写回与启动计数设计-2026-11-22.md)），
 以及供 CI 构建和后续真机 A1/A2/A3/C1b 会话使用的说明。
@@ -31,8 +32,12 @@ pin 文件、设计说明
   [a3-slot-boot-design.md](a3-slot-boot-design.md)。C1a 真机干跑暴露了 `bootm` 缺 ATAGS 缓冲区
   （`boot_prep_linux` data abort），patch 0008 修复、0009 修正 env 日志名称；重跑清单见
   [evidence/c1a-bootm-20261121.md](../evidence/c1a-bootm-20261121.md) §11。
-- **不做（后续阶段）**：真正写 mtd0/写槽位（D-U1 的写命令已交付，但刷写会话仍需用户批准并先零写入校验）、网络协议栈/网络引导（A5 只补
-  PHY/SerDes 参考时钟与管脚初始化，让内核能自己接管网口与 PCIe；引导仍用厂商 U-Boot 的 tftp）、
+- **E2（已交付，0018/0019/0020）**：U-Boot 自己的以太网驱动。为四个集成 PHY 加 clause-22 MDIO 总线，
+  复用内核驱动的交换机/流量管理器/DMA 初始化（16 MiB arena），把 lan1（switch port 2、PHY 12）接进 U-Boot
+  网络栈，提供 `e2631net` 状态命令。目录里的验收命令是 `mii info` / `dhcp` / `ping` / `tftp`（见 §5.4）；
+  单口、无中断轮询、不做 autoboot rescue（E3），第一次真机会话另行安排。
+- **不做（后续阶段）**：真正写 mtd0/写槽位（D-U1 的写命令已交付，但刷写会话仍需用户批准并先零写入校验）、
+  U-Boot 的 autoboot rescue/网络引导回退（E3；E2 只把网口接进 U-Boot 网络栈）、
   CPU1/SMP 交接（secondboot 已完成停车）、DDR/时钟初始化（secondboot 已完成）、时钟/复位驱动
   （依赖 secondboot 的控制器状态）、env 持久化（B1）、按活动槽位切换根文件系统。
 - 引导链：BootROM → secondboot（闭源，已完成 DDR/时钟/串口/SPI-NAND/CPU1 停车）→ 厂商 U-Boot 2013.04
@@ -84,7 +89,13 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0016 sha256 | `7838e8a22dd46996c9ccb31f9fe116e194641d2a26f548e9854548bfefc62461` |
 | patch 0017 | `uboot-port/patches/0017-board-zte-add-a-whitelisted-environment-writer.patch`（U-0017：`e2631env check/diff/save`，唯一 env 写入口，五步安全写 + 白名单 + 厂商键快照） |
 | patch 0017 sha256 | `da21478e0fe7c53fdf14f59e81ea3da86733b63998926f25e84b3675f96eca0d` |
-| am 之后 tree | `fd511f1e4aff26c8f0bf3187b139eaaf45fbd5bc`（与机器无关，17 个 patch） |
+| patch 0018 | `uboot-port/patches/0018-drivers-net-add-the-ZX279128S-MDIO-controller.patch`（E2：clause-22 MDIO 总线 + 共享寄存器头 `zx279128s_eth.h`） |
+| patch 0018 sha256 | `9a1e079b740d8f253f5c4c9a323a618a5820b8100ccbcff56fae84557d215a9c` |
+| patch 0019 | `uboot-port/patches/0019-drivers-net-add-the-ZX279128S-switch-and-traffic-manager-setup.patch`（交换机/流量管理器/DMA 初始化，16 MiB arena 布局） |
+| patch 0019 sha256 | `3e615397a428781683f753f42374a74b100d739819de64a63408616b557b4a3f` |
+| patch 0020 | `uboot-port/patches/0020-drivers-net-add-the-ZX279128S-Ethernet-driver.patch`（U-Boot 网络驱动：lan1/port 2/PHY 12、轮询 TX/RX、`e2631net`、arena guard） |
+| patch 0020 sha256 | `d8b9eb9f93125798c4d17a2fc09b621a5d9f139706263dcbd9160ba6b3e1416a` |
+| am 之后 tree | `10ade1ec0f7a3a7943783d6ba6146840fda6d4bf`（与机器无关，20 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 
@@ -100,7 +111,7 @@ git remote add origin https://github.com/u-boot/u-boot.git
 git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
-test "$(git rev-parse HEAD^{tree})" = fd511f1e4aff26c8f0bf3187b139eaaf45fbd5bc
+test "$(git rev-parse HEAD^{tree})" = 10ade1ec0f7a3a7943783d6ba6146840fda6d4bf
 ```
 
 ## 2. 新增/修改的文件
@@ -116,17 +127,21 @@ test "$(git rev-parse HEAD^{tree})" = fd511f1e4aff26c8f0bf3187b139eaaf45fbd5bc
 | `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()`；U-0016：选中槽 uImage 失败时经 `e2631_try_boot_slot()` 改试另一槽一次（class-1 回退，无 flash/env 写）；U-0017：`board_late_init()` 在覆盖 `bootcmd` 之前调用 `e2631_env_snapshot()` 保存四个厂商键 |
 | `board/zte/zxhn-e2631/e2631soc.c` | C1b：厂商顺序的 CP15 清理 + `e2631soc` 只读报告命令（SCTLR/CLIDR/TTBR0/VBAR/ACTLR 前后值；不启动、不写 flash/env） |
 | `board/zte/zxhn-e2631/e2631soc.h` | `e2631_soc_prepare_linux()` 原型（`e2631boot.c` 与 `e2631soc.c` 共用一条代码路径） |
-| `board/zte/zxhn-e2631/e2631net.c` | A5：厂商 `board_eth_init()` 的参考时钟/SerDes/CRM2/管脚序列（pinmux 六个整字、只驱动八个输出、`0x9400000C` 的 `bits[21:20]` 时钟选择）+ `e2631refclk` 前后 dump 命令（不启动、不写 flash/env） |
+| `board/zte/zxhn-e2631/e2631net.c` | A5：厂商 `board_eth_init()` 的参考时钟/SerDes/CRM2/管脚序列（pinmux 六个整字、只驱动八个输出、`0x9400000C` 的 `bits[21:20]` 时钟选择）+ `e2631refclk` 前后 dump 命令（不启动、不写 flash/env）；E2 起 `e2631_net_refclk_init()` 幂等（`refclk_done`），`e2631boot` 与以太网驱动的 `start()` 可以各调一次 |
 | `board/zte/zxhn-e2631/e2631net.h` | `e2631_net_refclk_init()` 原型（`e2631boot.c` 与 `e2631net.c` 共用一条代码路径） |
-| `board/zte/zxhn-e2631/e2631flash.c` | D-U1：`e2631flash`（块对齐擦除→全 0xFF 校验→写入→读回逐字节比较，RAM 或 NAND 偏移两种来源，1 MiB bounce buffer，payload/readback CRC32，DO NOT POWER OFF）、`e2631verify`（只读 CRC32）与 `e2631slot`（复用 `e2631boot` 扫描函数打印槽位表） |
+| `board/zte/zxhn-e2631/e2631flash.c` | D-U1：`e2631flash`（块对齐擦除→全 0xFF 校验→写入→读回逐字节比较，RAM 或 NAND 偏移两种来源，1 MiB bounce buffer，payload/readback CRC32，DO NOT POWER OFF）、`e2631verify`（只读 CRC32）与 `e2631slot`（复用 `e2631boot` 扫描函数打印槽位表）；E2 起拒绝任何落在 16 MiB 网络 DMA arena 里的 RAM 源（`static_assert` + 运行期 `e2631_check_ram_range()`），`e2631verify` 用同一检查 |
 | `board/zte/zxhn-e2631/e2631env.c` | U-0017：`e2631env check/diff/save`（唯一 env 写入口）；`save` = 坏块预检→擦除→全 0xFF 校验→写入→回读逐字节比较，只用 `CONFIG_ENV_OFFSET`/`CONFIG_ENV_SIZE` 常量（4 条编译期断言），白名单只放 `e2631_*` 与 `bootdelay`，导出前恢复 `bootcmd`/`bootargs`/`memsize`/`versioninfo` 快照，写前后断言 `0xE0000..0xFFFFF` 仍为全 0xFF；无变化时打印 `nothing to write` 且不擦除 |
 | `board/zte/zxhn-e2631/e2631env.h` | `e2631_env_snapshot()` 原型（`e2631boot.c` 与 `e2631env.c` 共用） |
 | `board/zte/zxhn-e2631/zxhn-e2631.c` | `dram_init`/`dram_init_banksize` 从内嵌 DT 读 256 MiB |
 | `board/zte/zxhn-e2631/MAINTAINERS` | 维护者与文件范围 |
 | `include/configs/zx279128s_zte_zxhn-e2631.h` | `CFG_SYS_SDRAM_BASE=0x40000000`、`CFG_PL011_CLOCK=0`、`CFG_SYS_HZ_CLOCK=500000000` |
-| `arch/arm/dts/zx279128s-zte-zxhn-e2631.dts` | memory / PL011 / A9 global timer / 500 MHz fixed-clock |
+| `arch/arm/dts/zx279128s-zte-zxhn-e2631.dts` | memory / PL011 / A9 global timer / 500 MHz fixed-clock；E2 起还有 `mdio@9a101000`（`zte,zx279128s-mdio` + `ethernet-phy@c`）与 `ethernet@92000000`（`zte,zx279128s-gmac`、`phy-handle=<&phy12>`、`zte,switch-port=<2>`） |
+| `drivers/net/zx279128s_eth.h` | E2：交换机/流量管理器/DMA 寄存器与 16 MiB arena 偏移、`e2631_net_refclk_init()` 原型（0018 引入，MDIO 驱动与以太网驱动共用） |
+| `drivers/net/zx279128s_mdio.c` | E2：clause-22 MDIO 主控制器（`0x9a101000`）；首次传输时懒初始化（先跑板级参考时钟 hook），支持 devad 0 的 read/write；`mii` 命令可直接使用 |
+| `drivers/net/zx279128s_eth.c` | E2：`zx_hw_init()`（复位/时钟门控/PP/索引表/TM 队列表/BMU/DMA 环/交换机/MAC）+ U-Boot `eth_ops`（BMU 缓冲池、TX 描述符与 TX_DONE、RX queue 0 轮询、free_pkt 归还） + `e2631net` 状态命令；`start()` 调 `e2631_net_refclk_init()`（幂等） |
+| `drivers/net/Kconfig`；`drivers/net/Makefile` | E2：`MDIO_ZX279128S` 与 `ETH_ZX279128S`（`depends on DM_ETH && NET_LEGACY`，select `DM_MDIO`/PHYLIB/PHY_GIGE；不能同时 depends DM_MDIO 与 select PHYLIB，否则 Kconfig 递归依赖） |
 | `arch/arm/dts/Makefile` | `dtb-$(CONFIG_TARGET_ZXHN_E2631) += zx279128s-zte-zxhn-e2631.dtb` |
-| `configs/zx279128s_zte_zxhn-e2631_defconfig`；D-U1 增加 `# CONFIG_CMD_MTD_WRITE is not set`，让 `e2631flash` 成为镜像里唯一的 MTD 写入口（0015） | A1/A2/A3 配置（已用 `make savedefconfig` 归一；A3 增加 `BOARD_LATE_INIT`/`SUPPORT_PASSING_ATAGS`/`ENV_IS_IN_MTD` 与只读 env 参数；0011 移除 `CONFIG_SKIP_LOWLEVEL_INIT`，让标准 `cpu_init_cp15`/`cpu_init_crit` 在入口重新生效） |
+| `configs/zx279128s_zte_zxhn-e2631_defconfig`；D-U1 增加 `# CONFIG_CMD_MTD_WRITE is not set`，让 `e2631flash` 成为镜像里唯一的 MTD 写入口（0015） | A1/A2/A3 配置（已用 `make savedefconfig` 归一；A3 增加 `BOARD_LATE_INIT`/`SUPPORT_PASSING_ATAGS`/`ENV_IS_IN_MTD` 与只读 env 参数；0011 移除 `CONFIG_SKIP_LOWLEVEL_INIT`，让标准 `cpu_init_cp15`/`cpu_init_crit` 在入口重新生效）；E2 增加 `CMD_DHCP`/`CMD_MII`/`CMD_PING`/`NET_RANDOM_ETHADDR`/`ETH_ZX279128S`/`MDIO_ZX279128S`（`NET`/`NET_LEGACY`/`DM_ETH`/`DM_MDIO`/`PHYLIB`/`PHY_GIGE`/`CMD_NET`/`CMD_TFTPBOOT` 是默认 y，savedefconfig 不重复写） |
 | `cmd/Kconfig` | D-U1：新增 `CONFIG_CMD_MTD_WRITE`（bool，默认 y，依赖 `CMD_MTD`） |
 | `cmd/mtd.c` | D-U1：write/erase 子命令表项、`do_mtd_io` 写分支、`do_mtd_erase()` 与 `mtd_special_write_oob()` 只在 `CMD_MTD_WRITE` 打开时编译；read/dump 不变 |
 
@@ -244,6 +259,36 @@ data CRC），任一失败则打印 `slot%d unusable (<reason>), falling back to
 让厂商链的 `zteboot_do_settings` 自愈），比设计稿的“允许修复”更保守。env 写入尚未在真机演练；
 第一次真实 `save` 并入下一次用户批准的设备会话。
 
+补丁 0018（2026-11-22，E2，MDIO）：四个集成 PHY 在 MDIO 地址 10-13，控制器在 `0x9a101000`（一个命令寄存器 +
+一个状态寄存器，clause-22）。新增 `drivers/net/zx279128s_mdio.c`（`MDIO_ZX279128S`，compatible
+`zte,zx279128s-mdio`）与共享头 `drivers/net/zx279128s_eth.h`（寄存器/arena 定义 + 板级
+`e2631_net_refclk_init()` 原型，MDIO 驱动与后面的以太网驱动共用）。控制器没有可用复位，驱动在**首次传输**时
+懒初始化：先调一次板级参考时钟 hook（0012 的幂等函数），再写 CMD/STATUS/CFG，因此提示符下直接 `mii info`
+也能工作；`mii` 命令由 MDIO uclass 的 post_probe 注册的 mii_bus 自动获得。注意 Kconfig：`DM_MDIO` 依赖
+`PHYLIB`，若驱动同时 `depends on DM_MDIO` 又 `select PHYLIB` 会触发递归依赖，所以用
+`depends on DM_ETH && NET_LEGACY` + `select DM_MDIO`。
+
+补丁 0019（2026-11-22，E2，交换机/TM/DMA）：新增 `drivers/net/zx279128s_eth.c` 的前半部分与
+`ETH_ZX279128S`：把 Linux 驱动（`target/linux/zx279128/files/.../zx279128s-main.c`）在同一硅片上的
+`zx_hw_init()` 搬进 U-Boot——主复位、时钟门控、PP 复位/桥/分类器、两张空闲缓冲索引表（4096/512 项，
+big-endian u16）、1168 条 TM 队列表（CPU 队列 0-15 按 1024 槽 RX ring 设上限并叠加上次启动残留，16-399 固定值，
+RED 384 与 SCHED 384）、TM/BMU 参数（4096 个 2048 B 缓冲，`LIMIT1=127`、`THRES1=4096<<16`）、DMA/TM 控制值、
+TX/RX 描述符环清零、交换机转发/每口 index/上行下行分类/trap ethertype、端口过滤，以及五个 MAC 口的厂商初值。
+16 MiB arena 的布局与内核一次 `dma_alloc` 的分配完全一致：`+0x000000` 缓冲池 8 MiB、`+0x800000` tab0、
+`+0x808000` tab1、`+0xA00000` 8 个 RX 队列环（每 0x4000）、`+0xB00000` area50、`+0xC00000` TX 环（1024×16 B）。
+
+补丁 0020（2026-11-22，E2，U-Boot 驱动）：把上面的初始化接进 U-Boot 网络栈。新增 `eth_ops`：`start()` 先调
+幂等的 `e2631_net_refclk_init()`（A5 时钟/SerDes 必须先于任何 GMAC 寄存器），再跑 `zx_hw_init()`、连 PHY 12、
+`phy_startup()` 后按 link 结果设 MAC speed/duplex、写 trap MAC、开 DMA；`send()` 从 BMU 取 2048 B 缓冲
+（拷贝到 `arena+bp*2048+16`）、填 16 B TX 描述符（queue = 40 + switch_port）、写 `0x92350064=1` 并轮询
+`TX_DONE` 低 16 位；`recv()` 轮询 RX queue 0 计数、解析描述符里的 bp/len/class，`free_pkt()` 把 RX slot 与
+缓冲还给硬件。固定 arena 地址 `0x45000000`，没有运行时分配；因为 arena 在网络启动后是活数据，
+`e2631flash` 与 `e2631verify` 都拒绝落在其中的 RAM 地址（编译期 + 运行期双重检查）。设备树新增
+`mdio@9a101000`/`ethernet-phy@c` 与 `ethernet@92000000`（`phy-handle=<&phy12>`、`zte,switch-port=<2>`），
+defconfig 打开 `CMD_DHCP/CMD_MII/CMD_PING/NET_RANDOM_ETHADDR/ETH_ZX279128S/MDIO_ZX279128S`。`e2631net`
+打印 switch port、PHY/link/speed、MAC ctrl、TM 中断、BMU 空闲计数与 8 个 RX 队列计数。单口 lan1；
+其它三个 PHY、PHY fixup、autoboot rescue 留后续阶段（M2/E3）。设计见 [e2-net-driver-design.md](e2-net-driver-design.md)。
+
 ## 3. 关键设计参数
 
 | 项 | 值 / 决定 | 说明 |
@@ -265,8 +310,11 @@ data CRC），任一失败则打印 `slot%d unusable (<reason>), falling back to
 | SPI-NAND | 只读（A2，0005） | SPIFC PIO + U-Boot SPI-NAND 核心 + FORESEE F35SQA001G + `mtd` 读；不写 flash、不碰 env |
 | 网络参考时钟/SerDes | `e2631_net_refclk_init()`（0012） | 厂商 `board_eth_init()` 的逐字段重放：分数 PLL `0x94000050/0x54`（第二寄存器先清 bit27/25/24、置 bit26，再以高字节保留的方式写 FRAC）、`0x94000008` bit4/bit5、`0x9FE00000` SerDes 25 写、CRM2 `0x94100010`、`0x9400004C`→`0x9A100004`、`0x9400000C` 的 `bits[21:20]=0b01`（厂商以太网 probe 的时钟 mux，两链 dump 证明不同）；内核 clk 驱动假设 bootloader 已完成该初始化，且无内核驱动碰这些寄存器（DTS 无法描述）。`e2631refclk` 打印前后 7 个寄存器，不启动 |
 | Pinmux / GPIO | `0x94200000` + 厂商板级表（0012） | pinmux 先三处 |= 厂商值，再按厂商顺序写入板级表六个整字；GPIO 先驱动八个输出（8=1/40=1/60=0 三色 LED、55/52/54/51/2=0），十个输入（strap 5/15/62/61/43/47/46/45、按键 18/20）复位后 DIR 已为 0，无需写；不驱动 flat 53。全部为板上外设的“回到厂商上电状态”，幂等 |
+| MDIO | clause-22 @ `0x9a101000`（0018） | 四个集成 PHY 在地址 10-13；驱动在首次传输时懒初始化（先跑 0012 的时钟 hook），提示符下 `mii info` 即可用；Kconfig 用 `select DM_MDIO` 避免与 PHYLIB 的递归依赖 |
+| U-Boot 以太网（E2） | lan1 = switch port 2 / PHY 12（0018-0020） | 单口接进 U-Boot 网络栈：`mii info` / `dhcp` / `ping` / `tftp`，链路 1 Gbps；`send/recv` 轮询、无中断；其它三个 PHY 与 autoboot rescue（E3）不在本阶段 |
+| DMA arena | `0x45000000..0x45FFFFFF`（16 MiB，固定） | 与内核驱动同布局：`+0x000000` 缓冲池 8 MiB、`+0x800000` tab0、`+0x808000` tab1、`+0xA00000` RX 环（8×0x4000）、`+0xB00000` area50、`+0xC00000` TX 环（1024×16 B）。U-Boot 不从这里分配别的内存；`e2631flash` 的 bounce buffer（`0x44000000`+1 MiB）与该 arena 的边界有编译期断言；内核 load `0x40008000`、uImage 暂存 `0x42000000` 都在其下 |
 | PCIe 端点复位/供电 | pin 2 / pin 51 置 1（0013） | 厂商 `zte_gpio_init()` 在板级表回放后还有两段按表索引的特例（`0x47f2f61c` 索引 0x33→pin 2；`0x47f2f66c` 索引 0x32→pin 51），无视表值 0 直接置 1；A5 两链差分的残留字正是 `0x94407014` bit2 与 `0x944070d4` bit3。厂商链能枚举 `14c3:7906`/`14c3:790a`，本链留低时只有 root port。功能文档未给出，复位/供电是工作假设；SET 位 RMW，幂等 |
-| 网络协议栈 | 无 | 网络引导仍用厂商 U-Boot 的 tftp；A5 只让内核能自己接管 PHY/PCIe |
+| 网络协议栈 | 仅 U-Boot 网络命令（E2） | `mii`/`dhcp`/`ping`/`tftp` 可用；不做网络引导回退/autoboot rescue（E3）。tftp 目标必须避开 16 MiB arena（例如 `0x43000000`），TFTP 写入的是运行时 DMA 数据区 |
 | 刷写 | 命令已交付（D-U1） | A3/A4 刷写会话前只做只读；`e2631flash`/`e2631verify`/`e2631slot`（0014）与唯一写入口开关（0015）已交付，写 mtd0/槽位仍需用户批准并先做零写入暂存 CRC 校验 |
 | CPU1/SRAM | 不碰 | secondboot 已把 CPU1 停在 `wfe` → SRAM `0x200800` 循环；内核 platsmp 依赖该约定，U-Boot 不得改写 SRAM |
 | 自更新命令 | `e2631flash` / `e2631verify` / `e2631slot`（0014） | `e2631flash` 块对齐擦除 → 全 0xFF 校验 → 写入 → 读回逐字节比较，打印 PASS/FAIL、首个不一致偏移与 staged payload/readback CRC32；`<src>` ≥0x40000000 为 RAM 地址、<0x10000000 为 NAND 字节偏移（先读入 `0x44000000` 的 1 MiB bounce buffer，flash→flash 更新不边擦边读目标）；拒绝未对齐/越界、secondboot 0x00000..0x20000、env 0xC0000..0xE0000 与长度 >1 MiB；擦除前打印 DO NOT POWER OFF。`e2631verify` 只读 CRC32；`e2631slot` 复用 `e2631boot` 的扫描函数 |
@@ -298,8 +346,8 @@ make O=build -j"$(nproc)"
 
 ### CI 验收断言（task-44 必须实现）
 
-1. `git rev-parse HEAD^{tree}` == `fd511f1e4aff26c8f0bf3187b139eaaf45fbd5bc`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 17）。
+1. `git rev-parse HEAD^{tree}` == `10ade1ec0f7a3a7943783d6ba6146840fda6d4bf`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 20）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -307,15 +355,19 @@ make O=build -j"$(nproc)"
    `CONFIG_MTD_SPI_NAND=y`、`CONFIG_CMD_MTD=y`；0011 起还要求 `# CONFIG_SKIP_LOWLEVEL_INIT is not set`
    （入口归一化不能再次被跳过）；0015 起还要求 `# CONFIG_CMD_MTD_WRITE is not set`（原始 mtd 写入口被编掉）；
    0017 起还要求 `# CONFIG_CMD_SAVEENV is not set`、没有 `CONFIG_CMD_ERASEENV=y` 与
-   `CONFIG_SYS_REDUNDAND_ENVIRONMENT=y`（env 只经 `e2631env` 写、且不做冗余块）。
+   `CONFIG_SYS_REDUNDAND_ENVIRONMENT=y`（env 只经 `e2631env` 写、且不做冗余块）；
+   E2 起还要求 `CONFIG_DM_ETH=y`、`CONFIG_DM_MDIO=y`、`CONFIG_PHYLIB=y`、`CONFIG_PHY_GIGE=y`、
+   `CONFIG_ETH_ZX279128S=y`、`CONFIG_MDIO_ZX279128S=y`、`CONFIG_NET_RANDOM_ETHADDR=y`、
+   `CONFIG_CMD_DHCP=y`、`CONFIG_CMD_MII=y`、`CONFIG_CMD_PING=y`、`CONFIG_CMD_TFTPBOOT=y`。
 3. 镜像尺寸：`size=$(stat -c%s build/u-boot.bin); test "$size" -le 653312`
    （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 22 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
-   0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings：新建文件缺 MAINTAINERS 更新、
-   新增自用板级命令、以及 0015 的 5 条 PREFER_IF——这些 `#if CONFIG_IS_ENABLED()` 必须在编译期生效才能把写入口编掉，
+   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 25 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
+   0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
+   0018 0 errors / 2 warnings→修正后 0/1（新建文件缺 MAINTAINERS 更新）；0019 0/1（同上）；0020 0/1（新增自用命令 `e2631net`）：
+   新建文件缺 MAINTAINERS 更新、新增自用板级命令、以及 0015 的 5 条 PREFER_IF——这些 `#if CONFIG_IS_ENABLED()` 必须在编译期生效才能把写入口编掉，
    运行期 `if` 达不到目的，均为已核对项）。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
    （OF_EMBED 把 DTB 打进镜像）。少了这条，构建会通过但 A1 串口仍然静默，正是 task-45 的故障模式。
@@ -327,10 +379,10 @@ make O=build -j"$(nproc)"
    `CONFIG_ENV_MTD_DEV="spi-nand0"`、`CONFIG_ENV_OFFSET=0xc0000`、`CONFIG_ENV_SIZE=0x20000`；
    并且 `# CONFIG_CMD_SAVEENV is not set`（只有显式 `e2631env` 能写 env；0017 起 `CONFIG_CMD_ERASEENV`
    与 `CONFIG_SYS_REDUNDAND_ENVIRONMENT` 也不能打开）、`CONFIG_ENV_IS_NOWHERE` 未启用。
-10. A3/C1b/A5/D-U1/U-0017 二进制：`grep -aq 'e2631boot'`、`'e2631soc'`、`'e2631refclk'`、`'e2631flash'`、
-    `'e2631verify'`、`'e2631slot'`、`'e2631env'` 与 `'spi-nand0'` 都要在 `build/u-boot.bin` 里命中（槽位/CP15/网络时钟/
-    自更新/env 命令与 env 设备名确实链接进镜像），且四条 usage 文本（flash/verify/slot/env 帮助首行）与
-    `DO NOT POWER OFF` 也能 grep 到。
+10. A3/C1b/A5/D-U1/U-0017/E2 二进制：`grep -aq 'e2631boot'`、`'e2631soc'`、`'e2631refclk'`、`'e2631flash'`、
+    `'e2631verify'`、`'e2631slot'`、`'e2631env'`、`'e2631net'` 与 `'spi-nand0'` 都要在 `build/u-boot.bin` 里命中（槽位/CP15/网络时钟/
+    自更新/env/以太网命令与 env 设备名确实链接进镜像），且四条 usage 文本（flash/verify/slot/env 帮助首行）、
+    `DO NOT POWER OFF` 与 E2 的 `lan1 up` 启动日志也能 grep 到。
 11. A3/C1a/C1b/A5 修复（0008/0009/0011/0012）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h`、
     `grep -q 'e2631_soc_prepare_linux' board/zte/zxhn-e2631/e2631boot.c`、
@@ -352,7 +404,13 @@ make O=build -j"$(nproc)"
     `md.l 0x944070d4 1` 的 bit3 必须为 1（0013 的两根 PCIe 端点线，见 [a6-pcie-endpoint-reset-design.md](a6-pcie-endpoint-reset-design.md)）。详见
     [a5-net-refclk-design.md](a5-net-refclk-design.md) §5。
 
-13. D-U1/U-0017 写入口：`.config` 与 defconfig 都必须有 `# CONFIG_CMD_MTD_WRITE is not set`；对 `build/u-boot`
+13. E2 以太网（0018-0020）：源码形状——`drivers/net/zx279128s_eth.c` 调 `e2631_net_refclk_init`、
+    `e2631net.c` 含 `refclk_done`（幂等）、`e2631flash.c` 含 `E2631_NET_ARENA_ADDR` 且 `e2631verify` 走
+    `e2631_check_ram_range("e2631verify", ...)`、`e2631flash.c` 与 `zx279128s_eth.c` 都钉了 `0x45000000UL`、
+    设备树含 `zte,switch-port` 与（二进制）`zte,zx279128s-gmac`/`zte,zx279128s-mdio`/`ethernet-phy`。
+    真机签名（后续会话记录）：`mii info` 看到 PHY 10-13、lan1 链路灯亮（1 Gbps），`dhcp` 拿到地址、
+    `ping` 通、`tftp 0x43000000 <file>` 下载成功（目标不要用 arena）；`e2631net` 打印 port 2/PHY 12 状态。
+14. D-U1/U-0017 写入口：`.config` 与 defconfig 都必须有 `# CONFIG_CMD_MTD_WRITE is not set`；对 `build/u-boot`
     反汇编做**调用点白名单**——所有 `mtd_write`/`mtd_erase`/`mtd_special_write_oob` 的 `bl` 只能落在
     `e2631_write_range`/`e2631_erase_range`/`do_e2631flash`/`e2631_env_write_block`/`do_e2631env_save` 内，
     且写调用点**恰好 4 个**（`-O2` 会把只有一个调用者的 static helper 内联，所以实际符号可能是
@@ -427,6 +485,26 @@ timer fixed-clock 假设；`go` 立即返回/复位 → 入口地址或镜像是
 header` → 用 `mtd read` 直接 dump 槽头核对偏移/CRC；`bootm` 报 “FDT and ATAGS support not compiled
 in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 
+### E2 以太网验收（需要真机会话；U-Boot 内 `mii`/`dhcp`/`ping`/`tftp`，不写 flash）
+
+装载方式同 A1（厂商控制台 `tftp 0x47F00000 u-boot.bin` + `go 0x47F00000`）。注意两次网络的先后：
+下载自定义 U-Boot 用的是**厂商 U-Boot 的**网络栈；进入我们的 U-Boot 后，驱动在第一次网络命令时才初始化。
+lan1 是 switch port 2、PHY 12（MDIO 地址 `0x0c`），链路 1 Gbps；其它三个 PHY（0x0a/0x0b/0x0d）本阶段不接
+U-Boot 网络栈。
+
+1. `e2631net`：应打印 switch port 2、PHY 12 的 link/speed、MAC ctrl、TM 中断、BMU 空闲计数与 8 个 RX 队列计数。
+2. `mii info`：应看到地址 10-13 的四个 PHY；lan1 对应 `0x0c`。
+3. `dhcp`：拿地址（`HOSTNAME=...`；env 里没有 `ethaddr` 时由 `CONFIG_NET_RANDOM_ETHADDR` 随机生成一个）。
+4. `ping <主机>`：验证 TX/RX 环与 trap 路径。
+5. `tftp 0x43000000 <文件>`：下载到 `0x43000000`。**不要用 `0x45000000`**——那是驱动固定的 16 MiB DMA arena，
+   TFTP 写进去会与 RX/TX 描述符和缓冲池互相覆盖；`e2631flash`/`e2631verify` 也会拒绝该地址。
+6. `e2631verify 0x43000000 <off> <len>`：只读比较下载内容与 flash；不写 flash。
+7. 记录完整串口日志与收发证据，落盘 evidence/ 并汇报 Lead。
+
+失败定位顺序：`e2631net` 报未 probe → 查 DT compatible/defconfig；`mii info` 无 PHY → 先 `e2631refclk`
+确认真机时钟序列；`dhcp` 无包 → 查 lan1 接线/链路与 PHY 12；`TX completion timed out` → 记录 `e2631net`
+全量与 `md.l 0x92350068 1`，按 [e2-net-driver-design.md](e2-net-driver-design.md) §7 的 BMU/DMA 顺序定位。
+
 ## 6. 已知限制与风险
 
 - **交接状态已显式归一化，但入口配置改动影响所有链**：0011 起 `CONFIG_SKIP_LOWLEVEL_INIT` 关闭并增加
@@ -460,6 +538,14 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
 `e2631_pinmux_gpio_init()` 末尾那两行 `e2631_gpio_drive()`，回到 A5 状态；它们不影响 eth。
 验收标准是内核能枚举 `14c3:7906`/`14c3:790a` 且 `mt7915e` 绑定成功。
 
+- **E2 只接 lan1，且尚未真机演练**：驱动只把 switch port 2（PHY 12）接进 U-Boot 网络栈；lan2/lan3/wan
+  三个 PHY 走内核，PHY 0x14 的 fixup 与多口留给 M2。E2 的证据只有静态检查与 CI 构建（编译、配置符号、
+  设备树字符串、arena guard、`e2631net`/`lan1 up` 二进制字符串）；第一次真机会话按 §5.4 的命令集验收，
+  串口日志落盘。另外 TX/RX 都是轮询、无中断，TFTP 大文件会占满 CPU 时间（可接受，U-Boot 只用于救砖/更新）。
+- **16 MiB DMA arena 与 `e2631flash` 的边界**：arena 固定 `0x45000000..0x45FFFFFF`（缓冲池/索引表/描述符环），
+  网络启动后是活数据；`e2631flash` 与 `e2631verify` 的 RAM 源必须避开它（编译期断言 + 运行期
+  `e2631_check_ram_range()`），bounce buffer 固定在 `0x44000000`（1 MiB，在其下）。改 arena 地址必须同时改
+  `zx279128s_eth.h` 与 `e2631flash.c` 的常量，否则 CI 形状门禁会失败。
 - **入口必须等于链接地址（非 PIE）**：`TEXT_BASE=0x47F00000` 对齐 secondboot 的固定入口；
   U-Boot 未开 `CONFIG_POSITION_INDEPENDENT`，`relocate.S` 的修正量假设运行地址 == 链接地址，
   从其它地址进入会在 banner 之前挂死或 data abort；改地址只能改 defconfig 后重编，不能只改 `go`。
@@ -476,20 +562,24 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   0xE0000 保留扇区、幂等与全 FF 校验）；第一次真实 save 必须并入用户批准的设备会话，先 `e2631env diff`
   核对变化键，再写并回读；写入期间掉电同样只影响 env 块（厂商链/我们的链都会回退默认 env，且厂商
   `zteboot_do_settings` 会重建），但写前仍要记录 0xC0000 块 sha256。
-- **checkpatch**：本系列 0 errors、22 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
-  0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings），
-  均为已核对的已知项——7 条 "does MAINTAINERS
+- **checkpatch**：本系列 0 errors、25 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0 errors / 2 warnings；
+  0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
+  0018/0019 各 0 errors / 1 warning、0020 0 errors / 1 warning），
+  均为已核对的已知项——9 条 "does MAINTAINERS
   need updating?"（patch 0001 新建 `arch/arm/mach-zx279128s/`、patch 0002 新建 `board/zte/zxhn-e2631/`、
   patch 0005 新建 `drivers/spi/spi-zx.c`、patch 0006 新增 `board/zte/zxhn-e2631/e2631boot.c`、
-  patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h`、patch 0017 新增 `e2631env.c|.h`
-  各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）+ 2 条 "Use the livetree API"
+  patch 0011 新增 `e2631soc.c|.h`、patch 0012 新增 `e2631net.c|.h`、patch 0017 新增 `e2631env.c|.h`、
+  patch 0018 新增 `drivers/net/zx279128s_mdio.c`/`zx279128s_eth.h`、patch 0019 新增
+  `drivers/net/zx279128s_eth.c` 各一条；checkpatch 按单 patch 看不到后续 patch 的 MAINTAINERS 更新）
+  + 2 条 "Use the livetree API"
   （板级 `fdtdec_setup_mem_size_base()`/`fdtdec_setup_memory_banksize()` 是 U-Boot 板级读 /memory 的
   常规 API，checkpatch 的 LIVETREE 检查对板级代码是误报）+ 3 条 "Possible new command - make sure you
   add a test"（`e2631boot`/`e2631soc`/`e2631refclk` 是自用板级命令，U-Boot 树里没有对应 DM 测试；
   验收是只读子命令 + 真机会话，不新增测试目录），加上 0014 的 3 条 CMD_TEST + 1 条文件路径提醒、
-  0017 的 1 条 CMD_TEST（`e2631env`）+ 1 条文件路径提醒，
+  0017 的 1 条 CMD_TEST（`e2631env`）+ 1 条文件路径提醒、0020 的 1 条 CMD_TEST（`e2631net`），
   以及 0015 的 5 条 PREFER_IF（这几处 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效才能把原始 mtd
-  写入口真正编掉，运行期 `if` 达不到目的，属于结构性豁免）。自用 fork，不提交上游。
+  写入口真正编掉，运行期 `if` 达不到目的，属于结构性豁免）。E2 的六处 `mb()` 与 `extern` 提示已在
+  patch 0018-0020 定稿时修掉（内存屏障加注释、MDIO 驱动改包含共享头而不是自己写原型）。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
@@ -506,6 +596,9 @@ in” → defconfig 的 `CONFIG_SUPPORT_PASSING_ATAGS` 丢了。
   网络协议栈/网络引导不在本阶段。
 - **A6**：PCIe 端点复位/供电线（pin 2 / pin 51）由 patch 0013 交付；A5 内核侧签名里的两个 endpoint
   依赖这两根线为高。下一次零写入会话先 `e2631refclk`（或直接 `e2631boot`）再按 §4 第 12 条验收。
+- **E2**：U-Boot 自己的以太网驱动由 patch 0018/0019/0020 交付（MDIO + 交换机/TM/DMA + lan1 驱动 +
+  `e2631net`），命令集 `mii info`/`dhcp`/`ping`/`tftp` 见 §5.4；autoboot rescue 与网络引导回退是 E3，
+  PHY fixup/多口是 M2。第一次真机会话另行安排。
 - **刷写阶段（原计划的 A3，重命名为 A4/路径 C）**：D-U1 已交付 `e2631flash`/`e2631verify`/`e2631slot`（0014）与唯一
   MTD 写入口（0015）。下一次真机会话先做零写入的暂存镜像 CRC 校验与槽位表核对，再单独一次写 mtd0 U-Boot 区并
   读回比较；写前写后 mtd0 sha256、串口恢复链路与用户批准缺一不可。在此之前，A1/A2/A3/A5/A6 都不写 flash。

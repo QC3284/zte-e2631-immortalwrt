@@ -1,0 +1,450 @@
+From 4e61d82f16fea961609d53f1245e484823e84770 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 11:28:55 +0800
+Subject: [PATCH 2/3] drivers/net: add the ZX279128S switch and traffic manager
+ setup (E2)
+
+The CPU packet path of the ZX279128S goes through the switch core, the
+traffic manager and the DMA engine, so bringing up one MAC port means
+programming all of them. Add the register map and the initialisation
+sequence of the Linux driver (target/linux/zx279128, zx279128s-main.c):
+master reset with DMA and the MACs quiesced, packet processor bridge and
+classifier, the 1168-entry traffic manager tables through the indirect
+window, the 4096-buffer pool (2048 never fills the BMU free list after a
+cold NAND boot), the TX ring and the eight RX queues in a 16 MiB fixed
+arena at 0x45000000, the switch trap tables, and the five MAC ports.
+
+DMA is left disabled: the driver patch enables it after the PHY reports a
+link, so nothing is received into a ring that is not ready yet.  Hardware
+forwarding, VLANs and flow offload are intentionally not programmed; frames
+reach the CPU through the trap table only, which is all U-Boot needs.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ drivers/net/Kconfig         |  12 ++
+ drivers/net/Makefile        |   1 +
+ drivers/net/zx279128s_eth.c | 377 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 390 insertions(+)
+ create mode 100644 drivers/net/zx279128s_eth.c
+
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 25a7ed7a..c8c280d6 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -126,6 +126,18 @@ config MDIO_AIROHA
+ 	  This driver supports the MDIO interface found in Airoha
+ 	  AN7583 SoC.
+ 
++config ETH_ZX279128S
++	bool "ZTE ZX279128S GMAC support"
++	depends on DM_ETH && NET_LEGACY
++	select DM_MDIO
++	select PHYLIB
++	select PHY_GIGE
++	help
++	  Ethernet support for the switch, traffic manager and CPU DMA engine
++	  of the ZTE ZX279128S SoC.  The ZXHN E2631 board uses one switch port
++	  (lan1) on the CPU path; the driver does not support hardware
++	  forwarding, VLANs or flow offload.
++
+ config MDIO_ZX279128S
+ 	bool "ZTE ZX279128S MDIO interface support"
+ 	depends on DM_MDIO
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index 0b557e92..6101db50 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -78,6 +78,7 @@ obj-$(CONFIG_MDIO_MUX_MMIOREG) += mdio_mux_mmioreg.o
+ obj-$(CONFIG_MDIO_MUX_SANDBOX) += mdio_mux_sandbox.o
+ obj-$(CONFIG_MDIO_SANDBOX) += mdio_sandbox.o
+ obj-$(CONFIG_MDIO_ZX279128S) += zx279128s_mdio.o
++obj-$(CONFIG_ETH_ZX279128S) += zx279128s_eth.o
+ obj-$(CONFIG_MEDIATEK_ETH) += mtk_eth/
+ obj-$(CONFIG_MPC8XX_FEC) += mpc8xx_fec.o
+ obj-$(CONFIG_MT7620_ETH) += mt7620-eth.o
+diff --git a/drivers/net/zx279128s_eth.c b/drivers/net/zx279128s_eth.c
+new file mode 100644
+index 00000000..cda93c02
+--- /dev/null
++++ b/drivers/net/zx279128s_eth.c
+@@ -0,0 +1,377 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZX279128S GMAC: switch core, traffic manager and CPU DMA engine
++ *
++ * The SoC has a switch with five MAC ports, an integrated traffic manager
++ * and a DMA engine that hands frames between the switch and the CPU.  U-Boot
++ * uses one port (lan1 on the ZXHN E2631) on the CPU path only: no flow
++ * offload, no bridge, no hardware forwarding.  The switch still has to be
++ * brought up, though, because the CPU path goes through it: frames reach the
++ * CPU only through the trap table, and mode-2 transmit goes through the packet
++ * processor bridge.
++ *
++ * The initialisation order is the one the Linux driver documents in
++ * target/linux/zx279128 (zx279128s-main.c): reset with DMA and the MACs
++ * quiesced, programme the packet processor, the traffic manager tables, the
++ * buffer pool and the DMA rings, then the switch trap tables, then the MACs.
++ * DMA is enabled last, after the PHY reports a link, so nothing is received
++ * into a ring that is not ready yet.
++ */
++
++#include <dm.h>
++#include <linux/bitfield.h>
++#include <linux/bitops.h>
++#include <linux/byteorder/generic.h>
++#include <linux/delay.h>
++#include <linux/if_ether.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/kernel.h>
++#include <memalign.h>
++#include <net.h>
++#include <phy.h>
++
++#include "zx279128s_eth.h"
++
++#define ZX_TM_POLL_US		1
++#define ZX_TM_TIMEOUT_US	1000
++#define ZX_BMU_TIMEOUT_US	1000
++#define ZX_BMU_FREE_TIMEOUT_US	5000
++#define ZX_RX_REL_TIMEOUT_US	5000
++
++static void zx_mac_set_speed(void __iomem *base, int port, int speed, int duplex)
++{
++	void __iomem *reg = base + ZX_MAC_PORT(port) + ZX_MAC_CTRL;
++	u32 val = readl(reg);
++
++	if (speed == SPEED_1000) {
++		val &= ~(ZX_MAC_CTRL_MII | ZX_MAC_CTRL_100);
++		val |= ZX_MAC_CTRL_FD;
++	} else {
++		if (duplex == DUPLEX_FULL) {
++			val |= ZX_MAC_CTRL_MII | ZX_MAC_CTRL_FD;
++		} else {
++			val &= ~ZX_MAC_CTRL_FD;
++			val |= ZX_MAC_CTRL_MII;
++		}
++		if (speed == SPEED_100)
++			val |= ZX_MAC_CTRL_100;
++		else
++			val &= ~ZX_MAC_CTRL_100;
++	}
++	writel(val, reg);
++}
++
++static void zx_mac_enable(void __iomem *base, int port, bool enable)
++{
++	void __iomem *reg = base + ZX_MAC_PORT(port) + ZX_MAC_CTRL;
++	u32 val = readl(reg);
++
++	if (enable)
++		val |= ZX_MAC_CTRL_EN;
++	else
++		val &= ~ZX_MAC_CTRL_EN;
++	writel(val, reg);
++}
++
++/*
++ * Frames addressed to one of our MAC addresses go to the CPU.  The two trap
++ * entries are the same two the vendor firmware programs: our own address in
++ * entry 0, and entry 1 empty (the ONU MAC table stays empty because the flow
++ * offload is not used).
++ */
++static void zx_set_trap_mac(void __iomem *base, const u8 *mac)
++{
++	writel((u32)mac[2] << 24 | (u32)mac[3] << 16 | (u32)mac[4] << 8 | mac[5],
++	       base + ZX_SPA_TRAP_DMAC);
++	writel((u32)mac[0] << 8 | mac[1], base + ZX_SPA_TRAP_DMAC + 4);
++	writel(0, base + ZX_SPA_TRAP_DMAC + 8);
++	writel(0, base + ZX_SPA_TRAP_DMAC + 12);
++}
++
++static void zx_dma_enable(void __iomem *base, bool enable)
++{
++	u32 val = readl(base + ZX_DMA_CTRL);
++
++	val &= ~ZX_DMA_CTRL_EN;
++	val |= ZX_DMA_CTRL_BIT21 | (enable ? ZX_DMA_CTRL_EN : 0);
++	writel(val, base + ZX_DMA_CTRL);
++	readl(base + ZX_DMA_CTRL);
++}
++
++static int zx_tm_write(void __iomem *base, u32 table, u32 index,
++		       const u32 data[4])
++{
++	u32 val;
++	int i, ret;
++
++	ret = readl_poll_sleep_timeout(base + ZX_TM_IND_STATUS, val,
++				       val & ZX_TM_IND_READY,
++				       ZX_TM_POLL_US, ZX_TM_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	writel(FIELD_PREP(ZX_TM_IND_INDEX, index) |
++	       FIELD_PREP(ZX_TM_IND_TABLE, table), base + ZX_TM_IND_CMD);
++	for (i = 3; i >= 0; i--)
++		writel(data[i], base + ZX_TM_IND_DATA(i));
++
++	return 0;
++}
++
++static int zx_tm_read0(void __iomem *base, u32 table, u32 index, u32 *data)
++{
++	u32 val;
++	int ret;
++
++	ret = readl_poll_sleep_timeout(base + ZX_TM_IND_STATUS, val,
++				       val & ZX_TM_IND_READY,
++				       ZX_TM_POLL_US, ZX_TM_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	writel(FIELD_PREP(ZX_TM_IND_INDEX, index) |
++	       FIELD_PREP(ZX_TM_IND_TABLE, table) | ZX_TM_IND_READ,
++	       base + ZX_TM_IND_CMD);
++
++	ret = readl_poll_sleep_timeout(base + ZX_TM_IND_STATUS, val,
++				       val & ZX_TM_IND_READY,
++				       ZX_TM_POLL_US, ZX_TM_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	*data = readl(base + ZX_TM_IND_DATA(0));
++	return 0;
++}
++
++/*
++ * Queue, RED and scheduler tables.  CPU queues 0-15 keep the 1023 frames the
++ * 1024-slot RX ring can hold and nothing more, so the traffic manager drops
++ * frames itself when a burst outruns the driver instead of letting the DMA
++ * overwrite slots that have not been read yet.  A previous boot (the vendor
++ * firmware after a TFTP download) can leave frames counted in a CPU queue
++ * that nobody will release, so raise each CPU queue's limit by that residue.
++ */
++static int zx_tm_init(void __iomem *base)
++{
++	static const u32 queue[4] = { 0x00800400, 0, 0, 0 };
++	static const u32 red[4] = { 0x00200020, 0, 0, 0 };
++	static const u32 sched[4] = { 0xff803fff, 0x0100ff80, 0x00100200, 32 };
++	u32 limit, min_limit, used, cpu_queue[4];
++	int i, ret;
++
++	for (i = 0; i < 16; i++) {
++		ret = zx_tm_read0(base, ZX_TM_TABLE_QUEUE_USE, i, &used);
++		if (ret)
++			return ret;
++
++		used = (used & 0x7ff) + ((used >> 11) & 0x7fff);
++		limit = 1023 + used;
++		min_limit = min(limit, 0x7ffU);
++		cpu_queue[0] = min_limit | ((limit - min_limit) << 11);
++		cpu_queue[1] = 0;
++		cpu_queue[2] = 0;
++		cpu_queue[3] = 0;
++		ret = zx_tm_write(base, ZX_TM_TABLE_QUEUE, i, cpu_queue);
++		if (ret)
++			return ret;
++	}
++
++	for (i = 16; i < 400; i++) {
++		ret = zx_tm_write(base, ZX_TM_TABLE_QUEUE, i, queue);
++		if (ret)
++			return ret;
++	}
++
++	for (i = 0; i < 384; i++) {
++		ret = zx_tm_write(base, ZX_TM_TABLE_RED, i, red);
++		if (ret)
++			return ret;
++		ret = zx_tm_write(base, ZX_TM_TABLE_SCHED, i, sched);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++/*
++ * Mode-2 transmit and the trap path go through the packet processor bridge,
++ * which the vendor bootloader programs only when it is about to use TFTP.
++ * Program its reset, bridge and classifier values while the DMA and the MACs
++ * are quiesced.
++ */
++static void zx_pp_init(void __iomem *base)
++{
++	writel(2, base + ZX_PP_RESET);
++	mdelay(2);
++
++	writel(0x000200ff, base + 0x388004);
++	writel(0x0000dfdf, base + 0x388008);
++	writel(0x00000000, base + 0x3881c0);
++	writel(0xff5ffdff, base + 0x388340);
++	writel(0x0000003e, base + 0x388344);
++	writel(0x0000003f, base + 0x388380);
++	writel(0xaaaaaaaa, base + 0x38863c);
++	writel(0x00005555, base + 0x3881c4);
++	writel(0x000bf874, base + 0x388188);
++	writel(0x000000ff, base + 0x3882c0);
++	writel(0x0000ffff, base + 0x388300);
++	writel(0x0000003e, base + 0x388304);
++
++	writel(0x0000309a, base + 0x38c080);
++	writel(0x00000000, base + 0x38c088);
++	writel(0x00000001, base + 0x38c0cc);
++	writel(0x00000000, base + 0x3a0010);
++	writel(0x00000000, base + 0x3a0014);
++}
++
++/* Reset the switch and leave its ports and the DMA stopped. */
++static void zx_hw_reset(void __iomem *base)
++{
++	int i;
++
++	writel(0, base + ZX_GLB_RESET);
++	mdelay(10);
++	writel(0xffffffff, base + ZX_GLB_RESET);
++
++	for (i = 0; i < ZX_NUM_PORTS; i++)
++		zx_mac_enable(base, i, false);
++
++	zx_dma_enable(base, false);
++	writel(0, base + ZX_BMU_CTRL);
++}
++
++static int zx_hw_init(void __iomem *base, const u8 *mac)
++{
++	u32 tab0 = ZX_DMA_ARENA_ADDR + ZX_TAB0_OFFSET;
++	u32 tab1 = ZX_DMA_ARENA_ADDR + ZX_TAB1_OFFSET;
++	u32 rx_ring = ZX_DMA_ARENA_ADDR + ZX_RX_OFFSET;
++	u32 tx_ring = ZX_DMA_ARENA_ADDR + ZX_TX_OFFSET;
++	u32 buf_pool = ZX_DMA_ARENA_ADDR;
++	__be16 *tab;
++	u32 val;
++	int i, ret;
++
++	zx_hw_reset(base);
++	writel(~0, base + ZX_TM_INT_MASK);
++	mdelay(20);
++
++	/* Clock gates: all five MAC ports, then the packet processor. */
++	val = readl(base + ZX_GLB_CLK_CTRL) & ~ZX_GLB_CLK_CTRL_BITS;
++	writel(val, base + ZX_GLB_CLK_CTRL);
++	writel(GENMASK(ZX_NUM_PORTS - 1, 0), base + ZX_GLB_PORT_CLK_EN);
++	zx_pp_init(base);
++
++	/* Free-buffer index tables, big endian as the traffic manager reads them. */
++	tab = (__be16 *)tab0;
++	for (i = 0; i < ZX_NUM_BUFFERS; i++)
++		tab[i] = cpu_to_be16(i);
++	tab = (__be16 *)tab1;
++	for (i = 0; i < 512; i++)
++		tab[i] = cpu_to_be16(i);
++
++	/* Publish the index tables before the traffic manager reads them. */
++	mb();
++	ret = zx_tm_init(base);
++	if (ret) {
++		printf("zx279128s: traffic manager table setup timed out\n");
++		return ret;
++	}
++
++	/* Buffer pool, free-index tables and the RX ring the hardware fills. */
++	writel(tab0, base + ZX_TM_TAB0_ADDR);
++	writel(tab1, base + ZX_TM_TAB1_ADDR);
++	writel(0x08000800, base + ZX_TM_TAB_LIMIT);
++	writel(buf_pool, base + ZX_TM_BUF_START);
++	writel(buf_pool + ZX_BUF_POOL_SIZE, base + ZX_TM_BUF_END);
++	writel(rx_ring, base + ZX_TM_BUF_F0);
++	writel(16, base + ZX_TM_CONFIG_START);
++
++	/* DMA and traffic manager control values from the vendor init. */
++	writel(1, base + ZX_DMA_BASE + 0x28);
++	writel(1, base + ZX_DMA_BASE + 0x2c);
++	writel(ZX_RX_IRQ_USECS * 50, base + ZX_DMA_RX_IRQ_TIMER);
++	writel(ZX_RX_IRQ_FRAMES, base + ZX_DMA_RX_IRQ_FRAMES);
++	writel(0x7f, base + ZX_DMA_BASE + 0x04);
++	writel(32, base + ZX_DMA_BASE + 0x20);
++	writel(32, base + ZX_DMA_BASE + 0x24);
++	writel(0x00131217, base + ZX_DMA_BASE + 0x388);
++	writel(readl(base + ZX_TM_CTRL) | ZX_TM_CTRL_BIT6,
++	       base + ZX_TM_CTRL);
++
++	/*
++	 * Buffer management unit.  The pool has to hold 4096 buffers: with
++	 * 2048 the BMU never fills its external free list after a cold NAND
++	 * boot and runs on its small internal cache only (kernel comment).
++	 */
++	writel(0, base + ZX_BMU_CTRL);
++	writel(0x0104c040, base + ZX_BMU_CFG1);
++	writel(0x0104c040, base + ZX_BMU_CFG2);
++	writel(ZX_NUM_BUFFERS / 32 - 1, base + ZX_BMU_LIMIT1);
++	writel(15, base + ZX_BMU_LIMIT2);
++	writel(ZX_NUM_BUFFERS << 16, base + ZX_BMU_THRES1);
++	writel(0x2000000, base + ZX_BMU_THRES2);
++	writel(0, base + ZX_BMU_BUF_ALLOC);
++	writel(ZX_BMU_CTRL_EN, base + ZX_BMU_CTRL);
++	writel(17, base + 0x3a00e0);
++
++	/* Descriptor rings: one TX ring, eight RX queues of 1024 slots each. */
++	memset((void *)tx_ring, 0, ZX_NUM_TX_DESC * ZX_DESC_SIZE);
++	memset((void *)rx_ring, 0, ZX_RX_QUEUES * ZX_RX_QUEUE_STRIDE);
++	writel(buf_pool + ZX_AREA50_OFFSET, base + ZX_DMA_AREA50);
++	writel(tx_ring, base + ZX_DMA_TX_RING);
++	writel(0x00400040, base + ZX_DMA_RING_CFG);
++	readl(base + ZX_DMA_TX_DONE);
++	/* Publish the rings the traffic manager now owns. */
++	mb();
++
++	/* Switch: forwarding on, each port's index enabled. */
++	writel(ZX_SW_FWD_CTRL_ON, base + ZX_SW_FWD_CTRL);
++	for (i = 0; i <= 6; i++)
++		writel(1, base + ZX_SPA_PORT_EN(i));
++
++	/* Hand every packet class to the CPU, as the stock firmware does. */
++	writel(0xffffffff, base + ZX_SPA_UP_REG_PKT_EN);
++	writel(0xffffffff, base + ZX_SPA_UP_REG_PKT_EN + 4);
++	writel(0xffffffff, base + ZX_SPA_DN_REG_PKT_EN);
++	writel(0xffffffff, base + ZX_SPA_DN_REG_PKT_EN + 4);
++
++	/* Trap IPv4, IPv6, ARP and VLAN tagged frames whatever their destination. */
++	writel(ETH_P_IP << 16 | ETH_P_IPV6, base + ZX_SPA_TRAP_ETH_TYPE);
++	writel(ETH_P_ARP << 16 | ETH_P_8021Q, base + ZX_SPA_TRAP_ETH_TYPE + 4);
++	writel(0, base + ZX_SPA_TRAP_PROTO);
++
++	for (i = 0; i < ZX_NUM_PORTS; i++) {
++		val = readl(base + ZX_SW_PORT_FILTER(i));
++		val &= ~ZX_SW_PORT_FILTER_BITS;
++		writel(val, base + ZX_SW_PORT_FILTER(i));
++	}
++
++	/* MAC ports: vendor init values, then 1000 Mbit/s full duplex. */
++	for (i = 0; i < ZX_NUM_PORTS; i++) {
++		void __iomem *port = base + ZX_MAC_PORT(i);
++
++		writel(0x00bbe000, port + ZX_MAC_CTRL);
++		writel(0x80000001, port + 0x08);
++		writel(0x0000fffe, port + 0x04);
++		writel(0x00011200, port + 0xe0);
++		writel(50, port + 0xd00);
++		writel(168, port + 0xd30);
++		writel(0x00300002, port + 0x70);
++		writel(0x4000, port + 0xb4);
++		writel(0x0010ff11, port + 0xb00);
++
++		zx_mac_set_speed(base, i, SPEED_1000, DUPLEX_FULL);
++		zx_mac_enable(base, i, false);
++	}
++
++	/* Our own address reaches the CPU through the trap table. */
++	zx_set_trap_mac(base, mac);
++	for (i = 0; i < ZX_SPA_ONU_MAC_NUM; i++) {
++		writel(0, base + ZX_SPA_ONU_MAC + i * 8);
++		writel(0, base + ZX_SPA_ONU_MAC + i * 8 + 4);
++	}
++
++	return 0;
++}
+-- 
+2.56.1
+

@@ -1,0 +1,654 @@
+From 25eecfe3f2d07b5fbf68d85a01eef63ac0d93fdc Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 11:28:55 +0800
+Subject: [PATCH 3/3] drivers/net: add the ZX279128S Ethernet driver (E2)
+
+Wire the block programmed by the previous two commits into the U-Boot
+network stack.  The device tree node is probed, the PHY behind lan1
+(MDIO address 12) is connected and started, and the MAC and the traffic
+manager are left ready for the first frame.
+
+The frame path is polled: the BMU hands out 2048-byte buffers by index,
+send/recv move one descriptor at a time through the fixed 16 MiB DMA
+arena at 0x45000000, and free_pkt returns both the RX slot and its
+buffer.  The arena is not allocated at runtime because the traffic
+manager tables, the descriptor rings and the buffer pool must all sit
+inside it; U-Boot owns no memory in that range otherwise.
+
+Because the arena is live while the network runs, e2631flash now refuses
+a RAM source that overlaps it, and e2631verify reports the same refusal
+instead of comparing traffic manager data.  e2631_net_refclk_init() is
+made idempotent so the driver can call it from start() even when
+e2631boot already ran it; the register sequence is unchanged.
+
+The e2631net command prints the driver state for a console session.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ arch/arm/dts/zx279128s-zte-zxhn-e2631.dts  |  35 +-
+ board/zte/zxhn-e2631/e2631flash.c          |  58 +++-
+ board/zte/zxhn-e2631/e2631net.c            |  11 +
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   6 +
+ drivers/net/zx279128s_eth.c                | 383 +++++++++++++++++++++
+ 5 files changed, 480 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+index ba395dc8..7ed1deb5 100644
+--- a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
++++ b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+@@ -2,9 +2,9 @@
+ /*
+  * ZTE ZXHN E2631 (Sanechips ZX279128S), A1 RAM-chain device tree
+  *
+- * Only the pieces the A1/A2 port uses are described: DRAM, the PL011 console,
+- * the Cortex-A9 global timer and the SPI-NAND controller. Ethernet and the
+- * CPU1 hand-off are intentionally left out until a later stage.
++ * Only the pieces the port uses are described: DRAM, the PL011 console, the
++ * Cortex-A9 global timer, the SPI-NAND controller and the Ethernet front end
++ * (MDIO bus, PHY and GMAC).  The CPU1 hand-off is still left out.
+  */
+ 
+ /dts-v1/;
+@@ -56,6 +56,35 @@
+ 		reg = <0x94404000 0x1000>;
+ 	};
+ 
++	/*
++	 * MDIO controller and the four integrated PHYs.  lan1 is PHY 12 on
++	 * switch port 2, which is the port U-Boot uses; the addresses are the
++	 * ones the kernel board file maps (phy10..phy13 -> phy@a..phy@d).
++	 */
++	mdio: mdio@9a101000 {
++		compatible = "zte,zx279128s-mdio";
++		reg = <0x9a101000 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy12: ethernet-phy@c {
++			reg = <12>;
++		};
++	};
++
++	/*
++	 * The GMAC block (switch, traffic manager, CPU DMA engine).  U-Boot
++	 * drives one port through the CPU path and does no hardware
++	 * forwarding; see uboot-port/e2-net-driver-design.md.
++	 */
++	ethernet@92000000 {
++		compatible = "zte,zx279128s-gmac";
++		reg = <0x92000000 0x400000>;
++		phy-handle = <&phy12>;
++		phy-mode = "internal";
++		zte,switch-port = <2>;
++	};
++
+ 	/*
+ 	 * SPI-NAND controller. secondboot already brought it up, U-Boot only
+ 	 * needs the PIO read path. There is deliberately no "clocks" property:
+diff --git a/board/zte/zxhn-e2631/e2631flash.c b/board/zte/zxhn-e2631/e2631flash.c
+index 67e11d36..bb19d287 100644
+--- a/board/zte/zxhn-e2631/e2631flash.c
++++ b/board/zte/zxhn-e2631/e2631flash.c
+@@ -34,6 +34,7 @@
+ #include <linux/types.h>
+ #include <malloc.h>
+ #include <memalign.h>
++#include <linux/build_bug.h>
+ #include <mtd.h>
+ #include <stdio.h>
+ #include <u-boot/crc.h>
+@@ -65,6 +66,21 @@
+ #define E2631_BOUNCE_MAX	0x100000UL
+ #define E2631_FLASH_SRC_MAX	0x10000000UL
+ 
++/*
++ * The Ethernet driver (patch 0020) owns a fixed 16 MiB DMA arena: buffer
++ * pool, traffic manager tables and the descriptor rings live there, and the
++ * traffic manager writes into it while the network is up.  e2631flash must
++ * never stage an image into it, and e2631verify must never read it as if it
++ * were a downloaded image.
++ */
++#define E2631_NET_ARENA_ADDR	0x45000000UL
++#define E2631_NET_ARENA_LEN	0x1000000UL
++
++static_assert(E2631_BOUNCE_ADDR + E2631_BOUNCE_MAX <= E2631_NET_ARENA_ADDR,
++	      "the e2631flash bounce buffer must stay below the network DMA arena");
++static_assert(E2631_NET_ARENA_ADDR + E2631_NET_ARENA_LEN <= E2631_RAM_LIMIT,
++	      "the network DMA arena must end below the relocated U-Boot");
++
+ static int e2631_mtd_get(struct mtd_info **mtdp)
+ {
+ 	struct mtd_info *mtd;
+@@ -91,6 +107,32 @@ static bool e2631_overlap(u64 a, u64 alen, u64 b, u64 blen)
+ 	return a < b + blen && b < a + alen;
+ }
+ 
++/*
++ * Check a RAM address range used as an image source: inside usable DRAM,
++ * and clear of the Ethernet driver's DMA arena.  A TFTP download into the
++ * arena would be overwritten by the traffic manager as soon as the network
++ * is used, and reading it as an image would compare live ring data.
++ */
++static int e2631_check_ram_range(const char *tag, ulong src, ulong len)
++{
++	if (src < E2631_RAM_BASE || (u64)src + len > E2631_RAM_LIMIT) {
++		printf("%s: source 0x%08lx..0x%08llx is outside usable DRAM (0x%08lx..0x%08lx)\n",
++		       tag, src, (u64)src + len, E2631_RAM_BASE,
++		       E2631_RAM_LIMIT);
++		return -EINVAL;
++	}
++
++	if (e2631_overlap(src, len, E2631_NET_ARENA_ADDR,
++			  E2631_NET_ARENA_LEN)) {
++		printf("%s: source 0x%08lx..0x%08llx overlaps the network DMA arena (0x%08lx..0x%08lx)\n",
++		       tag, src, (u64)src + len, E2631_NET_ARENA_ADDR,
++		       E2631_NET_ARENA_ADDR + E2631_NET_ARENA_LEN);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int e2631_read_region(struct mtd_info *mtd, u64 off, void *buf,
+ 			     size_t len)
+ {
+@@ -142,11 +184,11 @@ static int e2631_flash_check(struct mtd_info *mtd, ulong src, ulong off,
+ 			       src, len, (u64)mtd->size);
+ 			return -EINVAL;
+ 		}
+-	} else if (src < E2631_RAM_BASE ||
+-		   (u64)src + len > E2631_RAM_LIMIT) {
+-		printf("e2631flash: source 0x%08lx..0x%08llx is outside usable DRAM (0x%08lx..0x%08lx)\n",
+-		       src, (u64)src + len, E2631_RAM_BASE, E2631_RAM_LIMIT);
+-		return -EINVAL;
++	} else {
++		int ret = e2631_check_ram_range("e2631flash", src, len);
++
++		if (ret)
++			return ret;
+ 	}
+ 	if (off % mtd->erasesize || len % mtd->erasesize) {
+ 		printf("e2631flash: range 0x%08lx+0x%lx is not 0x%x aligned\n",
+@@ -386,12 +428,8 @@ static int do_e2631verify(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		printf("e2631verify: invalid length 0x%lx\n", len);
+ 		return CMD_RET_USAGE;
+ 	}
+-	if (!src || src < E2631_RAM_BASE ||
+-	    (u64)src + len > E2631_RAM_LIMIT) {
+-		printf("e2631verify: source 0x%08lx..0x%08llx is outside the usable DRAM window\n",
+-		       src, (u64)src + len);
++	if (!src || e2631_check_ram_range("e2631verify", src, len))
+ 		return CMD_RET_FAILURE;
+-	}
+ 
+ 	ret = e2631_mtd_get(&mtd);
+ 	if (ret)
+diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
+index ee21a080..b48cbda5 100644
+--- a/board/zte/zxhn-e2631/e2631net.c
++++ b/board/zte/zxhn-e2631/e2631net.c
+@@ -223,12 +223,21 @@ static void e2631_pinmux_gpio_init(void)
+  * The vendor ref_clk_set(0) fractional PLL programming on 0x94000050/0x94000054.
+  * Field layout is the one the kernel clock driver documents: FBDIV bits[17:6],
+  * PD1 bits[5:3], PD2 bits[2:0], FRAC in the second register bits[23:0].
++ *
++ * The sequence drives the PLLs, the SerDes lanes and the pinmux, and it waits
++ * about 750 ms in total.  Both the kernel hand-off (e2631boot) and the
++ * Ethernet start call it, so it runs once per boot: a second call returns
++ * immediately and leaves the programmed registers untouched.
+  */
+ void e2631_net_refclk_init(void)
+ {
++	static int refclk_done;
+ 	unsigned int i;
+ 	u32 val, frac, strap;
+ 
++	if (refclk_done)
++		return;
++
+ 	e2631_pinmux_gpio_init();
+ 
+ 	val = e2631_readl(E2631_TOP_CRM_PLL0);
+@@ -295,6 +304,8 @@ void e2631_net_refclk_init(void)
+ 	val &= ~0x00300000;
+ 	val |= 0x00100000;
+ 	e2631_writel(val, E2631_TOP_CRM_CTRL0C);
++
++	refclk_done = 1;
+ }
+ 
+ static void e2631_refclk_dump(const char *tag)
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index de49d0f1..364558ff 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -24,14 +24,20 @@ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+ # CONFIG_CMD_MTD_WRITE is not set
++CONFIG_CMD_DHCP=y
++CONFIG_CMD_MII=y
++CONFIG_CMD_PING=y
+ CONFIG_OF_CONTROL=y
+ CONFIG_OF_EMBED=y
+ CONFIG_ENV_IS_IN_MTD=y
+ CONFIG_ENV_MTD_DEV="spi-nand0"
++CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_CLK=y
+ CONFIG_MTD=y
+ CONFIG_DM_MTD=y
+ CONFIG_MTD_SPI_NAND=y
++CONFIG_ETH_ZX279128S=y
++CONFIG_MDIO_ZX279128S=y
+ CONFIG_DM_SERIAL=y
+ CONFIG_PL01X_SERIAL=y
+ CONFIG_SPI=y
+diff --git a/drivers/net/zx279128s_eth.c b/drivers/net/zx279128s_eth.c
+index cda93c02..e27f6df2 100644
+--- a/drivers/net/zx279128s_eth.c
++++ b/drivers/net/zx279128s_eth.c
+@@ -18,7 +18,9 @@
+  * into a ring that is not ready yet.
+  */
+ 
++#include <command.h>
+ #include <dm.h>
++#include <dm/device_compat.h>
+ #include <linux/bitfield.h>
+ #include <linux/bitops.h>
+ #include <linux/byteorder/generic.h>
+@@ -28,6 +30,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/kernel.h>
+ #include <memalign.h>
++#include <miiphy.h>
+ #include <net.h>
+ #include <phy.h>
+ 
+@@ -375,3 +378,383 @@ static int zx_hw_init(void __iomem *base, const u8 *mac)
+ 
+ 	return 0;
+ }
++
++/* ---- Packet path ------------------------------------------------------ */
++
++/*
++ * The buffer management unit hands out 2048-byte buffers by index.  A
++ * request that does not complete in time is left pending, exactly as the
++ * vendor driver does; U-Boot only sends a handful of frames, so a timeout
++ * is reported to the caller and the request is retried on the next frame.
++ */
++static int zx_bmu_alloc_bp(void __iomem *base)
++{
++	u32 val;
++	int ret;
++
++	val = readl(base + ZX_BMU_BUF_ALLOC);
++	writel(val | ZX_BMU_BUF_ALLOC_REQ, base + ZX_BMU_BUF_ALLOC);
++
++	ret = readl_poll_sleep_timeout(base + ZX_BMU_BUF_ALLOC, val,
++				       !(val & ZX_BMU_BUF_ALLOC_BUSY),
++				       ZX_TM_POLL_US, ZX_BMU_TIMEOUT_US);
++	if (ret)
++		return -ETIMEDOUT;
++
++	val = readl(base + ZX_BMU_BUF_ID);
++	if (!(val & ZX_BMU_BUF_ID_VALID))
++		return -ENOSPC;
++
++	return FIELD_GET(ZX_BMU_BUF_ID_BP, val);
++}
++
++static int zx_bmu_free_bp(void __iomem *base, u16 bp)
++{
++	u32 val;
++
++	if (readl_poll_sleep_timeout(base + ZX_BMU_FREE_STATUS, val,
++				     val & ZX_BMU_FREE_SLOTS,
++				     ZX_TM_POLL_US, ZX_BMU_FREE_TIMEOUT_US))
++		return -ETIMEDOUT;
++
++	writel(bp, base + ZX_BMU_BUF_FREE);
++	return 0;
++}
++
++/*
++ * Hand one consumed RX slot back to the traffic manager.  The traffic manager
++ * counts every frame against the class in descriptor byte 6 bit 0 and only
++ * returns slots of the class it names, so the class has to be preserved.
++ */
++static int zx_rx_release(void __iomem *base, int queue, int class)
++{
++	u32 val;
++	int ret;
++
++	ret = readl_poll_sleep_timeout(base + ZX_RX_REL_CTRL, val,
++				       !(val & ZX_RX_REL_BUSY),
++				       ZX_TM_POLL_US, ZX_RX_REL_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	writel(FIELD_PREP(ZX_RX_REL_COUNT, 1) |
++	       FIELD_PREP(ZX_RX_REL_CLASS, class) |
++	       FIELD_PREP(ZX_RX_REL_QUEUE, queue), base + ZX_RX_REL_DATA);
++	writel(ZX_RX_REL_BUSY, base + ZX_RX_REL_CTRL);
++	return 0;
++}
++
++struct zx279128s_eth_priv {
++	void __iomem *base;
++	u8 *arena;
++	int switch_port;
++	struct phy_device *phydev;
++	u16 tx_idx;
++	u32 rx_idx[ZX_RX_QUEUES];
++	u32 rx_bp;
++	u32 rx_class;
++	u32 rx_queue;
++	bool hw_ready;
++};
++
++static struct zx279128s_eth_priv *zx_debug_priv;
++
++/* The frame is sent from the fixed arena; caches are off, so no flush. */
++static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++	u32 tx_ring = ZX_DMA_ARENA_ADDR + ZX_TX_OFFSET;
++	__le32 *desc;
++	u32 len, idx, done;
++	u8 *buf;
++	int bp, ret;
++
++	len = length < ETH_ZLEN ? ETH_ZLEN : length;
++	if (len > 1536)
++		return -EINVAL;
++
++	bp = zx_bmu_alloc_bp(priv->base);
++	if (bp < 0)
++		return -ENOSPC;
++
++	buf = priv->arena + bp * ZX_BUF_SIZE + 16;
++	memset(buf, 0, len);
++	memcpy(buf, packet, length);
++
++	/*
++	 * Directed egress to this port's traffic manager queue; the frame
++	 * leaves through the packet processor bridge (mode 2 TX).
++	 */
++	idx = priv->tx_idx % ZX_NUM_TX_DESC;
++	desc = (__le32 *)(tx_ring + idx * ZX_DESC_SIZE);
++	desc[0] = cpu_to_le32(0x80 | (ZX_PORT_TX_QUEUE(priv->switch_port) << 20));
++	desc[1] = cpu_to_le32(0x10000);
++	desc[2] = cpu_to_le32(0x21000000 | ((len & 0x3fff) << 9));
++	desc[3] = cpu_to_le32(0x3 | ((len & 0x3fff) << 2));
++	((u8 *)desc)[7] = (u8)((bp & 0x7f) << 1);
++	((u8 *)desc)[8] = (u8)(bp >> 7);
++
++	/* Publish the descriptor before the doorbell. */
++	mb();
++	writel(1, priv->base + ZX_DMA_TX_START);
++	priv->tx_idx++;
++
++	/* The completion counter clears itself when read. */
++	ret = readl_poll_sleep_timeout(priv->base + ZX_DMA_TX_DONE, done,
++				       done & 0xffff, 10, 100000);
++	if (ret) {
++		printf("zx279128s: TX completion timed out\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++/*
++ * There is no interrupt handler: the RX queue count is polled.  Queue 0 is
++ * the one the switch puts CPU frames on.  The descriptor is cleared here,
++ * before its slot is released in free_pkt(), because with a full ring the
++ * hardware refills a slot as soon as it is released.
++ */
++static int zx279128s_eth_recv(struct udevice *dev, int flags, uchar **packetp)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++	u32 rx_ring = ZX_DMA_ARENA_ADDR + ZX_RX_OFFSET;
++	u32 avail = readl(priv->base + ZX_DMA_RX_QUEUE_CNT(0)) & 0xffff;
++	__le32 *desc;
++	u16 bp, len;
++	u8 *dp;
++	int class;
++
++	if (!avail)
++		return -EAGAIN;
++
++	desc = (__le32 *)(rx_ring + (priv->rx_idx[0] % ZX_NUM_RX_DESC) *
++			  ZX_DESC_SIZE);
++	/* Read the descriptor after the queue count announced a frame. */
++	mb();
++	dp = (u8 *)desc;
++	bp = (dp[7] >> 1) | ((u16)dp[8] << 7);
++	len = (le32_to_cpu(desc[3]) >> 2) & 0x3fff;
++	class = dp[6] & 1;
++	priv->rx_idx[0]++;
++
++	if (bp >= ZX_NUM_BUFFERS || len < ETH_HLEN || len > 1536) {
++		/* Empty or torn slot: consume it so the index stays in step. */
++		desc[0] = 0;
++		desc[1] = 0;
++		desc[2] = 0;
++		desc[3] = 0;
++		/* Clear the slot before the hardware can refill it. */
++		mb();
++		zx_rx_release(priv->base, 0, class);
++		if (bp && bp < ZX_NUM_BUFFERS)
++			zx_bmu_free_bp(priv->base, bp);
++		return -EAGAIN;
++	}
++
++	desc[0] = 0;
++	desc[1] = 0;
++	desc[2] = 0;
++	desc[3] = 0;
++
++	priv->rx_bp = bp;
++	priv->rx_class = class;
++	priv->rx_queue = 0;
++	*packetp = priv->arena + bp * ZX_BUF_SIZE + 16;
++
++	return len;
++}
++
++static int zx279128s_eth_free_pkt(struct udevice *dev, uchar *packet,
++				  int length)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	/* The payload is consumed; hand the slot back in order. */
++	mb();
++	ret = zx_rx_release(priv->base, priv->rx_queue, priv->rx_class);
++	if (ret)
++		return ret;
++
++	if (priv->rx_bp && priv->rx_bp < ZX_NUM_BUFFERS)
++		zx_bmu_free_bp(priv->base, priv->rx_bp);
++	priv->rx_bp = 0;
++
++	return 0;
++}
++
++static int zx279128s_eth_write_hwaddr(struct udevice *dev)
++{
++	struct eth_pdata *pdata = dev_get_plat(dev);
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++
++	if (!priv->hw_ready)
++		return 0;
++
++	zx_set_trap_mac(priv->base, pdata->enetaddr);
++	return 0;
++}
++
++static int zx279128s_eth_start(struct udevice *dev)
++{
++	struct eth_pdata *pdata = dev_get_plat(dev);
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++	struct phy_device *phydev;
++	int ret;
++
++	/* The CRM clocks and the SerDes lanes must be up before any register. */
++	e2631_net_refclk_init();
++
++	priv->hw_ready = false;
++	ret = zx_hw_init(priv->base, pdata->enetaddr);
++	if (ret)
++		return ret;
++	priv->hw_ready = true;
++	memset(priv->rx_idx, 0, sizeof(priv->rx_idx));
++	priv->tx_idx = 0;
++
++	phydev = dm_eth_phy_connect(dev);
++	if (!phydev) {
++		printf("zx279128s: no PHY for lan1\n");
++		return -ENODEV;
++	}
++
++	phydev->supported &= PHY_GBIT_FEATURES;
++	phydev->advertising = phydev->supported;
++	phy_config(phydev);
++
++	ret = phy_startup(phydev);
++	if (ret) {
++		printf("zx279128s: PHY startup failed (%d)\n", ret);
++		return ret;
++	}
++
++	if (!phydev->link) {
++		printf("zx279128s: no link on lan1 (PHY %d)\n", phydev->addr);
++		return -EREMOTEIO;
++	}
++
++	priv->phydev = phydev;
++	zx_mac_set_speed(priv->base, priv->switch_port, phydev->speed,
++			 phydev->duplex);
++	zx_mac_enable(priv->base, priv->switch_port, true);
++	zx_set_trap_mac(priv->base, pdata->enetaddr);
++	zx_dma_enable(priv->base, true);
++	writel(~0, priv->base + ZX_TM_INT_MASK);
++
++	printf("zx279128s: lan1 up, %d Mbit/s %s duplex, MAC %pM\n",
++	       phydev->speed, phydev->duplex ? "full" : "half",
++	       pdata->enetaddr);
++
++	return 0;
++}
++
++static void zx279128s_eth_stop(struct udevice *dev)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++
++	if (!priv->hw_ready)
++		return;
++
++	writel(~0, priv->base + ZX_TM_INT_MASK);
++	zx_dma_enable(priv->base, false);
++	zx_mac_enable(priv->base, priv->switch_port, false);
++	priv->hw_ready = false;
++}
++
++static int zx279128s_eth_probe(struct udevice *dev)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++	fdt_addr_t addr = dev_read_addr(dev);
++	u32 port;
++
++	if (addr == FDT_ADDR_T_NONE)
++		return -EINVAL;
++
++	priv->base = (void __iomem *)(uintptr_t)addr;
++	priv->arena = (u8 *)(uintptr_t)ZX_DMA_ARENA_ADDR;
++
++	port = dev_read_u32_default(dev, "zte,switch-port", 2);
++	if (port >= ZX_NUM_PORTS) {
++		dev_err(dev, "bad zte,switch-port %u\n", port);
++		return -EINVAL;
++	}
++	priv->switch_port = port;
++
++	/*
++	 * Register the MDIO bus during probe (it is passive until the first
++	 * transfer), so that the "mii" commands work before the first start.
++	 */
++	dm_mdio_probe_devices();
++
++	zx_debug_priv = priv;
++	return 0;
++}
++
++static const struct eth_ops zx279128s_eth_ops = {
++	.start = zx279128s_eth_start,
++	.send = zx279128s_eth_send,
++	.recv = zx279128s_eth_recv,
++	.free_pkt = zx279128s_eth_free_pkt,
++	.stop = zx279128s_eth_stop,
++	.write_hwaddr = zx279128s_eth_write_hwaddr,
++};
++
++static const struct udevice_id zx279128s_eth_ids[] = {
++	{ .compatible = "zte,zx279128s-gmac" },
++	{ }
++};
++
++U_BOOT_DRIVER(zx279128s_eth) = {
++	.name = "zx279128s_eth",
++	.id = UCLASS_ETH,
++	.of_match = zx279128s_eth_ids,
++	.probe = zx279128s_eth_probe,
++	.ops = &zx279128s_eth_ops,
++	.priv_auto = sizeof(struct zx279128s_eth_priv),
++	.plat_auto = sizeof(struct eth_pdata),
++};
++
++/* ---- Debug command ---------------------------------------------------- */
++
++static int do_e2631net(struct cmd_tbl *cmdtp, int flag, int argc,
++		       char *const argv[])
++{
++	struct zx279128s_eth_priv *priv = zx_debug_priv;
++	u32 mac_ctrl;
++	int i;
++
++	if (!priv) {
++		printf("e2631net: the Ethernet driver has not been probed\n");
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631net: lan1 switch port %d, %s\n", priv->switch_port,
++	       priv->hw_ready ? "started" : "stopped");
++	if (priv->phydev)
++		printf("e2631net: PHY %d %s, %d Mbit/s %s duplex\n",
++		       priv->phydev->addr,
++		       priv->phydev->link ? "link up" : "no link",
++		       priv->phydev->speed,
++		       priv->phydev->duplex ? "full" : "half");
++
++	mac_ctrl = readl(priv->base + ZX_MAC_PORT(priv->switch_port) +
++			 ZX_MAC_CTRL);
++	printf("e2631net: MAC ctrl 0x%08x, TM int 0x%08x, BMU free 0x%08x, TX done %u\n",
++	       mac_ctrl, readl(priv->base + ZX_TM_INT_STATUS),
++	       readl(priv->base + ZX_BMU_FREE_STATUS),
++	       readl(priv->base + ZX_DMA_TX_DONE) & 0xffff);
++
++	printf("e2631net: RX queue counts");
++	for (i = 0; i < ZX_RX_QUEUES; i++)
++		printf(" %u", readl(priv->base + ZX_DMA_RX_QUEUE_CNT(i)) & 0xffff);
++	printf("\n");
++
++	return CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631net, 1, 1, do_e2631net,
++	   "print the zx279128s Ethernet state",
++	   "");
+-- 
+2.56.1
+

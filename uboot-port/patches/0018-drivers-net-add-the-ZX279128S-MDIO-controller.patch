@@ -1,0 +1,378 @@
+From d229516367c13b5cb3cc16ccc6bdae229e9f0732 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 11:28:55 +0800
+Subject: [PATCH 1/3] drivers/net: add the ZX279128S MDIO controller (E2)
+
+The four integrated PHYs of the ZXHN E2631 sit on addresses 10-13 behind
+the SoC's clause-22 MDIO controller at 0x9a101000. Add a driver-model MDIO
+bus for it: one command/status transfer with a 2 ms timeout, register
+setup deferred to the first transfer (the block must not be touched before
+the CRM clocks in the board hook are up), clause-45 addresses rejected.
+
+No DTS node yet; patch 0020 adds it together with the GMAC driver.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ drivers/net/Kconfig          |   8 ++
+ drivers/net/Makefile         |   1 +
+ drivers/net/zx279128s_eth.h  | 150 +++++++++++++++++++++++++++++++++
+ drivers/net/zx279128s_mdio.c | 159 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 318 insertions(+)
+ create mode 100644 drivers/net/zx279128s_eth.h
+ create mode 100644 drivers/net/zx279128s_mdio.c
+
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 72b77064..25a7ed7a 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -126,6 +126,14 @@ config MDIO_AIROHA
+ 	  This driver supports the MDIO interface found in Airoha
+ 	  AN7583 SoC.
+ 
++config MDIO_ZX279128S
++	bool "ZTE ZX279128S MDIO interface support"
++	depends on DM_MDIO
++	help
++	  This driver supports the clause-22 MDIO controller of the ZTE
++	  ZX279128S SoC, whose four integrated PHYs sit on addresses 10-13.
++	  The ZXHN E2631 board uses this bus for its lan1-lan3 and wan ports.
++
+ source "drivers/net/airoha/Kconfig"
+ 
+ config AIROHA_ETH
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index b4076206..0b557e92 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -77,6 +77,7 @@ obj-$(CONFIG_MDIO_MUX_MESON_GXL) += mdio_mux_meson_gxl.o
+ obj-$(CONFIG_MDIO_MUX_MMIOREG) += mdio_mux_mmioreg.o
+ obj-$(CONFIG_MDIO_MUX_SANDBOX) += mdio_mux_sandbox.o
+ obj-$(CONFIG_MDIO_SANDBOX) += mdio_sandbox.o
++obj-$(CONFIG_MDIO_ZX279128S) += zx279128s_mdio.o
+ obj-$(CONFIG_MEDIATEK_ETH) += mtk_eth/
+ obj-$(CONFIG_MPC8XX_FEC) += mpc8xx_fec.o
+ obj-$(CONFIG_MT7620_ETH) += mt7620-eth.o
+diff --git a/drivers/net/zx279128s_eth.h b/drivers/net/zx279128s_eth.h
+new file mode 100644
+index 00000000..02f19be1
+--- /dev/null
++++ b/drivers/net/zx279128s_eth.h
+@@ -0,0 +1,150 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZX279128S switch and traffic manager: registers and DMA layout
++ *
++ * Offsets are relative to the GMAC block at 0x92000000 unless the name says
++ * otherwise.  The values and the initialisation order in zx279128s_eth.c are
++ * the ones the Linux driver (target/linux/zx279128, zx279128s-main.c) uses on
++ * the same silicon; the comments there explain why each step is needed.
++ */
++
++#ifndef __ZX279128S_ETH_H__
++#define __ZX279128S_ETH_H__
++
++#include <linux/bitops.h>
++
++/* Global control */
++#define ZX_GLB_RESET		0x000008
++#define ZX_GLB_CLK_CTRL		0x040018
++#define ZX_GLB_CLK_CTRL_BITS	GENMASK(1, 0)
++#define ZX_GLB_PORT_CLK_EN	0x04001c
++
++/* Switch core */
++#define ZX_SW_PORT_FILTER(p)	(0x1c0060 + 4 * (p))
++#define ZX_SW_PORT_FILTER_BITS	GENMASK(25, 23)
++#define ZX_SW_FWD_CTRL		0x1cc000
++#define ZX_SW_FWD_CTRL_ON	BIT(17)
++
++/* Switch port attributes */
++#define ZX_SPA_UP_REG_PKT_EN	0x1d4000
++#define ZX_SPA_DN_REG_PKT_EN	0x1d4040
++#define ZX_SPA_TRAP_DMAC	0x1d41a0
++#define ZX_SPA_TRAP_DMAC_NUM	2
++#define ZX_SPA_TRAP_PROTO	0x1d41c0
++#define ZX_SPA_TRAP_ETH_TYPE	0x1d41c4
++#define ZX_SPA_PORT_EN(i)	(0x1d428c + 4 * (i))
++#define ZX_SPA_ONU_MAC		0x1d4120
++#define ZX_SPA_ONU_MAC_NUM	16
++
++/* MAC ports 0-4 */
++#define ZX_MAC_BASE		0x200000
++#define ZX_PORT_STRIDE		0x040000
++#define ZX_MAC_PORT(p)		(ZX_MAC_BASE + (p) * ZX_PORT_STRIDE)
++#define ZX_MAC_CTRL		0x000
++#define ZX_MAC_CTRL_EN		GENMASK(1, 0)
++#define ZX_MAC_CTRL_FD		BIT(13)
++#define ZX_MAC_CTRL_100		BIT(14)
++#define ZX_MAC_CTRL_MII		BIT(15)
++
++/* Traffic manager */
++#define ZX_TM_BASE		0x340000
++#define ZX_TM_CTRL		(ZX_TM_BASE + 0x00)
++#define ZX_TM_CTRL_BIT6		BIT(6)
++#define ZX_TM_CONFIG_START	(ZX_TM_BASE + 0x04)
++#define ZX_TM_TAB0_ADDR		(ZX_TM_BASE + 0xe8)
++#define ZX_TM_TAB1_ADDR		(ZX_TM_BASE + 0xec)
++#define ZX_TM_BUF_F0		(ZX_TM_BASE + 0xf0)
++#define ZX_TM_BUF_START		(ZX_TM_BASE + 0xf4)
++#define ZX_TM_BUF_END		(ZX_TM_BASE + 0xf8)
++#define ZX_TM_TAB_LIMIT		(ZX_TM_BASE + 0xfc)
++#define ZX_TM_INT_STATUS	(ZX_TM_BASE + 0x100)
++#define ZX_TM_INT_MASK		(ZX_TM_BASE + 0x104)
++
++/* Traffic manager tables, reached through an indirect access window */
++#define ZX_TM_IND_CMD		(ZX_TM_BASE + 0x4014)
++#define ZX_TM_IND_INDEX		GENMASK(21, 0)
++#define ZX_TM_IND_TABLE		GENMASK(26, 22)
++#define ZX_TM_IND_READ		BIT(27)
++#define ZX_TM_IND_STATUS	(ZX_TM_BASE + 0x4018)
++#define ZX_TM_IND_READY		BIT(0)
++#define ZX_TM_IND_DATA(i)	(ZX_TM_BASE + 0x401c + 4 * (i))
++#define ZX_TM_TABLE_QUEUE	0
++#define ZX_TM_TABLE_QUEUE_USE	1
++#define ZX_TM_TABLE_RED		2
++#define ZX_TM_TABLE_SCHED	4
++
++/* Release of consumed RX slots */
++#define ZX_RX_REL_CTRL		(ZX_TM_BASE + 0x4064)
++#define ZX_RX_REL_BUSY		BIT(0)
++#define ZX_RX_REL_DATA		(ZX_TM_BASE + 0x4068)
++#define ZX_RX_REL_QUEUE		GENMASK(2, 0)
++#define ZX_RX_REL_CLASS		BIT(3)
++#define ZX_RX_REL_COUNT		GENMASK(13, 4)
++
++/* Buffer management unit */
++#define ZX_BMU_BASE		(ZX_TM_BASE + 0x8000)
++#define ZX_BMU_CTRL		(ZX_BMU_BASE + 0x00)
++#define ZX_BMU_CTRL_EN		BIT(0)
++#define ZX_BMU_CFG1		(ZX_BMU_BASE + 0x04)
++#define ZX_BMU_CFG2		(ZX_BMU_BASE + 0x08)
++#define ZX_BMU_BUF_ID		(ZX_BMU_BASE + 0x0c)
++#define ZX_BMU_BUF_ID_VALID	BIT(31)
++#define ZX_BMU_BUF_ID_BP	GENMASK(15, 0)
++#define ZX_BMU_BUF_FREE		(ZX_BMU_BASE + 0x10)
++#define ZX_BMU_BUF_ALLOC	(ZX_BMU_BASE + 0x14)
++#define ZX_BMU_BUF_ALLOC_REQ	BIT(0)
++#define ZX_BMU_BUF_ALLOC_BUSY	GENMASK(1, 0)
++#define ZX_BMU_FREE_STATUS	(ZX_BMU_BASE + 0xdc)
++#define ZX_BMU_FREE_SLOTS	GENMASK(8, 3)
++#define ZX_BMU_THRES1		(ZX_BMU_BASE + 0x48)
++#define ZX_BMU_THRES2		(ZX_BMU_BASE + 0x4c)
++#define ZX_BMU_LIMIT1		(ZX_BMU_BASE + 0x58)
++#define ZX_BMU_LIMIT2		(ZX_BMU_BASE + 0x5c)
++
++/* DMA engine between the switch and the CPU */
++#define ZX_DMA_BASE		(ZX_TM_BASE + 0x10000)
++#define ZX_DMA_CTRL		(ZX_DMA_BASE + 0x00)
++#define ZX_DMA_CTRL_EN		GENMASK(19, 16)
++#define ZX_DMA_CTRL_BIT21	BIT(21)
++#define ZX_DMA_RX_IRQ_TIMER	(ZX_DMA_BASE + 0x30)
++#define ZX_DMA_RX_IRQ_FRAMES	(ZX_DMA_BASE + 0x34)
++#define ZX_DMA_RING_CFG		(ZX_DMA_BASE + 0x3c)
++#define ZX_DMA_AREA50		(ZX_DMA_BASE + 0x50)
++#define ZX_DMA_TX_RING		(ZX_DMA_BASE + 0x60)
++#define ZX_DMA_TX_START		(ZX_DMA_BASE + 0x64)
++#define ZX_DMA_TX_DONE		(ZX_DMA_BASE + 0x68)
++#define ZX_DMA_RX_QUEUE_CNT(q)	(ZX_DMA_BASE + 0x100 + (q) * 4)
++
++/* Packet processor */
++#define ZX_PP_RESET		0x380000
++
++/* Traffic manager queues, buffers and descriptor rings */
++#define ZX_NUM_PORTS		5
++#define ZX_PORT_TX_QUEUE(p)	(40 + (p))
++#define ZX_NUM_BUFFERS		4096
++#define ZX_BUF_SIZE		2048
++#define ZX_BUF_POOL_SIZE	(ZX_NUM_BUFFERS * ZX_BUF_SIZE)
++#define ZX_NUM_TX_DESC		1024
++#define ZX_NUM_RX_DESC		1024
++#define ZX_DESC_SIZE		16
++#define ZX_RX_QUEUES		8
++#define ZX_RX_QUEUE_STRIDE	0x4000
++#define ZX_RX_IRQ_FRAMES	64
++#define ZX_RX_IRQ_USECS		500
++
++/* Layout of the 16 MiB DMA arena at ZX_DMA_ARENA_ADDR */
++#define ZX_DMA_ARENA_ADDR	0x45000000UL
++#define ZX_DMA_ARENA_SIZE	0x1000000UL
++#define ZX_TAB0_OFFSET		0x800000UL
++#define ZX_TAB1_OFFSET		0x808000UL
++#define ZX_RX_OFFSET		0xa00000UL
++#define ZX_AREA50_OFFSET	0xb00000UL
++#define ZX_TX_OFFSET		0xc00000UL
++
++/*
++ * Board hook from patch 0012: fractional PLL, CRM gates, SerDes lanes and
++ * the pinmux/GPIO table.  It is idempotent, see board/zte/zxhn-e2631/e2631net.c.
++ */
++void e2631_net_refclk_init(void);
++
++#endif /* __ZX279128S_ETH_H__ */
+diff --git a/drivers/net/zx279128s_mdio.c b/drivers/net/zx279128s_mdio.c
+new file mode 100644
+index 00000000..ab521c05
+--- /dev/null
++++ b/drivers/net/zx279128s_mdio.c
+@@ -0,0 +1,159 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZX279128S MDIO controller
++ *
++ * A clause-22 master with one command register and one status register: the
++ * command carries the operation, the PHY address and the register number,
++ * START launches it and STATUS.DONE reports completion.  The controller has
++ * no usable reset, so the driver programs it lazily on the first transfer:
++ * touching the block before the CRM clocks run is avoided altogether.
++ */
++
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <linux/bitfield.h>
++#include <linux/bitops.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <miiphy.h>
++
++#include "zx279128s_eth.h"
++
++#define ZX_MDIO_DATA_WR		0x04
++#define ZX_MDIO_DATA_RD		0x08
++#define ZX_MDIO_CFG		0x0c
++#define ZX_MDIO_STATUS		0x10
++#define ZX_MDIO_STATUS_DONE	BIT(0)
++#define ZX_MDIO_CMD		0x14
++#define ZX_MDIO_CMD_REG		GENMASK(4, 0)
++#define ZX_MDIO_CMD_ADDR	GENMASK(9, 5)
++#define ZX_MDIO_CMD_WR		BIT(10)
++#define ZX_MDIO_CMD_RD		BIT(11)
++#define ZX_MDIO_CMD_CLK_DIV	BIT(12)
++#define ZX_MDIO_CMD_BIT13	BIT(13)
++#define ZX_MDIO_CMD_START	BIT(14)
++#define ZX_MDIO_CMD_BIT15	BIT(15)
++
++#define ZX_MDIO_POLL_US		10
++#define ZX_MDIO_TIMEOUT_US	2000
++
++struct zx279128s_mdio_priv {
++	void __iomem *base;
++	bool ready;
++};
++
++static void zx279128s_mdio_setup(struct zx279128s_mdio_priv *priv)
++{
++	u32 val;
++
++	if (priv->ready)
++		return;
++
++	e2631_net_refclk_init();
++
++	val = readl(priv->base + ZX_MDIO_CMD);
++	val &= ~(ZX_MDIO_CMD_START | ZX_MDIO_CMD_BIT15 | ZX_MDIO_CMD_BIT13);
++	val |= ZX_MDIO_CMD_CLK_DIV;
++	writel(val, priv->base + ZX_MDIO_CMD);
++	writel(0, priv->base + ZX_MDIO_STATUS);
++	writel(0, priv->base + ZX_MDIO_CFG);
++
++	priv->ready = true;
++}
++
++static int zx279128s_mdio_xfer(struct zx279128s_mdio_priv *priv, u32 op,
++			       int addr, int reg, u16 data)
++{
++	u32 cmd, val;
++	int ret;
++
++	zx279128s_mdio_setup(priv);
++
++	/* Drop the previous command and its completion flag. */
++	writel(readl(priv->base + ZX_MDIO_CMD) & ~ZX_MDIO_CMD_START,
++	       priv->base + ZX_MDIO_CMD);
++	writel(0, priv->base + ZX_MDIO_STATUS);
++
++	cmd = readl(priv->base + ZX_MDIO_CMD);
++	cmd &= ~(ZX_MDIO_CMD_WR | ZX_MDIO_CMD_RD | ZX_MDIO_CMD_ADDR |
++		 ZX_MDIO_CMD_REG);
++	cmd |= op | FIELD_PREP(ZX_MDIO_CMD_ADDR, addr) |
++	       FIELD_PREP(ZX_MDIO_CMD_REG, reg);
++
++	if (op == ZX_MDIO_CMD_WR)
++		writel(data, priv->base + ZX_MDIO_DATA_WR);
++
++	writel(cmd | ZX_MDIO_CMD_START, priv->base + ZX_MDIO_CMD);
++
++	ret = readl_poll_sleep_timeout(priv->base + ZX_MDIO_STATUS, val,
++				       val & ZX_MDIO_STATUS_DONE,
++				       ZX_MDIO_POLL_US, ZX_MDIO_TIMEOUT_US);
++	if (ret)
++		printf("zx279128s-mdio: timeout (addr %d, reg %d)\n", addr, reg);
++
++	writel(0, priv->base + ZX_MDIO_STATUS);
++	writel(readl(priv->base + ZX_MDIO_CMD) & ~ZX_MDIO_CMD_START,
++	       priv->base + ZX_MDIO_CMD);
++
++	return ret;
++}
++
++static int zx279128s_mdio_read(struct udevice *dev, int addr, int devad,
++			       int reg)
++{
++	struct zx279128s_mdio_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	if (devad != MDIO_DEVAD_NONE)
++		return -EOPNOTSUPP;
++
++	ret = zx279128s_mdio_xfer(priv, ZX_MDIO_CMD_RD, addr, reg, 0);
++	if (ret)
++		return ret;
++
++	return readl(priv->base + ZX_MDIO_DATA_RD) & 0xffff;
++}
++
++static int zx279128s_mdio_write(struct udevice *dev, int addr, int devad,
++				int reg, u16 val)
++{
++	struct zx279128s_mdio_priv *priv = dev_get_priv(dev);
++
++	if (devad != MDIO_DEVAD_NONE)
++		return -EOPNOTSUPP;
++
++	return zx279128s_mdio_xfer(priv, ZX_MDIO_CMD_WR, addr, reg, val);
++}
++
++static int zx279128s_mdio_probe(struct udevice *dev)
++{
++	struct zx279128s_mdio_priv *priv = dev_get_priv(dev);
++
++	priv->base = dev_read_addr_ptr(dev);
++	if (!priv->base) {
++		dev_err(dev, "missing register base\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static const struct mdio_ops zx279128s_mdio_ops = {
++	.read = zx279128s_mdio_read,
++	.write = zx279128s_mdio_write,
++};
++
++static const struct udevice_id zx279128s_mdio_ids[] = {
++	{ .compatible = "zte,zx279128s-mdio" },
++	{ }
++};
++
++U_BOOT_DRIVER(zx279128s_mdio) = {
++	.name = "zx279128s_mdio",
++	.id = UCLASS_MDIO,
++	.of_match = zx279128s_mdio_ids,
++	.probe = zx279128s_mdio_probe,
++	.ops = &zx279128s_mdio_ops,
++	.priv_auto = sizeof(struct zx279128s_mdio_priv),
++};
+-- 
+2.56.1
+

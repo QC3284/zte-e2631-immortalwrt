@@ -165,6 +165,17 @@ jobs:
             'CONFIG_ENV_MTD_DEV="spi-nand0"' \
             CONFIG_ENV_OFFSET=0xc0000 \
             CONFIG_ENV_SIZE=0x20000 \
+            CONFIG_DM_ETH=y \
+            CONFIG_DM_MDIO=y \
+            CONFIG_PHYLIB=y \
+            CONFIG_PHY_GIGE=y \
+            CONFIG_ETH_ZX279128S=y \
+            CONFIG_MDIO_ZX279128S=y \
+            CONFIG_NET_RANDOM_ETHADDR=y \
+            CONFIG_CMD_DHCP=y \
+            CONFIG_CMD_MII=y \
+            CONFIG_CMD_PING=y \
+            CONFIG_CMD_TFTPBOOT=y \
             '# CONFIG_SKIP_LOWLEVEL_INIT is not set'; do
             grep -qx "$symbol" build/.config || {
               echo "::error::build/.config is missing $symbol"
@@ -178,7 +189,8 @@ jobs:
           # A2: the SPI controller and the SPI-NAND child must be in the
           # embedded DTB, otherwise the build passes while mtd would find no
           # flash at runtime.
-          for dtb_string in zte,zx279128s-spifc spi-nand; do
+          for dtb_string in zte,zx279128s-spifc spi-nand zte,zx279128s-gmac \
+                           zte,zx279128s-mdio ethernet-phy; do
             if ! grep -aq "$dtb_string" build/u-boot.bin; then
               echo "::error::the embedded DTB is missing $dtb_string"
               exit 1
@@ -186,7 +198,7 @@ jobs:
           done
           # A3: the slot boot command and the env device name must be linked
           # into the image, and saveenv must be compiled out (read-only stage).
-          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot e2631env spi-nand0; do
+          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot e2631env e2631net spi-nand0; do
             if ! grep -aq "$binary_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing $binary_string"
               exit 1
@@ -311,6 +323,39 @@ jobs:
             exit 1
           fi
           echo "class-1 slot fallback: source and image present"
+          # E2: the Ethernet driver needs the board clock/SerDes hook (the
+          # driver calls it from start(), so a boot path that skips it still
+          # gets the PHYs), and the arena guard belongs to e2631flash. The
+          # device-tree nodes are the only source of the register addresses.
+          if ! grep -q 'e2631_net_refclk_init' drivers/net/zx279128s_eth.c; then
+            echo "::error::the Ethernet driver does not run the board clock/SerDes hook"
+            exit 1
+          fi
+          if ! grep -q 'refclk_done' board/zte/zxhn-e2631/e2631net.c; then
+            echo "::error::e2631_net_refclk_init() is not idempotent (driver and boot path both call it)"
+            exit 1
+          fi
+          if ! grep -q 'E2631_NET_ARENA_ADDR' board/zte/zxhn-e2631/e2631flash.c; then
+            echo "::error::e2631flash does not know the network DMA arena"
+            exit 1
+          fi
+          if ! grep -q 'e2631_check_ram_range("e2631verify"' board/zte/zxhn-e2631/e2631flash.c; then
+            echo "::error::e2631verify does not use the arena guard"
+            exit 1
+          fi
+          if ! grep -q '0x45000000UL' board/zte/zxhn-e2631/e2631flash.c drivers/net/zx279128s_eth.c; then
+            echo "::error::the 16 MiB DMA arena base is not pinned in both files"
+            exit 1
+          fi
+          if ! grep -q 'zte,switch-port' arch/arm/dts/zx279128s-zte-zxhn-e2631.dts; then
+            echo "::error::the Ethernet node lost its zte,switch-port property"
+            exit 1
+          fi
+          if ! grep -aq 'lan1 up' build/u-boot.bin; then
+            echo "::error::u-boot.bin is missing the Ethernet bring-up log string"
+            exit 1
+          fi
+          echo "E2 Ethernet: driver, arena guard and device tree present"
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
           echo "u-boot.bin: $size bytes, limit $max bytes"
