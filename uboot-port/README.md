@@ -367,13 +367,13 @@ make O=build -j"$(nproc)"
    （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
-6. checkpatch（可选，见 §6）：`git format-patch c1958b5f..HEAD` 后跑
-   `u-boot/scripts/checkpatch.pl --no-tree`，本系列 **0 errors / 26 reviewed warnings**（0008/0009 各 0/0；0011 与 0012 各
-   0 errors / 2 warnings；0013 0/0；0014 0 errors / 4 warnings；0015 0 errors / 5 warnings；0016 0/0；0017 0 errors / 2 warnings；
-   0018 0 errors / 2 warnings→修正后 0/1（新建文件缺 MAINTAINERS 更新）；0019 0/1（同上）；0020 0/1（新增自用命令 `e2631net`）；
-   0021 0/0（MAINTAINERS 条目本身）；0022 0 errors / 1 warning（新增文档文件仍触发“MAINTAINERS need updating”——checkpatch 按单个 patch 判断，0021 的更新与 0022 不在同一个 patch 里）：
-   新建文件缺 MAINTAINERS 更新、新增自用板级命令、以及 0015 的 5 条 PREFER_IF——这些 `#if CONFIG_IS_ENABLED()` 必须在编译期生效才能把写入口编掉，
-   运行期 `if` 达不到目的，均为已核对项）。
+6. checkpatch（CI 门禁，见 §6）：CI 以 `--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF` 跑
+   `u-boot/scripts/checkpatch.pl --no-tree --terse`，要求 **0 errors / 0 warnings**。ignore 列表在 workflow 里
+   逐类注释，并由运行期断言钉成“恰好这四类”；这四类之外的任何 warning 或任何 error 都会让 uboot-build 失败。
+   不加 ignore 时的原始统计是 0 errors / 26 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0/2；0013 0/0；
+   0014 0/4；0015 0/5；0016 0/0；0017 0/2；0018 修正后 0/1；0019 0/1；0020 0/1；0021 0/0；0022 0/1），分项与原因见 §6；
+   四类豁免的必要性与 checkpatch.pl 源码依据（2805、3560-3568、2670-2674 行）见
+   [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
    （OF_EMBED 把 DTB 打进镜像）。少了这条，构建会通过但 A1 串口仍然静默，正是 task-45 的故障模式。
 8. 内嵌 DTB 的 SPI 节点：`grep -aq 'zte,zx279128s-spifc' build/u-boot.bin` 且
@@ -586,8 +586,12 @@ U-Boot 网络栈。
   以及 0015 的 5 条 PREFER_IF（这几处 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效才能把原始 mtd
   写入口真正编掉，运行期 `if` 达不到目的，属于结构性豁免）。E2 的六处 `mb()` 与 `extern` 提示已在
   patch 0018-0020 定稿时修掉（内存屏障加注释、MDIO 驱动改包含共享头而不是自己写原型）。0021/0022 这两个
-  文档 patch 无法消除上述提醒（checkpatch 逐 patch 独立判断、CMD_TEST 不读文档），四类豁免与实测见
-  [evidence/uboot-checkpatch-maitn-20261122.md](../evidence/uboot-checkpatch-maitn-20261122.md)。自用 fork，不提交上游。
+  文档 patch 无法消除上述提醒（checkpatch 逐 patch 独立判断、CMD_TEST 不读文档）。因此 CI 对这四类做**显式**
+  豁免：`--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF`，列表在 workflow 里逐类注释并被运行期断言
+  钉成“恰好这四类”，其余任何 warning 或任何 error 都会让 uboot-build 失败，所以 CI 的 checkpatch 结果是
+  0 errors / 0 warnings。上面这份逐类分解是本机不加 ignore 时的原始统计；源码依据（2805、3560-3568、
+  2670-2674 行）与两次构建的实测见
+  [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
@@ -735,4 +739,4 @@ U-Boot 网络栈。
   `9200fb3594845104ded8b32d494f1702728d9660d07512709931154b9317c739`、env 块 `6eee153b…` 未变。系列
   checkpatch 仍为 0 errors / 26 warnings（0021 为 0/0、0022 为 0/1：checkpatch 逐 patch 独立判断，前面的
   MAINTAINERS 更新无法消掉后面的新文件提醒；CMD_TEST 也不读文档），逐条分类、源码依据与 CI 级四类豁免
-  方案见 [evidence/uboot-checkpatch-maitn-20261122.md](../evidence/uboot-checkpatch-maitn-20261122.md)。
+  方案见 [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。

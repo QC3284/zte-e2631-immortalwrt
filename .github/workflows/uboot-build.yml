@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       checkpatch:
-        description: 'Run scripts/checkpatch.pl on the port patches (informational; the series reports 0 errors and a small set of reviewed warnings)'
+        description: 'Run scripts/checkpatch.pl on the port patches; exactly four reviewed warning classes are ignored and any other warning or error fails the build'
         type: boolean
         default: true
 run-name: E2631 A1/A2/A3 U-Boot - ${{ github.ref_name }} - run ${{ github.run_number }}
@@ -446,23 +446,47 @@ jobs:
             fi
           done
           echo "e2631env safety guards: present"
-      - name: Run checkpatch on the port series (informational)
+      - name: Run checkpatch on the port series (0 errors / 0 warnings required)
         if: inputs.checkpatch
         run: |
+          # Exactly four reviewed warning classes are ignored, and the ignore
+          # list itself is pinned below; any other warning class and every
+          # error fails this step, so a new warning cannot slip in silently.
+          #
+          # FILE_PATH_CHANGES: checkpatch clears $reported_maintainer_file for
+          # every patch (checkpatch.pl:2805; the new-file check at 3560-3568 is
+          # gated on it), so the trailing MAINTAINERS patch 0021 cannot silence
+          # the new-file reminders of the earlier patches, which are expected.
+          # CMD_TEST: matches only added lines shaped do_<name>(struct cmd_tbl
+          # (checkpatch.pl:2670-2674) and ignores documentation; the eight
+          # e2631* commands are board-local and U-Boot has no DM test for them.
+          # LIVETREE: false positives on the board-level fdtdec_setup_mem_size_base()
+          # and fdtdec_setup_memory_banksize() calls in the frozen port patch 0002.
+          # PREFER_IF: the deliberate compile-time #if CONFIG_IS_ENABLED(CMD_MTD_WRITE)
+          # gate in patch 0015; a runtime if would not compile the raw mtd write
+          # path out, so this one is structural.
           set -uo pipefail
           cd "$UBOOT_DIR"
+          ignores="FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF"
+          expected=$(printf '%s\n' FILE_PATH_CHANGES CMD_TEST LIVETREE PREFER_IF | sort | tr '\n' ' ' | sed 's/ $//')
+          got=$(printf '%s' "$ignores" | tr ',' '\n' | sort | tr '\n' ' ' | sed 's/ $//')
+          if [ "$got" != "$expected" ]; then
+            echo "::error::checkpatch ignore list is not exactly the four reviewed classes"
+            exit 1
+          fi
           out_dir="$RUNNER_TEMP/port-patches"
           mkdir -p "$out_dir"
           git -c user.name='E2631 CI' -c user.email='ci@localhost' \
             format-patch -q -o "$out_dir" "$E2631_UBOOT_SHA"..HEAD
-          out=$(scripts/checkpatch.pl --no-tree --terse "$out_dir"/*.patch 2>&1) || true
+          out=$(scripts/checkpatch.pl --no-tree --terse --ignore "$ignores" "$out_dir"/*.patch 2>&1) || true
           printf '%s\n' "$out" > "$UBOOT_DIR/build/checkpatch.txt"
           printf '%s\n' "$out" | tail -20
           errors=$(printf '%s\n' "$out" | grep -c ': ERROR:' || true)
           warnings=$(printf '%s\n' "$out" | grep -c ': WARNING:' || true)
-          echo "checkpatch: errors=$errors warnings=$warnings (0 errors expected; warnings are reviewed and informational)"
-          if [ "$errors" -gt 0 ]; then
-            echo "::warning::checkpatch reported $errors error(s); inspect the artifact"
+          echo "checkpatch: errors=$errors warnings=$warnings (four reviewed classes ignored; any other warning or error fails the build)"
+          if [ "$errors" -gt 0 ] || [ "$warnings" -gt 0 ]; then
+            echo "::error::checkpatch reported $errors error(s) and $warnings non-exempt warning(s); inspect the artifact"
+            exit 1
           fi
       - name: Package the flashable mtd0 image
         # The P0 tools (task-41) turn the freshly built payload into the mtd0
