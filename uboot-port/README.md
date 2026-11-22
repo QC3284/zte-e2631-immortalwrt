@@ -585,7 +585,9 @@ U-Boot 网络栈。
   不新增测试目录），
   以及 0015 的 5 条 PREFER_IF（这几处 `#if CONFIG_IS_ENABLED(CMD_MTD_WRITE)` 必须编译期生效才能把原始 mtd
   写入口真正编掉，运行期 `if` 达不到目的，属于结构性豁免）。E2 的六处 `mb()` 与 `extern` 提示已在
-  patch 0018-0020 定稿时修掉（内存屏障加注释、MDIO 驱动改包含共享头而不是自己写原型）。自用 fork，不提交上游。
+  patch 0018-0020 定稿时修掉（内存屏障加注释、MDIO 驱动改包含共享头而不是自己写原型）。0021/0022 这两个
+  文档 patch 无法消除上述提醒（checkpatch 逐 patch 独立判断、CMD_TEST 不读文档），四类豁免与实测见
+  [evidence/uboot-checkpatch-maitn-20261122.md](../evidence/uboot-checkpatch-maitn-20261122.md)。自用 fork，不提交上游。
 - 本机不编译（硬规则）；编译证据只能来自 task-44 的 CI run。
 
 ## 7. 与后续阶段的关系
@@ -723,3 +725,14 @@ U-Boot 网络栈。
   `efafbd0a68b32ca2674e44040d5beca619f742f6584ce586cb31aee66949ab73`、env 块 `6eee153b…` 未变、
   checkpatch 0 errors / 25 reviewed warnings；详见
   [evidence/uboot-e2-20261122.md](../evidence/uboot-e2-20261122.md)。
+- 2026-11-22（checkpatch 收口，patch 0021/0022）：新增一段 MAINTAINERS 条目（`ZTE ZXHN E2631 (SANECHIPS
+  ZX279128S)`，maintainer QC3284，覆盖板级/SoC/以太网·MDIO·SPI 驱动/DTS/defconfig/命令文档）与
+  `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 不含代码改动，0001-0020 的 patch 文件与 sha256 均未变。
+  重钉结果 tree `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（22 个 patch；0021 sha256 `c66643e1…`、
+  0022 sha256 `680435c3…`）。CI uboot-build run `44982672016`（head `0edf1bf`）SUCCESS：banner
+  `U-Boot 2027.01-rc2-g6bd1fbd087ba`、`u-boot.bin` 494,208 B sha256
+  `75ba2e66b448f08fba42fedffae4b21cd84ad082cb32de6f0d3474effc5ca11d`、crc32 `e13c0526`、mtd0 镜像 sha256
+  `9200fb3594845104ded8b32d494f1702728d9660d07512709931154b9317c739`、env 块 `6eee153b…` 未变。系列
+  checkpatch 仍为 0 errors / 26 warnings（0021 为 0/0、0022 为 0/1：checkpatch 逐 patch 独立判断，前面的
+  MAINTAINERS 更新无法消掉后面的新文件提醒；CMD_TEST 也不读文档），逐条分类、源码依据与 CI 级四类豁免
+  方案见 [evidence/uboot-checkpatch-maitn-20261122.md](../evidence/uboot-checkpatch-maitn-20261122.md)。
