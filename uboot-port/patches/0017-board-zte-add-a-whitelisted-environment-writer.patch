@@ -1,0 +1,882 @@
+From e64b68bfdece6b0356b4e5a7a8275116594b15a7 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sun, 22 Nov 2026 10:47:44 +0800
+Subject: [PATCH] board: zte: add a whitelisted environment writer (U-0017)
+
+The vendor chain and our port share the U-Boot environment block at mtd0
+0xC0000, but the generic saveenv command is compiled out and env/mtd.c
+keeps its .save pointer NULL. Provide the explicit e2631env command
+instead of wiring the generic writer:
+
+  e2631env check - read the 0x20000 block, parse it and recompute its CRC
+  e2631env diff  - build the candidate block, list what save would change
+  e2631env save  - whitelist-checked five-step rewrite
+
+The save path is structurally the same as e2631flash: bad-block precheck
+before the erase, erase, verify all-0xFF, write, read back and compare
+byte for byte. Addresses come only from CONFIG_ENV_OFFSET/CONFIG_ENV_SIZE
+and four compile-time asserts freeze the layout. A 0xE0000..0xFFFFF
+reserved sector is checked to be all 0xFF before and after the write, a
+second save without changes prints "nothing to write" and does not erase,
+and a non-blank block with a bad CRC is refused rather than rebuilt from
+the fallback environment (that would drop the vendor keys).
+
+Only e2631_* variables and bootdelay may change. The four vendor-managed
+keys (bootcmd/bootargs/memsize/versioninfo) are snapshotted in
+board_late_init() before bootcmd is overridden and restored before the
+candidate is exported, so the persisted block stays vendor-compatible.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile    |   1 +
+ board/zte/zxhn-e2631/e2631boot.c |  18 +-
+ board/zte/zxhn-e2631/e2631env.c  | 761 +++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631env.h  |  13 +
+ 4 files changed, 789 insertions(+), 4 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631env.c
+ create mode 100644 board/zte/zxhn-e2631/e2631env.h
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index 31898ddc..f299851c 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -3,6 +3,7 @@
+ # ZTE ZXHN E2631 board (Sanechips ZX279128S)
+ 
+ obj-y += e2631boot.o
++obj-y += e2631env.o
+ obj-y += e2631net.o
+ obj-y += e2631soc.o
+ obj-y += zxhn-e2631.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 67b2aa4e..59452855 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -38,6 +38,8 @@
+ #include <linux/types.h>
+ #include <mtd.h>
+ #include <stdio.h>
++
++#include "e2631env.h"
+ #include <u-boot/crc.h>
+ 
+ #include "e2631net.h"
+@@ -477,10 +479,11 @@ U_BOOT_CMD(e2631boot, 2, 1, do_e2631boot,
+ 	   "e2631boot load - pick and load the kernel, verify it, do not boot\n");
+ 
+ /*
+- * The environment is loaded read-only from the vendor block at 0xC0000 and
+- * its bootcmd belongs to the vendor bootloader. Replace it in RAM only:
+- * this stage never writes flash, and the persistent environment policy is
+- * a later (B1) decision. printenv still shows the loaded vendor values.
++ * The environment is loaded from the vendor block at 0xC0000 and its
++ * bootcmd belongs to the vendor bootloader. Replace it in RAM only: the
++ * boot path never writes flash, and persisting anything is an explicit
++ * decision (e2631env save, whitelisted and five-step safe). printenv still
++ * shows the loaded vendor values.
+  */
+ int board_late_init(void)
+ {
+@@ -495,6 +498,13 @@ int board_late_init(void)
+ 	 */
+ 	gd->bd->bi_boot_params = E2631_ATAGS_ADDR;
+ 
++	/*
++	 * Remember the vendor-managed environment keys before bootcmd is
++	 * overridden in RAM, so e2631env can restore them before exporting a
++	 * candidate block.
++	 */
++	e2631_env_snapshot();
++
+ 	if (env_set("bootcmd", "e2631boot"))
+ 		printf("e2631boot: cannot override bootcmd\n");
+ 
+diff --git a/board/zte/zxhn-e2631/e2631env.c b/board/zte/zxhn-e2631/e2631env.c
+new file mode 100644
+index 00000000..7b9d0e9c
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631env.c
+@@ -0,0 +1,761 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 U-Boot environment write-back (U-0017)
++ *
++ * The vendor chain and our port share one environment block at 0xC0000: a
++ * 32-bit CRC followed by NUL-separated key=value strings, padded with 0x00
++ * to 0x20000 (one SPI-NAND erase block). The generic saveenv command stays
++ * compiled out (CONFIG_CMD_SAVEENV is not set) and env/mtd.c keeps its
++ * .save pointer NULL, so this file is the only place that persists the
++ * environment.
++ *
++ * e2631env has three subcommands:
++ *   check - read the block, parse it and recompute its CRC (read-only)
++ *   diff  - build the candidate block and list what save would change
++ *   save  - whitelist-checked five-step rewrite of the block:
++ *           bad-block precheck, erase, verify all-0xFF, write, read back
++ *           and compare. The 0xE0000..0xFFFFF reserved sector is checked
++ *           to be all 0xFF before and after the write.
++ *
++ * Safety rules:
++ *   - only e2631_* variables and bootdelay may change; the four vendor
++ *     managed keys (bootcmd/bootargs/memsize/versioninfo) are restored to
++ *     their load-time snapshot before the candidate is exported;
++ *   - a second save with no changes prints "nothing to write" and does not
++ *     even erase the block;
++ *   - a non-blank block with a bad CRC is NOT rebuilt from the fallback
++ *     environment (that environment does not contain the vendor keys, so a
++ *     rebuild would silently drop e.g. ethaddr; the vendor chain heals a
++ *     bad-CRC block with its own saveenv instead);
++ *   - no address parameter exists: every erase/write address is derived
++ *     from CONFIG_ENV_OFFSET/CONFIG_ENV_SIZE.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <command.h>
++#include <env.h>
++#include <env_internal.h>
++#include <malloc.h>
++#include <linux/build_bug.h>
++#include <linux/errno.h>
++#include <linux/mtd/mtd.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <mtd.h>
++#include <stdio.h>
++#include <u-boot/crc.h>
++
++#include "e2631env.h"
++
++#define E2631_ENV_MTD_DEV		"spi-nand0"
++#define E2631_ENV_MAX_ENTRIES		64
++#define E2631_ENV_MAX_CHANGES		96
++#define E2631_ENV_VALUE_MAX		160
++
++/*
++ * Layout constants are frozen: the vendor chain reads 0xC0000 and expects
++ * one 0x20000 erase block with a 4-byte CRC header. Any config drift must
++ * fail the build, not produce a look-alike block.
++ */
++static_assert(CONFIG_ENV_OFFSET == 0xc0000,
++	      "the env block must stay at mtd0 0xc0000");
++static_assert(CONFIG_ENV_SIZE == 0x20000,
++	      "the env block must stay one 128 KiB erase block");
++static_assert(CONFIG_ENV_OFFSET % CONFIG_ENV_SIZE == 0,
++	      "the env block must be erase-block aligned");
++static_assert(sizeof(env_t) == CONFIG_ENV_SIZE,
++	      "env_t must cover the whole 0x20000 env block");
++
++struct e2631_env_entry {
++	char *key;
++	char *value;
++};
++
++struct e2631_env_change {
++	const char *key;
++	const char *old_value;	/* NULL when the key is new */
++	const char *new_value;	/* NULL when the key is removed */
++};
++
++struct e2631_env_vendor_key {
++	bool present;
++	char value[E2631_ENV_VALUE_MAX];
++};
++
++static const char *const e2631_env_vendor_names[] = {
++	"bootcmd", "bootargs", "memsize", "versioninfo",
++};
++
++static struct e2631_env_vendor_key
++	e2631_env_vendor[ARRAY_SIZE(e2631_env_vendor_names)];
++static bool e2631_env_snapshot_taken;
++
++static u32 e2631_env_le32(const u8 *p)
++{
++	return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
++	       ((u32)p[3] << 24);
++}
++
++static bool e2631_env_all_ff(const u8 *buf, size_t len)
++{
++	size_t i;
++
++	for (i = 0; i < len; i++) {
++		if (buf[i] != 0xff)
++			return false;
++	}
++
++	return true;
++}
++
++/*
++ * Parse one block in place: the data area is split at the NULs, so the
++ * buffer is modified. Returns 0 on a syntactically valid block (the CRC is
++ * reported, not enforced) and -EINVAL for a malformed one.
++ */
++static int e2631_env_parse(u8 *block, size_t len,
++			   struct e2631_env_entry *ents, int max,
++			   int *count, u32 *stored_crc, u32 *calc_crc)
++{
++	char *data = (char *)block + ENV_HEADER_SIZE;
++	size_t dlen = len - ENV_HEADER_SIZE;
++	size_t i = 0;
++	int n = 0;
++
++	*stored_crc = e2631_env_le32(block);
++	*calc_crc = crc32(0, (const unsigned char *)data, (u32)dlen);
++	*count = 0;
++
++	while (i < dlen) {
++		size_t start;
++		char *s, *eq;
++
++		if (!data[i])
++			break;
++
++		start = i;
++		while (i < dlen && data[i] != '\0')
++			i++;
++		if (i == dlen)
++			return -EINVAL;	/* unterminated string */
++		s = data + start;
++
++		eq = strchr(s, '=');
++		if (!eq || eq == s)
++			return -EINVAL;
++		*eq = '\0';
++
++		if (n >= max)
++			return -ENOSPC;
++		ents[n].key = s;
++		ents[n].value = eq + 1;
++		n++;
++
++		i++;	/* skip the terminating NUL */
++	}
++
++	*count = n;
++
++	return 0;
++}
++
++static const char *e2631_env_find(const struct e2631_env_entry *ents, int n,
++				  const char *key)
++{
++	int i;
++
++	for (i = 0; i < n; i++) {
++		if (!strcmp(ents[i].key, key))
++			return ents[i].value;
++	}
++
++	return NULL;
++}
++
++static bool e2631_env_key_allowed(const char *key)
++{
++	if (!strncmp(key, "e2631_", 6))
++		return true;
++
++	return !strcmp(key, "bootdelay");
++}
++
++/*
++ * Store the four vendor-managed keys as they were when the environment was
++ * loaded. board_late_init() calls this before it overrides bootcmd, so the
++ * values here are the persisted vendor values, not our RAM-only defaults.
++ */
++void e2631_env_snapshot(void)
++{
++	size_t i;
++
++	for (i = 0; i < ARRAY_SIZE(e2631_env_vendor_names); i++) {
++		const char *value = env_get(e2631_env_vendor_names[i]);
++
++		e2631_env_vendor[i].present = value ? true : false;
++		if (value)
++			strlcpy(e2631_env_vendor[i].value, value,
++				sizeof(e2631_env_vendor[i].value));
++		else
++			e2631_env_vendor[i].value[0] = '\0';
++	}
++
++	e2631_env_snapshot_taken = true;
++}
++
++static int e2631_env_restore_vendor_keys(void)
++{
++	size_t i;
++	int ret;
++
++	for (i = 0; i < ARRAY_SIZE(e2631_env_vendor_names); i++) {
++		const char *value = NULL;
++
++		if (e2631_env_vendor[i].present)
++			value = e2631_env_vendor[i].value;
++
++		ret = env_set(e2631_env_vendor_names[i], value);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++/*
++ * Export the current RAM environment into a fresh block, with the vendor
++ * keys restored to their load-time snapshot first.
++ */
++static int e2631_env_build_candidate(u8 *cand,
++				     struct e2631_env_entry *ents, int *count,
++				     u32 *crc)
++{
++	u32 calc_crc;
++	int ret;
++
++	if (!e2631_env_snapshot_taken) {
++		printf("e2631env: the vendor-key snapshot was not taken; refusing to touch the env block\n");
++		return -EPERM;
++	}
++
++	memset(cand, 0, CONFIG_ENV_SIZE);
++	ret = e2631_env_restore_vendor_keys();
++	if (ret) {
++		printf("e2631env: cannot restore the vendor keys (%d)\n", ret);
++		return ret;
++	}
++
++	if (env_export((env_t *)cand)) {
++		printf("e2631env: cannot export the environment\n");
++		return -EIO;
++	}
++
++	ret = e2631_env_parse(cand, CONFIG_ENV_SIZE, ents,
++			      E2631_ENV_MAX_ENTRIES, count, crc, &calc_crc);
++	if (ret) {
++		printf("e2631env: the exported environment is malformed\n");
++		return ret;
++	}
++	if (*crc != calc_crc) {
++		printf("e2631env: the exported environment CRC does not match\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/* All differences are listed in both directions, order-insensitive. */
++static int e2631_env_collect_changes(const struct e2631_env_entry *old_ents,
++				     int old_n, bool old_valid,
++				     const struct e2631_env_entry *new_ents,
++				     int new_n,
++				     struct e2631_env_change *changes, int max)
++{
++	int i, n = 0;
++
++	for (i = 0; i < new_n; i++) {
++		const char *old_value = NULL;
++
++		if (old_valid)
++			old_value = e2631_env_find(old_ents, old_n,
++						   new_ents[i].key);
++
++		if (old_valid && old_value &&
++		    !strcmp(old_value, new_ents[i].value))
++			continue;
++
++		if (n >= max)
++			break;
++		changes[n].key = new_ents[i].key;
++		changes[n].old_value = old_value;
++		changes[n].new_value = new_ents[i].value;
++		n++;
++	}
++
++	if (old_valid) {
++		for (i = 0; i < old_n; i++) {
++			if (e2631_env_find(new_ents, new_n, old_ents[i].key))
++				continue;
++			if (n >= max)
++				break;
++			changes[n].key = old_ents[i].key;
++			changes[n].old_value = old_ents[i].value;
++			changes[n].new_value = NULL;
++			n++;
++		}
++	}
++
++	return n;
++}
++
++static int e2631_env_read_block(struct mtd_info *mtd, u8 *buf)
++{
++	size_t retlen = 0;
++	int ret;
++
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen, buf);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: cannot read the env block 0x%x (ret %d, %u of %u bytes)\n",
++		       CONFIG_ENV_OFFSET, ret, (unsigned int)retlen,
++		       (unsigned int)CONFIG_ENV_SIZE);
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int e2631_env_reserved_check(struct mtd_info *mtd, u8 *buf,
++				    const char *when)
++{
++	size_t retlen = 0;
++	int ret;
++
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE,
++		       CONFIG_ENV_SIZE, &retlen, buf);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: cannot read the reserved sector 0x%x (ret %d)\n",
++		       CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE, ret);
++		return -EIO;
++	}
++
++	if (!e2631_env_all_ff(buf, CONFIG_ENV_SIZE)) {
++		printf("e2631env: reserved sector 0x%x..0x%x is not blank %s the write; refusing\n",
++		       CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE,
++		       CONFIG_ENV_OFFSET + 2 * CONFIG_ENV_SIZE - 1, when);
++		return -EIO;
++	}
++
++	printf("e2631env: reserved sector 0x%x..0x%x is blank %s the write\n",
++	       CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE,
++	       CONFIG_ENV_OFFSET + 2 * CONFIG_ENV_SIZE - 1, when);
++
++	return 0;
++}
++
++/*
++ * The only env writer in the image. It is the same structural rule as
++ * e2631flash: bad-block precheck, erase, verify all-0xFF, write, read back
++ * byte for byte. Addresses come from the two frozen config constants only.
++ */
++static int e2631_env_write_block(struct mtd_info *mtd, const u8 *cand)
++{
++	struct erase_info ei = { };
++	size_t retlen = 0;
++	u8 *readback;
++	int ret;
++
++	readback = malloc(CONFIG_ENV_SIZE);
++	if (!readback)
++		return -ENOMEM;
++
++	if (mtd_block_isbad(mtd, CONFIG_ENV_OFFSET) > 0) {
++		printf("e2631env: env block 0x%x is marked bad; refusing to write (the vendor chain reads this fixed offset)\n",
++		       CONFIG_ENV_OFFSET);
++		ret = -EIO;
++		goto out;
++	}
++
++	ei.mtd = mtd;
++	ei.addr = CONFIG_ENV_OFFSET;
++	ei.len = CONFIG_ENV_SIZE;
++
++	puts("e2631env: erasing the env block... ");
++	ret = mtd_erase(mtd, &ei);
++	if (ret) {
++		printf("FAILED (%d)\n", ret);
++		goto out;
++	}
++	puts("OK\n");
++
++	ret = e2631_env_read_block(mtd, readback);
++	if (ret)
++		goto out;
++	if (!e2631_env_all_ff(readback, CONFIG_ENV_SIZE)) {
++		size_t i;
++
++		for (i = 0; i < CONFIG_ENV_SIZE; i++) {
++			if (readback[i] != 0xff)
++				break;
++		}
++		printf("e2631env: erase left data behind (first non-FF byte at 0x%x); not writing\n",
++		       (u32)i);
++		ret = -EIO;
++		goto out;
++	}
++	puts("e2631env: erase verified (all 0xFF)\n");
++
++	ret = mtd_write(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen,
++			(const u_char *)cand);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: write failed (%d, %u of %u bytes); the block is NOT trustworthy, cold boot and check again\n",
++		       ret, (unsigned int)retlen, (unsigned int)CONFIG_ENV_SIZE);
++		ret = -EIO;
++		goto out;
++	}
++
++	ret = e2631_env_read_block(mtd, readback);
++	if (ret)
++		goto out;
++	if (memcmp(readback, cand, CONFIG_ENV_SIZE)) {
++		size_t i;
++
++		for (i = 0; i < CONFIG_ENV_SIZE; i++) {
++			if (readback[i] != cand[i])
++				break;
++		}
++		printf("e2631env: read-back mismatch at 0x%x (expected 0x%02x, got 0x%02x); the env block is NOT trustworthy\n",
++		       (u32)i, cand[i], readback[i]);
++		ret = -EIO;
++		goto out;
++	}
++
++	printf("e2631env: read back %u bytes, CRC 0x%08x matches\n",
++	       CONFIG_ENV_SIZE, e2631_env_le32(readback));
++	ret = 0;
++
++out:
++	free(readback);
++
++	return ret;
++}
++
++static int e2631_env_get_mtd(struct mtd_info **mtdp)
++{
++	struct mtd_info *mtd;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_ENV_MTD_DEV);
++	if (!mtd) {
++		printf("e2631env: %s is not available\n", E2631_ENV_MTD_DEV);
++		return -ENODEV;
++	}
++
++	if (mtd->erasesize != CONFIG_ENV_SIZE) {
++		printf("e2631env: erasesize is 0x%x, expected 0x%x; refusing to write\n",
++		       mtd->erasesize, CONFIG_ENV_SIZE);
++		put_mtd_device(mtd);
++		return -EINVAL;
++	}
++
++	*mtdp = mtd;
++
++	return 0;
++}
++
++static int do_e2631env_check(struct mtd_info *mtd)
++{
++	struct e2631_env_entry ents[E2631_ENV_MAX_ENTRIES];
++	u8 *block;
++	size_t retlen = 0;
++	u32 stored_crc, calc_crc;
++	int ret, count, i;
++
++	block = malloc(CONFIG_ENV_SIZE);
++	if (!block)
++		return -ENOMEM;
++
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen,
++		       block);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: cannot read the env block 0x%x\n",
++		       CONFIG_ENV_OFFSET);
++		ret = -EIO;
++		goto out;
++	}
++
++	if (e2631_env_all_ff(block, CONFIG_ENV_SIZE)) {
++		printf("e2631env: env block 0x%x..0x%x is blank (all 0xFF)\n",
++		       CONFIG_ENV_OFFSET,
++		       CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE - 1);
++		ret = 0;
++		goto out;
++	}
++
++	ret = e2631_env_parse(block, CONFIG_ENV_SIZE, ents,
++			      E2631_ENV_MAX_ENTRIES, &count, &stored_crc,
++			      &calc_crc);
++	if (ret) {
++		printf("e2631env: env block 0x%x is malformed (%d)\n",
++		       CONFIG_ENV_OFFSET, ret);
++		goto out;
++	}
++
++	printf("e2631env: env block 0x%x: stored CRC 0x%08x, calculated CRC 0x%08x (%s), %d entries\n",
++	       CONFIG_ENV_OFFSET, stored_crc, calc_crc,
++	       stored_crc == calc_crc ? "valid" : "INVALID", count);
++	for (i = 0; i < count; i++)
++		printf("e2631env:   %s=%s\n", ents[i].key, ents[i].value);
++
++	ret = e2631_env_reserved_check(mtd, block, "in");
++	if (ret)
++		goto out;
++
++	ret = 0;
++
++out:
++	free(block);
++
++	return ret;
++}
++
++static int e2631_env_print_changes(const struct e2631_env_change *changes,
++				   int n, bool enforce_whitelist)
++{
++	int i, denied = 0;
++
++	for (i = 0; i < n; i++) {
++		printf("e2631env:   %s: \"%s\" -> \"%s\"\n",
++		       changes[i].key,
++		       changes[i].old_value ? changes[i].old_value : "(absent)",
++		       changes[i].new_value ? changes[i].new_value : "(removed)");
++		if (enforce_whitelist &&
++		    !e2631_env_key_allowed(changes[i].key)) {
++			printf("e2631env: refusing to persist \"%s\": only e2631_* keys and bootdelay are in the whitelist\n",
++			       changes[i].key);
++			denied++;
++		}
++	}
++
++	return denied;
++}
++
++static int do_e2631env_diff(struct mtd_info *mtd)
++{
++	struct e2631_env_entry old_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_entry new_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_change changes[E2631_ENV_MAX_CHANGES];
++	u8 *old, *cand;
++	size_t retlen = 0;
++	bool old_valid = false, old_blank = false;
++	u32 old_crc = 0, old_calc = 0, new_crc = 0;
++	int ret, old_n = 0, new_n = 0, nchanges;
++
++	old = malloc(CONFIG_ENV_SIZE);
++	cand = malloc(CONFIG_ENV_SIZE);
++	if (!old || !cand) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen,
++		       old);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: cannot read the env block 0x%x\n",
++		       CONFIG_ENV_OFFSET);
++		ret = -EIO;
++		goto out;
++	}
++
++	if (e2631_env_all_ff(old, CONFIG_ENV_SIZE)) {
++		old_blank = true;
++	} else {
++		ret = e2631_env_parse(old, CONFIG_ENV_SIZE, old_ents,
++				      E2631_ENV_MAX_ENTRIES, &old_n, &old_crc,
++				      &old_calc);
++		old_valid = !ret && old_crc == old_calc;
++	}
++
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	if (ret)
++		goto out;
++
++	nchanges = e2631_env_collect_changes(old_ents, old_n, old_valid,
++					     new_ents, new_n, changes,
++					     E2631_ENV_MAX_CHANGES);
++
++	printf("e2631env: candidate: %d entries, block %u bytes, CRC 0x%08x\n",
++	       new_n, (unsigned int)CONFIG_ENV_SIZE, new_crc);
++	printf("e2631env: current block %s, CRC 0x%08x\n",
++	       old_blank ? "blank" : (old_valid ? "valid" : "INVALID"),
++	       old_crc);
++	if (!nchanges) {
++		printf("e2631env: nothing to write, the candidate matches the env block\n");
++	} else {
++		printf("e2631env: %d key(s) would change:\n", nchanges);
++		e2631_env_print_changes(changes, nchanges, true);
++	}
++
++	env_set("bootcmd", "e2631boot");
++	ret = 0;
++
++out:
++	free(old);
++	free(cand);
++
++	return ret;
++}
++
++static int do_e2631env_save(struct mtd_info *mtd)
++{
++	struct e2631_env_entry old_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_entry new_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_change changes[E2631_ENV_MAX_CHANGES];
++	u8 *old, *cand, *reserved;
++	size_t retlen = 0;
++	bool old_valid = false;
++	u32 old_crc = 0, old_calc = 0, new_crc = 0;
++	int ret, old_n = 0, new_n = 0, nchanges, i;
++
++	old = malloc(CONFIG_ENV_SIZE);
++	cand = malloc(CONFIG_ENV_SIZE);
++	reserved = malloc(CONFIG_ENV_SIZE);
++	if (!old || !cand || !reserved) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	/* Read the current block without writing anything. */
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen,
++		       old);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		printf("e2631env: cannot read the env block 0x%x\n",
++		       CONFIG_ENV_OFFSET);
++		ret = -EIO;
++		goto out;
++	}
++
++	if (e2631_env_all_ff(old, CONFIG_ENV_SIZE)) {
++		printf("e2631env: current env block is blank (all 0xFF); this is a first write\n");
++	} else {
++		ret = e2631_env_parse(old, CONFIG_ENV_SIZE, old_ents,
++				      E2631_ENV_MAX_ENTRIES, &old_n, &old_crc,
++				      &old_calc);
++		old_valid = !ret && old_crc == old_calc;
++		if (!old_valid) {
++			printf("e2631env: current env block is INVALID (stored CRC 0x%08x, calculated 0x%08x); refusing to rebuild it from the fallback environment\n",
++			       old_crc, old_calc);
++			printf("e2631env: boot the vendor chain once (its zteboot_do_settings rewrites a bad env), or restore the block, then retry\n");
++			ret = -EIO;
++			goto out;
++		}
++		printf("e2631env: current env block: %d entries, CRC 0x%08x\n",
++		       old_n, old_crc);
++	}
++
++	ret = e2631_env_reserved_check(mtd, reserved, "before");
++	if (ret)
++		goto out;
++
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	if (ret)
++		goto out;
++
++	printf("e2631env: candidate: %d entries, block %u bytes, CRC 0x%08x\n",
++	       new_n, (unsigned int)CONFIG_ENV_SIZE, new_crc);
++
++	nchanges = e2631_env_collect_changes(old_ents, old_n, old_valid,
++					     new_ents, new_n, changes,
++					     E2631_ENV_MAX_CHANGES);
++
++	if (!nchanges) {
++		printf("e2631env: nothing to write, env block left untouched\n");
++		env_set("bootcmd", "e2631boot");
++		ret = 0;
++		goto out;
++	}
++
++	printf("e2631env: %d key(s) to persist:\n", nchanges);
++	for (i = 0; i < nchanges; i++) {
++		printf("e2631env:   %s: \"%s\" -> \"%s\"\n",
++		       changes[i].key,
++		       changes[i].old_value ? changes[i].old_value :
++						"(absent)",
++		       changes[i].new_value ? changes[i].new_value :
++						"(removed)");
++	}
++	if (e2631_env_print_changes(changes, nchanges, true)) {
++		printf("e2631env: refusing to write; revert the keys above with setenv and retry\n");
++		ret = -EPERM;
++		goto out;
++	}
++
++	printf("e2631env: DO NOT POWER OFF DURING WRITE\n");
++	printf("e2631env: writing env block 0x%x..0x%x, CRC 0x%08x -> 0x%08x\n",
++	       CONFIG_ENV_OFFSET, CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE - 1,
++	       old_crc, new_crc);
++
++	ret = e2631_env_write_block(mtd, cand);
++	if (ret) {
++		printf("e2631env: env write FAILED (%d); the block is not trustworthy, cold boot and run e2631env check\n",
++		       ret);
++		goto out;
++	}
++
++	ret = e2631_env_reserved_check(mtd, reserved, "after");
++	if (ret)
++		goto out;
++
++	printf("e2631env: Saving Environment to MTD... OK\n");
++	printf("e2631env: old CRC 0x%08x, new CRC 0x%08x, %d key(s) changed\n",
++	       old_crc, new_crc, nchanges);
++
++	env_set("bootcmd", "e2631boot");
++	ret = 0;
++
++out:
++	free(old);
++	free(cand);
++	free(reserved);
++
++	return ret;
++}
++
++static int do_e2631env(struct cmd_tbl *cmdtp, int flag, int argc,
++		       char *const argv[])
++{
++	struct mtd_info *mtd;
++	int ret;
++
++	if (argc != 2)
++		return CMD_RET_USAGE;
++
++	ret = e2631_env_get_mtd(&mtd);
++	if (ret)
++		return CMD_RET_FAILURE;
++
++	if (!strcmp(argv[1], "check"))
++		ret = do_e2631env_check(mtd);
++	else if (!strcmp(argv[1], "diff"))
++		ret = do_e2631env_diff(mtd);
++	else if (!strcmp(argv[1], "save"))
++		ret = do_e2631env_save(mtd);
++	else
++		ret = -EINVAL;
++
++	put_mtd_device(mtd);
++
++	if (ret == -EINVAL)
++		return CMD_RET_USAGE;
++
++	return ret ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631env, 2, 1, do_e2631env,
++	   "inspect and persist the vendor-compatible environment block",
++	   "check - read the env block at 0xc0000, parse it and recompute its CRC (read-only)\n"
++	   "e2631env diff  - build the candidate block and list the keys save would change\n"
++	   "e2631env save  - whitelist-checked five-step rewrite of the env block: bad-block\n"
++	   "                 precheck, erase, verify all-0xFF, write, read back and compare;\n"
++	   "                 prints DO NOT POWER OFF and never touches 0xE0000..0xFFFFF\n");
+diff --git a/board/zte/zxhn-e2631/e2631env.h b/board/zte/zxhn-e2631/e2631env.h
+new file mode 100644
+index 00000000..82364dff
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631env.h
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 U-Boot environment write-back (U-0017)
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631ENV_H
++#define __E2631ENV_H
++
++void e2631_env_snapshot(void);
++
++#endif /* __E2631ENV_H */
+-- 
+2.56.1
+

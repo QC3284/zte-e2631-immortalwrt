@@ -186,7 +186,7 @@ jobs:
           done
           # A3: the slot boot command and the env device name must be linked
           # into the image, and saveenv must be compiled out (read-only stage).
-          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot spi-nand0; do
+          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot e2631env spi-nand0; do
             if ! grep -aq "$binary_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing $binary_string"
               exit 1
@@ -205,6 +205,49 @@ jobs:
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1
           fi
+          # U-0017: the environment is written only by the explicit e2631env
+          # command; the generic saveenv/eraseenv writers stay compiled out and
+          # the block is not redundant. The five-step writer must keep its
+          # bad-block precheck above the erase and the layout must stay frozen.
+          if grep -qx 'CONFIG_CMD_ERASEENV=y' build/.config; then
+            echo "::error::CONFIG_CMD_ERASEENV must stay disabled"
+            exit 1
+          fi
+          if grep -qx 'CONFIG_SYS_REDUNDAND_ENVIRONMENT=y' build/.config; then
+            echo "::error::the env block must not become redundant"
+            exit 1
+          fi
+          if ! grep -q 'e2631_env_snapshot' board/zte/zxhn-e2631/e2631boot.c; then
+            echo "::error::board_late_init must snapshot the vendor env keys"
+            exit 1
+          fi
+          if ! grep -q 'e2631_env_write_block' board/zte/zxhn-e2631/e2631env.c; then
+            echo "::error::the e2631env five-step writer is missing"
+            exit 1
+          fi
+          bad_line=$(grep -n 'mtd_block_isbad' board/zte/zxhn-e2631/e2631env.c | head -1 | cut -d: -f1)
+          erase_line=$(grep -n 'mtd_erase' board/zte/zxhn-e2631/e2631env.c | head -1 | cut -d: -f1)
+          if [ -z "$bad_line" ] || [ -z "$erase_line" ] || [ "$bad_line" -ge "$erase_line" ]; then
+            echo "::error::the e2631env bad-block precheck must stay above the erase"
+            exit 1
+          fi
+          env_asserts=$(grep -c 'static_assert(CONFIG_ENV' board/zte/zxhn-e2631/e2631env.c)
+          if [ "$env_asserts" != "4" ]; then
+            echo "::error::the env layout needs four compile-time asserts, found $env_asserts"
+            exit 1
+          fi
+          if grep -l '0[eE]0000' board/zte/zxhn-e2631/*.c | grep -v 'e2631env.c$'; then
+            echo "::error::the reserved 0xE0000 sector must be handled by e2631env.c only"
+            exit 1
+          fi
+          for env_usage in \
+            'inspect and persist the vendor-compatible environment block' \
+            'DO NOT POWER OFF'; do
+            if ! grep -aq "$env_usage" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the env text: $env_usage"
+              exit 1
+            fi
+          done
           if grep -qx 'CONFIG_ENV_IS_NOWHERE=y' build/.config; then
             echo "::error::ENV_IS_NOWHERE must not be set when ENV_IS_IN_MTD is"
             exit 1
@@ -283,11 +326,12 @@ jobs:
             exit 1
           fi
           echo "entry point: $entry"
-      - name: Assert e2631flash is the only MTD writer (D-U1)
+      - name: Assert e2631flash and e2631env are the only MTD writers (D-U1)
         # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out; the
         # call-site allowlist then proves every mtd_write()/mtd_erase() call in
-        # the linked image sits inside the e2631flash code, and requires at
-        # least one site so the gate cannot pass vacuously.
+        # the linked image sits inside one of the two safe writers (e2631flash
+        # helpers or the e2631env five-step writer) and requires exactly the
+        # expected number of sites so the gate cannot pass vacuously.
         run: |
           set -euo pipefail
           cd "$UBOOT_DIR"
@@ -308,7 +352,7 @@ jobs:
           fi
           echo "$sites"
           bad=$(echo "$sites" | awk -F'|' '
-            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash)$/ {
+            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash|e2631_env_write_block)$/ {
               print
             }')
           if [ -n "$bad" ]; then
@@ -317,11 +361,15 @@ jobs:
             exit 1
           fi
           writers=$(echo "$sites" | grep -cE '<mtd_write>|<mtd_erase>' || true)
-          if [ "$writers" -lt 1 ]; then
-            echo "::error::e2631flash has no mtd_write/mtd_erase call"
+          if [ "$writers" != "4" ]; then
+            echo "::error::expected 4 mtd_write/mtd_erase sites (2 e2631flash helpers + 2 e2631_env_write_block), found $writers"
             exit 1
           fi
-          echo "mtd writer sites: $writers, all inside e2631flash"
+          if ! echo "$sites" | grep -q 'e2631_env_write_block'; then
+            echo "::error::no MTD writer site was found inside e2631_env_write_block"
+            exit 1
+          fi
+          echo "mtd writer sites: $writers (2 e2631flash helpers + 2 e2631_env_write_block)"
           # The refusals that make that single writer safe must stay in the
           # source: the protected secondboot/environment areas, the alignment
           # and chip-bounds check, and the power-off banner printed before the
@@ -339,6 +387,20 @@ jobs:
             fi
           done
           echo "e2631flash safety guards: present"
+          # The env writer must keep the same guard order and the whitelist /
+          # snapshot machinery; these are source markers, the allowlist above
+          # already proves that no other code path can call the MTD writers.
+          for env_marker in \
+            'DO NOT POWER OFF DURING WRITE' \
+            'mtd_block_isbad' \
+            'e2631_env_vendor_names' \
+            'nothing to write'; do
+            if ! grep -q "$env_marker" board/zte/zxhn-e2631/e2631env.c; then
+              echo "::error::e2631env.c lost its safety marker: $env_marker"
+              exit 1
+            fi
+          done
+          echo "e2631env safety guards: present"
       - name: Run checkpatch on the port series (informational)
         if: inputs.checkpatch
         run: |
@@ -469,7 +531,7 @@ jobs:
             echo "# E2631 U-Boot command help (static dump; the ARM image is not executed on the runner)"
             echo "# Source: board/zte/zxhn-e2631/*.c at post-am tree $E2631_UBOOT_TREE_SHA"
             echo
-            for cmd in e2631flash e2631verify e2631slot; do
+            for cmd in e2631flash e2631verify e2631slot e2631env; do
               echo "## $cmd"
               awk -v c="$cmd" '
                 index($0, "U_BOOT_CMD(" c ",") { grab = 1 }
@@ -483,14 +545,14 @@ jobs:
               echo
             done
             echo "## command names found in build/u-boot.bin"
-            strings -a build/u-boot.bin | grep -aE 'e2631flash|e2631verify|e2631slot|e2631boot' | sed 's/^/  /'
+            strings -a build/u-boot.bin | grep -aE 'e2631flash|e2631verify|e2631slot|e2631boot|e2631env' | sed 's/^/  /'
           } > artifacts/E2631-COMMAND-HELP.txt
           test -s artifacts/E2631-COMMAND-HELP.txt || {
             echo "::error::E2631-COMMAND-HELP.txt is empty"
             exit 1
           }
           {
-            echo "E2631 A1/A2/A3 custom U-Boot (slot boot from RAM chain, read-only)"
+            echo "E2631 A1/A2/A3 custom U-Boot (slot boot, flash commands, env write-back)"
             echo "Repository: $E2631_UBOOT_REPO"
             echo "Branch: $E2631_UBOOT_BRANCH"
             echo "Baseline commit: $E2631_UBOOT_SHA"
@@ -525,7 +587,7 @@ jobs:
             echo "- entry point: $entry"
             echo "- banner: $banner"
             echo "- crc32: u-boot.bin $payload_crc, mtd0 image $mtd0_crc"
-            echo "- command help: E2631-COMMAND-HELP.txt (static dump of the three new commands)"
+            echo "- command help: E2631-COMMAND-HELP.txt (static dump of the new commands)"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
             echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM; the image asset is for the future, user-approved flash stage"
