@@ -26,6 +26,7 @@
 | 0028 | `e2631rescue`：DHCP + 极简 HTTP + gzip 救援页 + SHA-256/确认头契约 + 结构校验 + mtd0 五步写（task-78 修正窗口/源指针） |
 | 0029 | 厂商 TOPCRM 软复位：`mdelay(50)` 后向 `0x94000044` 写 1，替换占位 `reset_cpu()` |
 | 0030 | task-77：`env_mtd_load()` 读+import 重试 3 次；最终失败打印偏移、CRC32 与前 64 字节，env 仍只读 |
+| 0034 | task-78/E4 cold boot：`do_e2631rescue()` 在 `net_init()`/`eth_init()` 前显式调用幂等的 `e2631_net_refclk_init()`，让救援从 flash 冷启动第一条命令即可用；CI 新增 cold rescue gate（§5.2） |
 
 ## 2. 运行契约（v1 冻结）
 
@@ -172,6 +173,28 @@ U-Boot `g85df6772a444` → `mtd read` 暂存镜像 + `crc32 0x34b252a4` → `go`
 证据见 [evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) §11 与
 `evidence/e4-rescue-acceptance/run-2/`（kit 提交 `589b4d4`）。写模式验收仍需用户单独批准。
 
+## 5.2 冷启动救援修复（patch 0034，2026-11-28）
+
+真机证据（verify-docs 常驻检查，flash 上 E4 镜像冷启动；`write-run-2/session/serial.log`）：中断 autoboot 后在
+提示符直接跑 `e2631rescue`，串口出现
+`ethernet@92000000 Waiting for PHY auto negotiation to complete......... TIMEOUT !`、
+`zx279128s: PHY startup failed (-110)`、`e2631rescue: no usable Ethernet device`。同一镜像在 RAM 链
+（先跑过 `e2631net`/`e2631boot`）救援正常，boot log 里也已打印 `Net:   eth0: ethernet@92000000`。
+
+结论：冷启动第一条命令进救援时，网络参考时钟/SerDes 还没建立，内部 PHY 的 MDIO 不应答，
+`phy_startup()` 约 5 s 后超时（-110）。0034 让 `do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用
+幂等的 `e2631_net_refclk_init()`（`refclk_done` 守卫；`e2631boot` 与 eth 驱动 start 也调用同一函数，不会重复下发），
+保证“救援不需要先跑别的命令”。CI 新增 cold rescue gate：`e2631rescue.c` 必须 include `e2631net.h`，且
+`awk` 截取 `do_e2631rescue()` 后必须能 grep 到 `e2631_net_refclk_init();`。
+
+同一次交付还把两条真机运维规则写进 README §5：救援服务期间不要向 U-Boot 控制台发送任何字符
+（`Ctrl-C` 是唯一被识别的输入，会中断排队中的写并打印 WARNING）；同一次开机内救援只用一次
+（第二次进入 ARP/SYN 不应答，重进前先 `reset`/断电；静态审计见 task-78 记录）。
+
+静态备注：E2 的 eth 驱动 `start` 自引入起就在最前面调用同一 helper，因此 0034 的直接效果是把“参考时钟
+先于 net_init/eth_init（MDIO/PHY probe）”变成显式、不可退化的约束；若真机冷启动救援仍超时，下一层怀疑
+是 PHY/SerDes 首次上电的复位与 autoneg 时序，而不是调用缺失。
+
 ## 6. 风险与边界
 
 - 写窗口只在 mtd0 U-Boot 区，固件槽位与 env 不在救援范围内（用户裁决：v1/v2 都不刷固件镜像）。
@@ -179,6 +202,10 @@ U-Boot `g85df6772a444` → `mtd read` 暂存镜像 + `crc32 0x34b252a4` → `go`
   伪造了 SHA 头则无法检出，页面 SHA-256 只是信息性 + 传输完整性。
 - 救援页是 U-Boot 内的单线程轮询服务（无中断、无多连接），只适合维护会话；正常启动不初始化网络。
 - 复位依赖厂商 TOPCRM 寄存器；若真机上该写不触发复位，串口会停在自旋前提示，断电恢复。
+- 救援是“每次开机只用一次”：0034 修好冷启动入口后，同一次开机内 Ctrl-C 退出再进第二次仍可能 RX 不应答
+  （缓存的 PHY 对象与 master reset 后状态；见 uboot-port/README.md §5 E4 段）。
+- 救援服务期间不要向 U-Boot 控制台发送任何字符（含回车）；`Ctrl-C` 是唯一被识别的输入，会中断排队中的
+  flash 写并打印 WARNING。
 
 ## 7. 参考
 

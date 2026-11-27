@@ -349,6 +349,15 @@ jobs:
           grep -q 'e2631_http_header_value' board/zte/zxhn-e2631/e2631rescue.c
           grep -q 'e2631_http_name_is' board/zte/zxhn-e2631/e2631http.h
           echo "rescue header gate: the case-insensitive helpers are in the image"
+          # E4 cold-boot rescue (patch 0034): a rescue that only works after
+          # e2631boot/e2631net has run is not a rescue.  do_e2631rescue() must
+          # bring the network reference clocks up itself.
+          grep -q '#include "e2631net.h"' "$rescue_c"
+          if ! awk '/^static int do_e2631rescue\(/,/^}/' "$rescue_c" | grep -q 'e2631_net_refclk_init();'; then
+            echo "::error::do_e2631rescue() does not call e2631_net_refclk_init() (cold-boot rescue regression)"
+            exit 1
+          fi
+          echo "cold rescue gate: do_e2631rescue brings up the network reference clocks"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1

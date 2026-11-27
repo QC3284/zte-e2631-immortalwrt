@@ -5,7 +5,7 @@
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
 的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）
-、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、
+、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、0034 为冷启动救援修复（`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用幂等的 `e2631_net_refclk_init()`：flash 冷启动直接进救援时 `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 的 MDIO 不应答、`phy_startup()` 约 5 s 后超时（-110，`no usable Ethernet device`）；RAM 验收当时能过只是因为先跑过 `e2631net`/`e2631boot`）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -123,7 +123,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0032 sha256 | `8d1d11fdeae32fef0e2cccd364ffe1cad0dcaf3fc38f90728f8b5250e68d58a5` |
 | patch 0033 | `uboot-port/patches/0033-board-zte-match-the-rescue-HTTP-header-names-case-in.patch`（task-78/E4 phase-1：请求头名比较两侧都折成小写；头名/头值辅助函数移入无依赖的 `e2631http.h`；主机侧 fixture `uboot-port/tests/rescue_headers_test.c` 在 CI 回放混合大小写请求） |
 | patch 0033 sha256 | `5657f596688825f2111fd3fea3108fbe93e2973231f28947d0c2faa56d2e21ca` |
-| am 之后 tree | `cd67a0414737dcbb860072ddbaaf3de16a306b46`（与机器无关，33 个 patch） |
+| patch 0034 | `uboot-port/patches/0034-board-zte-bring-up-the-network-clocks-for-a-cold-rescue.patch`（task-78/E4 cold boot：`do_e2631rescue()` 在 `net_init()`/`eth_init()` 前调用幂等的 `e2631_net_refclk_init()`，让救援能从 flash 冷启动提示符独立工作；CI 断言该调用留在 `do_e2631rescue()` 内） |
+| patch 0034 sha256 | `eef4625c0e3689acf7055de3636b2edc5a7a4d0f4e89cc0c3ee0161fc0c1e986` |
+| am 之后 tree | `0480ef834d718b827e32c1ae9b787f671ca3f5a1`（与机器无关，34 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -141,7 +143,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = cd67a0414737dcbb860072ddbaaf3de16a306b46
+test "$(git rev-parse HEAD^{tree})" = 0480ef834d718b827e32c1ae9b787f671ca3f5a1
 ```
 
 ## 2. 新增/修改的文件
@@ -166,7 +168,7 @@ test "$(git rev-parse HEAD^{tree})" = cd67a0414737dcbb860072ddbaaf3de16a306b46
 
 | `board/zte/zxhn-e2631/zxhn-e2631.c` | `dram_init`/`dram_init_banksize` 从内嵌 DT 读 256 MiB；0029 起 `reset_cpu()` 走厂商 TOPCRM 软复位（`mdelay(50)` + `writel(1, 0x94000044)`，写后自旋） |
 | `board/zte/zxhn-e2631/e2631flash.h` | E4 起暴露五步写 job API（`e2631_flash_begin/erase/blank_check/write_image/readback/compare/end`），救援页只经它写 mtd0，不新增第二个 MTD 写实现 |
-| `board/zte/zxhn-e2631/e2631rescue.c` | E4 v1：`e2631rescue` 命令（DHCP + 极简 HTTP + gzip 救援页）；GET `/`、GET `/status`、POST `/flash?mode=validate|write`（655360 B 原始 body、`X-E2631-SHA256`/`X-E2631-Confirm: write` 契约、结构校验），校验通过后经 `e2631_flash_*` 五步写 mtd0 `0x20000..0xC0000`（源指针=镜像首地址，写长度 0xA0000）；不写 env/保留区、不自动重启 |
+| `board/zte/zxhn-e2631/e2631rescue.c` | E4 v1：`e2631rescue` 命令（DHCP + 极简 HTTP + gzip 救援页；0034 起 `do_e2631rescue()` 先调幂等的 `e2631_net_refclk_init()`，保证冷启动第一条命令即可用）；GET `/`、GET `/status`、POST `/flash?mode=validate|write`（655360 B 原始 body、`X-E2631-SHA256`/`X-E2631-Confirm: write` 契约、结构校验），校验通过后经 `e2631_flash_*` 五步写 mtd0 `0x20000..0xC0000`（源指针=镜像首地址，写长度 0xA0000）；不写 env/保留区、不自动重启 |
 | `board/zte/zxhn-e2631/e2631http.h` | E4 phase-1（0033）：无依赖的 HTTP/1.x 头名/头值辅助函数（头名大小写不敏感，RFC 7230 §3.2）；`e2631rescue.c` 与主机 fixture 共用同一份实现 |
 | `uboot-port/tests/rescue_headers_test.c` | E4 phase-1（0033）：kit 仓库侧主机 fixture（不进树），用捕获的混合大小写 GET/POST 头块回放真实辅助函数；CI 在 `git am` 之后用宿主机 gcc 编译运行 |
 | `net/mtk_tcp.c` / `net/mtk_tcp_priv.h` / `include/net/mtk_tcp.h` | E4：从 bl-mt798x-dhcpd（GPL-2.0，`e4cf4dc7`）移植的最小 TCP 栈，公开 API 头与私有协议头分开 |
@@ -360,7 +362,7 @@ defconfig 打开 `CMD_DHCP/CMD_MII/CMD_PING/NET_RANDOM_ETHADDR/ETH_ZX279128S/MDI
 | 自更新命令 | `e2631flash` / `e2631verify` / `e2631slot`（0014） | `e2631flash` 块对齐擦除 → 全 0xFF 校验 → 写入 → 读回逐字节比较，打印 PASS/FAIL、首个不一致偏移与 staged payload/readback CRC32；`<src>` ≥0x40000000 为 RAM 地址、<0x10000000 为 NAND 字节偏移（先读入 `0x44000000` 的 1 MiB bounce buffer，flash→flash 更新不边擦边读目标）；拒绝未对齐/越界、secondboot 0x00000..0x20000、env 0xC0000..0xE0000 与长度 >1 MiB；擦除前打印 DO NOT POWER OFF。`e2631verify` 只读 CRC32；`e2631slot` 复用 `e2631boot` 的扫描函数 |
 
 | 原始 mtd 写入口 | `CONFIG_CMD_MTD_WRITE`（0015） | 上游 `CONFIG_CMD_MTD` 自带 `mtd write/erase` 子命令；新增 `CONFIG_CMD_MTD_WRITE`（bool，默认 y）把它们编到开关后，本 defconfig 关闭，使 `e2631flash` 成为镜像中唯一调用 `mtd_write()`/`mtd_erase()` 的代码（CI 用调用点白名单证明） |
-| 救援模式（E4 v1） | `e2631rescue` + 0x46000000 上传区（0026-0028） | 串口进入；lan1 上跑 DHCP（192.168.1.1/24，池从 .100）与极简 HTTP；页面只刷 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B 整镜像，源指针=镜像首地址，SHA-256 + 结构校验后再经 `e2631_flash_*` 五步写）；secondboot `0x0..0x20000`、env `0xC0000..0xE0000` 与保留区 `0xE0000..0xFFFFF` 一律不碰；成功不自动重启，Ctrl-C 退出 |
+| 救援模式（E4 v1） | `e2631rescue` + 0x46000000 上传区（0026-0028；0034 冷启动补参考时钟） | 串口进入；lan1 上跑 DHCP（192.168.1.1/24，池从 .100）与极简 HTTP；页面只刷 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B 整镜像，源指针=镜像首地址，SHA-256 + 结构校验后再经 `e2631_flash_*` 五步写）；secondboot `0x0..0x20000`、env `0xC0000..0xE0000` 与保留区 `0xE0000..0xFFFFF` 一律不碰；成功不自动重启，Ctrl-C 退出 |
 | 软复位 | 厂商 TOPCRM `0x94000044`（0029） | `reset_cpu()` 先 `mdelay(50)`，再向 `TOPCRM+0x44` 写 1；BootROM 随后重跑 secondboot 并重新加载 U-Boot。没有 L2/SCU/时钟副作用，也不新增 MTD 写路径 |
 
 ### 内存图（staging / kernel copy / DMA arena）
@@ -412,8 +414,8 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `cd67a0414737dcbb860072ddbaaf3de16a306b46`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 31）。
+1. `git rev-parse HEAD^{tree}` == `0480ef834d718b827e32c1ae9b787f671ca3f5a1`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 34）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -546,6 +548,9 @@ make O=build -j"$(nproc)"
 21. E4 救援请求头修复（0033，task-78/E4 phase-1）：`rescue_headers_test.c` 主机 fixture 在 `git am` 之后、
     交叉编译之前编译运行并打印 `rescue header fixture: PASS`；源码含 `e2631_http_header_value`（`e2631rescue.c`）
     与 `e2631_http_name_is`（`e2631http.h`）。二进制里头的比较两侧必须都走大小写折叠。
+22. E4 冷启动救援（0034，task-78/E4 cold boot）：`e2631rescue.c` 含 `#include "e2631net.h"`，且 `do_e2631rescue()`
+    函数体内含 `e2631_net_refclk_init();`（CI 用 awk 截取该函数再 grep，缺一即失败）；打印
+    `cold rescue gate: do_e2631rescue brings up the network reference clocks`。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -674,6 +679,23 @@ E4 phase-1（2026-11-28）：0033 修复了所有 POST `/flash` 因请求头大�
 的缺陷；每次构建都会先跑主机侧 fixture（`uboot-port/tests/rescue_headers_test.c`），回放混合大小写的
 GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步做只读校验即可。
 
+冷启动（0034，2026-11-28）：救援必须能从 **flash 冷启动后的第一个命令** 独立工作。0033 之前从 flash 提示符
+直接跑 `e2631rescue` 会得到 `Waiting for PHY auto negotiation to complete......... TIMEOUT !` /
+`zx279128s: PHY startup failed (-110)` / `e2631rescue: no usable Ethernet device`：冷启动时 `e2631boot` 还没跑过，
+网络参考时钟与 SerDes 没建立，内部 PHY 不应答 MDIO。0034 让 `do_e2631rescue()` 在 `net_init()`/`eth_init()`
+之前调用幂等的 `e2631_net_refclk_init()`（与 `e2631boot`、eth 驱动 start 同一函数，`refclk_done` 守卫不会重复下发），
+CI 用 awk 截取该函数断言这个调用必须存在。RAM 链验收当时能过，只是因为先跑过 `e2631net`/`e2631boot`。
+
+控制台输入（重要）：救援服务循环用 `ctrlc()` + `tstc()/getchar()` 轮询控制台，**服务期间不要向 U-Boot 控制台
+发送任何字符**（包括回车/换行）；`Ctrl-C` 是唯一被识别的输入，会退出救援（若正在擦/写，会中断并打印危险
+WARNING）。因此网页操作期间串口终端应保持静默，等页面显示结果后再决定是否 Ctrl-C。
+
+同一次开机内重复进入（v1 已知限制）：第一次 Ctrl-C 退出后再跑 `e2631rescue`，第二次 `eth_init()` 成功、
+也打印 `lan1 up, 1000 Mbit/s`，但主机 ARP/SYN 收不到应答（2026-11-28 写验收 run-1 记录）。静态审计显示网络栈/
+驱动没有一次性初始化开关，差异只剩缓存的 PHY 对象（第二次 `genphy_update_link()` 因 `phydev->link=1` 跳过
+autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，把救援当作 **每次开机只用一次**：需要重进时先
+`reset` 或断电，再从冷启动提示符进入。
+
 1. U-Boot 提示符执行 `e2631rescue`：串口应打印监听 lan1、本机 IP（192.168.1.1）以及 DHCP/HTTP 启动行；
    接在 lan1 的 PC 应能从 DHCP 拿到 192.168.1.100 起的地址。
 2. 浏览器打开 `http://192.168.1.1/`：页面来自内嵌 gzip（Content-Encoding: gzip），不需要外网。
@@ -745,6 +767,7 @@ GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步
   人为破坏选中槽的 uImage（写 slot 区，需单独批准）或等真实坏槽事件。健康路径不受影响：选槽规则、版本头校验与
   uImage 校验顺序都与 0006 相同，回退只在选中槽失败时才发生，且不改任何持久状态。
 
+- **E4 救援是“每次开机只用一次”**：0034 已让救援从 flash 冷启动第一条命令就可用（自带参考时钟初始化），但同一次开机内 Ctrl-C 退出后再进第二次，DHCP/ARP 可能不再应答（v1 已知限制，见 §5 E4 验收的命令台输入与重复进入两段）。重进前先 `reset`/断电；救援期间别往 U-Boot 控制台打字，Ctrl-C 是唯一被识别的输入。
 - **E4 救援页直接写 mtd0，变砖风险最高**：`e2631rescue` 的写窗口是 U-Boot 区 `0x20000..0xC0000`（655360 B，到 env 前为止）；
   写前必须通过 SHA-256 + 结构校验，且页面要求 `X-E2631-Confirm: write` 才进入五步写。成功不自动重启；
   写期间掉电会留下半写镜像，只能靠串口 + 厂商/第二级链路恢复。该路径复用 `e2631_flash_*`，没有第二条
@@ -1049,3 +1072,12 @@ GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步
   错误摘要返回 HTTP 400 `error=sha256 mismatch` 且 `/status` 保持 idle（零擦写），`GET /`、`/status`、F1 全 PASS，
   证据见 [evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) §11（run-2）；
   写模式验收仍待用户单独批准。
+
+- 2026-11-28（task-78/E4 cold boot，救援独立启动修复）：flash 上 E4 镜像冷启动后，提示符第一条命令
+  `e2631rescue` 报 PHY autoneg TIMEOUT / `PHY startup failed (-110)` / `no usable Ethernet device`——冷启动时
+  `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 不应答 MDIO；RAM 链验收能过只因先跑过
+  `e2631net`。新增 patch 0034：`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前调用幂等的
+  `e2631_net_refclk_init()`，CI 新增 cold rescue gate（awk 截取 `do_e2631rescue()` 后断言该调用存在）。
+  同时把两条真机运维规则写进 §5：救援服务期间不要向 U-Boot 控制台发任何字符（Ctrl-C 是唯一被识别的
+  输入，会中断排队中的写并打印 WARNING）；同一次开机内救援只用一次（第二次进入 ARP/SYN 不应答，重进前
+  先 reset/断电）。
