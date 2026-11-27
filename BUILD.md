@@ -300,7 +300,7 @@ Since E4, space is a first-class constraint: `uboot-build.yml` gates the payload
 | payload window | mtd0 `0x20800..0xBFFFF` (0x9F800) |
 | hard cap | **653312 bytes (638 KiB)** |
 | CI gate | **645120 bytes** (hard cap - 8192 bytes = 8 KiB safety margin) |
-| current `u-boot.bin` (2026-11-22, 22 patches) | 494208 bytes; headroom to the hard cap 159104 bytes (24.35%), headroom to the CI gate 150912 bytes |
+| current `u-boot.bin` (2026-11-27, 24 patches) | 494880 bytes; headroom to the hard cap 158432 bytes (24.25%), headroom to the CI gate 150240 bytes |
 | failure behaviour | above 645120 bytes the build fails and prints both the observed size and the limit |
 
 Every successful build records a footprint table in the artifact's
