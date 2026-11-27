@@ -810,4 +810,9 @@ U-Boot 网络栈。
   （staging `0x42000000` / kernel copy `0x40008000` / arena `0x45000000`），并在 §3 内存图纠正卡片时代的
   `0x4554xxxx` 换算错误（3,491,146 B 止于 `0x4235454A`）。重钉结果 tree
   `721bb82538df42dca98fd633b98faa0582256850`（24 个 patch；0023 sha256 `e38d0545…`、0024 sha256
-  `8bf4e048…`）。CI 与 artifact 值见 [evidence/uboot-e2-fix-20261127.md](../evidence/uboot-e2-fix-20261127.md)。
+  `8bf4e048…`）。CI uboot-build run `45985501668`（head `454c105`，其上是 task-71 的 artifact 统计提交）
+  SUCCESS：banner `U-Boot 2027.01-rc2-gcbcaeea0d172`、`u-boot.bin` 494,880 B sha256
+  `15bfa0c1484d96a4ab90e774a47798251116a9abebd3480f29762dabf64d692a` crc32 `7db1de62`、mtd0 镜像 sha256
+  `c45baf4fd1831ec90b501f78dc1c02f18da0fd2bae80ba9f142a1a9a81895ae7` crc32 `e6a2274e`、env 块 `6eee153b…`
+  未变、checkpatch 0 errors / 0 warnings（3 条既有 CHECK 不阻断）；证据见
+  [evidence/uboot-e2-fix-20261127.md](../evidence/uboot-e2-fix-20261127.md)。
