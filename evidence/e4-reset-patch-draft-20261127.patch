@@ -1,0 +1,76 @@
+From e072792e21001953390e3bc1b6a196a895a2b700 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 20:20:00 +0800
+Subject: [PATCH] board: zte: reset the SoC through the vendor TOPCRM register
+
+The A1 port's reset_cpu() only printed a hint, so the reset command
+returned to the prompt and the rescue flow still needed a power cycle.
+
+The vendor U-Boot 2013.04 reset command is a single register write. Its
+handler at payload 0x47f01a40 prints "resetting ...", waits 50 ms and
+calls 0x47f00840, which stores 1 in TOPCRM + 0x44 (0x94000044). The
+write was measured on this board: after the message the BootROM runs the
+boot header and secondboot again, including "ddr init enter, rate is
+1333 Mbps", then reloads U-Boot from SPI-NAND. The serial excerpts are
+under evidence/c1b1a-write-rehearsal/run-2/ and evidence/b1-env-session/.
+
+Do the same in reset_cpu() and spin if the reset does not fire. This adds
+no MTD write path and keeps the four-site write allowlist unchanged.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/zxhn-e2631.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/zxhn-e2631.c b/board/zte/zxhn-e2631/zxhn-e2631.c
+index 1948dea..1136d43 100644
+--- a/board/zte/zxhn-e2631/zxhn-e2631.c
++++ b/board/zte/zxhn-e2631/zxhn-e2631.c
+@@ -11,7 +11,9 @@
+ #include <fdtdec.h>
+ #include <cpu_func.h>
+ #include <init.h>
++#include <linux/delay.h>
+ #include <stdio.h>
++#include <asm/io.h>
+ 
+ int dram_init(void)
+ {
+@@ -24,11 +26,30 @@ int dram_init_banksize(void)
+ }
+ 
+ /*
+- * A1 has no reset controller driver: the vendor bootloader still owns the
+- * SoC reset path. Report the limitation and return to the prompt instead of
+- * spinning forever; A2/A3 add the real reset mechanism.
++ * Reset through the vendor TOPCRM register. The vendor U-Boot 2013.04 reset
++ * handler (payload 0x47f01a40) prints "resetting ...", waits 50 ms and calls
++ * 0x47f00840, which stores 1 in TOPCRM + 0x44:
++ *
++ *     47f00840: mov r3, #0x94000000
++ *     47f00844: mov r2, #1
++ *     47f00848: str r2, [r3, #0x44]
++ *
++ * Measured on this board (evidence/c1b1a-write-rehearsal/run-2/
++ * serial-vendor-console-excerpt.txt): after "resetting ..." the BootROM runs
++ * again, secondboot re-initialises CRPM and DDR at 1333 Mbps, and the boot
++ * chain reloads U-Boot from SPI-NAND. So the write is a full SoC reset and
++ * nothing has to be preserved across it.
+  */
++#define ZX279128S_TOPCRM_BASE		0x94000000
++#define ZX279128S_TOPCRM_SOFT_RST	0x0044
++
+ void reset_cpu(void)
+ {
+-	printf("reset: the A1 port has no reset controller, power-cycle the board\n");
++	/* do_reset() has already printed "resetting ..." and flushed. */
++	mdelay(50);
++	writel(1, ZX279128S_TOPCRM_BASE + ZX279128S_TOPCRM_SOFT_RST);
++
++	/* The vendor never returns here; do not resume a half-dead prompt. */
++	while (1)
++		;
+ }
+-- 
+2.56.1
+
