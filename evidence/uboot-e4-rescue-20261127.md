@@ -150,6 +150,20 @@ CI 在 `git am` 之后、交叉编译之前用宿主机 gcc `-Wall -Wextra -Werr
 真机复测（patch 0033 构建）：按 §5 的第 1、2、3 步重跑；成功签名是 POST validate 返回 `result=ok` +
 CRC32（或页面显示校验通过），`/status` 保持 idle，mtd0 不变。write 验收仍需用户单独批准。
 
+### 5.1.1 CI 构建身份（run 46036894542，33 个 patch）
+
+| 项 | 值 |
+| --- | --- |
+| 运行 | `E2631 A1/A2/A3 U-Boot - iwrt-adaptation - run 39`，run id `46036894542`，head `a97b76c` |
+| post-am tree | `cd67a0414737dcbb860072ddbaaf3de16a306b46`（33 commits） |
+| banner | `U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)` |
+| u-boot.bin | 365,872 B sha256 `3dbbfc49e7fa580fe5327f9b0f11cddc0fe0d0f92e5a9fde9c37a7efdf133bb6` crc32 `34b252a4` |
+| mtd0 image | sha256 `8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9` crc32 `79ef8c50` |
+| 装配后首 0x800 | sha256 `232513cb16f11c15299716b14cdc3c4fb4e4b2d787c6cd10b01309be0acd29c9` |
+| env 块 | `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（未变） |
+| 门禁 | `rescue header fixture: PASS (mixed-case GET/POST blocks resolve)`；`rescue header gate`；`mtd writer sites: 4`；checkpatch `0 errors / 0 warnings`；入口 0x47f00000 |
+| 归档 | `/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/`（SHA256SUMS 校验通过） |
+
 ## 6. 风险与边界
 
 - 写窗口只在 mtd0 U-Boot 区，固件槽位与 env 不在救援范围内（用户裁决：v1/v2 都不刷固件镜像）。

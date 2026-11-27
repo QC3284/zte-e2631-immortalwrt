@@ -1040,4 +1040,8 @@ GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步
   （`Content-Length`/`X-E2631-SHA256`/`X-E2631-Confirm`）去比较，`'c' != 'C'` 使任何请求头都匹配不上；
   `GET /` 与 `/status` 不读请求头所以看起来正常。新增 patch 0033：比较两侧都折成小写，头名/头值辅助函数
   移入无依赖的 `e2631http.h`；新增主机 fixture `uboot-port/tests/rescue_headers_test.c`，CI 在 `git am` 之后、
-  交叉编译之前编译运行（失败即中止），防止同类缺陷再进镜像。CI 构建身份见后续条目。
+  交叉编译之前编译运行（失败即中止），防止同类缺陷再进镜像。CI 构建 run `46036894542`（head `a97b76c`，
+  33 个 patch，tree `cd67a0414737dcbb860072ddbaaf3de16a306b46`）全绿：banner `U-Boot 2027.01-rc2-g30dca5f54503`、
+  u-boot.bin 365,872 B sha256 `3dbbfc49e7fa580fe5327f9b0f11cddc0fe0d0f92e5a9fde9c37a7efdf133bb6` crc32 `34b252a4`、
+  mtd0 sha256 `8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9` crc32 `79ef8c50`、
+  env 块 `6eee153b...` 未变；`rescue header fixture: PASS`、`mtd writer sites: 4`、checkpatch 0E/0W。
