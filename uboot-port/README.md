@@ -522,6 +522,11 @@ make O=build -j"$(nproc)"
 
     flash 未擦除；成功路径最后一行是 `e2631rescue: PASS: mtd0 updated, CRC32 0x...` 且不自动重启。
     实测（run 46002766353）：`u-boot.bin` 320,848 → 360,624 B（+39,776 B，+12.40%），超出 Option A 的 34 KB 估算上限 4,960 B；距 mtd0 载荷硬上限余量 292,688 B。
+    合并构建（run 46010298863，banner `g6db632ad6e5b`，30 个 patch，tree `3be7118d...`）：`u-boot.bin` 361,448 B
+    （较上一构建 +824 B；相对 slim 320,848 B 为 +40,600 B / +12.65%），mtd0 sha256
+    `62bf1244d69471e2454be966694421dc2d6f8c8ce427393f7b056837d4893d71`，装配后首 0x800 sha256
+    `036d5dc72ee0d0fd020e1a542ee7b93ab750ec3ba1cc700e402ba9acd6ce0f4a`（模板 `19a9d546...`），env 块未变，
+    D-U1 白名单仍 4 个 site；`E4 rescue window gate` / `env retry gate` 均通过，checkpatch 0/0（24 CHECK 均既有）。
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
 前置：串口线接 UART0（115200 8N1），进入厂商 U-Boot 控制台（控制台密码见救砖手册）。
@@ -612,8 +617,10 @@ U-Boot 网络栈。
 
 ### E4 v1 救援模式验收（需要真机会话；会写 mtd0，需用户单独批准）
 
-救援路径只用于把已验证的 `mtd0` 整镜像（655360 B）刷进 U-Boot 区 `0x20000..0xC0000`（写长度 0xA0000，源指针=镜像首地址）进入前先记录
-`mtd0` 全盘 sha256 与 0xC0000 env 块 sha256；整个过程不写 env、不写 secondboot、不自动重启。
+救援路径只用于把已验证的 `mtd0` 整镜像（655360 B）刷进 U-Boot 区 `0x20000..0xC0000`（写长度 0xA0000，源指针=镜像首地址）。进入前先记录
+`mtd0` 全盘 sha256 与 0xC0000 env 块 sha256；整个过程不写 env、不写 secondboot、不自动重启。写入前必须先让
+verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` 通过（30 项检查；kit tree 不一致会失败），
+再申请用户批准。
 
 1. U-Boot 提示符执行 `e2631rescue`：串口应打印监听 lan1、本机 IP（192.168.1.1）以及 DHCP/HTTP 启动行；
    接在 lan1 的 PC 应能从 DHCP 拿到 192.168.1.100 起的地址。
@@ -933,3 +940,11 @@ U-Boot 网络栈。
   mtd0 sha256 `79dab60d3ce0e3eb72037cd6afb3431b89071824c6449df377d62cb233095a28`、env 块
   `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426` 未变；救援页资产 raw 9,216 B /
   gzip 4,456 B（上限 6,144 B）。
+
+- 2026-11-27（task-78/task-77，救援写窗口修正 + env 读重试）：verify-docs 在首个 E4 构建后审出 0028 的写窗口
+  与源指针错误（原 `0x20000..0xA0000`、源 `img+0x20000`），按 Lead 要求就地修正为整 U-Boot 区
+  `0x20000..0xC0000`（655360 B，源=镜像首地址，erase/write/compare 同窗），并加 workflow 回归门禁；同时新增
+  patch 0030 给 `env_mtd_load()` 加 3 次重试与失败现场打印（保留 0025，不丢 bootm 交接路径）。合并构建 run
+  `46010298863`（banner `g6db632ad6e5b`，30 patch，tree `3be7118d...`）全绿：`u-boot.bin` 361,448 B sha256
+  `a693afdb...`、mtd0 sha256 `62bf1244...`、env 块 `6eee153b...` 未变、白名单 4 site。真机写入仍需用户批准，
+  且先由 verify-docs 的 `e4_prewrite_check.py --archive` 离线门禁通过。

@@ -59,13 +59,20 @@
   `X-E2631-Confirm: write`、`e2631rescue: PASS: mtd0 updated` 必须命中。
 - 源码形状：`e2631rescue.c` 含 `e2631_flash_begin`/`sha256_csum_wd`/`e2631_failsafe_html_gz`，且不含
   `mtd_write`/`mtd_erase`；`zxhn-e2631.c` 含 `ZX279128S_TOPCRM_SOFT_RST` 与 `mdelay(50)`。
+- 写窗口回归（task-78）：断言 `E2631_RESCUE_FLASH_OFF=0x20000`、`LEN=0xA0000`、`MTD0_END=0xC0000 ==
+  CONFIG_ENV_OFFSET`、三处源指针是镜像首地址、erase/write/compare 同窗；出现 `img + E2631_RESCUE_FLASH_OFF`
+  或 `rescue_image() +` 直接失败。
+- env 重试（task-77）：`env/mtd.c` 含 `ENV_MTD_READ_RETRIES`、读循环重试、`env_mtd_dump_failure` 与
+  `env_mtd: stored crc 0x%08x, data crc 0x%08x` 诊断串。
+- UBOOT-INFO：分别报告装配后 mtd0 首 0x800 sha256 与厂商模板 sha256（模板的 +0x14 长度字段会被重写），
+  banner 用完整 token 匹配（`U-Boot <year>.<mm>-rc<n>-g<sha> `），不再匹配 `U-Boot 20` 前缀。
 - 救援页资产：`tools/embed-failsafe.sh` 生成确定性 gzip（本次 raw 9,216 B / gzip 4,456 B，上限 6,144 B），
   workflow 在 `git am` 之后、`make` 之前嵌入。
 - 保留：`# CONFIG_CMD_MTD_WRITE is not set`、`# CONFIG_CMD_SAVEENV is not set`、MTD 写调用点白名单、
   `CONFIG_TEXT_BASE=0x47F00000`、入口点、尺寸上限、可复现构建（`SOURCE_DATE_EPOCH` +
   `git am --committer-date-is-author-date`）。
 
-## 4. CI 产物（run 46002766353）
+## 4. 首个构建（run 46002766353；写窗口缺陷，已被 §4.1 取代）
 
 | 项 | 值 |
 | --- | --- |
@@ -83,6 +90,30 @@
 
 命令帮助（E2631-COMMAND-HELP.txt）：`e2631flash`/`e2631verify`/`e2631slot`/`e2631env`/`e2631rescue` 五段与
 二进制字符串均已确认；`e2631rescue` 短帮助为 `serve the web bootloader rescue on lan1`。
+
+## 4.1 合并构建（task-78 + task-77，run 46010298863）
+
+| 项 | 值 |
+| --- | --- |
+| kit head | `b995ecdd949185b9c129d60913ef82aef183b75e` |
+| uboot-build run | `46010298863`（SUCCESS，head `b995ecd`） |
+| kit check.yml run | `46010266268`（SUCCESS） |
+| 30 patch post-am tree | `3be7118d0e192cc2157ce2f734a5496d6d8738c1` |
+| banner | `U-Boot 2027.01-rc2-g6db632ad6e5b (Nov 19 2026 - 15:44:39 +0000)` |
+| u-boot.bin | 361,448 B / sha256 `a693afdb7f14e04115deecaf0f599c52329caa2cdf381d7ec650b8c7e056cbc3` / crc32 `4139ba37` |
+| mtd0 镜像 | 655,360 B / sha256 `62bf1244d69471e2454be966694421dc2d6f8c8ce427393f7b056837d4893d71` / crc32 `fed99379` |
+| mtd0 首 0x800（装配后） | sha256 `036d5dc72ee0d0fd020e1a542ee7b93ab750ec3ba1cc700e402ba9acd6ce0f4a` |
+| 厂商模板 0x800（输入） | sha256 `19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510` |
+| env 块 | `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（未变） |
+| `.config` | `d3a8450a810064adce1152741cf563237a587e1c2875ad598eaa6c5f969a7a5a` |
+| checkpatch | 0 errors / 0 warnings（四类 ignore 后；24 条非阻断 CHECK 全部在 0026 既有代码） |
+| D-U1 白名单 | `mtd writer sites: 4`（未变） |
+| 新门禁 | `E4 rescue window gate: ...`、`env retry gate: ...` 均输出；0 条 `##[error]` |
+| 尺寸 | 相对首个 E4 构建 360,624 → 361,448 B（+824 B）；相对 slim 320,848 B 为 +40,600 B（+12.65%）；距 CI 门禁余量 283,672 B |
+| artifact | `/home/qc233/zte/e2631-t5-artifacts/uboot-e4fix-46010298863/e2631-uboot-46010298863/`（SHA256SUMS 11/11 通过） |
+
+真机写入顺序不变：先由 verify-docs 的离线门禁 `e4_prewrite_check.py --archive <上面目录>` 通过，再申请用户
+批准；本构建不自动重启，写后外部复核 mtd0 全盘 sha256 应等于 `62bf1244...`。
 
 ## 5. 零写入真机验收（下一次设备会话，写入步骤需用户单独批准）
 
