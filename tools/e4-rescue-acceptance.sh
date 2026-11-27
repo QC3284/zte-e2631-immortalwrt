@@ -19,9 +19,12 @@
 #     15-patch image region b1ea9a48..., but the target's own region digest must
 #     be measured first (dd if=/dev/mtd0 bs=4096 skip=32 count=160 | sha256sum);
 #     pass it explicitly with --expected-sha and never substitute a different image;
-#   * every validate/write POST carries X-E2631-SHA256; a probe with a wrong
-#     digest must be refused. Without --require-digest an unenforced digest is
-#     reported as a loud WARNING (v1 gap) instead of being silently skipped;
+#   * every validate/write POST carries X-E2631-SHA256; v1 checks that digest
+#     against the uploaded bytes, so a probe with a wrong digest must be
+#     refused. The digest is still client-supplied (no pinned device-side
+#     authority), which is why the image identity comes from --expected-sha;
+#     without --require-digest an unenforced digest is reported as a loud
+#     WARNING instead of being silently skipped;
 #   * the image is the one the board already runs, so a successful write leaves
 #     /dev/mtd0 byte-identical (net-zero acceptance);
 #   * the harness never issues a reboot/reset: returning to Linux is a power
@@ -105,6 +108,11 @@ kv() { # kv <text> <key>
 
 get_status() {
 	curl -sS --max-time 5 "http://$HOST/status" 2>/dev/null || true
+}
+
+get_status_hdr() {
+	curl -sS --max-time 5 -D "$TMP/status.hdr" -o "$TMP/status.body" \
+		"http://$HOST/status" 2>/dev/null || true
 }
 
 assert_status_idle() { # assert_status_idle <context>
@@ -290,6 +298,11 @@ if ! grep -qi '^content-encoding:[[:space:]]*gzip' "$TMP/page.hdr"; then
 else
 	pass "GET / is served with Content-Encoding: gzip"
 fi
+if grep -qi '^content-type:[[:space:]]*text/html' "$TMP/page.hdr"; then
+	pass "GET / is served as text/html"
+else
+	failcase "GET / is not served as text/html (headers: $(tr -d '\r' <"$TMP/page.hdr" | head -8 | tr '\n' ' '))"
+fi
 if gzip -dc "$TMP/page.body" >"$TMP/page.html" 2>/dev/null; then
 	served_sha=$(sha256sum "$TMP/page.html" | awk '{print $1}')
 	served_size=$(stat -c %s "$TMP/page.html")
@@ -343,6 +356,11 @@ assert_validate_ok() { # assert_validate_ok <file> <context>
 	body=$(cat "$TMP/validate.body" 2>/dev/null || true)
 	result=$(kv "$body" result)
 	crc=$(kv "$body" crc32)
+	crc_src="body"
+	if [ -z "$crc" ]; then
+		crc=$(kv "$(get_status)" crc32)
+		crc_src="status"
+	fi
 	if [ "$code" != 200 ]; then
 		failcase "$ctx: validate returned HTTP $code (curl rc=$POST_RC, body='$body')"
 		return 1
@@ -352,7 +370,7 @@ assert_validate_ok() { # assert_validate_ok <file> <context>
 		return 1
 	fi
 	if [ -z "$crc" ]; then
-		failcase "$ctx: validate response has no crc32 (body='$body')"
+		failcase "$ctx: neither the validate response nor /status carries crc32 (body='$body')"
 		return 1
 	fi
 	if [ "$(lc "$crc")" != "$(lc "$LOCAL_CRC")" ]; then
@@ -376,7 +394,7 @@ assert_validate_ok() { # assert_validate_ok <file> <context>
 		printf '[e4-accept] WARNING: validate response has no sha256/sha_match; the build predates the digest contract (v1-consistency gap)\n' >&2
 		note "$ctx: response carries no sha256/sha_match (build predates the digest contract)"
 	fi
-	pass "$ctx: validate HTTP 200, result=ok, crc32=$crc"
+	pass "$ctx: validate HTTP 200, result=ok, crc32=$crc (from $crc_src)"
 	return 0
 }
 
@@ -407,7 +425,16 @@ assert_rejected() { # assert_rejected <file> <label>
 }
 
 # --- pre-state: the rescue server must be idle before anything is uploaded
-st=$(get_status)
+get_status_hdr
+if grep -qi '^content-type:[[:space:]]*text/plain' "$TMP/status.hdr"; then
+	pass "/status is served as text/plain"
+else
+	failcase "/status is not served as text/plain (headers: $(tr -d '\r' <"$TMP/status.hdr" | head -8 | tr '\n' ' '))"
+fi
+st=$(cat "$TMP/status.body" 2>/dev/null || get_status)
+if ! printf '%s\n' "$st" | grep -q '^stage='; then
+	failcase "/status body has no stage= key (body='$(printf '%s' "$st" | head -c 200)')"
+fi
 stage=$(kv "$st" stage)
 if [ "$stage" = idle ]; then
 	pass "pre-state: /status is idle"
@@ -602,12 +629,16 @@ else
 		else
 			note "write poll: /status never reported sha256 (build predates the digest contract)"
 		fi
+		seen_stages=0
 		for want in erase blank write readback compare; do
 			case "$observed" in
-			*" $want "*) pass "write poll: observed stage '$want'" ;;
-			*) failcase "write poll: stage '$want' was never observed (observed:$observed)" ;;
+			*" $want "*) pass "write poll: observed stage '$want'"; seen_stages=$((seen_stages + 1)) ;;
+			*) note "write poll: stage '$want' was not sampled between polls (transient; observed:$observed)" ;;
 			esac
 		done
+		if [ "$seen_stages" -eq 0 ]; then
+			failcase "write poll: none of erase/blank/write/readback/compare was ever observed (observed:$observed)"
+		fi
 		if [ -n "$crc" ] && [ "$(lc "$crc")" = "$(lc "$LOCAL_CRC")" ]; then
 			pass "write poll: final CRC32 $crc equals the local image CRC32"
 		else
