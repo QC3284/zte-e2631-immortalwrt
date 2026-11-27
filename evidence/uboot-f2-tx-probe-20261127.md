@@ -179,3 +179,22 @@ SBRG 块正确读地址是 `0x95883c0`（0x92000000 基址 + 0x3883c0），旧�
 | 门禁 | checkpatch 0 errors / 0 warnings（24 checks）；`mtd writer sites: 4`；`F2 TX probe gate` 与 `F2 forward-control gate` 均输出；入口 0x47f00000 |
 | 尺寸 | 365,872 B（较 0031 构建 +1,144 B；CI 门限余量 279,248 B，硬上限余量 287,440 B） |
 | 归档 | `/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/`（SHA256SUMS 校验通过） |
+
+### 8.2 真机验证：F2 GREEN（零写入 RAM 会话，2026-11-28 00:13）
+
+verify-docs 用 0032 构建（banner `gd38f69c44523`，u-boot.bin sha256 `e87a8580…`，crc32 `0966526e`）从
+userdata 暂存 + `go 0x47F00000` 进 RAM 链，零 flash 写入，全程无断电。原始记录：
+`/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/`（serial.log、session-results.json、tcpdump.log、driver.log）。
+
+| 观测 | 结果 |
+| --- | --- |
+| `e2631net bmu`（eth 启动前） | `switch fwd ctrl 0x00000000 (expected 0x00000011)` |
+| 第一次 `e2631net tx 3`（pp 模式） | `MAC TX frames 0:0 1:0 2:3 3:0 4:0`；主机 tcpdump 收到 3 个 60 B 广播 ARP（00:41:71:00:00:50） |
+| pp-alt / vendor / allow+pp | 计数 6 / 9 / 12；累计 12 个 ARP，`dma err` 始终 0x00000000 |
+| vendor-alt | 计数停在 9（queue 0 + 描述符 word3 bit0=1 未发出；默认 pp 模式不受影响，记为描述符变体观测） |
+| 最终 `e2631net bmu` | `switch fwd ctrl 0x00000011 (expected 0x00000011)` |
+| 写入审计 | mtd0 前后都是 `f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4`；env 块未动 |
+
+结论：`ZX_SW_FWD_CTRL_ON = 17` 的修复在真机上直接生效——同一描述符/同一 BMU 分配路径下，交换机开始转发
+CPU 交给 lan1 的帧；F2 从“TM 收下、帧不上线”转为计数与线缆都有帧。F1（Linux 启动）由 verify-docs 在
+同一会话里复测，结果并入其证据 bundle。

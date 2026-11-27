@@ -653,6 +653,8 @@ SBRG 块在 `0x92000000` 基址上：原始读地址是 `0x95883c0`，旧清单�
 地址（会话里读到 0，无意义），0032 起以 `e2631net sbrg` 的输出为准（learn/port ctrl/egress 每次
 都会打印）。C2（CPU egress mask）已被现场数据否定，修复窗口的首要判据是 `e2631net bmu` 的
 `switch fwd ctrl = 0x00000011`。
+2026-11-28 已用零写入 RAM 会话验证通过：修复后第一次 `e2631net tx 3` 就让 MAC TX frames 端口 2 增长、
+主机收到广播 ARP（证据 §8.2）；未修复时同一会话的计数与线缆都是零。
 
 ### E4 v1 救援模式验收（需要真机会话；会写 mtd0，需用户单独批准）
 
@@ -1018,3 +1020,6 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
   u-boot.bin 365,872 B sha256 `e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b`
   crc32 `0966526e`、mtd0 sha256 `4fa8bd4d0e4600fd4c3463848135c7239a21f7e2cdb6f4865c462b888ddcb857`
   crc32 `1ffd8cb2`、env 块 `6eee153b...` 未变；checkpatch 0E/0W、D-U1 白名单 4 site。
+  真机验证（同上，零写入 RAM 会话，2026-11-28）：`switch fwd ctrl` 0x00000000 → 0x00000011，`e2631net tx 3`
+  让 MAC TX frames 端口 2 从 0 涨到 3（后续 6/9/12），主机抓到 12 个 60 B 广播 ARP，mtd0 未变——
+  F2 根因确认，见 [evidence/uboot-f2-tx-probe-20261127.md](../evidence/uboot-f2-tx-probe-20261127.md) §8.2。
