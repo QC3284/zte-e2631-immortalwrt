@@ -685,6 +685,11 @@ GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步
 网络参考时钟与 SerDes 没建立，内部 PHY 不应答 MDIO。0034 让 `do_e2631rescue()` 在 `net_init()`/`eth_init()`
 之前调用幂等的 `e2631_net_refclk_init()`（与 `e2631boot`、eth 驱动 start 同一函数，`refclk_done` 守卫不会重复下发），
 CI 用 awk 截取该函数断言这个调用必须存在。RAM 链验收当时能过，只是因为先跑过 `e2631net`/`e2631boot`。
+真机复测（2026-11-28，零 mtd0 写入）：0034 镜像经 userdata 暂存 + `mtd read` + `go` 载入后，
+`e2631rescue` 作为**第一条网络命令**即 GREEN——`auto negotiation ... done`、
+`zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50`、页面与 validate 均 PASS，
+结束时 mtd0/region 未变；证据见 [evidence/e4-coldrescue-0034-20261128.md](../evidence/e4-coldrescue-0034-20261128.md)
+（kit 提交 `636b0ae`）。本轮是 warm reset + RAM 载入，不是把 0034 刷进 flash 后的真冷启动；后者仍待第三次写 mtd0 的批准。
 
 控制台输入（重要）：救援服务循环用 `ctrlc()` + `tstc()/getchar()` 轮询控制台，**服务期间不要向 U-Boot 控制台
 发送任何字符**（包括回车/换行）；`Ctrl-C` 是唯一被识别的输入，会退出救援（若正在擦/写，会中断并打印危险
@@ -1087,3 +1092,7 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
   crc32 `1e5ff289`、env 块 `6eee153b...` 未变；日志含 `cold rescue gate: do_e2631rescue brings up the
   network reference clocks`、`mtd writer sites: 4`、checkpatch 0E/0W。构建身份见
   [evidence/uboot-e4-rescue-20261127.md](../evidence/uboot-e4-rescue-20261127.md) §5.2.1。
+  真机复测 GREEN（2026-11-28，零 mtd0 写入）：0034 镜像经 userdata 暂存 + `mtd read` 载入，`e2631rescue`
+  作为第一条网络命令完成 autoneg/lan1 1 Gbps/页面/validate，mtd0 `d87db54a…` 与 region `8a38896e…` 未变；
+  证据 [evidence/e4-coldrescue-0034-20261128.md](../evidence/e4-coldrescue-0034-20261128.md)（kit `636b0ae`）。
+  真冷启动（刷入 0034 后）仍待用户批准。

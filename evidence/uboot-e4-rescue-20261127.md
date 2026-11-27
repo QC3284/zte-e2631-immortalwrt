@@ -214,6 +214,12 @@ U-Boot `g85df6772a444` → `mtd read` 暂存镜像 + `crc32 0x34b252a4` → `go`
   E4 窗口门禁 / env retry / F2 两个门禁均 PASS。
 - 归档路径：`/home/qc233/zte/e2631-t5-artifacts/uboot-coldrescue-46046018929/e2631-uboot-46046018929/`
   （SHA256SUMS 11/11 通过；verify-docs 的 `e4_prewrite_check.py --archive <目录>` 可据此跑离线门禁）。
+- 真机复测 GREEN（2026-11-28，warm reset + RAM 载入，零 mtd0 写入）：0034 镜像经 userdata 暂存 +
+  `mtd read spi-nand0 0x47F00000 0x3F00000 0x80000`（crc32 `0x9f2b707d`）+ `go` 载入后，`e2631rescue` 作为
+  第一条网络命令即完成 autoneg（`done`，无 -110/TIMEOUT）、`lan1 up, 1000 Mbit/s full duplex`、页面与
+  validate（`result=ok sha_match=ok`，crc32 `0x1e5ff289`）；结束时 mtd0 `d87db54a…`、region `8a38896e…` 未变。
+  证据 [e4-coldrescue-0034-20261128.md](e4-coldrescue-0034-20261128.md)（kit 提交 `636b0ae`）。该轮不是把
+  0034 刷进 flash 后的真冷启动，后者仍待写 mtd0 批准。
 
 
 ## 6. 风险与边界
