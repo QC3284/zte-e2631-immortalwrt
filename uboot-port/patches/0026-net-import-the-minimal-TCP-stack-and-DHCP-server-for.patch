@@ -1,0 +1,2958 @@
+From 7adbffc0138dda8f8021abb5ba12e3b12681a02b Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 20:21:55 +0800
+Subject: [PATCH 26/29] net: import the minimal TCP stack and DHCP server for
+ the rescue page
+
+Import the GPL-2.0 U-Boot TCP stack and the tiny DHCP server from
+bl-mt798x-dhcpd (master e4cf4dc72d451dc7a86c9508390ad5a2e50743c4)
+so that the E2631 web rescue can serve its own page, without any
+host-side network stack and without an external HTTP server.
+
+The files are taken from that tree, with these deliberate changes:
+
+  - mtk_tcp.c includes the private net/mtk_tcp_priv.h instead of the
+    public header, so that the frame/state definitions stay local to net/;
+  - the public include/net/mtk_tcp.h carries the API and also declares
+    mtk_receive_tcp(), which net/net.c uses below;
+  - net/mtk_dhcpd.c drops the upstream "dhcpd" console command; only the
+    start/stop/is_running API is kept, since the rescue owns the pool;
+  - net/net.c gains a CONFIG_MTK_TCP hook in the IPv4 path that hands TCP
+    frames to mtk_receive_tcp() instead of a listener. It is guarded by
+    the new symbol, so the default build is unchanged;
+  - arp_wait_clear() is added, because the stack clears a completed ARP
+    wait before sending into an unknown neighbour and U-Boot only had
+    arp_is_waiting().
+
+CONFIG_MTK_TCP and CONFIG_MTK_DHCPD are new, off by default; the E2631
+defconfig turns them on in the final patch of this series. While they are
+off no code from this commit is built.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ include/net/mtk_dhcpd.h |   23 +
+ include/net/mtk_tcp.h   |  113 +++
+ net/Kconfig             |   23 +
+ net/Makefile            |    2 +
+ net/arp.c               |   16 +
+ net/arp.h               |    1 +
+ net/mtk_dhcpd.c         |  815 ++++++++++++++++++
+ net/mtk_tcp.c           | 1727 +++++++++++++++++++++++++++++++++++++++
+ net/mtk_tcp_priv.h      |   87 ++
+ net/net.c               |    9 +
+ 10 files changed, 2816 insertions(+)
+ create mode 100644 include/net/mtk_dhcpd.h
+ create mode 100644 include/net/mtk_tcp.h
+ create mode 100644 net/mtk_dhcpd.c
+ create mode 100644 net/mtk_tcp.c
+ create mode 100644 net/mtk_tcp_priv.h
+
+diff --git a/include/net/mtk_dhcpd.h b/include/net/mtk_dhcpd.h
+new file mode 100644
+index 00000000..d0e45db5
+--- /dev/null
++++ b/include/net/mtk_dhcpd.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * All rights reserved.
++ *
++ * This file is part of the project bl-mt798x-dhcpd
++ * You may not use, copy, modify or distribute this file except in
++ * compliance with the license agreement.
++ *
++ * Minimal DHCPv4 server for MediaTek web failsafe.
++ */
++
++#ifndef __NET_MTK_DHCPD_H__
++#define __NET_MTK_DHCPD_H__
++
++#include <stdbool.h>
++
++int mtk_dhcpd_start(void);
++void mtk_dhcpd_stop(void);
++bool mtk_dhcpd_is_running(void);
++
++#endif /* __NET_MTK_DHCPD_H__ */
+diff --git a/include/net/mtk_tcp.h b/include/net/mtk_tcp.h
+new file mode 100644
+index 00000000..2a867ef7
+--- /dev/null
++++ b/include/net/mtk_tcp.h
+@@ -0,0 +1,113 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2022 MediaTek Inc. All Rights Reserved.
++ *
++ * Author: Weijie Gao <weijie.gao@mediatek.com>
++ *
++ * Simple TCP stack implementation
++ */
++
++#ifndef __NET_MTK_MTK_TCP_H__
++#define __NET_MTK_MTK_TCP_H__
++
++#ifdef __mips__
++#undef sp /* MIPS register name collision with struct field 'sp' */
++#endif
++
++enum mtk_tcp_cb_status {
++	MTK_TCP_CB_NONE,
++	MTK_TCP_CB_NEW_CONN,
++	MTK_TCP_CB_DATA_RCVD,
++	MTK_TCP_CB_DATA_SENT,
++	MTK_TCP_CB_REMOTE_CLOSING,
++	MTK_TCP_CB_REMOTE_CLOSED,
++	MTK_TCP_CB_CLOSING,
++	MTK_TCP_CB_CLOSED,
++	MTK_TCP_CB_POLL
++};
++
++struct mtk_tcp_cb_data {
++	const void *conn;
++	enum mtk_tcp_cb_status status;
++	bool timedout;
++	__be32 sip;
++	__be16 sp;
++	__be16 dp;
++	void *pdata;
++	void *data;
++	uint32_t datalen;
++};
++
++typedef void (*mtk_tcp_conn_cb)(struct mtk_tcp_cb_data *cbd);
++
++/* Initialize TCP subsystem */
++void mtk_tcp_start(void);
++
++/* Listen on specific port */
++int mtk_tcp_listen(__be16 port, mtk_tcp_conn_cb cb);
++
++/* Stop listening one porot */
++int mtk_tcp_listen_stop(__be16 port);
++
++/* Connect to remote port */
++int mtk_tcp_connect(__be32 destip, __be16 port, mtk_tcp_conn_cb cb,
++		    void *pdata);
++
++/* Set connection's private data. return previous pdata */
++void *mtk_tcp_conn_set_pdata(const void *conn, void *pdata);
++
++/*
++ * Set data buffer to be sent. Fail if previous data hasn't been fully sent.
++ * Contents pointed by data shouldn't be changed before they're fully acked
++ */
++int mtk_tcp_send_data(const void *conn, const void *data, uint32_t size);
++
++/* Close a connection */
++int mtk_tcp_close_conn(const void *conn, int rst);
++
++/* Close all connections and then exit net loop */
++void mtk_tcp_close_all_conn(void);
++
++/*
++ * Close every connection still tracked for the given local port.
++ *
++ * Upper layers call this before releasing the state their per-connection
++ * data points to, so that no stale connection survives into the next
++ * session.
++ */
++void mtk_tcp_close_conn_by_port(__be16 port);
++
++/* Reset all connections and then exit net loop */
++void mtk_tcp_reset_all_conn(void);
++
++/* Return 1 if connection is in ESTABLISHED state */
++int mtk_tcp_conn_is_alive(const void *conn);
++
++/* Called periodically to check the TCP status & send packets.
++ * Returns 1 if all listeners and connections are done (can exit loop), 0 otherwise.
++ */
++int mtk_tcp_periodic_check(void);
++
++/*
++ * Out-of-band console abort (telnet Ctrl+C, web console "Abort" button).
++ *
++ * A console session that is blocked inside run_command() cannot reach the
++ * serial Ctrl+C path, so it records a request here instead.  net_loop()
++ * consumes it (mtk_tcp_abort_pending()) on the next iteration and takes
++ * the exact same exit path as a serial Ctrl+C.
++ */
++void mtk_tcp_abort_request(void);
++void mtk_tcp_abort_clear(void);
++bool mtk_tcp_abort_pending(void);
++
++struct ip_hdr;
++struct ethernet_hdr;
++
++/*
++ * Receive one TCP segment.  Returns true when the segment belonged to a
++ * connection tracked by this stack (and was consumed), false otherwise so
++ * the caller can fall back to its own handler.
++ */
++bool mtk_receive_tcp(struct ip_hdr *ip, int len, struct ethernet_hdr *et);
++
++#endif /* __NET_MTK_MTK_TCP_H__ */
+diff --git a/net/Kconfig b/net/Kconfig
+index 56ff8542..0d4a8386 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -316,4 +316,27 @@ config SYS_RX_ETH_BUFFER
+ 
+ 	  FSL_ENETC requires this value to be a multiple of 8.
+ 
++config MTK_TCP
++	bool "Minimal TCP stack for the web failsafe"
++	depends on NET_LEGACY
++	help
++	  A small, self-contained TCP implementation used by the rescue web
++	  server on the ZTE ZXHN E2631. It shares the legacy U-Boot Ethernet
++	  and ARP layer and hooks the TCP receive path in net/net.c.
++
++config MTK_TCP_VERBOSE
++	bool "Verbose logging for the minimal TCP stack"
++	depends on MTK_TCP
++	help
++	  Print connection state changes and packet decisions of the
++	  minimal TCP stack. This is noisy and only meant for debugging
++	  the rescue server on a lab unit.
++
++config MTK_DHCPD
++	bool "Minimal DHCPv4 server for the web failsafe"
++	depends on NET_LEGACY
++	help
++	  A small DHCPv4 server used to hand out an address to the PC that
++	  opens the ZTE ZXHN E2631 rescue page on lan1.
++
+ endif   # if NET
+diff --git a/net/Makefile b/net/Makefile
+index 77456072..02a225da 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -29,6 +29,8 @@ obj-$(CONFIG_CMD_WOL)  += wol.o
+ obj-$(CONFIG_PROT_UDP) += udp.o
+ obj-$(CONFIG_PROT_TCP) += tcp.o
+ obj-$(CONFIG_WGET) += wget.o
++obj-$(CONFIG_MTK_TCP) += mtk_tcp.o
++obj-$(CONFIG_MTK_DHCPD) += mtk_dhcpd.o
+ 
+ # Disable this warning as it is triggered by:
+ # sprintf(buf, index ? "foo%d" : "foo", index)
+diff --git a/net/arp.c b/net/arp.c
+index 4801dca6..103a0ebc 100644
+--- a/net/arp.c
++++ b/net/arp.c
+@@ -37,6 +37,22 @@ void arp_init(void)
+ 	arp_tx_packet -= (ulong)arp_tx_packet % PKTALIGN;
+ }
+ 
++void arp_wait_clear(void)
++{
++	/*
++	 * Drop any pending ARP resolution.  Called when the owner of the wait
++	 * state goes away: arp_wait_packet_ethaddr points into a buffer that is
++	 * about to be freed, and a poll loop that never runs
++	 * arp_timeout_check() would otherwise carry the state into the next
++	 * session and write through a dangling pointer.
++	 */
++	net_arp_wait_packet_ip.s_addr = 0;
++	net_arp_wait_reply_ip.s_addr = 0;
++	arp_wait_packet_ethaddr = NULL;
++	arp_wait_tx_packet_size = 0;
++	arp_wait_try = 0;
++}
++
+ void arp_raw_request(struct in_addr source_ip, const uchar *target_ethaddr,
+ 	struct in_addr target_ip)
+ {
+diff --git a/net/arp.h b/net/arp.h
+index 882f3ec3..cf0429ab 100644
+--- a/net/arp.h
++++ b/net/arp.h
+@@ -20,6 +20,7 @@ extern int arp_wait_try;
+ extern uchar *arp_tx_packet;
+ 
+ void arp_init(void);
++void arp_wait_clear(void);
+ void arp_request(void);
+ void arp_raw_request(struct in_addr source_ip, const uchar *targetEther,
+ 	struct in_addr target_ip);
+diff --git a/net/mtk_dhcpd.c b/net/mtk_dhcpd.c
+new file mode 100644
+index 00000000..f606b869
+--- /dev/null
++++ b/net/mtk_dhcpd.c
+@@ -0,0 +1,815 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * All rights reserved.
++ *
++ * This file is part of the project bl-mt798x-dhcpd
++ * You may not use, copy, modify or distribute this file except in
++ * compliance with the license agreement.
++ *
++ * Minimal DHCPv4 server for MediaTek web failsafe.
++ *
++ * Goals:
++ * - Provide IP/netmask/gateway/DNS to a directly connected PC
++ * - Auto-start with web failsafe (httpd)
++ * - Small and self-contained
++ */
++
++#include <command.h>
++#include <env.h>
++#include <net.h>
++#include <vsprintf.h>
++
++#include <net/mtk_dhcpd.h>
++
++#define DHCPD_SERVER_PORT	67
++#define DHCPD_CLIENT_PORT	68
++
++/*
++ * BOOTP/DHCP has a historical minimum message size of 300 bytes.
++ * Some clients (notably Windows) may ignore shorter replies.
++ */
++#define DHCPD_MIN_BOOTP_LEN	300
++
++/* BOOTP/DHCP message header (RFC 2131) */
++struct dhcpd_pkt {
++	u8 op;
++	u8 htype;
++	u8 hlen;
++	u8 hops;
++	u32 xid;
++	u16 secs;
++	u16 flags;
++	u32 ciaddr;
++	u32 yiaddr;
++	u32 siaddr;
++	u32 giaddr;
++	u8 chaddr[16];
++	u8 sname[64];
++	u8 file[128];
++	u8 vend[312];
++} __packed;
++
++#define BOOTREQUEST		1
++#define BOOTREPLY		2
++
++#define HTYPE_ETHER		1
++#define HLEN_ETHER		6
++
++#define DHCPDISCOVER	1
++#define DHCPOFFER		2
++#define DHCPREQUEST		3
++#define DHCPNAK			6
++#define DHCPACK			5
++#define DHCPDECLINE		4
++#define DHCPRELEASE		7
++#define DHCPINFORM		8
++
++#define DHCP_OPTION_PAD			0
++#define DHCP_OPTION_SUBNET_MASK	1
++#define DHCP_OPTION_ROUTER		3
++#define DHCP_OPTION_DNS_SERVER	6
++#define DHCP_OPTION_REQ_IPADDR	50
++#define DHCP_OPTION_LEASE_TIME	51
++#define DHCP_OPTION_MSG_TYPE	53
++#define DHCP_OPTION_SERVER_ID	54
++#define DHCP_OPTION_MESSAGE		56
++#define DHCP_OPTION_END			255
++
++#define DHCP_FLAG_BROADCAST		0x8000
++
++#define DHCPD_DEFAULT_IP_STR	"192.168.1.1"
++#define DHCPD_DEFAULT_NETMASK_STR "255.255.255.0"
++#define DHCPD_DEFAULT_POOL_START_HOST	100
++#define DHCPD_DEFAULT_POOL_SIZE		101
++
++#define DHCPD_MAX_CLIENTS	8
++
++static const u8 dhcp_magic_cookie[4] = { 99, 130, 83, 99 };
++
++struct dhcpd_lease {
++	bool used;
++	u8 mac[6];
++	struct in_addr ip;
++};
++
++static struct dhcpd_lease leases[DHCPD_MAX_CLIENTS];
++
++static rxhand_f *prev_udp_handler;
++static bool dhcpd_running;
++
++static bool dhcpd_is_verbose(void)
++{
++	const char *val = env_get("dhcpd_verbose");
++
++	if (!val || !val[0])
++		return false;
++
++	return !strcmp(val, "1") ||
++	       !strcasecmp(val, "true") ||
++	       !strcasecmp(val, "yes") ||
++	       !strcasecmp(val, "on");
++}
++
++#define dhcpd_log(fmt, ...) \
++	do { if (dhcpd_is_verbose()) printf(fmt, ##__VA_ARGS__); } while (0)
++
++static struct in_addr dhcpd_get_server_ip(void)
++{
++#ifdef CONFIG_MTK_DHCPD_USE_CONFIG_IP
++	const char *env_ip = env_get("ipaddr");
++
++	if (env_ip && env_ip[0])
++		return string_to_ip(env_ip);
++
++	return string_to_ip(CONFIG_IPADDR);
++#else
++	if (net_ip.s_addr)
++		return net_ip;
++
++	return string_to_ip(DHCPD_DEFAULT_IP_STR);
++#endif
++}
++
++static struct in_addr dhcpd_get_netmask(void)
++{
++#ifdef CONFIG_MTK_DHCPD_USE_CONFIG_IP
++	const char *env_nm = env_get("netmask");
++
++	if (env_nm && env_nm[0])
++		return string_to_ip(env_nm);
++
++	return string_to_ip(CONFIG_NETMASK);
++#else
++	if (net_netmask.s_addr)
++		return net_netmask;
++
++	return string_to_ip(DHCPD_DEFAULT_NETMASK_STR);
++#endif
++}
++
++static struct in_addr dhcpd_get_gateway(void)
++{
++	if (net_gateway.s_addr)
++		return net_gateway;
++
++	return dhcpd_get_server_ip();
++}
++
++static struct in_addr dhcpd_get_dns(void)
++{
++	if (net_dns_server.s_addr)
++		return net_dns_server;
++
++	return dhcpd_get_server_ip();
++}
++
++static u32 dhcpd_get_pool_start_host(void)
++{
++	const char *val = env_get("dhcpd_pool_start");
++
++	if (val && val[0])
++		return (u32)simple_strtoul(val, NULL, 0);
++
++#ifdef CONFIG_MTK_DHCPD_USE_CONFIG_IP
++	return (u32)CONFIG_MTK_DHCPD_POOL_START_HOST;
++#else
++	return DHCPD_DEFAULT_POOL_START_HOST;
++#endif
++}
++
++static u32 dhcpd_get_pool_size(void)
++{
++	const char *val = env_get("dhcpd_pool_size");
++
++	if (val && val[0])
++		return (u32)simple_strtoul(val, NULL, 0);
++
++#ifdef CONFIG_MTK_DHCPD_USE_CONFIG_IP
++	return (u32)CONFIG_MTK_DHCPD_POOL_SIZE;
++#else
++	return DHCPD_DEFAULT_POOL_SIZE;
++#endif
++}
++
++static void dhcpd_get_pool_range(u32 *start, u32 *end)
++{
++	struct in_addr server_ip = dhcpd_get_server_ip();
++	struct in_addr netmask = dhcpd_get_netmask();
++	u32 ip_host = ntohl(server_ip.s_addr);
++	u32 mask = ntohl(netmask.s_addr);
++	u32 host_mask = ~mask;
++	u32 host_start = dhcpd_get_pool_start_host();
++	u32 size = dhcpd_get_pool_size();
++	u32 net = ip_host & mask;
++	u32 s, e, max_host;
++
++	if (!size)
++		size = 1;
++
++	max_host = host_mask;
++	host_start &= host_mask;
++	if (host_start == 0)
++		host_start = 1;
++
++	s = net | host_start;
++	e = s + size - 1;
++
++	if ((e & mask) != net || e > (net | max_host))
++		e = net | max_host;
++
++	if (start)
++		*start = s;
++	if (end)
++		*end = e;
++}
++
++static bool dhcpd_mac_equal(const u8 *a, const u8 *b)
++{
++	return memcmp(a, b, 6) == 0;
++}
++
++static struct dhcpd_lease *dhcpd_find_lease(const u8 *mac)
++{
++	int i;
++
++	for (i = 0; i < DHCPD_MAX_CLIENTS; i++) {
++		if (leases[i].used && dhcpd_mac_equal(leases[i].mac, mac))
++			return &leases[i];
++	}
++
++	return NULL;
++}
++
++static bool dhcpd_ip_in_pool(u32 ip_host)
++{
++	u32 start, end;
++
++	dhcpd_get_pool_range(&start, &end);
++
++	return ip_host >= start && ip_host <= end;
++}
++
++static bool dhcpd_ip_is_allocated(u32 ip_host)
++{
++	int i;
++
++	for (i = 0; i < DHCPD_MAX_CLIENTS; i++) {
++		if (!leases[i].used)
++			continue;
++		if (ntohl(leases[i].ip.s_addr) == ip_host)
++			return true;
++	}
++
++	return false;
++}
++
++static bool dhcpd_ip_allocated_to_mac(u32 ip_host, const u8 *mac)
++{
++	int i;
++
++	for (i = 0; i < DHCPD_MAX_CLIENTS; i++) {
++		if (!leases[i].used)
++			continue;
++		if (ntohl(leases[i].ip.s_addr) != ip_host)
++			continue;
++		return dhcpd_mac_equal(leases[i].mac, mac);
++	}
++
++	return false;
++}
++
++static u32 dhcpd_mac_hash(const u8 *mac)
++{
++	u32 h = 2166136261u;
++	int i;
++
++	for (i = 0; i < 6; i++) {
++		h ^= mac[i];
++		h *= 16777619u;
++	}
++
++	return h;
++}
++
++static struct in_addr dhcpd_alloc_ip(const u8 *mac)
++{
++	struct dhcpd_lease *l;
++	u32 start, end;
++	int i;
++	struct in_addr ip;
++	u32 pool_size;
++
++	l = dhcpd_find_lease(mac);
++	if (l && dhcpd_ip_in_pool(ntohl(l->ip.s_addr))) {
++		dhcpd_log("DHCP alloc: %pM already has lease %pI4\n",
++			  mac, &l->ip);
++		return l->ip;
++	}
++
++	dhcpd_get_pool_range(&start, &end);
++
++	pool_size = end >= start ? (end - start + 1) : 0;
++
++	if (pool_size) {
++		u32 hash = dhcpd_mac_hash(mac);
++		u32 off = hash % pool_size;
++
++		for (i = 0; i < (int)pool_size; i++) {
++			u32 cand = start + ((off + i) % pool_size);
++
++			if (!dhcpd_ip_is_allocated(cand)) {
++				ip.s_addr = htonl(cand);
++				return ip;
++			}
++		}
++	}
++
++	/* No free slot: just return the first address in pool */
++	ip.s_addr = htonl(start);
++	return ip;
++}
++
++static u8 dhcpd_parse_msg_type(const struct dhcpd_pkt *bp, unsigned int len)
++{
++	unsigned int fixed = offsetof(struct dhcpd_pkt, vend);
++	const u8 *opt;
++	unsigned int optlen;
++
++	if (len < fixed + 4)
++		return 0;
++
++	opt = (const u8 *)bp->vend;
++	optlen = len - fixed;
++
++	if (memcmp(opt, dhcp_magic_cookie, sizeof(dhcp_magic_cookie)))
++		return 0;
++
++	opt += 4;
++	optlen -= 4;
++
++	while (optlen) {
++		u8 code;
++		u8 olen;
++
++		code = *opt++;
++		optlen--;
++
++		if (code == DHCP_OPTION_PAD)
++			continue;
++		if (code == DHCP_OPTION_END)
++			break;
++
++		if (!optlen)
++			break;
++		olen = *opt++;
++		optlen--;
++
++		if (olen > optlen)
++			break;
++
++		if (code == DHCP_OPTION_MSG_TYPE) {
++			if (olen >= 1)
++				return opt[0];
++		}
++
++		opt += olen;
++		optlen -= olen;
++	}
++
++	return 0;
++}
++
++static bool dhcpd_parse_req_ip(const struct dhcpd_pkt *bp, unsigned int len,
++			      struct in_addr *req_ip)
++{
++	unsigned int fixed = offsetof(struct dhcpd_pkt, vend);
++	const u8 *opt;
++	unsigned int optlen;
++
++	if (len < fixed + 4)
++		return false;
++
++	opt = (const u8 *)bp->vend;
++	optlen = len - fixed;
++
++	if (memcmp(opt, dhcp_magic_cookie, sizeof(dhcp_magic_cookie)))
++		return false;
++
++	opt += 4;
++	optlen -= 4;
++
++	while (optlen) {
++		u8 code;
++		u8 olen;
++
++		code = *opt++;
++		optlen--;
++
++		if (code == DHCP_OPTION_PAD)
++			continue;
++		if (code == DHCP_OPTION_END)
++			break;
++
++		if (!optlen)
++			break;
++		olen = *opt++;
++		optlen--;
++
++		if (olen > optlen)
++			break;
++
++		if (code == DHCP_OPTION_REQ_IPADDR && olen == 4) {
++			memcpy(&req_ip->s_addr, opt, 4);
++			return true;
++		}
++
++		opt += olen;
++		optlen -= olen;
++	}
++
++	return false;
++}
++
++static bool dhcpd_parse_server_id(const struct dhcpd_pkt *bp, unsigned int len,
++			      struct in_addr *server_ip)
++{
++	unsigned int fixed = offsetof(struct dhcpd_pkt, vend);
++	const u8 *opt;
++	unsigned int optlen;
++
++	if (len < fixed + 4)
++		return false;
++
++	opt = (const u8 *)bp->vend;
++	optlen = len - fixed;
++
++	if (memcmp(opt, dhcp_magic_cookie, sizeof(dhcp_magic_cookie)))
++		return false;
++
++	opt += 4;
++	optlen -= 4;
++
++	while (optlen) {
++		u8 code;
++		u8 olen;
++
++		code = *opt++;
++		optlen--;
++
++		if (code == DHCP_OPTION_PAD)
++			continue;
++		if (code == DHCP_OPTION_END)
++			break;
++
++		if (!optlen)
++			break;
++		olen = *opt++;
++		optlen--;
++
++		if (olen > optlen)
++			break;
++
++		if (code == DHCP_OPTION_SERVER_ID && olen == 4) {
++			memcpy(&server_ip->s_addr, opt, 4);
++			return true;
++		}
++
++		opt += olen;
++		optlen -= olen;
++	}
++
++	return false;
++}
++
++static void dhcpd_process_lease(const u8 *mac, struct in_addr ip)
++{
++	struct dhcpd_lease *l;
++	int i;
++
++	l = dhcpd_find_lease(mac);
++	if (l) {
++		l->ip = ip;
++		return;
++	}
++
++	for (i = 0; i < DHCPD_MAX_CLIENTS; i++) {
++		if (!leases[i].used) {
++			leases[i].used = true;
++			memcpy(leases[i].mac, mac, 6);
++			leases[i].ip = ip;
++			return;
++		}
++	}
++
++	/* Fallback: replace the first entry */
++	leases[0].used = true;
++	memcpy(leases[0].mac, mac, 6);
++	leases[0].ip = ip;
++}
++
++static bool dhcpd_same_subnet(struct in_addr a, struct in_addr b,
++			      struct in_addr mask)
++{
++	return (a.s_addr & mask.s_addr) == (b.s_addr & mask.s_addr);
++}
++
++static u8 *dhcpd_opt_add_u8(u8 *p, u8 code, u8 val)
++{
++	*p++ = code;
++	*p++ = 1;
++	*p++ = val;
++	return p;
++}
++
++static u8 *dhcpd_opt_add_u32(u8 *p, u8 code, __be32 val)
++{
++	*p++ = code;
++	*p++ = 4;
++	memcpy(p, &val, 4);
++	return p + 4;
++}
++
++static u8 *dhcpd_opt_add_inaddr(u8 *p, u8 code, struct in_addr addr)
++{
++	return dhcpd_opt_add_u32(p, code, addr.s_addr);
++}
++
++static int dhcpd_send_reply(const struct dhcpd_pkt *req, unsigned int req_len,
++			    u8 dhcp_msg_type, struct in_addr yiaddr,
++			    const char *nak_message)
++{
++	struct dhcpd_pkt *bp;
++	struct in_addr server_ip, netmask, gw, dns;
++	struct in_addr bcast;
++	uchar *pkt;
++	uchar *payload;
++	int eth_hdr_size;
++	u8 *opt;
++	int payload_len;
++	__be32 lease;
++
++	(void)req_len;
++
++	server_ip = dhcpd_get_server_ip();
++	netmask = dhcpd_get_netmask();
++	gw = dhcpd_get_gateway();
++	dns = dhcpd_get_dns();
++
++	bcast.s_addr = 0xFFFFFFFF;
++
++	pkt = net_tx_packet;
++	eth_hdr_size = net_set_ether(pkt, net_bcast_ethaddr, PROT_IP);
++	net_set_udp_header(pkt + eth_hdr_size, bcast,
++			   DHCPD_CLIENT_PORT, DHCPD_SERVER_PORT, 0);
++
++	payload = pkt + eth_hdr_size + IP_UDP_HDR_SIZE;
++	bp = (struct dhcpd_pkt *)payload;
++	memset(bp, 0, sizeof(*bp));
++
++	bp->op = BOOTREPLY;
++	bp->htype = HTYPE_ETHER;
++	bp->hlen = HLEN_ETHER;
++	bp->hops = 0;
++	bp->xid = req->xid;
++	bp->secs = req->secs;
++	bp->flags = htons(DHCP_FLAG_BROADCAST);
++	bp->ciaddr = 0;
++	bp->yiaddr = yiaddr.s_addr;
++	bp->siaddr = server_ip.s_addr;
++	bp->giaddr = 0;
++	memcpy(bp->chaddr, req->chaddr, sizeof(bp->chaddr));
++
++	opt = (u8 *)bp->vend;
++	memcpy(opt, dhcp_magic_cookie, sizeof(dhcp_magic_cookie));
++	opt += 4;
++
++	opt = dhcpd_opt_add_u8(opt, DHCP_OPTION_MSG_TYPE, dhcp_msg_type);
++	opt = dhcpd_opt_add_inaddr(opt, DHCP_OPTION_SERVER_ID, server_ip);
++
++	if (dhcp_msg_type != DHCPNAK) {
++		opt = dhcpd_opt_add_inaddr(opt, DHCP_OPTION_SUBNET_MASK, netmask);
++		opt = dhcpd_opt_add_inaddr(opt, DHCP_OPTION_ROUTER, gw);
++		opt = dhcpd_opt_add_inaddr(opt, DHCP_OPTION_DNS_SERVER, dns);
++
++		lease = htonl(3600);
++		opt = dhcpd_opt_add_u32(opt, DHCP_OPTION_LEASE_TIME, lease);
++	} else if (nak_message && *nak_message) {
++		size_t msg_len = strlen(nak_message);
++		u8 len = msg_len > 240 ? 240 : (u8)msg_len;
++
++		*opt++ = DHCP_OPTION_MESSAGE;
++		*opt++ = len;
++		memcpy(opt, nak_message, len);
++		opt += len;
++	}
++
++	*opt++ = DHCP_OPTION_END;
++
++	payload_len = (int)((uintptr_t)opt - (uintptr_t)payload);
++	if (payload_len < DHCPD_MIN_BOOTP_LEN)
++		payload_len = DHCPD_MIN_BOOTP_LEN;
++
++	/* Update UDP header with actual payload length */
++	net_set_udp_header(pkt + eth_hdr_size, bcast,
++			   DHCPD_CLIENT_PORT, DHCPD_SERVER_PORT, payload_len);
++
++	net_send_packet(pkt, eth_hdr_size + IP_UDP_HDR_SIZE + payload_len);
++
++	dhcpd_log("DHCP %s to %pM yiaddr=%pI4 siaddr=%pI4\n",
++		  dhcp_msg_type == DHCPOFFER ? "OFFER" :
++		  dhcp_msg_type == DHCPACK   ? "ACK"   :
++		  dhcp_msg_type == DHCPNAK   ? "NAK"   : "?",
++		  req->chaddr, &yiaddr, &server_ip);
++
++	return 0;
++}
++
++static void dhcpd_handle_packet(uchar *pkt, unsigned int dport,
++			       struct in_addr sip, unsigned int sport,
++			       unsigned int len)
++{
++	const struct dhcpd_pkt *bp = (const struct dhcpd_pkt *)pkt;
++	u8 msg_type;
++	struct in_addr yiaddr;
++	struct in_addr req_ip;
++
++	(void)sip;
++
++	if (!dhcpd_running)
++		return;
++
++	if (dport != DHCPD_SERVER_PORT || sport != DHCPD_CLIENT_PORT)
++		return;
++
++	if (len < offsetof(struct dhcpd_pkt, vend))
++		return;
++
++	if (bp->op != BOOTREQUEST)
++		return;
++
++	if (bp->htype != HTYPE_ETHER || bp->hlen != HLEN_ETHER)
++		return;
++
++	msg_type = dhcpd_parse_msg_type(bp, len);
++	if (!msg_type)
++		return;
++
++	dhcpd_log("DHCP %s from %pM xid=0x%08x",
++		  msg_type == DHCPDISCOVER ? "DISCOVER" :
++		  msg_type == DHCPREQUEST  ? "REQUEST"  :
++		  msg_type == DHCPDECLINE  ? "DECLINE"  :
++		  msg_type == DHCPRELEASE  ? "RELEASE"  :
++		  msg_type == DHCPINFORM   ? "INFORM"   : "?",
++		  bp->chaddr, ntohl(bp->xid));
++	dhcpd_log(" flags=0x%04x ciaddr=%pI4\n",
++		  ntohs(bp->flags), &bp->ciaddr);
++
++	debug_cond(DEBUG_DEV_PKT, "dhcpd: msg=%u from %pM\n", msg_type, bp->chaddr);
++
++	switch (msg_type) {
++	case DHCPDISCOVER:
++		yiaddr = dhcpd_alloc_ip(bp->chaddr);
++		debug_cond(DEBUG_DEV_PKT, "dhcpd: offer %pI4\n", &yiaddr);
++		dhcpd_send_reply(bp, len, DHCPOFFER, yiaddr, NULL);
++		break;
++	case DHCPREQUEST:
++		{
++			struct in_addr server_id;
++			struct in_addr server_ip = dhcpd_get_server_ip();
++			struct in_addr netmask = dhcpd_get_netmask();
++			bool has_server_id;
++			bool has_req_ip;
++			u32 ip_host;
++			struct in_addr zero_ip;
++
++			zero_ip.s_addr = 0;
++			has_server_id = dhcpd_parse_server_id(bp, len, &server_id);
++			if (has_server_id && server_id.s_addr != server_ip.s_addr)
++				return;
++
++			has_req_ip = dhcpd_parse_req_ip(bp, len, &req_ip);
++			if (!has_req_ip) {
++				yiaddr = dhcpd_alloc_ip(bp->chaddr);
++				dhcpd_process_lease(bp->chaddr, yiaddr);
++				dhcpd_send_reply(bp, len, DHCPACK, yiaddr, NULL);
++				break;
++			}
++
++			ip_host = ntohl(req_ip.s_addr);
++			if (!dhcpd_same_subnet(req_ip, server_ip, netmask)) {
++				dhcpd_send_reply(bp, len, DHCPNAK, zero_ip, "bad subnet");
++				break;
++			}
++			if (!dhcpd_ip_in_pool(ip_host)) {
++				dhcpd_send_reply(bp, len, DHCPNAK, zero_ip, "outside pool");
++				break;
++			}
++			if (dhcpd_ip_is_allocated(ip_host) &&
++			    !dhcpd_ip_allocated_to_mac(ip_host, bp->chaddr)) {
++				dhcpd_send_reply(bp, len, DHCPNAK, zero_ip, "in use");
++				break;
++			}
++
++			yiaddr = req_ip;
++			dhcpd_process_lease(bp->chaddr, yiaddr);
++			dhcpd_send_reply(bp, len, DHCPACK, yiaddr, NULL);
++		}
++		break;
++	default:
++		break;
++	}
++}
++
++static void dhcpd_udp_handler(uchar *pkt, unsigned int dport,
++			     struct in_addr sip, unsigned int sport,
++			     unsigned int len)
++{
++	dhcpd_handle_packet(pkt, dport, sip, sport, len);
++
++	if (prev_udp_handler)
++		prev_udp_handler(pkt, dport, sip, sport, len);
++}
++
++int mtk_dhcpd_start(void)
++{
++	struct in_addr pool_start;
++	u32 pool_start_host, pool_end_host;
++
++	/*
++	 * Be robust against net_init()/net_clear_handlers() resetting handlers.
++	 * If we're already running but the UDP handler is no longer ours, re-hook.
++	 */
++	if (dhcpd_running) {
++		rxhand_f *cur = net_get_udp_handler();
++
++		if (cur != dhcpd_udp_handler) {
++			prev_udp_handler = cur;
++			net_set_udp_handler(dhcpd_udp_handler);
++		}
++		return 0;
++	}
++
++	/* Ensure we have a usable local IP, otherwise UDP replies will use 0.0.0.0 */
++	if (!net_ip.s_addr)
++		net_ip = dhcpd_get_server_ip();
++	if (!net_netmask.s_addr)
++		net_netmask = dhcpd_get_netmask();
++	if (!net_gateway.s_addr)
++		net_gateway = net_ip;
++	if (!net_dns_server.s_addr)
++		net_dns_server = net_ip;
++
++	memset(leases, 0, sizeof(leases));
++
++	dhcpd_get_pool_range(&pool_start_host, &pool_end_host);
++	pool_start.s_addr = htonl(pool_start_host);
++
++	prev_udp_handler = net_get_udp_handler();
++	net_set_udp_handler(dhcpd_udp_handler);
++
++	dhcpd_running = true;
++
++	dhcpd_log("DHCP server started\n");
++	dhcpd_log("  Server IP  : %pI4\n", &net_ip);
++	dhcpd_log("  Netmask    : %pI4\n", &net_netmask);
++	dhcpd_log("  Gateway    : %pI4\n", &net_gateway);
++	dhcpd_log("  DNS        : %pI4\n", &net_dns_server);
++	dhcpd_log("  Pool       : %d.%d.%d.%d - %d.%d.%d.%d\n",
++		  (pool_start_host >> 24) & 0xff,
++		  (pool_start_host >> 16) & 0xff,
++		  (pool_start_host >> 8) & 0xff,
++		  pool_start_host & 0xff,
++		  (pool_end_host >> 24) & 0xff,
++		  (pool_end_host >> 16) & 0xff,
++		  (pool_end_host >> 8) & 0xff,
++		  pool_end_host & 0xff);
++	dhcpd_log("  Leases     : %d max\n", DHCPD_MAX_CLIENTS);
++	dhcpd_log("  Verbose    : on (setenv dhcpd_verbose 0 to disable)\n");
++
++	return 0;
++}
++
++void mtk_dhcpd_stop(void)
++{
++	if (!dhcpd_running)
++		return;
++
++	/*
++	 * If the network loop already cleared handlers, don't resurrect another
++	 * handler here. We only restore the previous handler if we are still
++	 * installed.
++	 */
++	if (net_get_udp_handler() == dhcpd_udp_handler)
++		net_set_udp_handler(prev_udp_handler);
++	prev_udp_handler = NULL;
++	dhcpd_running = false;
++
++	dhcpd_log("DHCP server stopped\n");
++}
++
++bool mtk_dhcpd_is_running(void)
++{
++	return dhcpd_running;
++}
+diff --git a/net/mtk_tcp.c b/net/mtk_tcp.c
+new file mode 100644
+index 00000000..c5742eb0
+--- /dev/null
++++ b/net/mtk_tcp.c
+@@ -0,0 +1,1727 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2022 MediaTek Inc. All Rights Reserved.
++ *
++ * Author: Weijie Gao <weijie.gao@mediatek.com>
++ *
++ * Simple TCP stack implementation
++ */
++
++#include <command.h>
++#include <div64.h>
++#include <errno.h>
++#include <env.h>
++#include <malloc.h>
++#include <net.h>
++#include <linux/list.h>
++#include <asm/global_data.h>
++/*
++ * On MIPS, arch/mips/include/asm/regdef.h #defines sp as $29.
++ * Undefine it before mtk_tcp.h is parsed so struct field 'sp' stays intact.
++ */
++#ifdef __mips__
++#undef sp /* MIPS $29 register macro collides with struct field */
++#endif
++#include "mtk_tcp_priv.h"
++#include "arp.h"
++
++DECLARE_GLOBAL_DATA_PTR;
++
++/**
++ * mtk_tcp_is_verbose() - check if verbose logging is enabled
++ *
++ * Returns true if verbose logging should be enabled. Priority:
++ * 1. "mtk_tcp_verbose" environment variable (if set)
++ * 2. CONFIG_MTK_TCP_VERBOSE Kconfig option
++ *
++ * Environment variable values: "1", "true", "yes", "on" (case-insensitive)
++ */
++static bool mtk_tcp_is_verbose(void)
++{
++	const char *val = env_get("mtk_tcp_verbose");
++
++	if (val && val[0])
++		return !strcmp(val, "1") ||
++		       !strcasecmp(val, "true") ||
++		       !strcasecmp(val, "yes") ||
++		       !strcasecmp(val, "on");
++
++	return IS_ENABLED(CONFIG_MTK_TCP_VERBOSE);
++}
++
++#define mtk_tcp_log(fmt, ...) \
++	do { if (mtk_tcp_is_verbose()) printf(fmt, ##__VA_ARGS__); } while (0)
++
++struct mtk_tcp_conn {
++	struct list_head node;
++
++	enum mtk_tcp_state status;
++
++	struct in_addr ip_remote;
++	__be16 port_remote;
++	__be16 port_local;
++
++	u32 peer_seq;
++	u32 local_seq;
++	u32 local_seq_last;
++	u32 local_seq_acked;
++
++	u32 ts;
++	u32 ts_rexmit;
++	u32 num_rexmit;
++
++	u8 ethaddr[6];
++	u16 mss;
++
++	const u8 *tx;
++	u32 txlen;
++
++	mtk_tcp_conn_cb cb;
++	int close_flag;
++	int ack_flag;
++
++	int rexmit_mode;
++	int rexmit_wait_ack;
++
++	int zw_mode;
++	u32 peer_wnd;
++	u32 peer_ws;
++
++	u32 srtt;
++	u32 rttvar;
++	u32 rto;
++	u32 ts_rtt;
++	u32 ack_calc_rtt;
++
++	void *pdata;
++	int dying;
++};
++
++struct mtk_tcp_listen {
++	struct list_head node;
++
++	__be16 port;
++	mtk_tcp_conn_cb cb;
++};
++
++static int mtk_tcp_send_packet_opt(struct mtk_tcp_conn *c, u16 flags, u32 seq, u32 ack,
++			       void *opt, int opt_size, const void *payload,
++			       int payload_len);
++static int mtk_tcp_send_packet(struct mtk_tcp_conn *c, u16 flags, u32 seq, u32 ack,
++			   const void *payload, int payload_len);
++static int mtk_tcp_send_packet_ctrl(struct mtk_tcp_conn *c, u16 flags);
++static void mtk_tcp_conn_finish(struct mtk_tcp_conn *c,
++				enum mtk_tcp_cb_status status);
++static void mtk_tcp_conn_reap(void);
++
++static LIST_HEAD(listen_head);
++static LIST_HEAD(conn_head);
++static LIST_HEAD(dead_head);
++
++static int mtk_tcp_stop;
++static u16 mtk_tcp_port_seq = 50000;
++
++/*
++ * Pending out-of-band abort request.  See mtk_tcp_abort_* in mtk_tcp.h.
++ *
++ * Only ever set while a console session is executing a command (guarded by
++ * the session's own executing/busy flag), and only ever consumed by the
++ * net_loop() of that very command, so it cannot abort unrelated traffic.
++ */
++static bool mtk_tcp_abort_flag;
++
++void mtk_tcp_abort_request(void)
++{
++	mtk_tcp_abort_flag = true;
++}
++
++void mtk_tcp_abort_clear(void)
++{
++	mtk_tcp_abort_flag = false;
++}
++
++bool mtk_tcp_abort_pending(void)
++{
++	bool abort = mtk_tcp_abort_flag;
++
++	mtk_tcp_abort_flag = false;
++	return abort;
++}
++
++void mtk_tcp_start(void)
++{
++	/*
++	 * A previous session may have left an ARP resolution pending, for
++	 * example a connection that was destroyed while its peer MAC was
++	 * still unknown.  The web failsafe pumps eth_rx() from its own poll
++	 * loop and never runs arp_timeout_check(), so that state does not
++	 * expire on its own: it would survive into the new session, keep
++	 * pointing at the dead connection and make every later ARP reply
++	 * write through a dangling pointer.  Start from a clean state.
++	 */
++	if (arp_is_waiting())
++		arp_wait_clear();
++
++	/*
++	 * A session that ended without a final mtk_tcp_periodic_check()
++	 * may have left connections parked on dead_head.  Nobody is
++	 * holding a pointer to them any more, so release them before the
++	 * new session starts.
++	 */
++	mtk_tcp_conn_reap();
++
++	mtk_tcp_stop = 0;
++	mtk_tcp_log("[MTK_TCP] %s: stop=%d\n", __func__, mtk_tcp_stop);
++}
++
++static struct mtk_tcp_listen *mtk_tcp_listen_find(__be16 port)
++{
++	struct list_head *lh;
++	struct mtk_tcp_listen *l;
++
++	list_for_each(lh, &listen_head) {
++		l = list_entry(lh, struct mtk_tcp_listen, node);
++		if (l->port == port)
++			return l;
++	}
++
++	return NULL;
++}
++
++int mtk_tcp_listen(__be16 port, mtk_tcp_conn_cb cb)
++{
++	struct mtk_tcp_listen *l;
++
++	if (!port || !cb)
++		return -EINVAL;
++
++	if (mtk_tcp_listen_find(port))
++		return -EADDRINUSE;
++
++	l = malloc(sizeof(struct mtk_tcp_listen));
++	if (!l)
++		return -ENOMEM;
++
++	l->port = port;
++	l->cb = cb;
++
++	list_add_tail(&l->node, &listen_head);
++
++	mtk_tcp_log("[MTK_TCP] listen: port %d registered, stop=%d\n",
++		    ntohs(port), mtk_tcp_stop);
++
++	return 0;
++}
++
++int mtk_tcp_listen_stop(__be16 port)
++{
++	struct mtk_tcp_listen *l;
++
++	l = mtk_tcp_listen_find(port);
++	if (l) {
++		mtk_tcp_log("[MTK_TCP] listen_stop: port %d removed\n", ntohs(port));
++		list_del(&l->node);
++		free(l);
++		return 0;
++	}
++
++	return -1;
++}
++
++static struct mtk_tcp_conn *mtk_tcp_conn_find(__be32 remoteip, __be16 remoteport,
++	__be16 localport)
++{
++	struct list_head *lh;
++	struct mtk_tcp_conn *c;
++
++	list_for_each(lh, &conn_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++
++		if (c->ip_remote.s_addr == remoteip &&
++			c->port_remote == remoteport &&
++			c->port_local == localport)
++			return c;
++	}
++
++	return NULL;
++}
++
++/*
++ * Take @c out of service without freeing it.
++ *
++ * A connection is always killed from inside a callback chain: either the
++ * stack called the upper layer (mtk_receive_tcp(), mtk_tcp_conn_check())
++ * and that layer closed the connection, or an upper layer asked the stack
++ * to close one.  Freeing the object right there leaves every caller above
++ * it -- and the list_for_each_safe() that is currently walking conn_head --
++ * holding a dangling pointer, and lets a second (nested) teardown free the
++ * very same object twice.
++ *
++ * Parking the connection on dead_head and freeing it later, once the whole
++ * chain has unwound, removes both hazards.  The object stays valid (and
++ * thus safe to dereference) until mtk_tcp_conn_reap() runs.
++ */
++static void mtk_tcp_conn_zombify(struct mtk_tcp_conn *c)
++{
++	mtk_tcp_log("[MTK_TCP] conn_zombify: %pI4:%d -> %d, status=%d\n",
++		    &c->ip_remote, ntohs(c->port_remote), ntohs(c->port_local),
++		    c->status);
++
++	if (c->dying)
++		return;
++
++	/*
++	 * The ARP wait state may still point into this connection:
++	 * mtk_tcp_send_packet_opt() stores arp_wait_packet_ethaddr =
++	 * c->ethaddr while it resolves the peer MAC.  Drop that state so a
++	 * late ARP reply cannot write into the connection after it has
++	 * been freed.  The web failsafe pumps eth_rx() from its own poll
++	 * loop and never runs arp_timeout_check(), so this state would
++	 * otherwise survive the session.
++	 */
++	if (arp_wait_packet_ethaddr == c->ethaddr && arp_is_waiting())
++		arp_wait_clear();
++
++	c->dying = 1;
++	list_del(&c->node);
++	list_add_tail(&c->node, &dead_head);
++}
++
++/*
++ * Free every connection parked by mtk_tcp_conn_zombify().
++ *
++ * Must only be called from a place where no connection pointer is in use,
++ * i.e. outside any callback chain.
++ */
++static void mtk_tcp_conn_reap(void)
++{
++	struct list_head *lh, *n;
++	struct mtk_tcp_conn *c;
++
++	list_for_each_safe(lh, n, &dead_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++		list_del(&c->node);
++		free(c);
++	}
++}
++
++static void mtk_tcp_conn_del(struct mtk_tcp_conn *c)
++{
++	mtk_tcp_conn_zombify(c);
++}
++
++/*
++ * Deliver @cbd to the upper layer of @c, unless the connection has already
++ * been taken out of service.
++ *
++ * Every call site must use this instead of touching c->cb directly: the
++ * callback is allowed to close (and thus invalidate) the connection it was
++ * invoked on, and c->cb is cleared as soon as that happens.
++ */
++static void mtk_tcp_cb_call(struct mtk_tcp_conn *c, struct mtk_tcp_cb_data *cbd)
++{
++	mtk_tcp_conn_cb cb = c->cb;
++
++	if (!cb || c->dying)
++		return;
++
++	assert((size_t)cb > gd->ram_base);
++	cb(cbd);
++}
++
++static u16 mtk_tcp_checksum_compute(void *data, int len, __be32 sip, __be32 dip)
++{
++	int sum, oddbyte, phlen;
++	u16 *ptr;
++
++	struct {
++		__be32 sip;
++		__be32 dip;
++		u8 zero;
++		u8 prot;
++		__be16 len;
++	} mtk_tcp_pseudo_hdr = { sip, dip, 0, IPPROTO_TCP, htons(len & 0xffff) };
++
++	sum = 0;
++
++	phlen = sizeof(mtk_tcp_pseudo_hdr);
++	ptr = (u16 *)&mtk_tcp_pseudo_hdr;
++
++	while (phlen > 1) {
++		sum += *ptr++;
++		phlen -= 2;
++	}
++
++	ptr = (u16 *)data;
++
++	while (len > 1) {
++		sum += *ptr++;
++		len -= 2;
++	}
++
++	if (len == 1) {
++		oddbyte = 0;
++		((u8 *)&oddbyte)[0] = *(u8 *)ptr;
++		((u8 *)&oddbyte)[1] = 0;
++		sum += oddbyte;
++	}
++
++	sum = (sum >> 16) + (sum & 0xffff);
++	sum += (sum >> 16);
++	sum = ~sum & 0xffff;
++
++	return sum;
++}
++
++static int mtk_tcp_seq_sub(ulong a, ulong b)
++{
++	if (time_after(a, b)) {
++		if (a >= b)
++			return a - b;
++		else
++			return a + (~b) + 1;
++	} else {
++		if (a <= b)
++			return -(int)(b - a);
++		else
++			return -(int)(b + (~a) + 1);
++	}
++}
++
++static void rtt_calc(struct mtk_tcp_conn *c)
++{
++	u32 rtt = get_timer(c->ts_rtt);
++	u32 sub;
++
++	if (rtt > c->srtt)
++		sub = rtt - c->srtt;
++	else
++		sub = c->srtt - rtt;
++
++	c->rttvar = c->rttvar - (c->rttvar >> MTK_TCP_RTT_ALPHA) +
++		(sub >> MTK_TCP_RTT_ALPHA);
++	c->srtt = c->srtt - (c->srtt >> MTK_TCP_RTT_BETA) + (rtt >> MTK_TCP_RTT_BETA);
++	c->rto = c->srtt + max((u32)MTK_TCP_RTT_G, MTK_TCP_RTT_K * c->rttvar);
++}
++
++static void mtk_tcp_set_mss_opt(u8 *opt, u16 mss)
++{
++	opt[0] = MTK_TCP_OPT_MSS;
++	opt[1] = 4;
++	opt[2] = (mss >> 8) & 0xff;
++	opt[3] = mss & 0xff;
++	opt[4] = MTK_TCP_OPT_WS;
++	opt[5] = 3;
++	opt[6] = 0;
++	opt[7] = MTK_TCP_OPT_EOL;
++}
++
++static struct mtk_tcp_conn *mtk_tcp_conn_create(__be32 remoteip, struct mtk_tcp_hdr *tcp,
++					u32 tcphdr_len, u8 *ethaddr,
++					mtk_tcp_conn_cb cb)
++{
++	struct mtk_tcp_conn *c, tmp_c;
++	u8 *optend;
++	u8 opt[8];
++	u16 mss;
++	u8 *o;
++
++	mtk_tcp_log("[MTK_TCP] conn_create: SYN from %pI4:%d -> %d\n",
++		    &remoteip, ntohs(tcp->src), ntohs(tcp->dst));
++
++	c = malloc(sizeof(struct mtk_tcp_conn));
++	if (!c) {
++		/* malloc fail, use tmp_c as buffer to finish error handling */
++		mtk_tcp_log("[MTK_TCP] conn_create: malloc failed!\n");
++		c = &tmp_c;
++	}
++
++	memset(c, 0, sizeof(struct mtk_tcp_conn));
++
++	list_add_tail(&c->node, &conn_head);
++
++	c->status = SYN_RCVD;
++	memcpy(c->ethaddr, ethaddr, 6);
++	c->ip_remote.s_addr = remoteip;
++	c->port_remote = tcp->src;
++	c->port_local = tcp->dst;
++	c->peer_seq = ntohl(net_read_u32(&tcp->seq));
++	c->local_seq = (u32)lldiv(64000ULL * get_timer(0), 500);
++	c->peer_wnd = ntohs(tcp->wnd);
++	c->peer_ws = 0;
++	c->mss = 1460;
++	c->cb = cb;
++
++	if (c == &tmp_c) {
++		/*
++		 * malloc fail, try to send MTK_TCP_RST to peer and return
++		 * NULL.  tmp_c only ever existed to be able to build that
++		 * reset packet, it must not stay on conn_head: it lives on
++		 * the stack of this function and every later walk of the
++		 * list (mtk_tcp_periodic_check(), mtk_tcp_conn_find(), ...)
++		 * would dereference dead stack memory.
++		 */
++		mtk_tcp_send_packet(c, MTK_TCP_RST | MTK_TCP_ACK, 1, c->peer_seq, NULL, 0);
++
++		list_del(&c->node);
++
++		return NULL;
++	}
++
++	/* parse tcp options */
++	if (tcphdr_len > sizeof(struct mtk_tcp_hdr)) {
++		o = (u8 *)tcp + sizeof(struct mtk_tcp_hdr);
++		optend = o + tcphdr_len - sizeof(struct mtk_tcp_hdr);
++
++		while (o < optend) {
++			if (*o == MTK_TCP_OPT_EOL)
++				break;
++
++			if (*o == MTK_TCP_OPT_NOP) {
++				o++;
++				continue;
++			}
++
++			switch (*o) {
++			case MTK_TCP_OPT_MSS:
++				mss = ((u16)o[2] << 8) | o[3];
++				if (mss < c->mss)
++					c->mss = mss;
++				break;
++			case MTK_TCP_OPT_WS:
++				c->peer_ws = min((u32)o[2], 14U);
++				break;
++			}
++
++			o += o[1];
++		}
++	}
++
++	/* send first SYN ACK packet */
++	mtk_tcp_set_mss_opt(opt, c->mss);
++
++	mtk_tcp_send_packet_opt(c, MTK_TCP_SYN | MTK_TCP_ACK, c->local_seq, c->peer_seq + 1,
++			    opt, sizeof(opt), NULL, 0);
++	c->ts_rtt = get_timer(0);
++	c->ts = get_timer(0);
++	c->ts_rexmit = get_timer(0);
++	c->num_rexmit = 0;
++
++	mtk_tcp_log("[MTK_TCP] conn_create: SYN_RCVD -> %pI4:%d, seq=%u\n",
++		    &c->ip_remote, ntohs(c->port_remote), c->local_seq);
++
++	return c;
++}
++
++int mtk_tcp_connect(__be32 destip, __be16 port, mtk_tcp_conn_cb cb, void *pdata)
++{
++	struct mtk_tcp_conn *c;
++	u16 localport;
++
++	if (!destip || !port || !cb)
++		return -EINVAL;
++
++	c = calloc(1, sizeof(struct mtk_tcp_conn));
++	if (!c)
++		return -ENOMEM;
++
++	list_add_tail(&c->node, &conn_head);
++
++	if (mtk_tcp_port_seq >= 65535)
++		mtk_tcp_port_seq = 50000;
++
++	if (mtk_tcp_port_seq == 50000) {
++		srand((u32)get_ticks());
++		mtk_tcp_port_seq += (rand() * rand()) % 10000;
++	}
++
++	localport = mtk_tcp_port_seq++;
++
++	c->status = CONNECT;
++	memset(c->ethaddr, 0, 6);
++	c->ip_remote.s_addr = destip;
++	c->port_remote = port;
++	c->port_local = htons(localport);
++	c->peer_seq = 0;
++	c->local_seq = (u32)lldiv(64000ULL * get_timer(0), 500);
++	c->peer_wnd = 0;
++	c->peer_ws = 0;
++	c->mss = 1460;
++	c->cb = cb;
++	c->pdata = pdata;
++
++	return 0;
++}
++
++static void mtk_tcp_conn_fill(struct mtk_tcp_conn *c, struct mtk_tcp_hdr *tcp,
++			      u32 tcphdr_len, u8 *ethaddr)
++{
++	u8 *optend;
++	u16 mss;
++	u8 *o;
++
++	c->peer_seq = ntohl(net_read_u32(&tcp->seq));
++	c->peer_wnd = ntohs(tcp->wnd);
++
++	/* parse tcp options */
++	if (tcphdr_len > sizeof(struct mtk_tcp_hdr)) {
++		o = (u8 *)tcp + sizeof(struct mtk_tcp_hdr);
++		optend = o + tcphdr_len - sizeof(struct mtk_tcp_hdr);
++
++		while (o < optend) {
++			if (*o == MTK_TCP_OPT_EOL)
++				break;
++
++			if (*o == MTK_TCP_OPT_NOP) {
++				o++;
++				continue;
++			}
++
++			switch (*o) {
++			case MTK_TCP_OPT_MSS:
++				mss = ((u16)o[2] << 8) | o[3];
++				if (mss < c->mss)
++					c->mss = mss;
++				break;
++			case MTK_TCP_OPT_WS:
++				c->peer_ws = min((u32)o[2], 14U);
++				break;
++			}
++
++			o += o[1];
++		}
++	}
++
++	c->ts_rtt = get_timer(0);
++	c->ts = get_timer(0);
++	c->ts_rexmit = get_timer(0);
++	c->num_rexmit = 0;
++}
++
++bool mtk_receive_tcp(struct ip_hdr *ip, int len, struct ethernet_hdr *et)
++{
++	struct mtk_tcp_hdr *tcp;
++	struct mtk_tcp_listen *l;
++	struct mtk_tcp_conn *c;
++	u32 iphdr_len, tcphdr_len, data_size;
++	u8 *data;
++	u32 seq, ack, tmp;
++	u16 flags, chksum;
++	struct mtk_tcp_cb_data cbd = {};
++
++	iphdr_len = (ip->ip_hl_v & 0x0f) * 4;
++
++	tcp = (struct mtk_tcp_hdr *)((uintptr_t)ip + iphdr_len);
++
++	chksum = mtk_tcp_checksum_compute(tcp, len - iphdr_len,
++		net_read_ip(&ip->ip_src).s_addr,
++		net_read_ip(&ip->ip_dst).s_addr);
++	if (chksum) {
++		debug("bad tcp checksum\n");
++		return false;
++	}
++
++	flags = ntohs(tcp->flags);
++	tcphdr_len = ((flags >> MTK_TCP_HDR_LEN_SHIFT) & MTK_TCP_HDR_LEN_MASK) * 4;
++	if (tcphdr_len < sizeof(struct mtk_tcp_hdr)) {
++		debug("bad tcp header size\n");
++		return false;
++	}
++
++	data = (u8 *)((uintptr_t)tcp + tcphdr_len);
++	if (len < iphdr_len + tcphdr_len) {
++		debug("incomplete tcp data\n");
++		return false;
++	}
++
++	data_size = len - iphdr_len - tcphdr_len;
++
++	mtk_tcp_log("[MTK_TCP] rx: %pI4:%d -> %pI4:%d flags=0x%03x len=%u stop=%d\n",
++		    &ip->ip_src, ntohs(tcp->src),
++		    &ip->ip_dst, ntohs(tcp->dst),
++		    flags, data_size, mtk_tcp_stop);
++
++	/* discard urgent data */
++	if (flags & MTK_TCP_URG) {
++		data += ntohs(tcp->urg);
++		data_size -= ntohs(tcp->urg);
++	}
++
++	seq = ntohl(net_read_u32(&tcp->seq));
++	ack = ntohl(net_read_u32(&tcp->ack));
++
++	/* find existing connection */
++	c = mtk_tcp_conn_find(net_read_ip(&ip->ip_src).s_addr, tcp->src, tcp->dst);
++
++	/*
++	 * If a SYN arrives on an existing connection (not in handshake
++	 * state), the client is attempting to reconnect while the old
++	 * connection is still tracked.  This commonly happens after a
++	 * network command (tftp/ping via net_loop()) runs: eth_halt()
++	 * briefly interrupts TCP traffic, the client's keep-alive or
++	 * AJAX polling fails, and the browser sends a fresh SYN.
++	 *
++	 * RFC 793: "If the connection is in a synchronized state
++	 * (ESTABLISHED, FIN-WAIT-1, FIN-WAIT-2, CLOSE-WAIT, CLOSING,
++	 * LAST-ACK, TIME-WAIT), any unacceptable segment (out of
++	 * window, etc.) elicits ... a reset."
++	 *
++	 * We send RST on the old connection, delete it, and fall
++	 * through to create a new one for the incoming SYN.
++	 */
++	if (c && (flags & MTK_TCP_FLAG_MASK) == MTK_TCP_SYN &&
++	    c->status != SYN_SENT && c->status != SYN_RCVD) {
++		mtk_tcp_log("[MTK_TCP] rx: SYN on existing conn %pI4:%d status=%d, resetting\n",
++			    &c->ip_remote, ntohs(c->port_remote), c->status);
++		mtk_tcp_send_packet(c, MTK_TCP_RST | MTK_TCP_ACK,
++				    c->local_seq, c->peer_seq, NULL, 0);
++		mtk_tcp_conn_del(c);
++		c = NULL;
++	}
++
++	if (!c) {
++		/* whether to create new connection */
++		if ((flags & MTK_TCP_FLAG_MASK) == MTK_TCP_SYN) {
++			l = mtk_tcp_listen_find(tcp->dst);
++			if (l) {
++				if (mtk_tcp_stop) {
++					mtk_tcp_log("[MTK_TCP] rx: SYN rejected, stop=%d\n",
++						    mtk_tcp_stop);
++					return false;
++				}
++
++				/* create new connection */
++				mtk_tcp_conn_create(
++					net_read_ip(&ip->ip_src).s_addr,
++					tcp, tcphdr_len, et->et_src, l->cb);
++				return true;
++			}
++		}
++
++		return false;
++	}
++
++	/* Prepare for callback data */
++	cbd.conn = c;
++	cbd.sip = c->ip_remote.s_addr;
++	cbd.sp = tcp->src;
++	cbd.dp = tcp->dst;
++	cbd.pdata = c->pdata;
++
++	if (flags & MTK_TCP_RST) {
++		mtk_tcp_log("[MTK_TCP] rx: RST from %pI4:%d, status=%d\n",
++			    &c->ip_remote, ntohs(c->port_remote), c->status);
++		if (c->status != SYN_RCVD) {
++			/* The peer has reset the connection */
++			mtk_tcp_conn_finish(c, MTK_TCP_CB_REMOTE_CLOSED);
++			return true;
++		}
++
++		mtk_tcp_conn_del(c);
++		return true;
++	}
++
++	if (!(flags & MTK_TCP_ACK)) {
++		switch (c->status) {
++		case FIN_WAIT_1:
++		case FIN_WAIT_2:
++			break;
++		default:
++			/* Needs ACK bit */
++			return true;
++		}
++	}
++
++	switch (c->status) {
++	case SYN_SENT:
++		if (!(flags & MTK_TCP_SYN)) {
++			mtk_tcp_send_packet(c, MTK_TCP_RST, c->local_seq,
++					    c->peer_seq, NULL, 0);
++
++			cbd.status = MTK_TCP_CB_CLOSED;
++			mtk_tcp_cb_call(c, &cbd);
++
++			mtk_tcp_conn_del(c);
++			break;
++		}
++
++		mtk_tcp_conn_fill(c, tcp, tcphdr_len, et->et_src);
++
++		fallthrough;
++	case SYN_RCVD:
++		/* Calculate first RTO */
++		c->srtt = get_timer(c->ts_rtt);
++		c->rttvar = c->srtt / 2;
++		c->rto = c->srtt + max((u32)MTK_TCP_RTT_G,
++			MTK_TCP_RTT_K * c->rttvar);
++
++		c->peer_seq++;
++		c->local_seq++;
++		c->local_seq_last = c->local_seq;
++		c->local_seq_acked = c->local_seq;
++
++		if (c->status == SYN_SENT) {
++			mtk_tcp_send_packet(c, MTK_TCP_ACK, c->local_seq,
++					    c->peer_seq, NULL, 0);
++		}
++
++		mtk_tcp_log("[MTK_TCP] state: %pI4:%d %s -> ESTABLISHED\n",
++			    &c->ip_remote, ntohs(c->port_remote),
++			    c->status == SYN_SENT ? "SYN_SENT" : "SYN_RCVD");
++		c->status = ESTABLISHED;
++
++		cbd.status = MTK_TCP_CB_NEW_CONN;
++		mtk_tcp_cb_call(c, &cbd);
++
++		/*
++		 * The upper layer may have closed the connection from
++		 * inside the callback (mtk_tcp_close_conn(conn, 1)).  @c
++		 * is no longer part of conn_head then, and everything
++		 * below would be writing to a stale connection.
++		 */
++		if (c->dying)
++			return true;
++
++		if (!data_size)
++			break;
++
++		fallthrough;
++	case ESTABLISHED:
++		/* Update window */
++		tmp = ntohs(tcp->wnd) << c->peer_ws;
++		if (tmp > c->mss && tmp > c->peer_wnd)
++			c->zw_mode = 0;
++		c->peer_wnd = tmp;
++
++		if (mtk_tcp_seq_sub(seq, c->peer_seq) < 0) {
++			if (mtk_tcp_seq_sub(seq + data_size, c->peer_seq) > 0) {
++				/*
++				 * This packet contains payload of which we
++				 * have partially ACKed.
++				 * Extract only the part we've not ACKed.
++				 */
++				tmp = seq + data_size - c->peer_seq;
++				data += data_size - tmp;
++				data_size = tmp;
++			} else {
++				/*
++				 * Totally duplicated packet.
++				 * Discard the payload and send an ACK to
++				 * indicate our current ACK number
++				 */
++				c->ack_flag++;
++				data_size = 0;
++			}
++		} else if (mtk_tcp_seq_sub(seq, c->peer_seq) > 0) {
++			/*
++			 * Incoming packet loss.
++			 * Discard the payload and send an ACK to request
++			 * retransmission.
++			 */
++			data_size = 0;
++			c->ack_flag++;
++		}
++
++		if (mtk_tcp_seq_sub(ack, c->local_seq_acked) > 0) {
++			/* clear retransmission state */
++			c->rexmit_mode = 0;
++			c->rexmit_wait_ack = 0;
++
++			/* The peer has ACKed new data */
++			c->local_seq_acked = ack;
++
++			if (mtk_tcp_seq_sub(ack, c->ack_calc_rtt) >= 0 &&
++				c->ack_calc_rtt) {
++				/* Calculate new RTO */
++				c->ack_calc_rtt = 0;
++				rtt_calc(c);
++			}
++
++			if (mtk_tcp_seq_sub(c->local_seq_acked,
++				c->local_seq_last) == c->txlen) {
++				/* Current data chunk has been fully sent */
++				c->tx = NULL;
++				c->txlen = 0;
++				cbd.status = MTK_TCP_CB_DATA_SENT;
++				mtk_tcp_cb_call(c, &cbd);
++
++				if (c->dying)
++					return true;
++			}
++		} else {
++			/*
++			 * If the peer ACKed the data chunk we've already
++			 * fully sent, just ignore it
++			 */
++			if (mtk_tcp_seq_sub(ack, c->local_seq_last) < 0)
++				break;
++
++			/* Currently no more unACKed data */
++			if (c->local_seq == c->local_seq_acked)
++				goto check_new_data;
++
++			/*
++			 * Record the transmission position the peer required,
++			 * and enter the retransmission mode
++			 */
++			c->local_seq_acked = ack;
++			c->rexmit_mode = 1;
++		}
++
++check_new_data:
++		if (data_size) {
++			/*
++			 * We have new data received
++			 * Increase the next expected peer SEQ number
++			 * Send an ACK to acknowledge the peer
++			 */
++			c->peer_seq += data_size;
++			c->ack_flag++;
++
++			cbd.status = MTK_TCP_CB_DATA_RCVD;
++			cbd.data = data;
++			cbd.datalen = data_size;
++			mtk_tcp_cb_call(c, &cbd);
++
++			if (c->dying)
++				return true;
++		}
++
++		if (flags & MTK_TCP_FIN) {
++			/* The peer is closing the connection */
++			mtk_tcp_log("[MTK_TCP] rx: FIN from %pI4:%d, -> CLOSE_WAIT\n",
++				    &c->ip_remote, ntohs(c->port_remote));
++			c->status = CLOSE_WAIT;
++			cbd.status = MTK_TCP_CB_REMOTE_CLOSING;
++			mtk_tcp_cb_call(c, &cbd);
++		}
++
++		break;
++	case LAST_ACK:
++		if (mtk_tcp_seq_sub(ack, c->local_seq + 1))
++			return true;
++
++		mtk_tcp_log("[MTK_TCP] rx: LAST_ACK done for %pI4:%d, -> CLOSED\n",
++			    &c->ip_remote, ntohs(c->port_remote));
++		c->status = CLOSE_WAIT;
++		mtk_tcp_conn_finish(c, MTK_TCP_CB_REMOTE_CLOSED);
++		break;
++	case FIN_WAIT_1:
++		if (flags & MTK_TCP_ACK) {
++			if (mtk_tcp_seq_sub(ack, c->local_seq + 1))
++				return true;
++		}
++
++		if ((flags & (MTK_TCP_ACK | MTK_TCP_FIN)) == (MTK_TCP_ACK | MTK_TCP_FIN)) {
++			mtk_tcp_log("[MTK_TCP] rx: FIN_WAIT_1 + ACK+FIN -> TIME_WAIT\n");
++			c->status = TIME_WAIT;
++			c->local_seq++;
++		} else if (flags & MTK_TCP_ACK) {
++			mtk_tcp_log("[MTK_TCP] rx: FIN_WAIT_1 + ACK -> FIN_WAIT_2\n");
++			c->status = FIN_WAIT_2;
++			c->local_seq++;
++		} else if (flags & MTK_TCP_FIN) {
++			mtk_tcp_log("[MTK_TCP] rx: FIN_WAIT_1 + FIN -> CLOSING\n");
++			c->status = CLOSING;
++		}
++		break;
++	case FIN_WAIT_2:
++		if (flags & MTK_TCP_FIN) {
++			mtk_tcp_log("[MTK_TCP] rx: FIN_WAIT_2 + FIN -> TIME_WAIT\n");
++			c->status = TIME_WAIT;
++		}
++		break;
++	case CLOSING:
++		if (mtk_tcp_seq_sub(ack, c->local_seq + 1))
++			return true;
++
++		mtk_tcp_log("[MTK_TCP] rx: CLOSING + ACK -> TIME_WAIT\n");
++		c->status = TIME_WAIT;
++		c->local_seq++;
++		break;
++	default:
++		break;
++	}
++
++	return true;
++}
++
++static void mtk_tcp_rexmit_init(struct mtk_tcp_conn *c)
++{
++	c->ts_rexmit = get_timer(0);
++	c->ts = get_timer(0);
++	c->num_rexmit = 0;
++}
++
++static void mtk_tcp_rexmit_reset(struct mtk_tcp_conn *c)
++{
++	c->ts = get_timer(0);
++	c->num_rexmit++;
++}
++
++static int mtk_tcp_rexmit_check(struct mtk_tcp_conn *c, struct mtk_tcp_cb_data *cbd)
++{
++	ulong curts, timeout;
++
++	if (get_timer(c->ts_rexmit) > MTK_TCP_REXMIT_MAX_CONN_DELAY) {
++		/*
++		 * Reached maximum retransmission count,
++		 * resetting the connection
++		 */
++		mtk_tcp_send_packet(c, MTK_TCP_RST | MTK_TCP_ACK, c->local_seq,
++				c->peer_seq, NULL, 0);
++
++		/* Callback if the connection has established */
++		switch (c->status) {
++		case ESTABLISHED:
++			cbd->status = MTK_TCP_CB_REMOTE_CLOSED;
++			cbd->timedout = true;
++			mtk_tcp_cb_call(c, cbd);
++			break;
++		case FIN_WAIT_1:
++		case FIN_WAIT_2:
++		case CLOSING:
++		case CLOSE_WAIT:
++			cbd->status = MTK_TCP_CB_CLOSED;
++			mtk_tcp_cb_call(c, cbd);
++			break;
++		default:
++			break;
++		}
++
++		mtk_tcp_conn_del(c);
++		return -1;
++	}
++
++	/* Calculate RTO * 2^N */
++	timeout = c->rto << c->num_rexmit;
++	timeout = min(timeout, (ulong)MTK_TCP_REXMIT_MAX_SEG_DELAY);
++	timeout += c->ts;
++
++	curts = get_timer(0);
++
++	if (time_after(curts, timeout))
++		/* Timed out, retransmission needed */
++		return 1;
++
++	return 0;
++}
++
++static void mtk_tcp_connect_rexmit_reset(struct mtk_tcp_conn *c)
++{
++	c->ts = get_timer(0);
++	c->num_rexmit++;
++}
++
++static int mtk_tcp_connect_rexmit_check(struct mtk_tcp_conn *c,
++					struct mtk_tcp_cb_data *cbd)
++{
++	ulong curts, timeout;
++
++	if (get_timer(c->ts_rexmit) > MTK_TCP_REXMIT_MAX_CONN_DELAY) {
++		/*
++		 * Reached maximum retransmission count,
++		 * resetting the connection
++		 */
++		mtk_tcp_send_packet(c, MTK_TCP_RST, c->local_seq, c->peer_seq,
++				    NULL, 0);
++
++		cbd->status = MTK_TCP_CB_REMOTE_CLOSED;
++		cbd->timedout = true;
++		mtk_tcp_cb_call(c, cbd);
++
++		mtk_tcp_conn_del(c);
++		return -1;
++	}
++
++	timeout = c->ts + (MTK_TCP_CONNECT_INIT_DELAY << c->num_rexmit);
++
++	curts = get_timer(0);
++
++	if (time_after(curts, timeout))
++		/* Timed out, retransmission needed */
++		return 1;
++
++	return 0;
++}
++
++static void mtk_tcp_conn_check(struct mtk_tcp_conn *c)
++{
++	const u8 *data = NULL;
++	u32 datalen = 0;
++	u8 flags = MTK_TCP_ACK;
++	u32 sendseq;
++	u32 datalen_sent, datalen_acked;
++	u8 opt[8];
++	struct mtk_tcp_cb_data cbd = {};
++
++	/* Update timer */
++	get_timer(0);
++
++	cbd.conn = c;
++	cbd.sip = c->ip_remote.s_addr;
++	cbd.sp = c->port_remote;
++	cbd.dp = c->port_local;
++	cbd.pdata = c->pdata;
++
++	switch (c->status) {
++	case CONNECT:
++		/* send first SYN packet */
++		mtk_tcp_set_mss_opt(opt, c->mss);
++
++		mtk_tcp_send_packet_opt(c, MTK_TCP_SYN, c->local_seq,
++					c->peer_seq, opt, sizeof(opt), NULL, 0);
++
++		c->ts = get_timer(0);
++		c->ts_rexmit = get_timer(0);
++		c->num_rexmit = 0;
++
++		c->status = SYN_SENT;
++		break;
++
++	case SYN_SENT:
++		switch (mtk_tcp_connect_rexmit_check(c, &cbd)) {
++		case -1:
++			return;
++		case 1:
++			mtk_tcp_set_mss_opt(opt, c->mss);
++			mtk_tcp_send_packet_opt(c, MTK_TCP_SYN, c->local_seq,
++						c->peer_seq, opt, sizeof(opt),
++						NULL, 0);
++			mtk_tcp_connect_rexmit_reset(c);
++		}
++
++		break;
++
++	case SYN_RCVD:
++		switch (mtk_tcp_rexmit_check(c, &cbd)) {
++		case -1:
++			return;
++		case 1:
++			mtk_tcp_set_mss_opt(opt, c->mss);
++			mtk_tcp_send_packet_opt(c, MTK_TCP_SYN | MTK_TCP_ACK,
++					    c->local_seq, c->peer_seq + 1,
++					    opt, sizeof(opt), NULL, 0);
++			mtk_tcp_rexmit_reset(c);
++		}
++
++		break;
++	case ESTABLISHED:
++		sendseq = c->local_seq;
++
++		datalen_sent = mtk_tcp_seq_sub(c->local_seq, c->local_seq_last);
++		datalen_acked = mtk_tcp_seq_sub(c->local_seq_acked,
++					    c->local_seq_last);
++
++		if (!c->rexmit_mode) {
++			if (c->txlen > datalen_sent) {
++				/* There is still data to be sent */
++				data = c->tx + datalen_sent;
++				datalen = min(c->txlen - datalen_sent,
++					      (u32)c->mss);
++
++				if (datalen >= c->peer_wnd) {
++					/* The peer may be zero-window */
++					if (!c->zw_mode)
++						mtk_tcp_rexmit_init(c);
++					/* Enter zero-window mode */
++					c->zw_mode = 1;
++					/* And send no data */
++					datalen = 0;
++				} else {
++					c->local_seq += datalen;
++					c->peer_wnd -= datalen;
++					c->ack_flag++;
++					if (datalen == c->txlen - datalen_sent)
++						flags |= MTK_TCP_PSH;
++					mtk_tcp_rexmit_init(c);
++				}
++			} else if (c->txlen > datalen_acked) {
++				/* There is data to be ACKed */
++				switch (mtk_tcp_rexmit_check(c, &cbd)) {
++				case -1:
++					return;
++				case 1:
++					/*
++					 * Timed out waiting for ACK, entering
++					 * retransmission mode
++					 */
++					c->rexmit_mode = 1;
++					c->rexmit_wait_ack = 0;
++				}
++			}
++		}
++
++		if (c->rexmit_mode) {
++			if (c->rexmit_wait_ack) {
++				switch (mtk_tcp_rexmit_check(c, &cbd)) {
++				case -1:
++					return;
++				case 1:
++					/*
++					 * Timed out waiting for ACK of
++					 * retransmitted segment, start for
++					 * the next trial
++					 */
++					c->rexmit_wait_ack = 0;
++				}
++			}
++
++			if (!c->rexmit_wait_ack) {
++				sendseq = c->local_seq_acked;
++
++				if (!c->zw_mode) {
++					/*
++					 * Send data if not in zero-window mode
++					 */
++					data = c->tx + datalen_acked;
++					datalen = min(c->txlen - datalen_acked,
++						      (u32)c->mss);
++					c->ack_flag++;
++					c->rexmit_wait_ack = 1;
++					mtk_tcp_rexmit_reset(c);
++				}
++
++				if (get_timer(c->ts_rtt) > MTK_TCP_RTT_INTERVAL) {
++					/* Start calculating RTO */
++					c->ack_calc_rtt = c->local_seq_acked +
++							  datalen;
++					c->ts_rtt = get_timer(0);
++				}
++			}
++		}
++
++		if (!c->peer_wnd || c->zw_mode) {
++			if (!c->zw_mode) {
++				/* Enter zero-window mode */
++				c->zw_mode = 1;
++				mtk_tcp_rexmit_init(c);
++			}
++
++			if (c->txlen > datalen_sent) {
++				/* Doing zero window probing */
++				switch (mtk_tcp_rexmit_check(c, &cbd)) {
++				case -1:
++					return;
++				case 1:
++					/*
++					 * If we have data unsend or unacked,
++					 * send one byte to probe
++					 */
++					datalen = 1;
++					sendseq = c->local_seq_acked;
++					data = c->tx + datalen_acked;
++					if (c->local_seq == c->local_seq_acked)
++						c->local_seq += datalen;
++					c->ack_flag++;
++					mtk_tcp_rexmit_reset(c);
++				}
++			}
++		}
++
++		if (c->ack_flag) {
++			c->ack_flag = 0;
++			mtk_tcp_send_packet(c, flags, sendseq, c->peer_seq,
++					data, datalen);
++		}
++
++		if (c->close_flag) {
++			if (!c->tx || !c->txlen) {
++				/*
++				 * Close the connection after we've sent
++				 * current data chunk
++				 */
++				mtk_tcp_log("[MTK_TCP] close_flag -> FIN_WAIT_1 %pI4:%d\n",
++					    &c->ip_remote, ntohs(c->port_remote));
++				mtk_tcp_send_packet(c, MTK_TCP_FIN | MTK_TCP_ACK,
++						c->local_seq, c->peer_seq,
++						NULL, 0);
++				c->status = FIN_WAIT_1;
++				mtk_tcp_rexmit_init(c);
++
++				cbd.status = MTK_TCP_CB_CLOSING;
++				mtk_tcp_cb_call(c, &cbd);
++			}
++		}
++
++		break;
++	case CLOSE_WAIT:
++		mtk_tcp_log("[MTK_TCP] conn_check: %pI4:%d CLOSE_WAIT -> LAST_ACK\n",
++			    &c->ip_remote, ntohs(c->port_remote));
++		mtk_tcp_send_packet_ctrl(c, MTK_TCP_FIN | MTK_TCP_ACK);
++		c->status = LAST_ACK;
++		mtk_tcp_rexmit_init(c);
++		break;
++	case LAST_ACK:
++		switch (mtk_tcp_rexmit_check(c, &cbd)) {
++		case -1:
++			return;
++		case 1:
++			mtk_tcp_send_packet_ctrl(c, MTK_TCP_FIN | MTK_TCP_ACK);
++			mtk_tcp_rexmit_reset(c);
++		}
++
++		break;
++	case FIN_WAIT_1:
++		switch (mtk_tcp_rexmit_check(c, &cbd)) {
++		case -1:
++			return;
++		case 1:
++			mtk_tcp_send_packet(c, MTK_TCP_FIN | MTK_TCP_ACK,
++				c->local_seq, c->peer_seq, NULL, 0);
++			mtk_tcp_rexmit_reset(c);
++		}
++
++		break;
++	case FIN_WAIT_2:
++	case CLOSING:
++		/*
++		 * Half-closed, waiting for the last ACK/FIN of the peer.
++		 * Nothing is retransmitted in these states, but the
++		 * connection must not stay here forever when the peer never
++		 * answers: upper layers wait for MTK_TCP_CB_CLOSED before
++		 * acting (the web failsafe reboot, for one), and
++		 * mtk_tcp_periodic_check() only reports "done" once every
++		 * connection is gone.
++		 */
++		switch (mtk_tcp_rexmit_check(c, &cbd)) {
++		case -1:
++			return;
++		default:
++			break;
++		}
++
++		break;
++	case TIME_WAIT:
++		mtk_tcp_log("[MTK_TCP] conn_check: %pI4:%d TIME_WAIT -> CLOSED\n",
++			    &c->ip_remote, ntohs(c->port_remote));
++		mtk_tcp_send_packet_ctrl(c, MTK_TCP_ACK);
++		mtk_tcp_conn_finish(c, MTK_TCP_CB_CLOSED);
++		break;
++	default:
++		return;
++	}
++}
++
++/*
++ * Issue MTK_TCP_CB_POLL for connections that are able to accept a new data
++ * chunk right now.
++ *
++ * This is the pump that lets upper layers stream console output while a
++ * blocking command (tftp, ping, dhcp, ...) is still executing: the inner
++ * net_loop() keeps calling mtk_tcp_periodic_check(), so the callback is
++ * reached even though run_command() has not returned yet.
++ */
++static void mtk_tcp_conn_poll(struct mtk_tcp_conn *c)
++{
++	struct mtk_tcp_cb_data cbd = {};
++	u32 datalen_acked;
++
++	if (!c->cb || c->close_flag)
++		return;
++
++	if (c->status != ESTABLISHED)
++		return;
++
++	/* Only one unacknowledged chunk is supported per connection */
++	datalen_acked = mtk_tcp_seq_sub(c->local_seq_acked, c->local_seq_last);
++	if (c->tx && c->txlen > datalen_acked)
++		return;
++
++	cbd.conn = c;
++	cbd.sip = c->ip_remote.s_addr;
++	cbd.sp = c->port_remote;
++	cbd.dp = c->port_local;
++	cbd.pdata = c->pdata;
++	cbd.status = MTK_TCP_CB_POLL;
++
++	mtk_tcp_cb_call(c, &cbd);
++}
++
++int mtk_tcp_periodic_check(void)
++{
++	struct list_head *lh, *n;
++	struct mtk_tcp_conn *c;
++	int num = 0;
++
++	list_for_each_safe(lh, n, &conn_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++		/*
++		 * Run the poll callback BEFORE the connection state
++		 * machine.  Either of them may close @c -- the upper
++		 * layer is free to call mtk_tcp_close_conn() from any
++		 * callback, and mtk_tcp_conn_check() finishes the
++		 * TIME_WAIT connections -- so it must not be touched
++		 * again once it has been taken out of service.
++		 */
++		mtk_tcp_conn_poll(c);
++		if (c->dying) {
++			num++;
++			continue;
++		}
++
++		mtk_tcp_conn_check(c);
++		num++;
++	}
++
++	/*
++	 * Every callback chain has unwound by now: nothing below this
++	 * point holds a connection pointer, so the connections parked by
++	 * this pass (and by any eth_rx() that ran before it) can be
++	 * released.
++	 */
++	mtk_tcp_conn_reap();
++
++	if (list_empty(&listen_head)) {
++		if (!mtk_tcp_stop)
++			mtk_tcp_log("[MTK_TCP] listen_head empty, stop=1\n");
++		mtk_tcp_stop = 1;
++	}
++
++	mtk_tcp_log("[MTK_TCP] periodic_check: stop=%d, conns=%d, listen_empty=%d\n",
++		    mtk_tcp_stop, num, list_empty(&listen_head));
++
++	/*
++	 * "Done" means: no listeners AND no active connections.
++	 * Using mtk_tcp_stop alone is unsafe because it is a module-level
++	 * static that can carry over from a previous session (e.g. the
++	 * failsafe's mtk_tcp_close_all_conn() on exit, or a prior wget
++	 * that auto-set it via the list_empty() check above). The caller
++	 * may not have reset it before the first poll, which caused the
++	 * failsafe loop to terminate immediately on entry. Anchoring the
++	 * exit condition to listen_head ensures sessions with registered
++	 * listeners (httpd/telnetd) never spuriously exit.
++	 */
++	return (list_empty(&listen_head) && !num) ? 1 : 0;
++}
++
++static int mtk_tcp_send_packet_opt(struct mtk_tcp_conn *c, u16 flags, u32 seq, u32 ack,
++			       void *opt, int opt_size, const void *payload,
++			       int payload_len)
++{
++	int eth_hdr_size, pkt_hdr_size;
++	struct mtk_tcp_hdr *tcp;
++	struct ip_hdr *ip;
++	uchar *pkt;
++	u32 len;
++
++	seq = htonl(seq);
++	ack = htonl(ack);
++
++	pkt = (uchar *)net_tx_packet;
++
++	eth_hdr_size = net_set_ether(pkt, c->ethaddr, PROT_IP);
++	pkt += eth_hdr_size;
++
++	ip = (struct ip_hdr *)pkt;
++	len = IP_HDR_SIZE + MTK_TCP_HDR_SIZE + opt_size + payload_len;
++	net_set_ip_header(pkt, c->ip_remote, net_ip, len, IPPROTO_TCP);
++	pkt += IP_HDR_SIZE;
++
++	tcp = (struct mtk_tcp_hdr *)pkt;
++	tcp->src = c->port_local;
++	tcp->dst = c->port_remote;
++	tcp->flags = htons((((MTK_TCP_HDR_SIZE + opt_size) / 4) <<
++		MTK_TCP_HDR_LEN_SHIFT) | (flags & MTK_TCP_FLAG_MASK));
++	memcpy(&tcp->seq, &seq, 4);
++	memcpy(&tcp->ack, &ack, 4);
++	tcp->wnd = htons(MTK_TCP_RCV_WND);
++	/* avoid compiler's optimization leading to an unaligned access */
++	memset(&tcp->urg, 0, sizeof(tcp->urg));
++	tcp->chksum = 0;
++
++	pkt += MTK_TCP_HDR_SIZE;
++
++	if (opt_size) {
++		memcpy(pkt, opt, opt_size);
++		pkt += opt_size;
++	}
++
++	memcpy(pkt, payload, payload_len);
++
++	tcp->chksum = mtk_tcp_checksum_compute(tcp, MTK_TCP_HDR_SIZE + opt_size +
++		payload_len, net_ip.s_addr, c->ip_remote.s_addr);
++
++	pkt_hdr_size = eth_hdr_size + IP_HDR_SIZE + MTK_TCP_HDR_SIZE + opt_size;
++
++	/* if MAC address was not discovered yet, do an ARP request */
++	if (memcmp(c->ethaddr, net_null_ethaddr, 6) == 0) {
++		/* save the ip and eth addr for the packet to send after arp */
++		net_arp_wait_packet_ip = c->ip_remote;
++		arp_wait_packet_ethaddr = c->ethaddr;
++
++		/* size of the waiting packet */
++		arp_wait_tx_packet_size = pkt_hdr_size + payload_len;
++
++		/* and do the ARP request */
++		arp_wait_try = 1;
++		arp_wait_timer_start = get_timer(0);
++		arp_request();
++		return 0;	/* waiting */
++	} else {
++		return eth_send(net_tx_packet, pkt_hdr_size + payload_len);
++	}
++}
++
++static int mtk_tcp_send_packet(struct mtk_tcp_conn *c, u16 flags, u32 seq, u32 ack,
++			   const void *payload, int payload_len)
++{
++	return mtk_tcp_send_packet_opt(c, flags, seq, ack, NULL, 0,
++		payload, payload_len);
++}
++
++static int mtk_tcp_send_packet_ctrl(struct mtk_tcp_conn *c, u16 flags)
++{
++	return mtk_tcp_send_packet_opt(c, flags, c->local_seq, c->peer_seq + 1,
++		NULL, 0, NULL, 0);
++}
++
++void *mtk_tcp_conn_set_pdata(const void *conn, void *pdata)
++{
++	struct mtk_tcp_conn *c = (struct mtk_tcp_conn *)conn;
++	void *prev_pdata;
++
++	if (!c)
++		return NULL;
++
++	prev_pdata = c->pdata;
++	c->pdata = pdata;
++
++	return prev_pdata;
++}
++
++int mtk_tcp_send_data(const void *conn, const void *data, u32 size)
++{
++	struct mtk_tcp_conn *c = (struct mtk_tcp_conn *)conn;
++	u32 datalen_acked;
++
++	if (!c || !data || !size)
++		return -EINVAL;
++
++	if (c->close_flag)
++		return 1;
++
++	datalen_acked = mtk_tcp_seq_sub(c->local_seq_acked, c->local_seq_last);
++
++	if (c->tx && (c->txlen > datalen_acked))
++		return 1;
++
++	c->tx = data;
++	c->txlen = size;
++	c->local_seq_last = c->local_seq;
++	c->local_seq_acked = c->local_seq;
++
++	return 0;
++}
++
++/*
++ * Deliver the final notification for @c and release it.
++ *
++ * The connection is unlinked from conn_head and stripped of its callback
++ * and private data BEFORE the callback runs.  A callback is free to call
++ * back into this stack -- an upper layer's CLOSED handler may call
++ * mtk_tcp_close_all_conn().  If @c were still linked here, that call would
++ * find @c again and re-enter the very same callback: the web failsafe's
++ * reboot handler recursed this way, printing its "Rebooting now" line once
++ * per level and never reaching do_reset().  Clearing c->pdata likewise
++ * stops a second (nested) delivery from handing already-freed private data
++ * to the handler.
++ *
++ * The object itself is only parked on dead_head; it is freed by
++ * mtk_tcp_conn_reap() once the whole callback chain has unwound.  That
++ * keeps @c valid for the callers above us, which still hold a pointer to
++ * it and may not have finished dereferencing it.
++ *
++ * @c must not be used for anything meaningful afterwards.
++ */
++static void mtk_tcp_conn_finish(struct mtk_tcp_conn *c,
++				enum mtk_tcp_cb_status status)
++{
++	struct mtk_tcp_cb_data cbd = {};
++	mtk_tcp_conn_cb cb;
++	void *pdata;
++
++	mtk_tcp_conn_zombify(c);
++
++	cb = c->cb;
++	pdata = c->pdata;
++	c->cb = NULL;
++	c->pdata = NULL;
++
++	if (cb && pdata) {
++		cbd.conn = c;
++		cbd.sip = c->ip_remote.s_addr;
++		cbd.sp = c->port_remote;
++		cbd.dp = c->port_local;
++		cbd.pdata = pdata;
++		cbd.status = status;
++
++		assert((size_t)cb > gd->ram_base);
++		cb(&cbd);
++	}
++}
++
++/*
++ * Tear a connection down immediately: reset the peer, notify the upper layer
++ * so it can free its private data, and drop the connection from conn_head.
++ *
++ * This is the only safe way to dispose of a connection once the networking
++ * session is ending.  mtk_tcp_close_conn(c, 0) only raises close_flag and
++ * relies on a FIN/ACK round trip to reach TIME_WAIT before the connection is
++ * deleted, but the caller is about to (or already has) call eth_halt(), so
++ * that round trip never completes and the connection stays on conn_head
++ * forever with close_flag set.
++ *
++ * Such a leftover is found again by mtk_tcp_conn_find() as soon as the peer
++ * reconnects from the same source port -- which is exactly what a browser
++ * does when the web failsafe is stopped and started again.  The next session
++ * then hands freed per-connection data back to the callback, and the first
++ * packet that arrives on the stale connection dereferences uri handlers that
++ * httpd_free_instance() has already released.
++ */
++static void mtk_tcp_conn_teardown(struct mtk_tcp_conn *c)
++{
++	/*
++	 * Only reset when the peer MAC is known.  Otherwise
++	 * mtk_tcp_send_packet_opt() would kick off an ARP request for a
++	 * connection that is being destroyed right now, leaving the ARP wait
++	 * state pointing into a connection that is gone.
++	 */
++	if (memcmp(c->ethaddr, net_null_ethaddr, 6))
++		mtk_tcp_send_packet(c, MTK_TCP_RST | MTK_TCP_ACK,
++				    c->local_seq, c->peer_seq, NULL, 0);
++
++	mtk_tcp_conn_finish(c, MTK_TCP_CB_CLOSED);
++}
++
++int mtk_tcp_close_conn(const void *conn, int rst)
++{
++	struct mtk_tcp_conn *c = (struct mtk_tcp_conn *)conn;
++
++	if (!c)
++		return -EINVAL;
++
++	if (rst)
++		mtk_tcp_conn_teardown(c);
++	else
++		c->close_flag = 1;
++
++	return 0;
++}
++
++void mtk_tcp_close_all_conn(void)
++{
++	struct list_head *lh, *n;
++	struct mtk_tcp_conn *c;
++	struct mtk_tcp_listen *l;
++	static bool tearing_down;
++
++	mtk_tcp_log("[MTK_TCP] %s: stop=%d\n", __func__, mtk_tcp_stop);
++
++	/*
++	 * A connection callback invoked below may legitimately call this
++	 * function again.  The outer list_for_each_safe() has already
++	 * stashed the "next" pointer, so a nested run would unlink it and
++	 * make the outer loop walk the wrong list.  The outer run disposes
++	 * of every connection anyway, so the nested one has nothing to do.
++	 */
++	if (tearing_down)
++		return;
++
++	tearing_down = true;
++
++	list_for_each_safe(lh, n, &conn_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++		mtk_tcp_conn_teardown(c);
++	}
++
++	/*
++	 * Remove all listeners so that mtk_tcp_periodic_check() can
++	 * return 1 (list_empty(&listen_head) && !num) and the polling
++	 * loop in failsafe can exit cleanly.  This is needed for
++	 * initramfs boot where we must leave net_loop / poll loop
++	 * without a board reset.
++	 */
++	list_for_each_safe(lh, n, &listen_head) {
++		l = list_entry(lh, struct mtk_tcp_listen, node);
++		mtk_tcp_log("[MTK_TCP] close_all_conn: removing listener port %d\n",
++			    ntohs(l->port));
++		list_del(&l->node);
++		free(l);
++	}
++
++	/*
++	 * A connection that sent through mtk_tcp_send_packet_opt() with an
++	 * unresolved peer MAC is referenced by the ARP wait state
++	 * (arp_wait_packet_ethaddr points into the connection).  The
++	 * connections are gone now, so drop that state too -- otherwise an
++	 * ARP reply arriving in the next session writes through a dangling
++	 * pointer and transmits a stale net_tx_packet.
++	 */
++	if (arp_is_waiting())
++		arp_wait_clear();
++
++	tearing_down = false;
++
++	/*
++	 * Nothing below still holds a connection pointer: release the
++	 * connections parked by this run so the next session starts from
++	 * an empty heap state.
++	 */
++	mtk_tcp_conn_reap();
++
++	mtk_tcp_stop = 1;
++}
++
++void mtk_tcp_close_conn_by_port(__be16 port)
++{
++	struct list_head *lh, *n;
++	struct mtk_tcp_conn *c;
++
++	/*
++	 * Dispose of every connection still tracked for a local port.
++	 *
++	 * Used when an upper layer (httpd) tears down its instance: the
++	 * per-connection data of the still-tracked connections references
++	 * resources owned by that instance, so they must go away before the
++	 * instance is freed.  Without this, restarting the web failsafe
++	 * leaves the connections of the previous session behind and the next
++	 * packet from the peer runs the callback on freed state.
++	 */
++	list_for_each_safe(lh, n, &conn_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++		if (c->port_local == port)
++			mtk_tcp_conn_teardown(c);
++	}
++
++	/*
++	 * The caller is about to release whatever the per-connection data
++	 * points at, so make sure the connection objects themselves are
++	 * gone as well instead of lingering on dead_head.
++	 */
++	mtk_tcp_conn_reap();
++}
++
++void mtk_tcp_reset_all_conn(void)
++{
++	struct list_head *lh, *n;
++	struct mtk_tcp_conn *c;
++
++	mtk_tcp_log("[MTK_TCP] %s: stop=%d\n", __func__, mtk_tcp_stop);
++
++	list_for_each_safe(lh, n, &conn_head) {
++		c = list_entry(lh, struct mtk_tcp_conn, node);
++		mtk_tcp_close_conn(c, 1);
++	}
++
++	mtk_tcp_conn_reap();
++
++	mtk_tcp_stop = 1;
++}
++
++int mtk_tcp_conn_is_alive(const void *conn)
++{
++	struct mtk_tcp_conn *c = (struct mtk_tcp_conn *)conn;
++
++	return c->status == ESTABLISHED;
++}
+diff --git a/net/mtk_tcp_priv.h b/net/mtk_tcp_priv.h
+new file mode 100644
+index 00000000..79f19303
+--- /dev/null
++++ b/net/mtk_tcp_priv.h
+@@ -0,0 +1,87 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2022 MediaTek Inc. All Rights Reserved.
++ *
++ * Author: Weijie Gao <weijie.gao@mediatek.com>
++ */
++
++#ifndef __MTK_TCP_PRIV_H__
++#define __MTK_TCP_PRIV_H__
++
++#include <stdbool.h>
++#include <net.h>
++
++#include <net/mtk_tcp.h>
++
++#define MTK_TCP_MSS			1440
++#define MTK_TCP_RCV_WND		65535
++
++struct mtk_tcp_hdr {
++	__be16 src;
++	__be16 dst;
++	__be32 seq;
++	__be32 ack;
++	__be16 flags;
++	__be16 wnd;
++	__be16 chksum;
++	__be16 urg;
++};
++
++#define MTK_TCP_HDR_SIZE			(sizeof(struct mtk_tcp_hdr))
++
++/* TCP flag bit */
++#define MTK_TCP_FIN				BIT(0)
++#define MTK_TCP_SYN				BIT(1)
++#define MTK_TCP_RST				BIT(2)
++#define MTK_TCP_PSH				BIT(3)
++#define MTK_TCP_ACK				BIT(4)
++#define MTK_TCP_URG				BIT(5)
++#define MTK_TCP_FLAG_MASK			GENMASK(5, 0)
++
++#define MTK_TCP_HDR_LEN_MASK		0x0f
++#define MTK_TCP_HDR_LEN_SHIFT		12
++
++/* TCP option kind */
++#define MTK_TCP_OPT_EOL			0
++#define MTK_TCP_OPT_NOP			1
++#define MTK_TCP_OPT_MSS			2
++#define MTK_TCP_OPT_WS			3
++
++/* TCP RTT/RTO options */
++#define MTK_TCP_RTT_G			200
++#define MTK_TCP_RTT_K			4
++#define MTK_TCP_RTT_ALPHA			3
++#define MTK_TCP_RTT_BETA			2
++#define MTK_TCP_RTT_INTERVAL		3000
++
++/* TCP retransmission options */
++#define MTK_TCP_CONNECT_INIT_DELAY	500
++#define MTK_TCP_REXMIT_MAX_SEG_DELAY	60000
++#define MTK_TCP_REXMIT_MAX_CONN_DELAY	300000
++
++/* TCP state */
++enum mtk_tcp_state {
++	INVALID_MTK_TCP_STATE = 0,
++	LISTEN,
++	CONNECT,
++	SYN_SENT,
++	SYN_RCVD,
++	ESTABLISHED,
++	FIN_WAIT_1,
++	FIN_WAIT_2,
++	CLOSE_WAIT,
++	CLOSING,
++	LAST_ACK,
++	TIME_WAIT,
++	CLOSED
++};
++
++/* Receive TCP packet */
++bool mtk_receive_tcp(struct ip_hdr *ip, int len, struct ethernet_hdr *et);
++
++/* Called periodically to check the TCP status & send packets.
++ * Returns 1 if all listeners and connections are done (can exit loop), 0 otherwise.
++ */
++int mtk_tcp_periodic_check(void);
++
++#endif /* __MTK_TCP_H__ */
+diff --git a/net/net.c b/net/net.c
+index 43889bba..126850ff 100644
+--- a/net/net.c
++++ b/net/net.c
+@@ -89,6 +89,9 @@
+ #include <led.h>
+ #include <log.h>
+ #include <net.h>
++#if defined(CONFIG_MTK_TCP)
++#include <net/mtk_tcp.h>
++#endif
+ #include <net6.h>
+ #include <ndisc.h>
+ #include <watchdog.h>
+@@ -1343,6 +1346,12 @@ void net_process_received_packet(uchar *in_packet, int len)
+ 		ip = net_defragment(ip, &len);
+ 		if (!ip)
+ 			return;
++#if defined(CONFIG_MTK_TCP)
++		if (ip->ip_p == IPPROTO_TCP) {
++			mtk_receive_tcp(ip, len, et);
++			return;
++		}
++#endif
+ 		/*
+ 		 * watch for ICMP host redirects
+ 		 *
+-- 
+2.56.1
+

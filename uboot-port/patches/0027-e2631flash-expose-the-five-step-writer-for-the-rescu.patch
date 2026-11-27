@@ -1,0 +1,210 @@
+From 7b75db1ecc1cc3a00260cb46136ee8954cb4b893 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 20:21:56 +0800
+Subject: [PATCH 27/29] e2631flash: expose the five-step writer for the rescue
+ path
+
+The web rescue has to program mtd0 exactly the way the e2631flash command
+does: block-aligned erase, a blank check, the payload write, a read back
+and a byte compare. Rather than growing a second writer, factor the
+existing helpers behind a small job API in e2631flash.[ch]:
+
+  e2631_flash_begin()        validate the range and open the MTD device
+  e2631_flash_erase()        erase whole blocks
+  e2631_flash_blank_check()  require every erased byte to read 0xff
+  e2631_flash_write_image()  program from RAM, skipping bad blocks
+  e2631_flash_readback()     read the range back into the 0x44000000 bounce
+  e2631_flash_compare()      CRC32 plus a byte compare against the source
+  e2631_flash_end()          release the device
+
+The API is a thin wrapper over the static helpers the command already
+uses, so there is still exactly one writer in the image and the D-U1
+allowlist is unchanged. The existing command behaviour, messages and
+refusals are untouched; the job is only opened by the rescue path.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631flash.c | 125 ++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631flash.h |  27 +++++++
+ 2 files changed, 152 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631flash.h
+
+diff --git a/board/zte/zxhn-e2631/e2631flash.c b/board/zte/zxhn-e2631/e2631flash.c
+index 9fbe6144..bf734b61 100644
+--- a/board/zte/zxhn-e2631/e2631flash.c
++++ b/board/zte/zxhn-e2631/e2631flash.c
+@@ -40,6 +40,8 @@
+ #include <u-boot/crc.h>
+ #include <vsprintf.h>
+ 
++#include "e2631flash.h"
++
+ #define E2631_MTD_DEV		"spi-nand0"
+ 
+ /* Areas that e2631flash must never touch. */
+@@ -487,6 +489,129 @@ static int do_e2631verify(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	return CMD_RET_SUCCESS;
+ }
+ 
++/*
++ * Shared five-step writer for the web failsafe.  e2631_flash_begin() runs
++ * the same range checks e2631flash does (alignment, chip bounds, secondboot
++ * and environment protection) and keeps the MTD device open until
++ * e2631_flash_end().  Each phase then calls the same static helper the
++ * console command uses, so both paths share one implementation.
++ */
++struct e2631_flash_job {
++	struct mtd_info *mtd;
++	u64 off;
++	u64 len;
++	u_char *bounce;
++	bool active;
++};
++
++static struct e2631_flash_job flash_job;
++
++int e2631_flash_begin(u64 off, u64 len, const void *src)
++{
++	struct mtd_info *mtd;
++	int ret;
++
++	if (flash_job.active) {
++		printf("e2631flash: a flash job is already active\n");
++		return -EBUSY;
++	}
++
++	ret = e2631_mtd_get(&mtd);
++	if (ret)
++		return ret;
++
++	ret = e2631_flash_check(mtd, (ulong)src, (ulong)off, (ulong)len);
++	if (ret) {
++		put_mtd_device(mtd);
++		return ret;
++	}
++
++	memset(&flash_job, 0, sizeof(flash_job));
++	flash_job.mtd = mtd;
++	flash_job.off = off;
++	flash_job.len = len;
++	flash_job.bounce = (u_char *)E2631_BOUNCE_ADDR;
++	flash_job.active = true;
++
++	return 0;
++}
++
++int e2631_flash_erase(void)
++{
++	if (!flash_job.active)
++		return -EINVAL;
++
++	return e2631_erase_range(flash_job.mtd, flash_job.off, flash_job.len);
++}
++
++int e2631_flash_blank_check(void)
++{
++	if (!flash_job.active)
++		return -EINVAL;
++
++	return e2631_check_blank(flash_job.mtd, flash_job.off, flash_job.len,
++				 flash_job.bounce);
++}
++
++int e2631_flash_write_image(const void *src)
++{
++	if (!flash_job.active)
++		return -EINVAL;
++
++	return e2631_write_range(flash_job.mtd, src, flash_job.off,
++				 flash_job.len);
++}
++
++int e2631_flash_readback(void)
++{
++	u64 addr;
++	int ret;
++
++	if (!flash_job.active)
++		return -EINVAL;
++
++	for (addr = flash_job.off; addr < flash_job.off + flash_job.len;
++	     addr += flash_job.mtd->erasesize) {
++		ret = e2631_read_region(flash_job.mtd, addr,
++					flash_job.bounce + (addr - flash_job.off),
++					flash_job.mtd->erasesize);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++int e2631_flash_compare(const void *src, u32 *crc)
++{
++	ulong i;
++
++	if (!flash_job.active)
++		return -EINVAL;
++
++	*crc = crc32(0, flash_job.bounce, flash_job.len);
++
++	for (i = 0; i < flash_job.len; i++) {
++		if (flash_job.bounce[i] != ((const u_char *)src)[i]) {
++			printf("e2631flash: FAIL: mismatch at flash offset 0x%08llx (wrote 0x%02x, read 0x%02x)\n",
++			       flash_job.off + i, ((const u_char *)src)[i],
++			       flash_job.bounce[i]);
++			return -EIO;
++		}
++	}
++
++	return 0;
++}
++
++void e2631_flash_end(void)
++{
++	if (!flash_job.active)
++		return;
++
++	put_mtd_device(flash_job.mtd);
++	memset(&flash_job, 0, sizeof(flash_job));
++}
++
+ U_BOOT_CMD(e2631flash, 4, 1, do_e2631flash,
+ 	   "flash an image to SPI-NAND with erase, blank and readback checks",
+ 	   " <src> <off> <len>\n"
+diff --git a/board/zte/zxhn-e2631/e2631flash.h b/board/zte/zxhn-e2631/e2631flash.h
+new file mode 100644
+index 00000000..5acd7180
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631flash.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 SPI-NAND image writer, shared by e2631flash and the
++ * web failsafe (e2631rescue).
++ *
++ * The phases mirror e2631flash exactly: range check, erase, blank check,
++ * program, read back and compare. Only one job can be active at a time and
++ * the writer is the same code path e2631flash uses, so there is exactly one
++ * MTD write implementation in the image.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631FLASH_H__
++#define __E2631FLASH_H__
++
++#include <linux/types.h>
++
++int e2631_flash_begin(u64 off, u64 len, const void *src);
++int e2631_flash_erase(void);
++int e2631_flash_blank_check(void);
++int e2631_flash_write_image(const void *src);
++int e2631_flash_readback(void);
++int e2631_flash_compare(const void *src, u32 *crc);
++void e2631_flash_end(void);
++
++#endif /* __E2631FLASH_H__ */
+-- 
+2.56.1
+

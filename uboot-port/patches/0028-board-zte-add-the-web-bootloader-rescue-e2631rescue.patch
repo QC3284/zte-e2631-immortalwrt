@@ -1,0 +1,1054 @@
+From cc2ec2ac25550010c4a67b2160138e383ed46c02 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 20:21:56 +0800
+Subject: [PATCH 28/29] board: zte: add the web bootloader rescue (e2631rescue)
+
+Add e2631rescue, a console command that turns lan1 into a self-contained
+recovery network without rebooting and without touching flash by itself:
+
+  - DHCP: 192.168.1.1/24, pool from 192.168.1.100;
+  - HTTP: GET / serves the gzip rescue page generated at build time from
+    uboot-port/failsafe/e2631-failsafe.html, GET /status reports the
+    key=value progress snapshot, and POST /flash?mode=validate|write
+    accepts one raw 655360-byte mtd0 image;
+  - the body is staged at 0x46000000 (1 MiB, clear of the kernel load
+    area, the uImage staging area and the network DMA arena) and checked
+    before any erase: exact size, vendor header magic, payload length
+    window, 0xff padding, "U-Boot 20" banner and the SHA-256 sent in
+    X-E2631-SHA256. A write also needs X-E2631-Confirm: write; a missing
+    or mismatched digest refuses with an error and no erase;
+  - an accepted write runs the e2631flash five-step sequence through the
+    shared job API, only inside mtd0 0x20000..0xA0000. secondboot, the
+    environment block and the reserved tail are never touched;
+  - every stage is published on /status; a failure is reported both on the
+    page and on the console. Nothing reboots automatically, and normal
+    boot never starts the network.
+
+The board Makefile links the generated page asset and the defconfig
+enables CONFIG_MTK_TCP, CONFIG_MTK_DHCPD and CONFIG_SHA256. The page
+asset step already runs in the build workflow before the compile.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile              |   2 +
+ board/zte/zxhn-e2631/e2631rescue.c         | 979 +++++++++++++++++++++
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   3 +
+ 3 files changed, 984 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631rescue.c
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index f299851c..c8c47ba2 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -8,3 +8,5 @@ obj-y += e2631net.o
+ obj-y += e2631soc.o
+ obj-y += zxhn-e2631.o
+ obj-y += e2631flash.o
++obj-y += e2631rescue.o
++obj-y += e2631_failsafe_asset.o
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+new file mode 100644
+index 00000000..6ed64363
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -0,0 +1,979 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 web failsafe (E4 v1)
++ *
++ * e2631rescue serves a minimal DHCP server and an HTTP server on lan1 so
++ * that a bootloader image can be validated and written into mtd0 from a
++ * browser, with no serial transfer and no md.b ladder:
++ *
++ *   - DHCP  : 192.168.1.1/24, pool 192.168.1.100-200 (lan1 only)
++ *   - HTTP  : GET  /                 rescue page (gzip, built in-tree)
++ *             GET  /status           key=value progress snapshot
++ *             POST /flash?mode=...   raw 655360-byte mtd0 image
++ *
++ * The POST body is staged in RAM at 0x46000000 (1 MiB, clear of the kernel
++ * load area, the uImage staging area and the 16 MiB network DMA arena), then
++ * checked before anything touches flash:
++ *   - size is exactly 655360 bytes and the vendor header magic is present
++ *   - the payload length and the 0xff padding window are consistent
++ *   - the payload carries the "U-Boot 20" banner
++ *   - SHA-256 over the whole image matches X-E2631-SHA256 (required for a
++ *     write; a mismatched digest refuses with no erase)
++ *
++ * A write reuses the e2631flash five-step writer (erase, blank check,
++ * program, read back, compare) and only ever touches mtd0 0x20000..0xA0000.
++ * secondboot (0x0..0x20000), the environment (0xC0000..0xE0000) and the
++ * reserved tail (0xE0000..0xFFFFF) are never written. Nothing here reboots
++ * or saves the environment, and normal boot never starts the network.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <command.h>
++#include <console.h>
++#include <errno.h>
++#include <malloc.h>
++#include <net.h>
++#include <stdio.h>
++#include <string.h>
++#include <time.h>
++#include <u-boot/crc.h>
++#include <u-boot/sha256.h>
++#include <vsprintf.h>
++#include <asm/global_data.h>
++#include <linux/build_bug.h>
++#include <linux/delay.h>
++#include <linux/types.h>
++#include <net/mtk_dhcpd.h>
++#include <net/mtk_tcp.h>
++
++#include "e2631flash.h"
++
++/* Upload staging: see the memory map in uboot-port/README.md. */
++#define E2631_RESCUE_IMG_ADDR	0x46000000UL
++#define E2631_RESCUE_IMG_MAX	0x100000UL
++#define E2631_RESCUE_IMG_LEN	0xA0000UL	/* 655360: whole mtd0 image */
++
++/* Only this window of mtd0 is ever erased or programmed. */
++#define E2631_RESCUE_FLASH_OFF	0x20000UL
++#define E2631_RESCUE_FLASH_LEN	0x80000UL
++#define E2631_RESCUE_MTD0_END	0xA0000UL
++
++#define E2631_RESCUE_DWELL_MS	400UL
++#define E2631_RESCUE_TCP_PORT	80
++
++/* Vendor mtd0 image layout (tools/mkuboot-image.mjs). */
++#define E2631_IMG_MAGIC_OFS	0x10
++#define E2631_IMG_MAGIC		0x73383231
++#define E2631_IMG_LEN_OFS	0x14
++#define E2631_IMG_PAYLOAD_OFS	0x800
++#define E2631_IMG_PAYLOAD_MAX	(E2631_RESCUE_IMG_LEN - E2631_IMG_PAYLOAD_OFS)
++#define E2631_IMG_BANNER	"U-Boot 20"
++
++#define E2631_RESCUE_HDR_MAX	1024
++#define E2631_RESCUE_OUT_MAX	8192
++
++static_assert(E2631_RESCUE_IMG_ADDR >= 0x45000000UL + 0x1000000UL,
++	      "the rescue upload buffer must stay clear of the network DMA arena");
++static_assert(E2631_RESCUE_IMG_ADDR > CONFIG_SYS_LOAD_ADDR,
++	      "the rescue upload buffer must stay above the uImage staging area");
++static_assert(E2631_RESCUE_IMG_ADDR + E2631_RESCUE_IMG_MAX <= 0x4f000000UL,
++	      "the rescue upload buffer must stay below relocated U-Boot");
++static_assert(E2631_RESCUE_FLASH_OFF + E2631_RESCUE_FLASH_LEN ==
++	      E2631_RESCUE_MTD0_END,
++	      "the rescue write window must end at the reserved tail");
++static_assert(E2631_RESCUE_IMG_LEN <= E2631_RESCUE_IMG_MAX,
++	      "the mtd0 image must fit in the rescue upload buffer");
++
++enum e2631_rescue_stage {
++	RESCUE_IDLE = 0,
++	RESCUE_ERASE,
++	RESCUE_BLANK,
++	RESCUE_WRITE,
++	RESCUE_READBACK,
++	RESCUE_COMPARE,
++	RESCUE_DONE,
++	RESCUE_ERROR,
++	RESCUE_STAGED,
++};
++
++struct e2631_rescue_status {
++	enum e2631_rescue_stage stage;
++	int progress;
++	u32 crc;
++	bool have_crc;
++	char sha256[SHA256_SUM_LEN * 2 + 1];
++	char browser_sha256[SHA256_SUM_LEN * 2 + 1];
++	char sha_state[16];
++	char error[128];
++};
++
++static struct e2631_rescue_status rescue_status;
++static bool rescue_active;
++static bool flash_pending;
++static bool flash_job_open;
++static unsigned long flash_next_ms;
++
++struct e2631_rescue_conn {
++	void *conn;
++	char hdr[E2631_RESCUE_HDR_MAX];
++	unsigned int hdr_len;
++	bool hdr_done;
++	bool responded;
++	bool close_after_send;
++	bool upload;
++	char method[8];
++	char path[96];
++	char mode[16];
++	char sha_header[SHA256_SUM_LEN * 2 + 1];
++	char confirm_header[16];
++	u32 content_len;
++	u32 body_len;
++	u8 out[E2631_RESCUE_OUT_MAX];
++};
++
++#include "e2631_failsafe_asset.h"
++
++static bool rescue_query_value(const char *query, const char *key, char *out,
++			       size_t outsz)
++{
++	const char *p = query;
++	size_t klen = strlen(key);
++	size_t n = 0;
++
++	while (*p) {
++		if (!strncmp(p, key, klen)) {
++			p += klen;
++			while (*p && *p != '&' && n + 1 < outsz)
++				out[n++] = *p++;
++			out[n] = 0;
++			return n != 0;
++		}
++		p = strchr(p, '&');
++		if (!p)
++			break;
++		p++;
++	}
++
++	return false;
++}
++
++static const unsigned char *rescue_image(void)
++{
++	return (const unsigned char *)(uintptr_t)E2631_RESCUE_IMG_ADDR;
++}
++
++static const char *rescue_stage_name(enum e2631_rescue_stage stage)
++{
++	switch (stage) {
++	case RESCUE_IDLE:
++		return "idle";
++	case RESCUE_STAGED:
++		return "staged";
++	case RESCUE_ERASE:
++		return "erase";
++	case RESCUE_BLANK:
++		return "blank";
++	case RESCUE_WRITE:
++		return "write";
++	case RESCUE_READBACK:
++		return "readback";
++	case RESCUE_COMPARE:
++		return "compare";
++	case RESCUE_DONE:
++		return "done";
++	case RESCUE_ERROR:
++		return "error";
++	default:
++		return "idle";
++	}
++}
++
++static u32 rescue_le32(const u8 *p)
++{
++	return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) |
++	       ((u32)p[3] << 24);
++}
++
++static void rescue_hex(const u8 *digest, char *out)
++{
++	static const char hex[] = "0123456789abcdef";
++	int i;
++
++	for (i = 0; i < SHA256_SUM_LEN; i++) {
++		out[i * 2] = hex[digest[i] >> 4];
++		out[i * 2 + 1] = hex[digest[i] & 0xf];
++	}
++	out[SHA256_SUM_LEN * 2] = 0;
++}
++
++static void rescue_sha256(const void *buf, u32 len, char *out)
++{
++	u8 digest[SHA256_SUM_LEN];
++
++	sha256_csum_wd(buf, len, digest, CHUNKSZ_SHA256);
++	rescue_hex(digest, out);
++}
++
++static bool rescue_hex_digest_valid(const char *hex)
++{
++	int i;
++
++	if (!hex || strlen(hex) != SHA256_SUM_LEN * 2)
++		return false;
++
++	for (i = 0; i < SHA256_SUM_LEN * 2; i++) {
++		char c = hex[i];
++
++		if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
++		      (c >= 'A' && c <= 'F')))
++			return false;
++	}
++
++	return true;
++}
++
++static void rescue_hex_lower(const char *in, char *out)
++{
++	int i;
++
++	for (i = 0; i < SHA256_SUM_LEN * 2; i++) {
++		char c = in[i];
++
++		if (c >= 'A' && c <= 'F')
++			c = c - 'A' + 'a';
++		out[i] = c;
++	}
++	out[SHA256_SUM_LEN * 2] = 0;
++}
++
++static char rescue_lower(char c)
++{
++	if (c >= 'A' && c <= 'Z')
++		return c - 'A' + 'a';
++	return c;
++}
++
++static bool rescue_name_is(const char *line, const char *name)
++{
++	unsigned int i;
++
++	for (i = 0; name[i]; i++) {
++		if (!line[i] || rescue_lower(line[i]) != name[i])
++			return false;
++	}
++
++	return line[i] == ':';
++}
++
++static bool rescue_header_value(const char *hdr, const char *name, char *out,
++				size_t outsz)
++{
++	const char *p = hdr;
++	size_t n = 0;
++
++	while (*p) {
++		const char *eol = strchr(p, '\n');
++		const char *v;
++
++		if (!rescue_name_is(p, name)) {
++			if (!eol)
++				break;
++			p = eol + 1;
++			continue;
++		}
++
++		v = p + strlen(name) + 1;
++		while (*v == ' ' || *v == '\t')
++			v++;
++		while (*v && *v != '\r' && *v != '\n' && n + 1 < outsz)
++			out[n++] = *v++;
++		out[n] = 0;
++		return true;
++	}
++
++	return false;
++}
++
++static int rescue_tcp_send(struct e2631_rescue_conn *c, const void *data,
++			   u32 len)
++{
++	if (mtk_tcp_send_data(c->conn, data, len)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return -EIO;
++	}
++
++	c->responded = true;
++	c->close_after_send = true;
++
++	return 0;
++}
++
++static int rescue_reply(struct e2631_rescue_conn *c, int code,
++			const char *reason, const char *ctype,
++			const char *encoding, const void *body, u32 body_len)
++{
++	int n;
++
++	n = snprintf((char *)c->out, sizeof(c->out),
++		     "HTTP/1.1 %d %s\r\n"
++		     "Server: e2631rescue\r\n"
++		     "Content-Type: %s\r\n", code, reason, ctype);
++	if (n < 0 || (u32)n >= sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return -ENOSPC;
++	}
++	if (encoding)
++		n += snprintf((char *)c->out + n, sizeof(c->out) - n,
++			      "Content-Encoding: %s\r\n", encoding);
++	if (n < 0 || (u32)n >= sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return -ENOSPC;
++	}
++	n += snprintf((char *)c->out + n, sizeof(c->out) - n,
++		      "Content-Length: %u\r\n"
++		      "Cache-Control: no-store\r\n"
++		      "Connection: close\r\n"
++		      "\r\n", body_len);
++	if (n < 0 || (u32)n + body_len > sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return -ENOSPC;
++	}
++
++	if (body_len)
++		memcpy(c->out + n, body, body_len);
++
++	return rescue_tcp_send(c, c->out, (u32)n + body_len);
++}
++
++static int rescue_error_reply(struct e2631_rescue_conn *c, const char *error)
++{
++	char body[256];
++	int n;
++
++	n = snprintf(body, sizeof(body), "result=error\nerror=%s\n", error);
++	if (n < 0 || (size_t)n >= sizeof(body))
++		n = snprintf(body, sizeof(body), "result=error\nerror=internal\n");
++
++	return rescue_reply(c, 400, "Bad Request", "text/plain", NULL, body,
++			    (u32)n);
++}
++
++static void rescue_set_error(const char *error)
++{
++	rescue_status.stage = RESCUE_ERROR;
++	snprintf(rescue_status.error, sizeof(rescue_status.error), "%s", error);
++	if (flash_job_open) {
++		e2631_flash_end();
++		flash_job_open = false;
++	}
++	flash_pending = false;
++	printf("e2631rescue: FAIL: %s\n", rescue_status.error);
++}
++
++static int rescue_check_image(const unsigned char *img, u32 len, char *err,
++			      size_t errsz)
++{
++	u32 payload_len;
++	u32 i;
++	bool found = false;
++
++	if (len != E2631_RESCUE_IMG_LEN) {
++		snprintf(err, errsz, "image is %u bytes, expected %lu", len,
++			 (unsigned long)E2631_RESCUE_IMG_LEN);
++		return -EINVAL;
++	}
++
++	if (rescue_le32(img + E2631_IMG_MAGIC_OFS) != E2631_IMG_MAGIC) {
++		snprintf(err, errsz, "bad mtd0 header magic at 0x10");
++		return -EINVAL;
++	}
++
++	payload_len = rescue_le32(img + E2631_IMG_LEN_OFS);
++	if (!payload_len || payload_len > E2631_IMG_PAYLOAD_MAX ||
++	    E2631_IMG_PAYLOAD_OFS + payload_len > E2631_RESCUE_IMG_LEN) {
++		snprintf(err, errsz, "payload length 0x%x is outside the window",
++			 payload_len);
++		return -EINVAL;
++	}
++
++	for (i = E2631_IMG_PAYLOAD_OFS + payload_len;
++	     i < E2631_RESCUE_IMG_LEN; i++) {
++		if (img[i] != 0xff) {
++			snprintf(err, errsz,
++				 "padding is not 0xff at +0x%x", i);
++			return -EINVAL;
++		}
++	}
++
++	for (i = E2631_IMG_PAYLOAD_OFS;
++	     i + sizeof(E2631_IMG_BANNER) - 1 <=
++	     E2631_IMG_PAYLOAD_OFS + payload_len; i++) {
++		if (!memcmp(img + i, E2631_IMG_BANNER,
++			    sizeof(E2631_IMG_BANNER) - 1)) {
++			found = true;
++			break;
++		}
++	}
++	if (!found) {
++		snprintf(err, errsz, "payload has no U-Boot banner");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static void rescue_status_text(char *buf, size_t bufsz)
++{
++	int n = 0;
++	int ret;
++
++	ret = snprintf(buf + n, bufsz - n, "stage=%s\n",
++		       rescue_stage_name(rescue_status.stage));
++	if (ret > 0)
++		n += ret;
++	ret = snprintf(buf + n, bufsz - n, "progress=%d\n",
++		       rescue_status.progress);
++	if (ret > 0)
++		n += ret;
++	if (rescue_status.have_crc) {
++		ret = snprintf(buf + n, bufsz - n, "crc32=0x%08x\n",
++			       rescue_status.crc);
++		if (ret > 0)
++			n += ret;
++	}
++	ret = snprintf(buf + n, bufsz - n, "sha256=%s\n",
++		       rescue_status.sha256);
++	if (ret > 0)
++		n += ret;
++	ret = snprintf(buf + n, bufsz - n, "browser_sha256=%s\n",
++		       rescue_status.browser_sha256);
++	if (ret > 0)
++		n += ret;
++	ret = snprintf(buf + n, bufsz - n, "sha_match=%s\n",
++		       rescue_status.sha_state);
++	if (ret > 0)
++		n += ret;
++
++	if (rescue_status.stage == RESCUE_STAGED) {
++		ret = snprintf(buf + n, bufsz - n, "result=staged\n");
++		if (ret > 0)
++			n += ret;
++	} else if (rescue_status.stage == RESCUE_DONE) {
++		ret = snprintf(buf + n, bufsz - n, "result=ok\n");
++		if (ret > 0)
++			n += ret;
++	} else if (rescue_status.stage == RESCUE_ERROR) {
++		ret = snprintf(buf + n, bufsz - n, "result=error\nerror=%s\n",
++			       rescue_status.error);
++		if (ret > 0)
++			n += ret;
++	}
++}
++
++static void rescue_handle_get(struct e2631_rescue_conn *c)
++{
++	char body[512];
++
++	if (!strcmp(c->path, "/")) {
++		rescue_reply(c, 200, "OK", "text/html; charset=utf-8",
++			     "gzip", e2631_failsafe_html_gz,
++			     e2631_failsafe_html_gz_len);
++		return;
++	}
++
++	if (!strcmp(c->path, "/status")) {
++		rescue_status_text(body, sizeof(body));
++		rescue_reply(c, 200, "OK", "text/plain", NULL, body,
++			     strlen(body));
++		return;
++	}
++
++	rescue_reply(c, 404, "Not Found", "text/plain", NULL,
++		     "result=error\nerror=not found\n",
++		     strlen("result=error\nerror=not found\n"));
++}
++
++static void rescue_body_bytes(struct e2631_rescue_conn *c, const u8 *data,
++			      u32 len)
++{
++	u32 space = E2631_RESCUE_IMG_LEN - c->body_len;
++
++	if (len > space)
++		len = space;
++
++	if (len) {
++		memcpy((void *)(uintptr_t)(E2631_RESCUE_IMG_ADDR + c->body_len),
++		       data, len);
++		c->body_len += len;
++	}
++
++	if (c->body_len < c->content_len)
++		return;
++
++	/* Body complete: this is called from the TCP receive callback. */
++	{
++		char err[128];
++		char computed[SHA256_SUM_LEN * 2 + 1];
++		char expected[SHA256_SUM_LEN * 2 + 1];
++		char body[256];
++		const unsigned char *img = rescue_image();
++		u32 crc;
++		int n;
++		bool have_expected;
++		int ret;
++
++		if (flash_pending || rescue_status.stage == RESCUE_ERASE ||
++		    rescue_status.stage == RESCUE_BLANK ||
++		    rescue_status.stage == RESCUE_WRITE ||
++		    rescue_status.stage == RESCUE_READBACK ||
++		    rescue_status.stage == RESCUE_COMPARE) {
++			rescue_error_reply(c, "a flash operation is already active");
++			return;
++		}
++
++		rescue_sha256(img, E2631_RESCUE_IMG_LEN, computed);
++		printf("e2631rescue: received %u bytes, sha256 %s\n",
++		       c->content_len, computed);
++
++		ret = rescue_check_image(img, c->content_len, err, sizeof(err));
++		if (ret) {
++			snprintf(body, sizeof(body),
++				 "result=error\nerror=%s\n", err);
++			rescue_reply(c, 400, "Bad Request", "text/plain", NULL,
++				     body, strlen(body));
++			return;
++		}
++
++		have_expected = c->sha_header[0] != 0;
++		if (have_expected && !rescue_hex_digest_valid(c->sha_header)) {
++			rescue_error_reply(c, "malformed X-E2631-SHA256 header");
++			return;
++		}
++
++		snprintf(rescue_status.sha256, sizeof(rescue_status.sha256),
++			 "%s", computed);
++		rescue_status.have_crc = true;
++		rescue_status.crc = crc32(0, img, E2631_RESCUE_IMG_LEN);
++
++		if (have_expected) {
++			rescue_hex_lower(c->sha_header, expected);
++			snprintf(rescue_status.browser_sha256,
++				 sizeof(rescue_status.browser_sha256), "%s",
++				 expected);
++			if (strcmp(expected, computed)) {
++				snprintf(rescue_status.sha_state,
++					 sizeof(rescue_status.sha_state),
++					 "mismatch");
++				printf("e2631rescue: sha256 mismatch (device %s, browser %s)\n",
++				       computed, expected);
++				rescue_error_reply(c, "sha256 mismatch");
++				return;
++			}
++			snprintf(rescue_status.sha_state,
++				 sizeof(rescue_status.sha_state), "ok");
++		} else {
++			snprintf(rescue_status.sha_state,
++				 sizeof(rescue_status.sha_state), "absent");
++		}
++
++		if (!strcmp(c->mode, "write")) {
++			if (!have_expected) {
++				rescue_error_reply(c,
++						   "X-E2631-SHA256 header is required for a write");
++				return;
++			}
++			if (strcmp(c->confirm_header, "write")) {
++				rescue_error_reply(c,
++						   "X-E2631-Confirm: write is required");
++				return;
++			}
++
++			ret = e2631_flash_begin(E2631_RESCUE_FLASH_OFF,
++						E2631_RESCUE_FLASH_LEN,
++						img + E2631_RESCUE_FLASH_OFF);
++			if (ret) {
++				rescue_error_reply(c,
++						   "the flash range was refused by the writer");
++				return;
++			}
++			flash_job_open = true;
++			flash_pending = true;
++			rescue_status.stage = RESCUE_STAGED;
++			rescue_status.progress = 0;
++			rescue_status.error[0] = 0;
++			flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++			printf("e2631rescue: image accepted, write queued\n");
++			n = snprintf(body, sizeof(body),
++				     "result=accepted\nsha256=%s\nsha_match=ok\n",
++				     computed);
++			if (n < 0 || (size_t)n >= sizeof(body))
++				n = sizeof(body) - 1;
++			rescue_reply(c, 200, "OK", "text/plain", NULL, body,
++				     (u32)n);
++			return;
++		}
++
++		rescue_status.stage = RESCUE_IDLE;
++		rescue_status.progress = 0;
++		n = snprintf(body, sizeof(body),
++			     "result=ok\nsha256=%s\nsha_match=%s\n",
++			     computed, rescue_status.sha_state);
++		if (n < 0 || (size_t)n >= sizeof(body))
++			n = sizeof(body) - 1;
++		rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
++	}
++}
++
++static void rescue_handle_request(struct e2631_rescue_conn *c)
++{
++	char *hdr_start;
++	char *eol;
++	char *sp1;
++	char *sp2;
++	char *rest;
++	char *query;
++	char value[32];
++
++	eol = strstr(c->hdr, "\r\n");
++	if (!eol)
++		goto bad;
++	*eol = 0;
++	hdr_start = eol + 2;
++
++	sp1 = strchr(c->hdr, ' ');
++	if (!sp1)
++		goto bad;
++	*sp1 = 0;
++	snprintf(c->method, sizeof(c->method), "%s", c->hdr);
++	rest = sp1 + 1;
++	sp2 = strchr(rest, ' ');
++	if (!sp2)
++		goto bad;
++	*sp2 = 0;
++	snprintf(c->path, sizeof(c->path), "%s", rest);
++
++	query = strchr(c->path, '?');
++	if (query) {
++		*query = 0;
++		query++;
++	}
++
++	c->hdr_done = true;
++
++	if (!strcmp(c->method, "GET")) {
++		rescue_handle_get(c);
++		return;
++	}
++
++	if (strcmp(c->method, "POST") || strcmp(c->path, "/flash"))
++		goto bad;
++
++	if (!query || !rescue_query_value(query, "mode=", c->mode,
++					  sizeof(c->mode)))
++		goto bad;
++
++	if (!rescue_header_value(hdr_start, "Content-Length", value,
++				 sizeof(value)))
++		goto bad;
++	c->content_len = (u32)simple_strtoul(value, NULL, 10);
++	if (c->content_len != E2631_RESCUE_IMG_LEN) {
++		rescue_error_reply(c, "Content-Length must be 655360");
++		return;
++	}
++
++	if (!strcmp(c->mode, "write")) {
++		if (!rescue_header_value(hdr_start, "X-E2631-SHA256",
++					 c->sha_header, sizeof(c->sha_header)))
++			rescue_header_value(hdr_start, "X-File-Sha256",
++					    c->sha_header,
++					    sizeof(c->sha_header));
++		rescue_header_value(hdr_start, "X-E2631-Confirm",
++				    c->confirm_header,
++				    sizeof(c->confirm_header));
++	} else if (!strcmp(c->mode, "validate")) {
++		rescue_header_value(hdr_start, "X-E2631-SHA256",
++				    c->sha_header, sizeof(c->sha_header));
++	} else {
++		goto bad;
++	}
++
++	c->upload = true;
++	return;
++
++bad:
++	rescue_error_reply(c, "unsupported request");
++}
++
++static void rescue_conn_data(struct e2631_rescue_conn *c, const u8 *data,
++			     u32 len)
++{
++	u32 i;
++	char *end;
++
++	if (c->responded)
++		return;
++
++	if (c->hdr_done) {
++		if (c->upload)
++			rescue_body_bytes(c, data, len);
++		return;
++	}
++
++	for (i = 0; i < len; i++) {
++		if (c->hdr_len + 1 >= sizeof(c->hdr)) {
++			rescue_error_reply(c, "request header too large");
++			return;
++		}
++		c->hdr[c->hdr_len++] = data[i];
++		c->hdr[c->hdr_len] = 0;
++		if (c->hdr_len >= 4 &&
++		    !memcmp(c->hdr + c->hdr_len - 4, "\r\n\r\n", 4))
++			break;
++	}
++
++	end = strstr(c->hdr, "\r\n\r\n");
++	if (!end) {
++		if (c->hdr_len + 1 >= sizeof(c->hdr))
++			rescue_error_reply(c, "request header too large");
++		return;
++	}
++
++	*end = 0;
++	rescue_handle_request(c);
++
++	if (!c->responded && c->upload && i + 1 < len)
++		rescue_body_bytes(c, data + i + 1, len - (i + 1));
++}
++
++static void rescue_conn_closed(struct e2631_rescue_conn *c)
++{
++	free(c);
++}
++
++static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
++{
++	struct e2631_rescue_conn *c = cbd->pdata;
++
++	switch (cbd->status) {
++	case MTK_TCP_CB_NEW_CONN:
++		c = calloc(1, sizeof(*c));
++		if (!c) {
++			mtk_tcp_close_conn(cbd->conn, 1);
++			return;
++		}
++		c->conn = cbd->conn;
++		mtk_tcp_conn_set_pdata(cbd->conn, c);
++		return;
++	case MTK_TCP_CB_DATA_RCVD:
++		if (!c)
++			return;
++		rescue_conn_data(c, cbd->data, cbd->datalen);
++		return;
++	case MTK_TCP_CB_DATA_SENT:
++		if (!c)
++			return;
++		if (c->close_after_send) {
++			c->close_after_send = false;
++			mtk_tcp_close_conn(c->conn, 0);
++		}
++		return;
++	case MTK_TCP_CB_REMOTE_CLOSING:
++	case MTK_TCP_CB_REMOTE_CLOSED:
++		if (c)
++			mtk_tcp_close_conn(c->conn, 0);
++		return;
++	case MTK_TCP_CB_CLOSED:
++		if (c) {
++			mtk_tcp_conn_set_pdata(cbd->conn, NULL);
++			rescue_conn_closed(c);
++		}
++		return;
++	default:
++		if (cbd->timedout && c)
++			mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++}
++
++static void rescue_flash_poll(void)
++{
++	int ret;
++
++	if (!flash_pending)
++		return;
++
++	if (get_timer(0) < flash_next_ms)
++		return;
++
++	switch (rescue_status.stage) {
++	case RESCUE_STAGED:
++		rescue_status.stage = RESCUE_ERASE;
++		rescue_status.progress = 10;
++		break;
++	case RESCUE_ERASE:
++		printf("e2631rescue: erasing mtd0 0x%lx..0x%lx\n",
++		       (unsigned long)E2631_RESCUE_FLASH_OFF,
++		       (unsigned long)(E2631_RESCUE_FLASH_OFF +
++				       E2631_RESCUE_FLASH_LEN));
++		ret = e2631_flash_erase();
++		if (ret) {
++			rescue_set_error("erase failed");
++			return;
++		}
++		rescue_status.stage = RESCUE_BLANK;
++		rescue_status.progress = 30;
++		break;
++	case RESCUE_BLANK:
++		ret = e2631_flash_blank_check();
++		if (ret) {
++			rescue_set_error("blank check failed");
++			return;
++		}
++		rescue_status.stage = RESCUE_WRITE;
++		rescue_status.progress = 45;
++		break;
++	case RESCUE_WRITE:
++		printf("e2631rescue: writing %lu bytes to mtd0\n",
++		       (unsigned long)E2631_RESCUE_FLASH_LEN);
++		ret = e2631_flash_write_image(rescue_image() +
++					      E2631_RESCUE_FLASH_OFF);
++		if (ret) {
++			rescue_set_error("write failed");
++			return;
++		}
++		rescue_status.stage = RESCUE_READBACK;
++		rescue_status.progress = 80;
++		break;
++	case RESCUE_READBACK:
++		ret = e2631_flash_readback();
++		if (ret) {
++			rescue_set_error("read back failed");
++			return;
++		}
++		rescue_status.stage = RESCUE_COMPARE;
++		rescue_status.progress = 90;
++		break;
++	case RESCUE_COMPARE:
++		ret = e2631_flash_compare(rescue_image() +
++					  E2631_RESCUE_FLASH_OFF,
++					  &rescue_status.crc);
++		e2631_flash_end();
++		flash_job_open = false;
++		if (ret) {
++			rescue_set_error("read back does not match the image");
++			return;
++		}
++		rescue_status.stage = RESCUE_DONE;
++		rescue_status.progress = 100;
++		flash_pending = false;
++		printf("e2631rescue: PASS: mtd0 updated, CRC32 0x%08x\n",
++		       rescue_status.crc);
++		printf("e2631rescue: nothing was rebooted; power-cycle or run reset\n");
++		return;
++	default:
++		flash_pending = false;
++		return;
++	}
++
++	flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++}
++
++static int rescue_loop(void)
++{
++	struct in_addr server_ip;
++	int ch;
++
++	printf("e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\n");
++	net_init();
++
++	if (eth_init()) {
++		printf("e2631rescue: no usable Ethernet device\n");
++		return CMD_RET_FAILURE;
++	}
++
++	server_ip = string_to_ip("192.168.1.1");
++	net_ip = server_ip;
++	net_netmask = string_to_ip("255.255.255.0");
++	net_gateway = server_ip;
++	net_dns_server = server_ip;
++
++	mtk_tcp_start();
++	if (mtk_tcp_listen(htons(E2631_RESCUE_TCP_PORT), rescue_tcp_cb)) {
++		printf("e2631rescue: cannot listen on port %d\n",
++		       E2631_RESCUE_TCP_PORT);
++		eth_halt();
++		return CMD_RET_FAILURE;
++	}
++
++	if (mtk_dhcpd_start()) {
++		printf("e2631rescue: cannot start the DHCP server\n");
++		mtk_tcp_listen_stop(htons(E2631_RESCUE_TCP_PORT));
++		eth_halt();
++		return CMD_RET_FAILURE;
++	}
++
++	printf("e2631rescue: open http://192.168.1.1/ from a lan1 host\n");
++	printf("e2631rescue: press Ctrl-C to leave the rescue mode\n");
++
++	rescue_active = true;
++	while (!ctrlc()) {
++		eth_rx();
++		mtk_tcp_periodic_check();
++		rescue_flash_poll();
++		udelay(200);
++		if (tstc()) {
++			ch = getchar();
++			if (ch == 3)
++				break;
++		}
++	}
++	rescue_active = false;
++
++	/*
++	 * A Ctrl-C can land between two flash stages. Finish the bookkeeping
++	 * but never hide that the update did not complete.
++	 */
++	if (flash_job_open) {
++		e2631_flash_end();
++		flash_job_open = false;
++	}
++	if (flash_pending || (rescue_status.stage >= RESCUE_ERASE &&
++			      rescue_status.stage <= RESCUE_COMPARE))
++		printf("e2631rescue: WARNING: the flash update was interrupted before it completed\n");
++	flash_pending = false;
++
++	mtk_dhcpd_stop();
++	mtk_tcp_listen_stop(htons(E2631_RESCUE_TCP_PORT));
++	mtk_tcp_close_all_conn();
++	eth_halt();
++
++	printf("e2631rescue: left the rescue mode\n");
++	return CMD_RET_SUCCESS;
++}
++
++static int do_e2631rescue(struct cmd_tbl *cmdtp, int flag, int argc,
++			  char *const argv[])
++{
++	if (argc > 1)
++		return CMD_RET_USAGE;
++
++	if (rescue_active) {
++		printf("e2631rescue: already running\n");
++		return CMD_RET_FAILURE;
++	}
++
++	memset(&rescue_status, 0, sizeof(rescue_status));
++	rescue_status.stage = RESCUE_IDLE;
++	snprintf(rescue_status.sha_state, sizeof(rescue_status.sha_state),
++		 "absent");
++
++	return rescue_loop();
++}
++
++U_BOOT_CMD(e2631rescue, 1, 1, do_e2631rescue,
++	   "serve the web bootloader rescue on lan1",
++	   "e2631rescue - start DHCP and the HTTP rescue page; no flash is\n"
++	   "              written until a validated image is uploaded and the\n"
++	   "              X-E2631-Confirm: write header is present. Ctrl-C leaves.\n");
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 5ebb5862..fd68f6f0 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -32,6 +32,8 @@ CONFIG_OF_EMBED=y
+ CONFIG_ENV_IS_IN_MTD=y
+ CONFIG_ENV_MTD_DEV="spi-nand0"
+ CONFIG_NET_RANDOM_ETHADDR=y
++CONFIG_MTK_TCP=y
++CONFIG_MTK_DHCPD=y
+ CONFIG_CLK=y
+ # CONFIG_MMC is not set
+ CONFIG_MTD=y
+@@ -46,3 +48,4 @@ CONFIG_DM_SPI=y
+ CONFIG_SPI_ZX=y
+ CONFIG_TIMER=y
+ CONFIG_ARM_GLOBAL_TIMER=y
++CONFIG_SHA256=y
+-- 
+2.56.1
+
