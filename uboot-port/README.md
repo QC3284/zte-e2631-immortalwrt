@@ -1080,4 +1080,10 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
   `e2631_net_refclk_init()`，CI 新增 cold rescue gate（awk 截取 `do_e2631rescue()` 后断言该调用存在）。
   同时把两条真机运维规则写进 §5：救援服务期间不要向 U-Boot 控制台发任何字符（Ctrl-C 是唯一被识别的
   输入，会中断排队中的写并打印 WARNING）；同一次开机内救援只用一次（第二次进入 ARP/SYN 不应答，重进前
-  先 reset/断电）。
+  先 reset/断电）。CI 构建 run `46046018929`（run 40，head `9ffadd5`，34 个 patch，tree
+  `0480ef834d718b827e32c1ae9b787f671ca3f5a1`）全绿：banner `U-Boot 2027.01-rc2-g1673d5c89c7b`、
+  u-boot.bin 365,872 B sha256 `b7ea6bbc138e1b3cbea6389fbaae89419d1d7e46e0668ef88637dd2cd14ac33d`
+  crc32 `9f2b707d`、mtd0 sha256 `23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1`
+  crc32 `1e5ff289`、env 块 `6eee153b...` 未变；日志含 `cold rescue gate: do_e2631rescue brings up the
+  network reference clocks`、`mtd writer sites: 4`、checkpatch 0E/0W。构建身份见
+  [evidence/uboot-e4-rescue-20261127.md](../evidence/uboot-e4-rescue-20261127.md) §5.2.1。

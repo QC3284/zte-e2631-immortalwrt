@@ -195,6 +195,27 @@ U-Boot `g85df6772a444` → `mtd read` 暂存镜像 + `crc32 0x34b252a4` → `go`
 先于 net_init/eth_init（MDIO/PHY probe）”变成显式、不可退化的约束；若真机冷启动救援仍超时，下一层怀疑
 是 PHY/SerDes 首次上电的复位与 autoneg 时序，而不是调用缺失。
 
+### 5.2.1 冷启动修复构建身份（run 46046018929，34 个 patch）
+
+- kit 提交 `9ffadd5`（patch 0034 + re-pin + cold rescue gate + README/evidence）；post-am tree
+  `0480ef834d718b827e32c1ae9b787f671ca3f5a1`（34 patches），patch 0034 sha256
+  `eef4625c0e3689acf7055de3636b2edc5a7a4d0f4e89cc0c3ee0161fc0c1e986`，干净重放验证树一致。
+- 构建：uboot-build run `46046018929`（run 40，head `9ffadd5`）SUCCESS；kit check.yml run `46046016648` SUCCESS。
+- banner `U-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)`；`u-boot.bin` 365,872 B
+  sha256 `b7ea6bbc138e1b3cbea6389fbaae89419d1d7e46e0668ef88637dd2cd14ac33d` crc32 `9f2b707d`；
+  mtd0 镜像 655,360 B sha256 `23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1`
+  crc32 `1e5ff289`；装配后首 0x800 头 sha256 `232513cb16f11c15299716b14cdc3c4fb4e4b2d787c6cd10b01309be0acd29c9`
+  （模板输入仍 `19a9d546…`）；env 块 `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426` 未变；
+  `.config` `d3a8450a810064adce1152741cf563237a587e1c2875ad598eaa6c5f969a7a5a`；入口 `0x47f00000`。
+- 日志证据：`rescue header fixture: PASS`、`cold rescue gate: do_e2631rescue brings up the network reference clocks`、
+  `mtd writer sites: 4 (e2631flash and the e2631env writer; -O2 inlines the static helpers)`、
+  `e2631env safety guards: present`、checkpatch `errors=0 warnings=0`、
+  `Reproducible: git am --committer-date-is-author-date, SOURCE_DATE_EPOCH=1795103079`；
+  E4 窗口门禁 / env retry / F2 两个门禁均 PASS。
+- 归档路径：`/home/qc233/zte/e2631-t5-artifacts/uboot-coldrescue-46046018929/e2631-uboot-46046018929/`
+  （SHA256SUMS 11/11 通过；verify-docs 的 `e4_prewrite_check.py --archive <目录>` 可据此跑离线门禁）。
+
+
 ## 6. 风险与边界
 
 - 写窗口只在 mtd0 U-Boot 区，固件槽位与 env 不在救援范围内（用户裁决：v1/v2 都不刷固件镜像）。
