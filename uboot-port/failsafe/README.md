@@ -55,8 +55,9 @@ bash tools/embed-failsafe.sh \
 - 生成物**不入库**：`uboot-build.yml` 的 "Embed the failsafe rescue page" 步骤在
   `git am` 之后、`Configure and build` 之前运行；缺少生成物时编译会因缺
   `e2631_failsafe_asset.o` 而失败（这是有意的 fail-fast）。
-- 产物：`E2631-FAILSAFE-ASSET.txt` 进 `SHA256SUMS`，并在 `UBOOT-INFO.txt` 里记录；
-  页面 gzip 字节也受整体 payload 预算（653,312 B 硬上限 / 645,120 B CI 门禁）约束。
+- 产物：生成物 `e2631_failsafe_asset.c/.h` 与 `E2631-FAILSAFE-ASSET.txt` 一起进 artifact 和
+  `SHA256SUMS`，并在 `UBOOT-INFO.txt` 里记录；页面 gzip 字节也受整体 payload 预算
+  （653,312 B 硬上限 / 645,120 B CI 门禁）约束。
 
 ## 4. 页面行为（v1，与 Lead 需求 MUST 对齐）
 

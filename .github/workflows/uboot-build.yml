@@ -713,6 +713,11 @@ jobs:
           gate_headroom=$((gate - size))
           mkdir -p artifacts
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
+          # E4 v1 (task-73): ship the generated rescue-page asset files too, so
+          # the artifact proves what the build embedded (the .c/.h are generated,
+          # never committed).
+          cp board/zte/zxhn-e2631/e2631_failsafe_asset.c \
+             board/zte/zxhn-e2631/e2631_failsafe_asset.h artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
           patch_shas=$(env | grep '^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=' | sort | sed 's/^[^=]*=//' | tr '\n' ' ')
           banner=$(strings -a build/u-boot.bin | grep -m1 -E '^U-Boot 20' || true)
@@ -793,7 +798,7 @@ jobs:
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
-          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin E2631-COMMAND-HELP.txt UBOOT-SIZES.txt E2631-FAILSAFE-ASSET.txt > SHA256SUMS)
+          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin E2631-COMMAND-HELP.txt UBOOT-SIZES.txt E2631-FAILSAFE-ASSET.txt e2631_failsafe_asset.c e2631_failsafe_asset.h > SHA256SUMS)
           cat artifacts/SHA256SUMS
           {
             echo "### E2631 A1/A2/A3 U-Boot build"
