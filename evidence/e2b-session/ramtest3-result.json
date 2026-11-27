@@ -1,0 +1,89 @@
+{
+ "started": "2026-11-27 19:18:49",
+ "commands": {
+  "version": {
+   "t0": 1795778330.79,
+   "dt": 0.05,
+   "out": "version\r\nU-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  "mtd read spi-nand0 0x48000000 0x2300000 0x800": {
+   "t0": 1795778330.84,
+   "dt": 0.05,
+   "out": "mtd read spi-nand0 0x48000000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=> "
+  },
+  "crc32 0x480020 0x40": {
+   "t0": 1795778334.2,
+   "dt": 0.07,
+   "out": "crc32 0x480020 0x40\r\nCRC32 for 00480020 ... 0048005f ==> 758d6336\r\n=> "
+  },
+  "md 0x48000000 0x40": {
+   "t0": 1795778331.09,
+   "dt": 0.11,
+   "out": "md 0x48000000 0x40\r\n48000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n48000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n48000020: 56190527 c23645f7 9eb1006b ea443500  '..V.E6.k....5D.\r\n48000030: 00800040 00800040 f6c6a962 00020205  @...@...b.......\r\n48000040: 204d5241 6f6d6d49 6c617472 20747257  ARM ImmortalWrt \r\n48000050: 756e694c 2e362d78 362e3831 00000030  Linux-6.18.60...\r\n48000060: e1a00000 e1a00000 e1a00000 e1a00000  ................\r\n48000070: e1a00000 e1a00000 e1a00000 e1a00000  ................\r\n48000080: ea000005 016f2818 00000000 00351a28  .....(o.....(.5.\r\n48000090: 04030201 45454545 00006524 e10f9000  ....EEEE$e......\r\n480000a0: eb000256 e1a07001 e1a08002 e10f2000  V....p....... ..\r\n480000b0: e3120003 1a000001 e3a00017 ef123456  ............V4..\r\n480000c0: e10f0000 e220001a e310001f e3c0001f  ...... .........\r\n480000d0: e38000d3 1a000004 e3800c01 e28fe00c  ................\r\n480000e0: e16ff000 e12ef30e e160006e e121f000  ..o.....n.`...!.\r\n480000f0: e16ff009 00000000 00000000 00000000  ..o.............\r\n=> "
+  },
+  "mw 0x49000000 0xdeadbeef 0x40": {
+   "t0": 1795778334.26,
+   "dt": 0.04,
+   "out": "mw 0x49000000 0xdeadbeef 0x40\r\n=> "
+  },
+  "md 0x49000000 0x8": {
+   "t0": 1795778334.37,
+   "dt": 0.04,
+   "out": "md 0x49000000 0x8\r\n49000000: deadbeef deadbeef deadbeef deadbeef  ................\r\n49000010: deadbeef deadbeef deadbeef deadbeef  ................\r\n=> "
+  },
+  "md 0x490020 0x8": {
+   "t0": 1795778337.41,
+   "dt": 0.06,
+   "out": "md 0x490020 0x8\r\n00490020: 00000000 00000000 00000000 00000000  ................\r\n00490030: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  },
+  "e2631boot load": {
+   "t0": 1795778337.47,
+   "dt": 4.94,
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> "
+  },
+  "md 0x42000000 0x8": {
+   "t0": 1795778342.41,
+   "dt": 0.04,
+   "out": "md 0x42000000 0x8\r\n42000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n42000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> "
+  },
+  "md 0x420020 0x8": {
+   "t0": 1795778342.46,
+   "dt": 0.05,
+   "out": "md 0x420020 0x8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  },
+  "crc32 0x420020 0x40": {
+   "t0": 1795778342.5,
+   "dt": 0.05,
+   "out": "crc32 0x420020 0x40\r\nCRC32 for 00420020 ... 0042005f ==> 758d6336\r\n=> "
+  }
+ },
+ "pause": {
+  "supervisor_pids": [
+   91932
+  ],
+  "bootwatch_pids": [
+   92006
+  ],
+  "tty_holders": [
+   91939
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "attach": true,
+ "ended": "2026-11-27 19:19:02",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   102088
+  ],
+  "bootwatch_pids": [
+   102175
+  ],
+  "tty_holders": [
+   102094
+  ],
+  "events_tail": "2026-11-27T19:16:10+08:00 reader-start pid=91932\n2026-11-27T19:19:04+08:00 reader-start pid=102088",
+  "ok": true
+ }
+}

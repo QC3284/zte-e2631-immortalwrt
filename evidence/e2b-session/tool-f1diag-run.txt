@@ -1,0 +1,3 @@
+19:03:44 capture paused: {"supervisor_pids": [22261], "bootwatch_pids": [22268], "tty_holders": [22267], "tty_holders_after": [], "free": true}
+19:03:45 serial hub started pid=53194 log=/home/qc233/zte/e2631-p3/e2/session2/f1diag/serial.log
+19:03:52 capture restore: {"restore_rc": 0, "supervisor_pids": [53329], "bootwatch_pids": [53376], "tty_holders": [53339], "events_tail": "2026-11-27T18:54:09+08:00 reader-start pid=22261\n2026-11-27T19:03:48+08:00 reader-start pid=53329", "ok": true}

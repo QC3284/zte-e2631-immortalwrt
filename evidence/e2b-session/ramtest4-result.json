@@ -1,0 +1,78 @@
+{
+ "started": "2026-11-27 19:21:26",
+ "commands": {
+  "version": {
+   "dt": 0.05,
+   "out": "version\r\nU-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  "crc32 0x47f00000 0x20": {
+   "dt": 0.04,
+   "out": "crc32 0x47f00000 0x20\r\nCRC32 for 47f00000 ... 47f0001f ==> c65a2cff\r\n=> "
+  },
+  "crc32 0x47f00000 0x40": {
+   "dt": 0.06,
+   "out": "crc32 0x47f00000 0x40\r\nCRC32 for 47f00000 ... 47f0003f ==> 25ec17d1\r\n=> "
+  },
+  "md 0x47f00000 0x10": {
+   "dt": 0.04,
+   "out": "md 0x47f00000 0x10\r\n47f00000: ea0000b8 e59ff014 e59ff014 e59ff014  ................\r\n47f00010: e59ff014 e59ff014 e59ff014 e59ff014  ................\r\n47f00020: 47f00060 47f000c0 47f00120 47f00180  `..G...G ..G...G\r\n47f00030: 47f001e0 47f00240 47f002a0 deadbeef  ...G@..G...G....\r\n=> "
+  },
+  "mw 0x4a000000 0xa5a5a5a5 0x10": {
+   "dt": 0.05,
+   "out": "mw 0x4a000000 0xa5a5a5a5 0x10\r\n=> "
+  },
+  "md 0x4a000000 0x10": {
+   "dt": 0.06,
+   "out": "md 0x4a000000 0x10\r\n4a000000: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n4a000010: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n4a000020: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n4a000030: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n=> "
+  },
+  "md 0x4a000020 0x8": {
+   "dt": 0.04,
+   "out": "md 0x4a000020 0x8\r\n4a000020: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n4a000030: a5a5a5a5 a5a5a5a5 a5a5a5a5 a5a5a5a5  ................\r\n=> "
+  },
+  "mtd read spi-nand0 0x4b000000 0x2300000 0x800": {
+   "dt": 0.04,
+   "out": "mtd read spi-nand0 0x4b000000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=> "
+  },
+  "crc32 0x4b000000 0x20": {
+   "dt": 0.04,
+   "out": "crc32 0x4b000000 0x20\r\nCRC32 for 4b000000 ... 4b00001f ==> 5076ace3\r\n=> "
+  },
+  "md 0x4b000000 0x10": {
+   "dt": 0.04,
+   "out": "md 0x4b000000 0x10\r\n4b000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n4b000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n4b000020: 56190527 c23645f7 9eb1006b ea443500  '..V.E6.k....5D.\r\n4b000030: 00800040 00800040 f6c6a962 00020205  @...@...b.......\r\n=> "
+  },
+  "md 0x480020 0x8": {
+   "dt": 0.06,
+   "out": "md 0x480020 0x8\r\n00480020: 00000000 00000000 00000000 00000000  ................\r\n00480030: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  }
+ },
+ "pause": {
+  "supervisor_pids": [
+   102088
+  ],
+  "bootwatch_pids": [
+   102175
+  ],
+  "tty_holders": [
+   102094
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "attach": true,
+ "ended": "2026-11-27 19:21:28",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   109735
+  ],
+  "bootwatch_pids": [
+   109782
+  ],
+  "tty_holders": [
+   109745
+  ],
+  "events_tail": "2026-11-27T19:19:04+08:00 reader-start pid=102088\n2026-11-27T19:21:30+08:00 reader-start pid=109735",
+  "ok": true
+ }
+}

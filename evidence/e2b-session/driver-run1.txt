@@ -1,0 +1,86 @@
+18:45:28 capture restore: {"restore_rc": 0, "supervisor_pids": [14643], "bootwatch_pids": [14660], "tty_holders": [14652], "events_tail": "2026-11-22T12:21:56+08:00 reader-start pid=928063\n2026-11-27T18:45:23+08:00 reader-start pid=14643", "ok": true}
+18:45:28 serial capture chain restarted as a single reader
+18:48:29 stage wget 1.39s rc=0: wget -O /tmp/e2-uboot-stage.bin http://192.168.1.191:18080/e2-stage-3cf00029.bin 2>&1 | tail -3; sha
+18:48:30 stage erase 0.89s rc=0: mtd erase userdata; echo ERASE_RC=$?
+18:48:31 stage write 0.40s rc=0: mtd write /tmp/e2-uboot-stage.bin userdata; echo WRITE_RC=$?
+18:48:31 stage readback 0.26s rc=0: dd if=/dev/mtd10 bs=4096 count=128 2>/dev/null | sha256sum
+18:48:31 stage sync 0.22s rc=0: sync; echo SYNCED
+18:48:31 PHASE 1 GREEN: artifact staged in userdata and read back
+18:48:41 tcpdump ready=True
+18:48:43 capture paused: {"supervisor_pids": [14643], "bootwatch_pids": [14660], "tty_holders": [14652], "tty_holders_after": [], "free": true}
+18:48:44 serial hub started pid=17550 log=/home/qc233/zte/e2631-p3/e2/session2/run-1/serial.log
+18:48:45 reboot -f requested; waiting for the flash U-Boot banner
+18:48:47 banner seen; stopping autoboot
+18:48:50 stop_autoboot: {"banner": true, "prompt": true}
+18:48:50 ub cmd: version ok=True
+18:48:50 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+18:48:51 ub cmd: crc32 0x47f00000 0x78a80 ok=True
+18:48:51 gate: staged image crc32 == 0x3ccc7333
+18:48:51 banner seen; stopping autoboot
+18:48:54 stop_autoboot: {"banner": true, "prompt": true}
+18:48:54 ub cmd: version ok=True
+18:48:54 PHASE 2 GREEN: new image banner and prompt
+18:48:54 ub cmd: md.l 0x9234800c 1 ok=True
+18:48:54 ub cmd: md.l 0x92348014 1 ok=True
+18:48:54 ub cmd: md.l 0x923480dc 1 ok=True
+18:48:54 BMU snapshot before_mii {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+18:48:55 ub cmd: mii info ok=True
+18:48:55 ub cmd: md.l 0x9234800c 1 ok=True
+18:48:55 ub cmd: md.l 0x92348014 1 ok=True
+18:48:55 ub cmd: md.l 0x923480dc 1 ok=True
+18:48:55 BMU snapshot after_mii {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+18:48:55 ub cmd: md.l 0x9234800c 1 ok=True
+18:48:55 ub cmd: md.l 0x92348014 1 ok=True
+18:48:55 ub cmd: md.l 0x923480dc 1 ok=True
+18:48:55 BMU snapshot before_e2631net {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+18:48:55 ub cmd: e2631net ok=True
+18:48:55 ub cmd: md.l 0x9234800c 1 ok=True
+18:48:55 ub cmd: md.l 0x92348014 1 ok=True
+18:48:55 ub cmd: md.l 0x923480dc 1 ok=True
+18:48:55 BMU snapshot after_e2631net {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+18:48:55 ub cmd: md.l 0x9234800c 1 ok=True
+18:48:55 ub cmd: md.l 0x92348014 1 ok=True
+18:48:55 ub cmd: md.l 0x923480dc 1 ok=True
+18:48:55 BMU snapshot before_dhcp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+18:53:13 dhcp prompt=True ip=None dt=257.51
+18:53:13 ub cmd: md.l 0x9234800c 1 ok=True
+18:53:13 ub cmd: md.l 0x92348014 1 ok=True
+18:53:13 ub cmd: md.l 0x923480dc 1 ok=True
+18:53:13 BMU snapshot after_dhcp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+18:53:13 dhcp gave no address; setting RAM-only static addresses for ping/tftp
+18:53:13 ub cmd: setenv ipaddr 192.168.1.50 ok=True
+18:53:13 ub cmd: setenv netmask 255.255.255.0 ok=True
+18:53:13 ub cmd: setenv serverip 192.168.1.191 ok=True
+18:53:13 ub cmd: md.l 0x9234800c 1 ok=True
+18:53:13 ub cmd: md.l 0x92348014 1 ok=True
+18:53:13 ub cmd: md.l 0x923480dc 1 ok=True
+18:53:13 BMU snapshot before_ping {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+18:53:34 ub cmd: ping 192.168.1.191 ok=True
+18:53:34 ub cmd: md.l 0x9234800c 1 ok=True
+18:53:34 ub cmd: md.l 0x92348014 1 ok=True
+18:53:34 ub cmd: md.l 0x923480dc 1 ok=True
+18:53:34 BMU snapshot after_ping {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "80000111"}
+18:53:34 ub cmd: md.l 0x9234800c 1 ok=True
+18:53:34 ub cmd: md.l 0x92348014 1 ok=True
+18:53:34 ub cmd: md.l 0x923480dc 1 ok=True
+18:53:34 BMU snapshot before_tftp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "80000111"}
+18:53:54 ub cmd: tftp 0x43000000 e2-test.bin ok=True
+18:53:54 ub cmd: md.l 0x9234800c 1 ok=True
+18:53:54 ub cmd: md.l 0x92348014 1 ok=True
+18:53:54 ub cmd: md.l 0x923480dc 1 ok=True
+18:53:54 BMU snapshot after_tftp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+18:53:54 ub cmd: crc32 0x43000000 0x10000 ok=True
+18:54:01 PHASE 3 F2 evidence recorded
+18:54:06 ub cmd: e2631boot load ok=True
+18:54:06 ub cmd: md.l 0x42000000 8 ok=True
+18:54:06 ub cmd: md.l 0x420020 8 ok=True
+18:54:06 ub cmd: iminfo 0x420020 ok=True
+18:54:06 bootm attempt bootm 0x42000000 outcome=prompt dt=0.06
+18:54:06 bootm attempt bootm 0x420020 outcome=prompt dt=0.04
+18:54:06 ub cmd: printenv machid ok=True
+18:54:06 ub cmd: bootm start 0x42000000 ok=True
+18:54:06 PHASE 4 F1 verdict SILENT_RETURN
+18:54:13 capture restore: {"restore_rc": 0, "supervisor_pids": [22261], "bootwatch_pids": [22268], "tty_holders": [22267], "events_tail": "2026-11-27T18:45:23+08:00 reader-start pid=14643\n2026-11-27T18:54:09+08:00 reader-start pid=22261", "ok": true}
+18:54:16 host services stopped rc=0
+18:58:24 VERDICT F1_SILENT_RETURN
+18:58:24 checks: {"artifact_pins": true, "staging": true, "staging_crc_gate": true, "new_banner": true, "new_version": true, "f1_verdict": "SILENT_RETURN", "f2_recorded": true, "no_uboot_flash_writes": true, "mtd0_unchanged": false, "no_panics": false, "capture_after": true, "no_error": true}

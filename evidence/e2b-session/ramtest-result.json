@@ -1,0 +1,126 @@
+{
+ "started": "2026-11-27 19:13:32",
+ "commands": {
+  "version": {
+   "t": "19:13:34",
+   "out": "version\r\nU-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  "md 0x46000000 4": {
+   "t": "19:13:35",
+   "out": "md 0x46000000 4\r\n46000000: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  },
+  "mw 0x46000000 0xdeadbeef 4": {
+   "t": "19:13:34",
+   "out": "mw 0x46000000 0xdeadbeef 4\r\n=> "
+  },
+  "mw 0x46000000 0 4": {
+   "t": "19:13:35",
+   "out": "mw 0x46000000 0 4\r\n=> "
+  },
+  "md.l 0x47f00000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x47f00000 8\r\n47f00000: ea0000b8 e59ff014 e59ff014 e59ff014  ................\r\n47f00010: e59ff014 e59ff014 e59ff014 e59ff014  ................\r\n=> "
+  },
+  "mtd read spi-nand0 0x44000000 0x0 0x800": {
+   "t": "19:13:35",
+   "out": "mtd read spi-nand0 0x44000000 0x0 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x00000000\r\n=> "
+  },
+  "md.l 0x44000000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x44000000 8\r\n44000000: 00000000 00000000 00000000 00000000  ................\r\n44000010: 73383231 00008000 00000000 00000000  128s............\r\n=> "
+  },
+  "mtd read spi-nand0 0x44100000 0x20000 0x800": {
+   "t": "19:13:35",
+   "out": "mtd read spi-nand0 0x44100000 0x20000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x00020000\r\n=> "
+  },
+  "md.l 0x44100000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x44100000 8\r\n44100000: 00000000 00000000 00000000 00000000  ................\r\n44100010: 73383231 0006f6e0 00000000 00000000  128s............\r\n=> "
+  },
+  "mtd read spi-nand0 0x44200000 0x2300000 0x800": {
+   "t": "19:13:35",
+   "out": "mtd read spi-nand0 0x44200000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=> "
+  },
+  "md.l 0x44200000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x44200000 8\r\n44200000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n44200010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> "
+  },
+  "mtd read spi-nand0 0x44300000 0x2400000 0x800": {
+   "t": "19:13:35",
+   "out": "mtd read spi-nand0 0x44300000 0x2400000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02400000\r\n=> "
+  },
+  "md.l 0x44300000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x44300000 8\r\n44300000: dbb08574 5c397070 9b9bbebc bbd4a941  t...pp9\\....A...\r\n44300010: e09bed13 2fe334df cc7b28ae c00650df  .....4./.({..P..\r\n=> "
+  },
+  "mtd read spi-nand0 0x44400000 0x700000 0x800": {
+   "t": "19:13:35",
+   "out": "mtd read spi-nand0 0x44400000 0x700000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x00700000\r\n=> "
+  },
+  "md.l 0x44400000 8": {
+   "t": "19:13:35",
+   "out": "md.l 0x44400000 8\r\n44400000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n44400010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> "
+  },
+  "e2631boot load": {
+   "t": "19:13:40",
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> "
+  },
+  "md.l 0x42000000 8": {
+   "t": "19:13:40",
+   "out": "md.l 0x42000000 8\r\n42000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n42000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> "
+  },
+  "md.l 0x420020 8": {
+   "t": "19:13:40",
+   "out": "md.l 0x420020 8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  },
+  "md.l 0x420060 8": {
+   "t": "19:13:40",
+   "out": "md.l 0x420060 8\r\n00420060: 00000000 00000000 00000000 00000000  ................\r\n00420070: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  },
+  "iminfo 0x420020": {
+   "t": "19:13:40",
+   "out": "iminfo 0x420020\r\n\r\n## Checking Image at 00420020 ...\r\nUnknown image format!\r\n=> "
+  },
+  "crc32 0x42000000 0x35454a": {
+   "t": "19:13:41",
+   "out": "crc32 0x42000000 0x35454a\r\nCRC32 for 42000000 ... 42354549 ==> b82b5044\r\n=> "
+  },
+  "crc32 0x420020 0x40": {
+   "t": "19:13:41",
+   "out": "crc32 0x420020 0x40\r\nCRC32 for 00420020 ... 0042005f ==> 758d6336\r\n=> "
+  },
+  "md.l 0x46000000 4": {
+   "t": "19:13:41",
+   "out": "md.l 0x46000000 4\r\n46000000: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  }
+ },
+ "pause": {
+  "supervisor_pids": [
+   53329
+  ],
+  "bootwatch_pids": [
+   53376
+  ],
+  "tty_holders": [
+   53339
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "attach": true,
+ "ended": "2026-11-27 19:13:41",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   83997
+  ],
+  "bootwatch_pids": [
+   84044
+  ],
+  "tty_holders": [
+   84007
+  ],
+  "events_tail": "2026-11-27T19:03:48+08:00 reader-start pid=53329\n2026-11-27T19:13:43+08:00 reader-start pid=83997",
+  "ok": true
+ }
+}

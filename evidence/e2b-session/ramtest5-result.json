@@ -1,0 +1,70 @@
+{
+ "started": "2026-11-27 19:25:04",
+ "commands": {
+  "version": {
+   "dt": 0.06,
+   "out": "version\r\nU-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> "
+  },
+  "mw 0x4c000000 0x5a5a5a5a 0x40": {
+   "dt": 0.04,
+   "out": "mw 0x4c000000 0x5a5a5a5a 0x40\r\n=> "
+  },
+  "md 0x4c000000 0x8": {
+   "dt": 0.04,
+   "out": "md 0x4c000000 0x8\r\n4c000000: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ\r\n4c000010: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ\r\n=> "
+  },
+  "e2631boot info": {
+   "dt": 0.76,
+   "out": "e2631boot info\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\n=> "
+  },
+  "e2631refclk": {
+   "dt": 0.06,
+   "out": "e2631refclk\r\ne2631refclk: before PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff\r\ne2631refclk: before CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800\r\ne2631refclk: running the vendor network reference-clock and SerDes sequence\r\ne2631refclk: after PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff\r\ne2631refclk: after CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800\r\ne2631refclk: back at the prompt, nothing was booted\r\n=> "
+  },
+  "e2631boot load": {
+   "dt": 4.97,
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> "
+  },
+  "md 0x4c000020 0x8": {
+   "dt": 0.06,
+   "out": "md 0x4c000020 0x8\r\n4c000020: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ\r\n4c000030: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ\r\n=> "
+  },
+  "md 0x42000000 0x8": {
+   "dt": 0.04,
+   "out": "md 0x42000000 0x8\r\n42000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n42000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> "
+  },
+  "md 0x420020 0x8": {
+   "dt": 0.06,
+   "out": "md 0x420020 0x8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> "
+  }
+ },
+ "pause": {
+  "supervisor_pids": [
+   109735
+  ],
+  "bootwatch_pids": [
+   109782
+  ],
+  "tty_holders": [
+   109745
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "attach": true,
+ "ended": "2026-11-27 19:25:12",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   121113
+  ],
+  "bootwatch_pids": [
+   121164
+  ],
+  "tty_holders": [
+   121123
+  ],
+  "events_tail": "2026-11-27T19:21:30+08:00 reader-start pid=109735\n2026-11-27T19:25:14+08:00 reader-start pid=121113",
+  "ok": true
+ }
+}

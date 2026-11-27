@@ -61,6 +61,8 @@
 
 | [E4-多功能U-Boot设计-2026-11-27.md](E4-多功能U-Boot设计-2026-11-27.md) | E4 设计稿：MUST/SHOULD/WON'T 需求、A/B/C 方案对照（逐条回答 MUST、假定预算）、v1 最小救援规格（串口 `e2631rescue`→DHCP+单页 HTTP→e2631flash 五步→重启）、刷写路径/掉电回滚、行为合同与可执行验收、F2/E3 依赖 |
 | [../evidence/e4-bl-mt798x-dhcpd-study-20261127.md](../evidence/e4-bl-mt798x-dhcpd-study-20261127.md) | E4-研1（task-70）：bl-mt798x-dhcpd 移植评估——上游实为 Yuzhii0718 仓（981213 仓不存在）、核心 TCP/HTTP/DHCP 可搬但高级模块绑定 MTK MMC/UBI 胶水须重写、逐文件尺寸与 gzip 资产 70,858 B、密度校准 0.15–0.30、A/B/C 预算（16–34 / 22–44 / 85–137 KB vs 基线 159,104 B + 捐献 289,800 B）、刷写/RAM 缓冲 0x46000000/五步校验、F2 真机复测门槛 |
+| [../evidence/e2b-session-20261127.md](../evidence/e2b-session-20261127.md) | task-67 rev3 / E2-B 真机会话：22-patch RAM 链 U-Boot 的以太网与 bootm 复核——F2 在 42 次 BOOTP broadcast 期间物理线 0 帧（决定性；主机 tcpdump 66 帧内 U-Boot MAC 0 帧、dnsmasq 无 DHCP 事务）、BMU 三寄存器只有 FREE_STATUS 变化；F1 本产物签名为 `Wrong Image Type`（e2631boot load 自校验 header/data CRC 通过，但 0x420020 对 md/bootm 不可见；与 2026-11-22 静默返回不同）；另记录 md vs crc32 可见性观察（待复现，不作解释）；零 mtd0 写入（51 条 U-Boot 命令审计，唯一写入为 userdata staging） |
+| [../evidence/e2b-session/](../evidence/e2b-session/) | task-67 会话附件：session-results、驱动/串口原始字节、tcpdump、dnsmasq/http、f1diag 与 5 轮只读探针结果、产物构建清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|

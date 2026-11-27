@@ -1,0 +1,812 @@
+{
+ "mode": "e2b-session",
+ "started": "2026-11-27T18:45:21+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-repro-b-44991704112/e2631-uboot-44991704112/u-boot.bin",
+  "size": 494208,
+  "size_hex": "0x78a80",
+  "sha256": "3cf000291b1b2d7552b4e7859204a310640dba81fbba5e60b36f99d7b89f355d",
+  "crc32": "0x3ccc7333",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-gf355ce89283c",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/session2/run-1/e2-stage-3cf00029.bin",
+  "size": 524288,
+  "sha256": "ad3a4d5cbabb39432ec4296b8c5f56cdb5ac48d5e7bd6494d1d013fd66dff56c",
+  "payload_crc32": "0x3ccc7333",
+  "payload_size": 494208
+ },
+ "testfile": {
+  "name": "e2-test.bin",
+  "size": 65536,
+  "size_hex": "0x10000",
+  "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32": "0x695b8eb2",
+  "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)",
+  "path": "/home/qc233/zte/e2631-p3/e2/tftp/e2-test.bin",
+  "present": true,
+  "sha256_file": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32_file": "0x695b8eb2"
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "output": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00000 0x78a80",
+   "output": "crc32 0x47f00000 0x78a80\r\nCRC32 for 47f00000 ... 47f78a7f ==> 3ccc7333\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mii info",
+   "output": "mii info\r\nPHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net",
+   "output": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "dhcp",
+   "output": "dhcp\r\nethernet@92000000 Waiting for PHY auto negotiation to complete....... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv ipaddr 192.168.1.50",
+   "output": "setenv ipaddr 192.168.1.50\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv netmask 255.255.255.0",
+   "output": "setenv netmask 255.255.255.0\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv serverip 192.168.1.191",
+   "output": "setenv serverip 192.168.1.191\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "ping 192.168.1.191",
+   "output": "ping 192.168.1.191\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nUsing ethernet@92000000 device\r\n\r\nARP Retry count exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nping failed; host 192.168.1.191 is not alive\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 80000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 80000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "tftp 0x43000000 e2-test.bin",
+   "output": "tftp 0x43000000 e2-test.bin\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nUsing ethernet@92000000 device\r\nTFTP from server 192.168.1.191; our IP address is 192.168.1.50\r\nFilename 'e2-test.bin'.\r\nLoad address: 0x43000000\r\nLoading: *\b\r\nARP Retry count exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x43000000 0x10000",
+   "output": "crc32 0x43000000 0x10000\r\nCRC32 for 43000000 ... 4300ffff ==> cabc8d5e\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631boot load",
+   "output": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x42000000 8",
+   "output": "md.l 0x42000000 8\r\n42000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n42000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x420020 8",
+   "output": "md.l 0x420020 8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x420020",
+   "output": "iminfo 0x420020\r\n\r\n## Checking Image at 00420020 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "bootm 0x42000000",
+   "output": "bootm 0x42000000\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "bootm 0x420020",
+   "output": "bootm 0x420020\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "printenv machid",
+   "output": "printenv machid\r\n## Error: \"machid\" not defined\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "bootm start 0x42000000",
+   "output": "bootm start 0x42000000\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> ",
+   "ok": true
+  }
+ ],
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n3525\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "capture_chain_before": {
+  "supervisor": [],
+  "bootwatch": [],
+  "tty": []
+ },
+ "capture_restart": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   14643
+  ],
+  "bootwatch_pids": [
+   14660
+  ],
+  "tty_holders": [
+   14652
+  ],
+  "events_tail": "2026-11-22T12:21:56+08:00 reader-start pid=928063\n2026-11-27T18:45:23+08:00 reader-start pid=14643",
+  "ok": true
+ },
+ "services": {
+  "rc": 124,
+  "stdout": "",
+  "stderr": "timeout",
+  "dhcp_tftp": [
+   "UNCONN 0      0                               0.0.0.0%enp0s20u1u4u2c2:67         0.0.0.0:*",
+   "UNCONN 0      0                                             127.0.0.1:69         0.0.0.0:*",
+   "UNCONN 0      0                                         192.168.1.191:69         0.0.0.0:*",
+   "UNCONN 0      0                                                 [::1]:69            [::]:*"
+  ],
+  "http": [
+   "LISTEN 0      5                                         192.168.1.191:18080      0.0.0.0:*"
+  ],
+  "ok": true
+ },
+ "staging": {
+  "url": "http://192.168.1.191:18080/e2-stage-3cf00029.bin",
+  "padded": {
+   "path": "/home/qc233/zte/e2631-p3/e2/session2/run-1/e2-stage-3cf00029.bin",
+   "size": 524288,
+   "sha256": "ad3a4d5cbabb39432ec4296b8c5f56cdb5ac48d5e7bd6494d1d013fd66dff56c",
+   "payload_crc32": "0x3ccc7333",
+   "payload_size": 494208
+  },
+  "wget": {
+   "rc": 0,
+   "out": "Writing to '/tmp/e2-uboot-stage.bin'\n\n/tmp/e2-uboot-stage. 100% |*******************************|   512k  0:00:00 ETA\nDownload completed (524288 bytes)\nad3a4d5cbabb39432ec4296b8c5f56cdb5ac48d5e7bd6494d1d013fd66dff56c  /tmp/e2-uboot-stage.bin\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 1.39
+  },
+  "erase": {
+   "rc": 0,
+   "out": "ERASE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "elapsed_s": 0.89
+  },
+  "write": {
+   "rc": 0,
+   "out": "WRITE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e2-uboot-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "elapsed_s": 0.4
+  },
+  "readback": {
+   "rc": 0,
+   "out": "ad3a4d5cbabb39432ec4296b8c5f56cdb5ac48d5e7bd6494d1d013fd66dff56c  -\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.26
+  },
+  "sync": {
+   "rc": 0,
+   "out": "SYNCED\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.22
+  },
+  "ok": true
+ },
+ "tcpdump": {
+  "rc": 0,
+  "container": "05e47ceadb1d7a6c7116a4f0bf5ba2e04af35428a84f6794d74c50b4b03c617f",
+  "stderr": "",
+  "ready": true
+ },
+ "capture_pause": {
+  "supervisor_pids": [
+   14643
+  ],
+  "bootwatch_pids": [
+   14660
+  ],
+  "tty_holders": [
+   14652
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 17550,
+ "flash_banner_seen": true,
+ "flash_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "flash_version_ok": true,
+ "read_staging": {
+  "ok": true,
+  "tail": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> "
+ },
+ "staging_crc": {
+  "got": "0x3ccc7333",
+  "want": "0x3ccc7333",
+  "ok": true
+ },
+ "go_sent": "2026-11-27T18:48:51+0800",
+ "new_banner_seen": true,
+ "new_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "new_version_ok": true,
+ "f2": {
+  "mii_info": {
+   "snapshot": {
+    "label": "before_mii",
+    "t": "2026-11-27T18:48:54+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "mii info\r\nPHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\n=> ",
+   "after": {
+    "label": "after_mii",
+    "t": "2026-11-27T18:48:55+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "e2631net": {
+   "snapshot": {
+    "label": "before_e2631net",
+    "t": "2026-11-27T18:48:55+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\n=> ",
+   "after": {
+    "label": "after_e2631net",
+    "t": "2026-11-27T18:48:55+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "dhcp": {
+   "snapshot": {
+    "label": "before_dhcp",
+    "t": "2026-11-27T18:48:55+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "result": {
+    "cmd": "dhcp",
+    "prompt": true,
+    "ip": null,
+    "dt": 257.51,
+    "out": "dhcp\r\nethernet@92000000 Waiting for PHY auto negotiation to complete....... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\n=> "
+   },
+   "after": {
+    "label": "after_dhcp",
+    "t": "2026-11-27T18:53:13+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "static_fallback": true,
+  "ping": {
+   "snapshot": {
+    "label": "before_ping",
+    "t": "2026-11-27T18:53:13+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "ping 192.168.1.191\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nUsing ethernet@92000000 device\r\n\r\nARP Retry count exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nping failed; host 192.168.1.191 is not alive\r\n=> ",
+   "after": {
+    "label": "after_ping",
+    "t": "2026-11-27T18:53:34+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "80000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 80000111                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "tftp": {
+   "snapshot": {
+    "label": "before_tftp",
+    "t": "2026-11-27T18:53:34+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "80000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 80000111                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "tftp 0x43000000 e2-test.bin\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\nUsing ethernet@92000000 device\r\nTFTP from server 192.168.1.191; our IP address is 192.168.1.50\r\nFilename 'e2-test.bin'.\r\nLoad address: 0x43000000\r\nLoading: *\b\r\nARP Retry count exceeded; starting again\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\n=> ",
+   "after": {
+    "label": "after_tftp",
+    "t": "2026-11-27T18:53:54+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   },
+   "bytes": null,
+   "size": 65536,
+   "crc": {
+    "out": "crc32 0x43000000 0x10000\r\nCRC32 for 43000000 ... 4300ffff ==> cabc8d5e\r\n=> ",
+    "got": "0xcabc8d5e",
+    "want": "0x695b8eb2"
+   }
+  }
+ },
+ "f1": {
+  "load": {
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "crc_good": true
+  },
+  "md_marker": "md.l 0x42000000 8\r\n42000000: 33333333 cccccccc 88888888 dddddddd  3333............\r\n42000010: ffffffff ffffffff ffffffff ffffffff  ................\r\n=> ",
+  "md_header": "md.l 0x420020 8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+  "iminfo": "iminfo 0x420020\r\n\r\n## Checking Image at 00420020 ...\r\nUnknown image format!\r\n=> ",
+  "bootm_marker_addr": {
+   "cmd": "bootm 0x42000000",
+   "outcome": "prompt",
+   "dt": 0.06,
+   "out": "bootm 0x42000000\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> "
+  },
+  "bootm_uimage_addr": {
+   "cmd": "bootm 0x420020",
+   "outcome": "prompt",
+   "dt": 0.04,
+   "out": "bootm 0x420020\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> "
+  },
+  "verdict": "SILENT_RETURN",
+  "printenv_machid": "printenv machid\r\n## Error: \"machid\" not defined\r\n=> ",
+  "bootm_start": "bootm start 0x42000000\r\nWrong Image Type for bootm command\r\nERROR -91: can't get kernel image!\r\n=> "
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   22261
+  ],
+  "bootwatch_pids": [
+   22268
+  ],
+  "tty_holders": [
+   22267
+  ],
+  "events_tail": "2026-11-27T18:45:23+08:00 reader-start pid=14643\n2026-11-27T18:54:09+08:00 reader-start pid=22261",
+  "ok": true
+ },
+ "device_after": {
+  "raw": "",
+  "rc": 255,
+  "stderr": "ssh: connect to host 192.168.1.1 port 22: No route to host\n",
+  "mtd0_sha": null,
+  "userdata_mounted": null,
+  "version": null
+ },
+ "postcheck": {
+  "rc": 255,
+  "out": "",
+  "err": "ssh: connect to host 192.168.1.1 port 22: No route to host\n"
+ },
+ "audit": {
+  "uboot_commands": [
+   "version",
+   "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "crc32 0x47f00000 0x78a80",
+   "version",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "mii info",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "e2631net",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "dhcp",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "setenv ipaddr 192.168.1.50",
+   "setenv netmask 255.255.255.0",
+   "setenv serverip 192.168.1.191",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "ping 192.168.1.191",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "tftp 0x43000000 e2-test.bin",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "crc32 0x43000000 0x10000",
+   "e2631boot load",
+   "md.l 0x42000000 8",
+   "md.l 0x420020 8",
+   "iminfo 0x420020",
+   "bootm 0x42000000",
+   "bootm 0x420020",
+   "printenv machid",
+   "bootm start 0x42000000"
+  ],
+  "uboot_flash_writes": [],
+  "staging_linux_writes": [],
+  "net_cmds": [
+   "crc32 0x47f00000 0x78a80",
+   "mii info",
+   "e2631net",
+   "dhcp",
+   "setenv ipaddr 192.168.1.50",
+   "setenv netmask 255.255.255.0",
+   "setenv serverip 192.168.1.191",
+   "ping 192.168.1.191",
+   "tftp 0x43000000 e2-test.bin",
+   "crc32 0x43000000 0x10000"
+  ],
+  "staging_ops": {
+   "erase": 0,
+   "write": 0,
+   "readback": 0,
+   "wget": 0,
+   "sync": 0
+  }
+ },
+ "finished": "2026-11-27T18:58:24+0800",
+ "checks": {
+  "artifact_pins": true,
+  "staging": true,
+  "staging_crc_gate": true,
+  "new_banner": true,
+  "new_version": true,
+  "f1_verdict": "SILENT_RETURN",
+  "f2_recorded": true,
+  "no_uboot_flash_writes": true,
+  "mtd0_unchanged": false,
+  "no_panics": false,
+  "capture_after": true,
+  "no_error": true
+ },
+ "verdict": "F1_SILENT_RETURN"
+}

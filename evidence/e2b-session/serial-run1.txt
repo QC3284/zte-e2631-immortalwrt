@@ -1,0 +1,249 @@
+[ 3729.599892] br-lan: port 3(lan3) entered disabled state
+[ 3729.601309] br-lan: port 2(lan2) entered disabled state
+[ 3729.602271] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[ 3729.602568] br-lan: port 1(lan1) entered disabled state
+[ 3729.628735] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x47f00000 0x3f00000 0x80000
+Reading 524288 byte(s) (256 page(s)) at offset 0x03f00000
+=> crc32 0x47f00000 0x78a80
+CRC32 for 47f00000 ... 47f78a7f ==> 3ccc7333
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  13 devices, 11 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> mii info
+PHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> e2631net
+e2631net: lan1 switch port 2, stopped
+e2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0
+e2631net: RX queue counts 0 0 0 0 0 0 0 0
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> dhcp
+ethernet@92000000 Waiting for PHY auto negotiation to complete....... done
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> setenv ipaddr 192.168.1.50
+=> setenv netmask 255.255.255.0
+=> setenv serverip 192.168.1.191
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> ping 192.168.1.191
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+Using ethernet@92000000 device
+
+ARP Retry count exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+ping failed; host 192.168.1.191 is not alive
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 80000111                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 80000111                             ....
+=> tftp 0x43000000 e2-test.bin
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+Using ethernet@92000000 device
+TFTP from server 192.168.1.191; our IP address is 192.168.1.50
+Filename 'e2-test.bin'.
+Load address: 0x43000000
+Loading: *
+ARP Retry count exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> crc32 0x43000000 0x10000
+CRC32 for 43000000 ... 4300ffff ==> cabc8d5e
+=> e2631boot load
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+=> md.l 0x42000000 8
+42000000: 33333333 cccccccc 88888888 dddddddd  3333............
+42000010: ffffffff ffffffff ffffffff ffffffff  ................
+=> md.l 0x420020 8
+00420020: 00000000 00000000 00000000 00000000  ................
+00420030: 00000000 00000000 00000000 00000000  ................
+=> iminfo 0x420020
+
+## Checking Image at 00420020 ...
+Unknown image format!
+=> bootm 0x42000000
+Wrong Image Type for bootm command
+ERROR -91: can't get kernel image!
+=> bootm 0x420020
+Wrong Image Type for bootm command
+ERROR -91: can't get kernel image!
+=> printenv machid
+## Error: "machid" not defined
+=> bootm start 0x42000000
+Wrong Image Type for bootm command
+ERROR -91: can't get kernel image!
+=> 

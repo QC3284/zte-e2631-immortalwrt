@@ -1,0 +1,48 @@
+
+00480040: 00000000 00000000 00000000 00000000  ................
+00480050: 00000000 00000000 00000000 00000000  ................
+=> version
+U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mw 0x4c000000 0x5a5a5a5a 0x40
+=> md 0x4c000000 0x8
+4c000000: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+4c000010: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+=> e2631boot info
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+=> md 0x4c000000 0x8
+4c000000: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+4c000010: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+=> e2631refclk
+e2631refclk: before PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff
+e2631refclk: before CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800
+e2631refclk: running the vendor network reference-clock and SerDes sequence
+e2631refclk: after PLL0=0004176b PLL1=144fdf3b CTRL8=10061fff
+e2631refclk: after CRM2_10=00000100 CTRL4C=000381ff LSP1_04=0001381b CTRL0C=00517800
+e2631refclk: back at the prompt, nothing was booted
+=> md 0x4c000000 0x8
+4c000000: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+4c000010: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+=> e2631boot load
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+=> md 0x4c000000 0x8
+4c000000: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+4c000010: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+=> md 0x4c000020 0x8
+4c000020: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+4c000030: 5a5a5a5a 5a5a5a5a 5a5a5a5a 5a5a5a5a  ZZZZZZZZZZZZZZZZ
+=> md 0x42000000 0x8
+42000000: 33333333 cccccccc 88888888 dddddddd  3333............
+42000010: ffffffff ffffffff ffffffff ffffffff  ................
+=> md 0x420020 0x8
+00420020: 00000000 00000000 00000000 00000000  ................
+00420030: 00000000 00000000 00000000 00000000  ................
+=> 
