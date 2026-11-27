@@ -1,0 +1,99 @@
+From f47f27da680e78ba0c8fc84eeef08c861560b509 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 18:41:32 +0800
+Subject: [PATCH] board: zte: assert the staging, kernel-copy and DMA-arena
+ geometry
+
+The E2 failure analysis (evidence/e2-session-failure-analysis-20261122.md)
+proved that the staged uImage and the Ethernet DMA arena do not overlap:
+3,491,146 bytes staged at 0x42000000 end at 0x4235454A, 46.8 MiB below the
+arena at 0x45000000.  The card-era "0x4554xxxx" figure was a decimal/hex
+conversion error, not a real overlap.  The remaining value of the check is
+defensive: a much larger staged image could reach the arena in the future.
+
+Pin the layout at compile time instead of leaving it to comments:
+
+  - drivers/net/zx279128s_eth.c: the arena must start above the uImage
+    staging address (CONFIG_SYS_LOAD_ADDR) and end inside DRAM;
+  - board/zte/zxhn-e2631/e2631flash.c: the bounce buffer sits above the
+    staging address, at least 48 MiB of staging fits below the arena, and
+    the arena ends below the relocated U-Boot;
+  - board/zte/zxhn-e2631/e2631boot.c: the kernel copy window ends below the
+    staging address, so loading an image cannot overwrite the kernel that
+    was just extracted from a slot.
+
+No behaviour change; the memory map in uboot-port/README.md carries the
+same numbers.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631boot.c  |  2 ++
+ board/zte/zxhn-e2631/e2631flash.c |  6 ++++++
+ drivers/net/zx279128s_eth.c       | 12 ++++++++++++
+ 3 files changed, 20 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 59452855..4dfd39e2 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -86,6 +86,8 @@ static_assert(E2631_ATAGS_ADDR > CFG_SYS_SDRAM_BASE,
+ 	      "ATAGS buffer must start above the DRAM base");
+ static_assert(E2631_ATAGS_ADDR + E2631_ATAGS_MAX <= E2631_KERNEL_LOAD_ADDR,
+ 	      "ATAGS buffer must stay below the kernel load address");
++static_assert(E2631_KERNEL_LOAD_ADDR + E2631_KERNEL_MAX <= CONFIG_SYS_LOAD_ADDR,
++	      "the uImage staging area must start above the kernel copy window");
+ 
+ static const u8 e2631_inner_magic[16] = {
+ 	0x33, 0x33, 0x33, 0x33, 0x66, 0x66, 0x66, 0x66,
+diff --git a/board/zte/zxhn-e2631/e2631flash.c b/board/zte/zxhn-e2631/e2631flash.c
+index bb19d287..9fbe6144 100644
+--- a/board/zte/zxhn-e2631/e2631flash.c
++++ b/board/zte/zxhn-e2631/e2631flash.c
+@@ -76,8 +76,14 @@
+ #define E2631_NET_ARENA_ADDR	0x45000000UL
+ #define E2631_NET_ARENA_LEN	0x1000000UL
+ 
++static_assert(E2631_BOUNCE_ADDR > CONFIG_SYS_LOAD_ADDR,
++	      "the e2631flash bounce buffer must stay above the uImage staging area");
+ static_assert(E2631_BOUNCE_ADDR + E2631_BOUNCE_MAX <= E2631_NET_ARENA_ADDR,
+ 	      "the e2631flash bounce buffer must stay below the network DMA arena");
++static_assert(E2631_NET_ARENA_ADDR > CONFIG_SYS_LOAD_ADDR,
++	      "the network DMA arena must start above the uImage staging address");
++static_assert(E2631_NET_ARENA_ADDR - CONFIG_SYS_LOAD_ADDR >= 0x3000000UL,
++	      "at least 48 MiB of uImage staging must fit below the network DMA arena");
+ static_assert(E2631_NET_ARENA_ADDR + E2631_NET_ARENA_LEN <= E2631_RAM_LIMIT,
+ 	      "the network DMA arena must end below the relocated U-Boot");
+ 
+diff --git a/drivers/net/zx279128s_eth.c b/drivers/net/zx279128s_eth.c
+index ca88f8c9..0385d6a7 100644
+--- a/drivers/net/zx279128s_eth.c
++++ b/drivers/net/zx279128s_eth.c
+@@ -21,6 +21,7 @@
+ #include <command.h>
+ #include <dm.h>
+ #include <dm/device_compat.h>
++#include <linux/build_bug.h>
+ #include <linux/bitfield.h>
+ #include <linux/bitops.h>
+ #include <linux/byteorder/generic.h>
+@@ -36,6 +37,17 @@
+ 
+ #include "zx279128s_eth.h"
+ 
++/*
++ * Geometry guard for the fixed DMA arena.  A staged image (tftp writes to
++ * CONFIG_SYS_LOAD_ADDR) must never reach the arena the traffic manager
++ * writes to, and the arena must stay inside DRAM.  The kernel keeps the same
++ * regions apart by allocating the arena at probe; here they are constants.
++ */
++static_assert(ZX_DMA_ARENA_ADDR > CONFIG_SYS_LOAD_ADDR,
++	      "the network DMA arena must start above the uImage staging address");
++static_assert(ZX_DMA_ARENA_ADDR + ZX_DMA_ARENA_SIZE <= 0x50000000UL,
++	      "the network DMA arena must end below the top of DRAM");
++
+ #define ZX_TM_POLL_US		1
+ #define ZX_TM_TIMEOUT_US	1000
+ #define ZX_BMU_TIMEOUT_US	1000
+-- 
+2.56.1
+

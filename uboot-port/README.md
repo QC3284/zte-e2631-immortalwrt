@@ -99,7 +99,11 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0021 sha256 | `c66643e1eca8c5cc2313e0136636b0ea22822f38f7207236b41786ba93ab7976` |
 | patch 0022 | `uboot-port/patches/0022-doc-add-the-e2631net-usage-page.patch`（`doc/usage/cmd/e2631net.rst`：`e2631net` 用法页） |
 | patch 0022 sha256 | `680435c34a4b6ca5154debb0ace1caea7fd7000641e5e572c6477f22b6959b72` |
-| am 之后 tree | `c812dd8689ccf146deeec83bd0e74067c8b8abc5`（与机器无关，22 个 patch） |
+| patch 0023 | `uboot-port/patches/0023-drivers-net-report-TX-failures-and-keep-timed-out-BMU-buffers.patch`（F2-a：send 失败不再静默——打印原因、所需 buffer 数、BMU 状态；移植内核 pending-retry，超时请求留给下一次收取） |
+| patch 0023 sha256 | `e38d0545d0463101e19a26760a29fc7ebbc6b8b5782cce836ffc9d5e725c87d3` |
+| patch 0024 | `uboot-port/patches/0024-board-zte-assert-the-staging-kernel-copy-and-DMA-arena-geometry.patch`（防御性 geometry：staging / kernel copy / DMA arena 的编译期断言） |
+| patch 0024 sha256 | `8bf4e048b1726c795b04ebb92ec361e7a91814fded24f83b3e1432a88b0f79e1` |
+| am 之后 tree | `721bb82538df42dca98fd633b98faa0582256850`（与机器无关，24 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -325,6 +329,26 @@ defconfig 打开 `CMD_DHCP/CMD_MII/CMD_PING/NET_RANDOM_ETHADDR/ETH_ZX279128S/MDI
 | 自更新命令 | `e2631flash` / `e2631verify` / `e2631slot`（0014） | `e2631flash` 块对齐擦除 → 全 0xFF 校验 → 写入 → 读回逐字节比较，打印 PASS/FAIL、首个不一致偏移与 staged payload/readback CRC32；`<src>` ≥0x40000000 为 RAM 地址、<0x10000000 为 NAND 字节偏移（先读入 `0x44000000` 的 1 MiB bounce buffer，flash→flash 更新不边擦边读目标）；拒绝未对齐/越界、secondboot 0x00000..0x20000、env 0xC0000..0xE0000 与长度 >1 MiB；擦除前打印 DO NOT POWER OFF。`e2631verify` 只读 CRC32；`e2631slot` 复用 `e2631boot` 的扫描函数 |
 | 原始 mtd 写入口 | `CONFIG_CMD_MTD_WRITE`（0015） | 上游 `CONFIG_CMD_MTD` 自带 `mtd write/erase` 子命令；新增 `CONFIG_CMD_MTD_WRITE`（bool，默认 y）把它们编到开关后，本 defconfig 关闭，使 `e2631flash` 成为镜像中唯一调用 `mtd_write()`/`mtd_erase()` 的代码（CI 用调用点白名单证明） |
 
+### 内存图（staging / kernel copy / DMA arena）
+
+E2 失败分析（[evidence/e2-session-failure-analysis-20261122.md](../evidence/e2-session-failure-analysis-20261122.md) §4）
+用实测值核对了这三个区间；**它们互不重叠**，Lead 卡上早期的 `0x4554xxxx` 是十进制/十六进制换算错误：
+3,491,146 B = `0x35454A`，从 `0x42000000` 起算止于 `0x4235454A`，不是 `0x4554xxxx`。
+
+| 区域 | 地址范围 | 大小 / 说明 |
+| --- | --- | --- |
+| DRAM | `0x40000000..0x4FFFFFFF` | 256 MiB，secondboot 已初始化 |
+| ATAGS | `0x40000100..0x400001FF` | `E2631_ATAGS_ADDR`，`CFG_SYS_SDRAM_BASE+0x100`；0008 起 `board_late_init()` 设置 `bi_boot_params` |
+| kernel copy | `0x40008000..0x403FFFFF`（最大） | `E2631_KERNEL_LOAD_ADDR`，uImage data 拷入处；`E2631_KERNEL_MAX = 0x400000-0x20`，所以最大止于 `0x403FFFE0` |
+| uImage staging | `0x42000000..` | `CONFIG_SYS_LOAD_ADDR`（tftp/loadx 的目标）。E2 会话实测 3,491,146 B → 止于 `0x4235454A`，距 arena 还有 46.8 MiB；只有 staged 数据超过 48 MiB（`0x45000000-0x42000000`）才会碰到 arena |
+| e2631flash bounce | `0x44000000..0x440FFFFF` | 1 MiB；flash→flash 更新时先读入，避免边擦边读 |
+| net DMA arena | `0x45000000..0x45FFFFFF` | 16 MiB，BMU 缓冲池 + TM 表 + RX/TX 环；网络启动后硬件会写入 |
+| relocated U-Boot | DRAM 顶部（`< 0x50000000`） | 重定位目标；`e2631flash` 只允许 `0x40000000..0x4EFFFFFF` 作为 RAM 源 |
+
+0024 把这张图写成编译期断言：arena 必须高于 staging 且低于 DRAM 顶、bounce 高于 staging、
+staging 到 arena 之间至少留 48 MiB、kernel copy 窗口必须止于 staging 之下。
+这些断言防的是**将来**把地址改坏或 staged 镜像变大；它们不是 E2 失败的修复项。
+
 ### 启动流程（A1）
 
 1. BootROM 读 secondboot；secondboot 初始化 DDR/时钟/串口/SPI-NAND，停 CPU1，然后加载厂商 U-Boot。
@@ -429,6 +453,13 @@ make O=build -j"$(nproc)"
     固定为 `U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)`；同一 head 连续两次 dispatch 的
     `u-boot.bin`/mtd0/`.config`/`u-boot.map` 逐字节相同，证据见
     [evidence/uboot-reproducible-build-20261122.md](../evidence/uboot-reproducible-build-20261122.md)。
+
+16. F2-a + geometry（task-69 items 1/2，patch 0023/0024）：源码形状——`drivers/net/zx279128s_eth.c` 含
+    `bmu_alloc_pending`（pending-retry 状态）、send 失败打印 `1 buffer required`（附原因 / BMU 状态 / 计数），
+    `e2631net` 打印 BMU alloc 的 failed/late/pending 计数；三处 geometry 断言（driver、`e2631flash.c`、
+    `e2631boot.c`）必须存在。二进制必须含 `TX buffer allocation failed`。真机签名（后续会话记录）：
+    `dhcp` 失败若由 BMU 分配引起，串口出现该行与 BUF_ALLOC/BUF_ID/FREE_STATUS，`e2631net` 的计数可以区分
+    “从未发出”和“发出但没回”；`0x4554xxxx` 的旧说法已按实测更正为 `0x4235454A`（见 §3 内存图）。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -772,4 +803,11 @@ U-Boot 网络栈。
   `18255c2cbe6b50a178e9531895e50820025f8840522276a6aafbe22f86589ce3`，crc32 `e70fb953`）、`.config`、
   `u-boot.map`、命令帮助与 env 块（`6eee153b…`）逐字节相同，`cmp` 全部 IDENTICAL；证据见
   [evidence/uboot-reproducible-build-20261122.md](../evidence/uboot-reproducible-build-20261122.md)。真机会话改用
-  这件可复现产物（取代 run `44983615483`）。
+  这件可复现产物（取代 run `44983615483`）。- 2026-11-27（task-69 items 1/2，E2 F2-a + geometry，patch 0023/0024）：0023 让 `eth_send` 不再静默——
+  BMU 分配失败打印原因、所需 buffer 数（1）与 BMU 状态，并移植内核 `zx_bmu_alloc_bp()`
+  （`zx279128s-main.c:43-83`）的 pending-retry：超时请求保持 pending，下一次调用先收迟到 buffer，不再丢帧；
+  `e2631net` 增打印 failed/late/pending 与 BUF_ALLOC/BUF_ID。0024 为防御性 geometry 断言
+  （staging `0x42000000` / kernel copy `0x40008000` / arena `0x45000000`），并在 §3 内存图纠正卡片时代的
+  `0x4554xxxx` 换算错误（3,491,146 B 止于 `0x4235454A`）。重钉结果 tree
+  `721bb82538df42dca98fd633b98faa0582256850`（24 个 patch；0023 sha256 `e38d0545…`、0024 sha256
+  `8bf4e048…`）。CI 与 artifact 值见 [evidence/uboot-e2-fix-20261127.md](../evidence/uboot-e2-fix-20261127.md)。

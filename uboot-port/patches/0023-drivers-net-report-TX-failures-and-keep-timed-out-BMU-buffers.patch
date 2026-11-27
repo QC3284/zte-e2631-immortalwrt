@@ -1,0 +1,204 @@
+From d83611d43d41c9ddd56ec191756a283e358f776a Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 18:41:10 +0800
+Subject: [PATCH] drivers/net: report TX failures and keep timed-out BMU
+ buffers
+
+The E2 session showed a BOOTP broadcast in the log while the host saw no
+frame at all, and send() could fail without a word: a BMU allocation that
+timed out returned -ENOSPC silently, and the timed-out request was then
+replaced by a new one, losing the buffer the BMU eventually produced.
+
+Both defects are fixed here, following the kernel driver semantics:
+
+  - Port the pending-retry logic of zx_bmu_alloc_bp() from
+    target/linux/zx279128/files/drivers/net/ethernet/zte/
+    zx279128s-main.c:43-83.  A request that does not complete keeps the
+    pending flag; the next call waits for it, collects the late buffer and
+    counts it, instead of starting a fresh request.  The kernel can return
+    -EBUSY at once because its stack retries, but U-Boot sends
+    synchronously and drops a frame whose send() fails, so the wait is
+    bounded by the same BMU timeout and the frame is only dropped when the
+    BMU really has produced nothing.
+
+  - Never fail silently.  send() now prints the reason, the buffer count
+    the frame needed (one) and the BMU state (BUF_ALLOC, BUF_ID,
+    FREE_STATUS, failed/late counters).  e2631net prints the same counters,
+    so the next DHCP attempt can be classified from the console alone.
+
+The register writes of the send path and of the BMU protocol are unchanged;
+this only adds the missing wait, bookkeeping and reporting.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ drivers/net/zx279128s_eth.c | 120 +++++++++++++++++++++++++++---------
+ 1 file changed, 91 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/net/zx279128s_eth.c b/drivers/net/zx279128s_eth.c
+index e27f6df2..ca88f8c9 100644
+--- a/drivers/net/zx279128s_eth.c
++++ b/drivers/net/zx279128s_eth.c
+@@ -381,31 +381,77 @@ static int zx_hw_init(void __iomem *base, const u8 *mac)
+ 
+ /* ---- Packet path ------------------------------------------------------ */
+ 
++struct zx279128s_eth_priv {
++	void __iomem *base;
++	u8 *arena;
++	int switch_port;
++	struct phy_device *phydev;
++	u16 tx_idx;
++	u32 rx_idx[ZX_RX_QUEUES];
++	u32 rx_bp;
++	u32 rx_class;
++	u32 rx_queue;
++	bool hw_ready;
++	bool bmu_alloc_pending;
++	u32 bmu_alloc_late;
++	u32 bmu_alloc_fail;
++};
++
++static struct zx279128s_eth_priv *zx_debug_priv;
++
+ /*
+- * The buffer management unit hands out 2048-byte buffers by index.  A
+- * request that does not complete in time is left pending, exactly as the
+- * vendor driver does; U-Boot only sends a handful of frames, so a timeout
+- * is reported to the caller and the request is retried on the next frame.
++ * The buffer management unit hands out 2048-byte buffers by index.  This is
++ * a port of the kernel driver's pending-retry semantics
++ * (target/linux/zx279128/files/drivers/net/ethernet/zte/zx279128s-main.c:
++ * zx_bmu_alloc_bp): a request that does not complete in time stays with the
++ * BMU, which hands out its buffer later.  Keep it pending and collect that
++ * buffer on the next call; starting a new request instead lost the pending
++ * buffer for good.  U-Boot has no concurrent senders, so no lock is needed.
++ *
++ * The kernel returns -EBUSY immediately when an earlier request is still
++ * outstanding, because its network stack retries.  U-Boot sends frames
++ * synchronously and the callers drop a frame whose send() fails, so wait
++ * for the outstanding request within the same timeout here: a frame is only
++ * dropped when the BMU really has not produced a buffer by then.
+  */
+-static int zx_bmu_alloc_bp(void __iomem *base)
++static int zx_bmu_alloc_bp(struct zx279128s_eth_priv *priv)
+ {
++	void __iomem *base = priv->base;
+ 	u32 val;
+ 	int ret;
+ 
++	if (priv->bmu_alloc_pending) {
++		ret = readl_poll_sleep_timeout(base + ZX_BMU_BUF_ALLOC, val,
++					       !(val & ZX_BMU_BUF_ALLOC_REQ),
++					       ZX_TM_POLL_US, ZX_BMU_TIMEOUT_US);
++		if (ret) {
++			priv->bmu_alloc_fail++;
++			return -ETIMEDOUT;
++		}
++		priv->bmu_alloc_pending = false;
++		val = readl(base + ZX_BMU_BUF_ID);
++		if (val & ZX_BMU_BUF_ID_VALID) {
++			priv->bmu_alloc_late++;
++			return FIELD_GET(ZX_BMU_BUF_ID_BP, val);
++		}
++	}
++
+ 	val = readl(base + ZX_BMU_BUF_ALLOC);
+ 	writel(val | ZX_BMU_BUF_ALLOC_REQ, base + ZX_BMU_BUF_ALLOC);
+ 
+ 	ret = readl_poll_sleep_timeout(base + ZX_BMU_BUF_ALLOC, val,
+ 				       !(val & ZX_BMU_BUF_ALLOC_BUSY),
+ 				       ZX_TM_POLL_US, ZX_BMU_TIMEOUT_US);
+-	if (ret)
+-		return -ETIMEDOUT;
+-
+-	val = readl(base + ZX_BMU_BUF_ID);
+-	if (!(val & ZX_BMU_BUF_ID_VALID))
+-		return -ENOSPC;
++	if (!ret) {
++		val = readl(base + ZX_BMU_BUF_ID);
++		if (val & ZX_BMU_BUF_ID_VALID)
++			return FIELD_GET(ZX_BMU_BUF_ID_BP, val);
++		ret = -ENOSPC;
++	}
+ 
+-	return FIELD_GET(ZX_BMU_BUF_ID_BP, val);
++	priv->bmu_alloc_pending = true;
++	priv->bmu_alloc_fail++;
++	return ret;
+ }
+ 
+ static int zx_bmu_free_bp(void __iomem *base, u16 bp)
+@@ -444,20 +490,18 @@ static int zx_rx_release(void __iomem *base, int queue, int class)
+ 	return 0;
+ }
+ 
+-struct zx279128s_eth_priv {
+-	void __iomem *base;
+-	u8 *arena;
+-	int switch_port;
+-	struct phy_device *phydev;
+-	u16 tx_idx;
+-	u32 rx_idx[ZX_RX_QUEUES];
+-	u32 rx_bp;
+-	u32 rx_class;
+-	u32 rx_queue;
+-	bool hw_ready;
+-};
+-
+-static struct zx279128s_eth_priv *zx_debug_priv;
++/* One reason string per BMU allocation failure, for the honest send error. */
++static const char *zx_bmu_alloc_reason(int err)
++{
++	switch (err) {
++	case -ETIMEDOUT:
++		return "the BMU did not complete the request in time";
++	case -ENOSPC:
++		return "the BMU returned no valid buffer id";
++	default:
++		return "unknown BMU allocation error";
++	}
++}
+ 
+ /* The frame is sent from the fixed arena; caches are off, so no flush. */
+ static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
+@@ -473,9 +517,22 @@ static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
+ 	if (len > 1536)
+ 		return -EINVAL;
+ 
+-	bp = zx_bmu_alloc_bp(priv->base);
+-	if (bp < 0)
+-		return -ENOSPC;
++	bp = zx_bmu_alloc_bp(priv);
++	if (bp < 0) {
++		/*
++		 * Never drop a frame silently: say why it could not be sent,
++		 * how many buffers the send needed and what the BMU looked
++		 * like at that moment.  The counters make the next DHCP
++		 * attempt distinguishable from a link/IP problem.
++		 */
++		printf("zx279128s: TX buffer allocation failed: %s (1 buffer required, %d-byte frame; %u failed, %u late; BUF_ALLOC=0x%08x BUF_ID=0x%08x FREE_STATUS=0x%08x)\n",
++		       zx_bmu_alloc_reason(bp), length,
++		       priv->bmu_alloc_fail, priv->bmu_alloc_late,
++		       readl(priv->base + ZX_BMU_BUF_ALLOC),
++		       readl(priv->base + ZX_BMU_BUF_ID),
++		       readl(priv->base + ZX_BMU_FREE_STATUS));
++		return bp;
++	}
+ 
+ 	buf = priv->arena + bp * ZX_BUF_SIZE + 16;
+ 	memset(buf, 0, len);
+@@ -746,6 +803,11 @@ static int do_e2631net(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	       mac_ctrl, readl(priv->base + ZX_TM_INT_STATUS),
+ 	       readl(priv->base + ZX_BMU_FREE_STATUS),
+ 	       readl(priv->base + ZX_DMA_TX_DONE) & 0xffff);
++	printf("e2631net: BMU alloc %u failed, %u late, pending %d; BUF_ALLOC 0x%08x, BUF_ID 0x%08x\n",
++	       priv->bmu_alloc_fail, priv->bmu_alloc_late,
++	       priv->bmu_alloc_pending,
++	       readl(priv->base + ZX_BMU_BUF_ALLOC),
++	       readl(priv->base + ZX_BMU_BUF_ID));
+ 
+ 	printf("e2631net: RX queue counts");
+ 	for (i = 0; i < ZX_RX_QUEUES; i++)
+-- 
+2.56.1
+

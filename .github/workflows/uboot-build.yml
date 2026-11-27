@@ -367,6 +367,33 @@ jobs:
             exit 1
           fi
           echo "E2 Ethernet: driver, arena guard and device tree present"
+          # F2-a fix (task-69 item 1): the send path must never fail silently
+          # and a timed-out BMU request must stay pending for the next call.
+          if ! grep -q 'bmu_alloc_pending' drivers/net/zx279128s_eth.c; then
+            echo "::error::the BMU pending-retry state is missing from the Ethernet driver"
+            exit 1
+          fi
+          if ! grep -q '1 buffer required' drivers/net/zx279128s_eth.c; then
+            echo "::error::the Ethernet send path does not report the required buffer count"
+            exit 1
+          fi
+          if ! grep -aq 'TX buffer allocation failed' build/u-boot.bin; then
+            echo "::error::u-boot.bin is missing the honest TX-failure log string"
+            exit 1
+          fi
+          # Item 2: the staging / kernel-copy / arena geometry is asserted at
+          # compile time, so a later address change cannot silently make a
+          # staged image overlap the traffic manager arena.
+          for shape_marker in \
+            'the network DMA arena must start above the uImage staging address' \
+            'the uImage staging area must start above the kernel copy window' \
+            'at least 48 MiB of uImage staging must fit below the network DMA arena'; do
+            if ! grep -rqs "$shape_marker" drivers/net board/zte/zxhn-e2631; then
+              echo "::error::missing geometry assertion: $shape_marker"
+              exit 1
+            fi
+          done
+          echo "E2 fix: BMU pending retry, honest TX error and geometry asserts present"
           # Multifunction U-Boot space budget: the mtd0 payload window is
           # 0x20800..0xBFFFF (0x9F800 = 653312 bytes). Keep an 8 KiB safety
           # margin for the next patches, so the build fails above 645120 bytes
@@ -586,6 +613,41 @@ jobs:
           if (payloadEnd > 0xA0000) throw new Error('payload end 0x' + payloadEnd.toString(16) + ' crosses the env at mtd0 0xC0000');
           console.log('mtd0 image: 0xa0000 bytes, vendor header + ' + payload.length + ' payload bytes (payload end 0x' + payloadEnd.toString(16) + '), erased tail, env @0xC0000 untouched');
           NODE
+      - name: Report the per-object .text size table
+        # The pinned U-Boot baseline has no 'make sizes' target (checked in the
+        # pinned Makefile and upstream master), so this computes the same
+        # authoritative per-object report from the build objects:
+        # arm-none-eabi-size over every .o plus the linked-image total, sorted
+        # by .text descending. UBOOT-SIZES.txt ships in the artifact and is
+        # covered by SHA256SUMS; the E4 features (DHCP server, web UI) are
+        # sized against this table, not against the map.
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          mkdir -p artifacts
+          {
+            echo "# E2631 U-Boot per-object .text sizes"
+            echo "# tree $E2631_UBOOT_TREE_SHA; toolchain $(arm-none-eabi-gcc --version | head -1)"
+            echo "# columns: text data bss filename (arm-none-eabi-size, sorted by text desc)"
+            echo "# linked image total:"
+            arm-none-eabi-size build/u-boot | sed 's/^/# /'
+            echo "# objects:"
+            find build -type f -name '*.o' -print0 \
+              | xargs -0 -r arm-none-eabi-size 2>/dev/null \
+              | awk '$1 ~ /^[0-9]+$/ { printf "%8d %8d %8d %s\n", $1, $2, $3, $6 }' \
+              | sort -k1,1nr -k4,4 || true
+          } > artifacts/UBOOT-SIZES.txt
+          test -s artifacts/UBOOT-SIZES.txt || {
+            echo "::error::UBOOT-SIZES.txt is empty"
+            exit 1
+          }
+          rows=$(grep -c '^ *[0-9]' artifacts/UBOOT-SIZES.txt || true)
+          if [ "$rows" -lt 100 ]; then
+            echo "::error::UBOOT-SIZES.txt has only $rows object rows (expected the full build)"
+            exit 1
+          fi
+          echo "UBOOT-SIZES.txt: $rows object rows, sorted by .text"
+          head -12 artifacts/UBOOT-SIZES.txt
       - name: Stage the artifact and record provenance
         run: |
           set -euo pipefail
@@ -682,7 +744,7 @@ jobs:
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
-          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin E2631-COMMAND-HELP.txt > SHA256SUMS)
+          (cd artifacts && sha256sum u-boot.bin u-boot.map .config UBOOT-INFO.txt e2631-uboot-mtd0.bin e2631-env-block.bin E2631-COMMAND-HELP.txt UBOOT-SIZES.txt > SHA256SUMS)
           cat artifacts/SHA256SUMS
           {
             echo "### E2631 A1/A2/A3 U-Boot build"
@@ -694,6 +756,7 @@ jobs:
             echo "- banner: $banner"
             echo "- crc32: u-boot.bin $payload_crc, mtd0 image $mtd0_crc"
             echo "- command help: E2631-COMMAND-HELP.txt (static dump of the new commands)"
+            echo "- sizes: UBOOT-SIZES.txt (per-object .text, sorted descending; see the artifact)"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
             echo "- payload footprint: u-boot.bin $size / hard cap $payload_max bytes (headroom $headroom bytes, $headroom_pct%); CI gate $gate bytes; mtd0 image $mtd0_size bytes"
