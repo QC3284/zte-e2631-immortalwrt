@@ -63,6 +63,7 @@
 | [../evidence/e4-bl-mt798x-dhcpd-study-20261127.md](../evidence/e4-bl-mt798x-dhcpd-study-20261127.md) | E4-研1（task-70）：bl-mt798x-dhcpd 移植评估——上游实为 Yuzhii0718 仓（981213 仓不存在）、核心 TCP/HTTP/DHCP 可搬但高级模块绑定 MTK MMC/UBI 胶水须重写、逐文件尺寸与 gzip 资产 70,858 B、密度校准 0.15–0.30、A/B/C 预算（16–34 / 22–44 / 85–137 KB vs 基线 159,104 B + 捐献 289,800 B）、刷写/RAM 缓冲 0x46000000/五步校验、F2 真机复测门槛 |
 | [../evidence/e2b-session-20261127.md](../evidence/e2b-session-20261127.md) | task-67 rev3 / E2-B 真机会话：22-patch RAM 链 U-Boot 的以太网与 bootm 复核——F2 在 42 次 BOOTP broadcast 期间物理线 0 帧（决定性；主机 tcpdump 66 帧内 U-Boot MAC 0 帧、dnsmasq 无 DHCP 事务）、BMU 三寄存器只有 FREE_STATUS 变化；F1 本产物签名为 `Wrong Image Type`（e2631boot load 自校验 header/data CRC 通过，但 0x420020 对 md/bootm 不可见；与 2026-11-22 静默返回不同）；另记录 md vs crc32 可见性观察（待复现，不作解释）；零 mtd0 写入（51 条 U-Boot 命令审计，唯一写入为 userdata staging） |
 | [../evidence/e2b-session/](../evidence/e2b-session/) | task-67 会话附件：session-results、驱动/串口原始字节、tcpdump、dnsmasq/http、f1diag 与 5 轮只读探针结果、产物构建清单、sha256 清单 |
+| [../evidence/e4-rescue-acceptance-plan-20261127.md](../evidence/e4-rescue-acceptance-plan-20261127.md) | E4-验1（task-75）：救援模式验收方案 + 无浏览器脚本——零净载荷钉死为当前镜像区 sha256 b1ea9a48…（整 mtd0 f9239040…），Phase 1 userdata 暂存 + mtd read + go 的 RAM 链、S0–S9 步骤、拒绝矩阵（size±1/坏 magic/长度/ padding/banner/摘要不符/payload-flip）、X-E2631-SHA256 传输完整性 vs --expected-sha 权威性、默认 validate-only + 双开关写入、mock 自测 37/50 PASS |
 
 | 文件 | 内容 |
 |---|---|
