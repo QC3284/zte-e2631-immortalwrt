@@ -58,6 +58,8 @@
 | [../evidence/uboot-reproducible-build-20261122.md](../evidence/uboot-reproducible-build-20261122.md) | U-Boot 可复现构建（task-69 item d）：workflow 加 `git am --committer-date-is-author-date` + 固定 `SOURCE_DATE_EPOCH=1795103079`（pinned base committer 时间），banner 固定为 `U-Boot 2027.01-rc2-gf355ce89283c (Nov 19 2026 - 15:44:39 +0000)`；连续两次 dispatch（run 44991454540 / 44991704112，同 head be1e405）的 u-boot.bin（sha256 3cf00029…、494,208 B）、mtd0（sha256 18255c2c…）、.config、u-boot.map、命令帮助与 env 块逐字节相同；无代码/history 改动，tree 仍 c812dd86… |
 | [../evidence/uboot-e2-fix-20261127.md](../evidence/uboot-e2-fix-20261127.md) | E2 修复（task-69 items 1/2）：patch 0023 让 eth_send 不再静默（打印 BMU 原因/所需 buffer 数/状态）并移植内核 pending-retry（超时请求保持 pending，下一次收迟到 buffer）；patch 0024 加 staging/kernel-copy/arena 编译期断言并把 0x4554xxxx 换算错误更正为 0x4235454A；24 patches tree 721bb82…，CI run 45985501668 GREEN（banner gcbcaeea0d172、u-boot.bin sha256 15bfa0c1…、mtd0 sha256 c45baf4f…、env 块未变、checkpatch 0E/0W） |
 
+| [E4-多功能U-Boot设计-2026-11-27.md](E4-多功能U-Boot设计-2026-11-27.md) | E4 设计稿：MUST/SHOULD/WON'T 需求、A/B/C 方案对照（逐条回答 MUST、假定预算）、v1 最小救援规格（串口 `e2631rescue`→DHCP+单页 HTTP→e2631flash 五步→重启）、刷写路径/掉电回滚、行为合同与可执行验收、F2/E3 依赖 |
+| [../evidence/e4-bl-mt798x-dhcpd-study-20261127.md](../evidence/e4-bl-mt798x-dhcpd-study-20261127.md) | E4-研1（task-70）：bl-mt798x-dhcpd 移植评估——上游实为 Yuzhii0718 仓（981213 仓不存在）、核心 TCP/HTTP/DHCP 可搬但高级模块绑定 MTK MMC/UBI 胶水须重写、逐文件尺寸与 gzip 资产 70,858 B、密度校准 0.15–0.30、A/B/C 预算（16–34 / 22–44 / 85–137 KB vs 基线 159,104 B + 捐献 289,800 B）、刷写/RAM 缓冲 0x46000000/五步校验、F2 真机复测门槛 |
 
 | 文件 | 内容 |
 |---|---|
