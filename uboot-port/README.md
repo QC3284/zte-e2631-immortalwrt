@@ -471,6 +471,8 @@ make O=build -j"$(nproc)"
     MMC/BLK/EFI/BOOTSTD/FAT 栈，并保留 `CMD_BOOTM`/`CMD_MTD`/`CMD_DHCP`/`CMD_TFTPBOOT`/`CMD_MII`/`CMD_PING`/
     `OF_LIBFDT`/`LMB`；`e2631boot`/`e2631flash`/`e2631env`/网络驱动与 MTD 写白名单不变。真机签名：串口命令表
     里不再有上述命令，`bootm` 与全部 `e2631*` 命令仍在。
+    实测（run 45988430055）：`u-boot.bin` 494,880 → 320,848 B（**-174,032 B，-35.17%**），距 CI 门禁余量
+    324,272 B；56 个 `=y` 符号消失、0 新增。
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
 前置：串口线接 UART0（115200 8N1），进入厂商 U-Boot 控制台（控制台密码见救砖手册）。
@@ -830,5 +832,11 @@ U-Boot 网络栈。
   EFI loader、标准启动（BOOTSTD）、FAT、块缓存及其 helper 库（event/SMBIOS/SHA1/UUID 等）全部消失——`.config`
   少 56 个 `=y` 符号、0 个新增；控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm`、`e2631boot`、
   `e2631flash`、`e2631env`、网络驱动与 MTD 写白名单不变。重钉后 tree `ac98701595404b43ecd48ea43d6ff7f3cf7676fb`
-  （25 个 patch；0025 sha256 `af158e9f…`）。CI 与尺寸结果见 evidence 与下方 run 记录。
+  （25 个 patch；0025 sha256 `af158e9f…`）。CI uboot-build run `45988430055`（head `98592c2`）SUCCESS：
+  `u-boot.bin` 320,848 B（比 24-patch 的 494,880 B 少 174,032 B，-35.17%）sha256
+  `339289583f80bd60b7214fa65ad9a4b5a3ca68eb37d95bd1bad65215265ee2fa` crc32 `92257c50`、banner
+  `U-Boot 2027.01-rc2-ge6678e875e60`、mtd0 镜像 sha256
+  `99886ea0966877fa4978faad2b52df58ceb698ad627a049763957ddbb92bfe51` crc32 `13051599`、env 块
+  `6eee153b…` 未变、checkpatch 0 errors / 0 warnings；证据见
+  [evidence/uboot-defconfig-slim-20261127.md](../evidence/uboot-defconfig-slim-20261127.md)。
 
