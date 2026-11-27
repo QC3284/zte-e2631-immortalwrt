@@ -1,0 +1,774 @@
+{
+ "mode": "e4-rescue-write-acceptance",
+ "started": "2026-11-28T01:40:22+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/u-boot.bin",
+  "size": 365872,
+  "size_hex": "0x59530",
+  "sha256": "3dbbfc49e7fa580fe5327f9b0f11cddc0fe0d0f92e5a9fde9c37a7efdf133bb6",
+  "crc32": "0x34b252a4",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-g30dca5f54503",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/e2-stage-3dbbfc49.bin",
+  "size": 524288,
+  "sha256": "3ed8250bde6c6def65ced4e5b3323c5986dddc19f1f9888e6731d91a11f748ae",
+  "payload_crc32": "0x34b252a4",
+  "payload_size": 365872
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "output": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00000 0x59530",
+   "output": "crc32 0x47f00000 0x59530\r\nCRC32 for 47f00000 ... 47f5952f ==> 34b252a4\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x44000000 0xc0000 0x20000",
+   "output": "mtd read spi-nand0 0x44000000 0xc0000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x000c0000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x44000000 4",
+   "output": "md 0x44000000 4\r\n44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x44000000 0x20000",
+   "output": "crc32 0x44000000 0x20000\r\ncrc32 for 44000000 ... 4401ffff ==> e826c394\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "printenv",
+   "output": "printenv\r\nbaudrate=115200\r\nbootcmd=e2631boot\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\ne2631_flashboot=reset\r\ne2631_netboot=tftp 0x42000000 e2631-netboot.uImage\r\ne2631_pocgo=go 0x43000000\r\ne2631_pocload=tftp 0x43000000 u-boot.bin\r\nethact=eth0\r\nethaddr=00:41:71:00:00:50\r\nfdtcontroladdr=4fff2ad0\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial@94404000\r\nstdin=serial@94404000\r\nstdout=serial@94404000\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 646/131068 bytes\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "help e2631rescue",
+   "output": "help e2631rescue\r\ne2631rescue - serve the web bootloader rescue on lan1\r\n\r\nUsage:\r\ne2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is\r\n              written until a validated image is uploaded and the\r\n              X-E2631-Confirm: write header is present. Ctrl-C leaves.\r\n\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631rescue"
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x46000000 0x20000 0xa0000",
+   "output": "mtd read spi-nand0 0x46000000 0x20000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x46000000 0xa0000",
+   "output": "crc32 0x46000000 0xa0000\r\ncrc32 for 46000000 ... 4609ffff ==> 79ef8c50\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47000000 0xc0000 0x20000",
+   "output": "mtd read spi-nand0 0x47000000 0xc0000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x000c0000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x47000000 1",
+   "output": "md 0x47000000 1\r\n47000000: f95a816e                             n.Z.\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47000000 0x20000",
+   "output": "crc32 0x47000000 0x20000\r\ncrc32 for 47000000 ... 4701ffff ==> e826c394\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x48000000 0x0 0x20000",
+   "output": "mtd read spi-nand0 0x48000000 0x0 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x48000000 0x20000",
+   "output": "crc32 0x48000000 0x20000\r\ncrc32 for 48000000 ... 4801ffff ==> 9848a667\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631rescue"
+  }
+ ],
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true,
+  "size_ok": true
+ },
+ "reconstruct": {
+  "base": {
+   "path": "/home/qc233/zte/e2631-p3/b1-env-session/resume-1/target-mtd0.bin",
+   "size": 1048576,
+   "sha256": "887a7f6c9b407abc734eb9a76f08733a691441f91987369e8626deb8faf0fa9f",
+   "crc32": "0x5592f6cb"
+  },
+  "netzero": {
+   "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/run-2/netzero-mtd0-image.bin",
+   "size": 655360,
+   "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+   "crc32": "0x0721e716"
+  },
+  "e4": {
+   "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/e2631-uboot-mtd0.bin",
+   "size": 655360,
+   "sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+   "crc32": "0x79ef8c50"
+  },
+  "cur_sha256": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "cur_ok": true,
+  "want_sha256": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338",
+  "want_ok": true,
+  "secondboot_crc": "0x9848a667",
+  "env_region_crc": "0xe826c394",
+  "env_block_sha": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893"
+ },
+ "netzero": {
+  "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/run-2/netzero-mtd0-image.bin",
+  "size": 655360,
+  "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "crc32": "0x0721e716"
+ },
+ "e4_image": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/e2631-uboot-mtd0.bin",
+  "size": 655360,
+  "sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+  "crc32": "0x79ef8c50"
+ },
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "mtd0": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "region": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "env_block": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "secondboot": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "raw": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nb1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893\n540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd\n"
+ },
+ "capture_chain_before": {
+  "supervisor": [
+   407072
+  ],
+  "bootwatch": [
+   407119
+  ],
+  "tty": [
+   407086
+  ]
+ },
+ "staging": {
+  "method": "ssh-stdin",
+  "padded": {
+   "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/e2-stage-3dbbfc49.bin",
+   "size": 524288,
+   "sha256": "3ed8250bde6c6def65ced4e5b3323c5986dddc19f1f9888e6731d91a11f748ae",
+   "payload_crc32": "0x34b252a4",
+   "payload_size": 365872
+  },
+  "copy": {
+   "rc": 0,
+   "out": "3ed8250bde6c6def65ced4e5b3323c5986dddc19f1f9888e6731d91a11f748ae  /tmp/e2-uboot-stage.bin\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\r\n",
+   "elapsed_s": 0.26
+  },
+  "copy_bytes": 524288,
+  "erase": {
+   "rc": 0,
+   "out": "ERASE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "elapsed_s": 0.83
+  },
+  "write": {
+   "rc": 0,
+   "out": "WRITE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e2-uboot-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "elapsed_s": 0.39
+  },
+  "readback": {
+   "rc": 0,
+   "out": "3ed8250bde6c6def65ced4e5b3323c5986dddc19f1f9888e6731d91a11f748ae  -\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.24
+  },
+  "sync": {
+   "rc": 0,
+   "out": "SYNCED\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.18
+  },
+  "ok": true
+ },
+ "tcpdump": {
+  "rc": 0,
+  "container": "71a6df357d76e643f08efbc91b835d7841e306c1da528ea93e380276e5a89dc4",
+  "stderr": "",
+  "ready": true
+ },
+ "capture_pause": {
+  "supervisor_pids": [
+   407072
+  ],
+  "bootwatch_pids": [
+   407119
+  ],
+  "tty_holders": [
+   407086
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 415663,
+ "flash_banner_seen": true,
+ "flash_stop": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "flash_version_ok": true,
+ "staging_read": {
+  "ok": true,
+  "tail": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> "
+ },
+ "staging_crc": {
+  "got": "0x34b252a4",
+  "want": "0x34b252a4",
+  "ok": true
+ },
+ "go_sent": "2026-11-28T01:40:51+0800",
+ "new_banner_seen": true,
+ "new_stop": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "new_version_ok": true,
+ "env_block": {
+  "offset": "0xc0000",
+  "length": "0x20000",
+  "addr": "0x44000000",
+  "expected": {
+   "path": "/home/qc233/zte/e2631-p3/b1-env-session/resume-1/target-env-block.bin",
+   "sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "crc": 3894854548,
+   "stored": 4183458158
+  },
+  "read_tail": "mtd read spi-nand0 0x44000000 0xc0000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x000c0000\r\n=> ",
+  "read_ok": true,
+  "md": "md 0x44000000 4\r\n44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115\r\n=> ",
+  "stored_crc": "0xf95a816e",
+  "region_crc": "0xe826c394",
+  "want_region_crc": "0xe826c394",
+  "want_stored_crc": "0xf95a816e",
+  "want_block_sha": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "stored_ok": true,
+  "region_ok": true,
+  "state": "OK"
+ },
+ "env_sanity": {
+  "boot_text_tail": "go 0x47f00000\r\n## Starting application at 0x47F00000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  8 devices, 8 uclasses, devicetree: embed\r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   eth0: ethernet@92000000\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=>                    version\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+  "boot_env_ok": true,
+  "entries": 27,
+  "expected_entries": 26,
+  "expected_entries_effective": 26,
+  "runtime_extras": [
+   "fdtcontroladdr"
+  ],
+  "unexpected": [],
+  "entry_count_ok": true,
+  "missing": [],
+  "mismatched": [],
+  "values_ok": true,
+  "ethaddr": "00:41:71:00:00:50",
+  "ethaddr_ok": true,
+  "random_mac_absent": true,
+  "bootdelay_ok": true,
+  "bootcmd_ok": true,
+  "stdio_ok": true,
+  "env_sanity_ok": true
+ },
+ "rescue_presence": {
+  "help_text": "help e2631rescue\r\ne2631rescue - serve the web bootloader rescue on lan1\r\n\r\nUsage:\r\ne2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is\r\n              written until a validated image is uploaded and the\r\n              X-E2631-Confirm: write header is present. Ctrl-C leaves.\r\n\r\n=> ",
+  "present": true,
+  "short_help": true
+ },
+ "help_ok": true,
+ "step1": {
+  "tag": "step1-netzero",
+  "body": "/home/qc233/zte/e2631-p3/e2/e4-rescue/run-2/netzero-mtd0-image.bin",
+  "body_sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "want_crc": "0x0721e716",
+  "start": {
+   "marker": true,
+   "tail": "e2631rescue\r\ne2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\r\nethernet@92000000 Waiting for PHY auto negotiation to complete........ done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\ne2631rescue: open http://192.168.1.1/",
+   "attempt": 1
+  },
+  "page": {
+   "name": "step1-netzero-page",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.067,
+   "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-page.headers",
+   "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-page.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/html; charset=utf-8\r\nContent-Encoding: gzip\r\nContent-Length: 4456\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 200,
+   "content_type": "text/html; charset=utf-8",
+   "content_encoding": "gzip",
+   "content_length": "4456",
+   "body_len": 4456,
+   "body_sha256": "8f16817b30d66197364cf5a67d9cf5ddd2720a7a09975e8d01dd2494d78616d3",
+   "body_text": "\u001f\u008b\b\u0000\u0000\u0000\u0000\u0000\u0002\u0003\u00cd9k\u0093\u00dbT\u0096\u00df\u00fbW(\u0082IIXVK\u00b2-\u00cb\u00edV\u00a7 \u0084\r5aHM2[\u00ec\u0086\u0086\u00ba\u0092\u00ae\u00da\u009a\u00c8\u0092W\u0092\u00fb1no5\u00ec\u00e4IB\u0002\u0004\u00c2#L`\t\u0099\f3I\u00b3,\u0084\u0090\u0004R\u00b5?%\u00d3vw\u007f\u00ca_\u00d8s\u00ae\u001ev;\u009d\u009da>-)Z\u00d2\u00b9\u00e7\u009es\u00eey\u009f\u00eb\u00d9=\u00cf\u00bf\u00bc\u00ff\u00e8\u00bf\u001c>\u00c0\u00b5\u0092\u00b6?75\u00db\u00a6\t\u00e1\u00ec\u0016\u0089b\u009a\u0098|7q\u00cb\u0006\u009f\u0083\u0003\u00d2\u00a6&\u00bf\u00e8\u00d1\u00a5N\u0018%<g\u0087AB\u0003@[\u00f2\u009c\u00a4e:t\u00d1\u00b3i\u0099}H^\u00e0%\u001e\u00f1\u00cb\u00b1M|j\u00aaH#\u00f1\u0012\u009f\u00ce\u001d\u00d0\u00f4\u008a\u00ca\u00fd\u00a6\u00fc\\\u0018&\u00dc\u00f0\u00fdw\u0086\u0017\u00be\u009d\u009dN\u0097\u00a6f\u00e3d\u0005\u009fV\u00e8\u00ac\u00f4\\\u00a0>\u00a3V;\u00cb\u00d3\u00aa\\\u00e3\u00e2\u00958\u00a1\u00edr\u00d7\u0093b\u0012\u00c4\u00e5\u0098F\u009e\u00dbl\u0093h\u00c1\u000bf\u0094\u00a6E\u00ec\u00e3\u000bQ\u00d8\r\u009c\u0099\u00a7\u00dc*\u00fek\u00da\u00a1\u001fF3Oi\u009a\u00d6\u009fj\u0013/\u00e8\u00b5\u00c9r*\u00db\u008c^U:\u00cb\u00c5f\u008et\u0093\u00b0\u00d9!\u008e\u00e3\u0005\u000b3\u001a,\u00f5\u00a7Z*c_\u008e\u00bd\u00dfQ\u0006\u001aa+\\\u00151:\u00bd\f\u00a2w\u00969\u00a5?%\u00db$rz;\u00e4p\u00dd\u00a6\u0015F\u000e\u008dfT\u00c0\u0089C\u00dfs\u00b8\u00a7\u001c\u00c7\u00c9\u00a0\u00e5\u00888^7\u009e1\u0080z\u00ce\u001d\u008f\u00cb\u00a9\u00fa\u0088\u009f\u00aae\u00e4\u00dba\u0010\u00a62\u00b9\u00a4\u00ed\u00f9+3]\u00af\u008c\u00b0\u00b8Cl*\u0015o\u00cd\u0091\u00d8\u00b8\u00b5\u00b9\u0004\u00ac\u00caVD\u00c9\u00f1\u0019\u00f6\u00b7L|\u00bf?\u00f5T\u00dc\"\u00bdLA\u00b5Z\r\u0000\u0016\u0089z-\u00ea-\u00b4R\u0095\u00efP(\u00ad\u00e0\u00bf\t\u00a9\u00eb\u0080\u0014.\u00d2\u00c8\u00f5\u00c3\u00a5\u0099\u0096\u00e784\u00002\u00ae\u00e7\u00fb\u0005\u001dE\u00f9E3U\u00f8N\u0003i\u00b6N-\u00a7\u0099D`Hp\u00920\u0098aX\u009c\u00ac\u00c5@\u00c2\u000f\u0017z\u0019\u00ab$\u00ec\u008c\u00ab\u008eR\u009a\u00a9\u0085\u00ad\u008c\u00e9\u008d}\u00ebh\u0016\u00dc\u00ce9\u00deb\u00af\u00d0h\u00a6\u00bf\u00f0x~`\u00d5\u00a8\u0013\u00cd\u00ed\u00cb4\u008ar\u0090\u00a5(\u008a\u0006XV7I\u00c2 \u00f5</h\u0081\u008f%\u0085i\f\u00b4\u008c1\u00b2\f~\u00e3\u00ff\u00e0\u0011\u0013\u00aaA\u00f3=n\u00f8\u00ec\u00d4\u00bb(\"\u0013\u0002\u00fd\u00c5\u00eeF1\u00bcwB\u000f\"+\u00ca\u0005\u0092\u0089\u009f<\u00e6Z\u00b9\u007f3\u001a9\u00e6\u008c\u00e3\u00c5\u00c4\u00f2\u00a9\u00d3\u000b\u00c1\u001b\u00bcdeF\u00ae\u00d6r\u00aa\u000euI\u00d7O@\u0019q\u001b\u00dc\u00a07\u00e1*\u0019A]\u00d7\u00fbS\u00b3\u00d3Y$\u00ceb\u00e8\u00c0\u00a3\u00a5\u00ce\u00fd\u00eb\u00d1\u0003\u00dc\u00ae\u00c1\u000bkS\u00b3\u001d\u00ce\u00f6I\u001c\u009b<\u00a3\u00cd\u00cfm\u00dd\u00faip\u00ed\u0014\u00f7\u00e2aNmh\u00b2\u00aa\u001b\u00b2*\u00ab\u007f]{sk\u00fd\u00fb\u00ed\u00b53\u00c3\u00b7\u00fe4\u00b8\u00f5\u00e1\u00f0\u0083\u001f\u00b8v\u00e2(\u00dc\u00f6\u00fbW\u0006\u00ffq\u00e1\u00d1\u00fd\u00d3\u00c37\u00be\u00e6\u00f4Z\u00ad\u00a2+\u00dc\u00e0\u00e6\u00e5\u00ad\u00b3o>\u00ba\u007ffp\u00f1\u00ed\u00c1\u0089\u00d3\u000f\u00d7\u00ael\u00dc;1\u00fc\u00ec\u00f3\u00ed\u00af\u00ce=\\\u00fb\u00f4\u00d1\u00fds\u00dbk\u001fo=8\u0085\u00ab'\u00cf\u00c3\u00ea\u00e0\u00e4G\u0083\u0013_\u000e~:1x\u00e7G@\u0000V\u00b3\u00d3\u001d\u0010\f\u009c!\u0017\rC\u0014\u0013\u0091\u0017t\u00ba\t\u00e79&\u000f\u00feJy.Y\u00e9\u00d0\u00fc\u009d\u00d86\u00ed@J\u0093-/\u0090H\u00a7\u00e3{6A\u001f\u009d\u000e\u00ed\u0084\u0082\u00ba\u0012\u0088\u00a26\u00cf\u000e\u008c\u00040/\u00f2\u0013G\u001f^\u00f9*=\u00e2\u00f0\u0083S\u001b\u00f7n\u00a7bL\u00ea\u00e7\u00c8\u00c1g\u00cbZM\u00c73\u007fwa\u00eb\u008f\u00a7\u0007\u001f\u00dd\u00d8\u00fc\u00f3:\u001c\u00f7\u00d1\u00fd\u008fg!\u0094\u0003F\u001e\u00e2\u00b4\u00a0\u008e1\u00ce\u00cf=\\\u00bb\u0004\u00c6\u0081\u00f5\u00b9\u00bfE7\u00b5\u00c0.D!O\u00ff|\u00ba\u00c3w>\u00dc\u00ba\u00fe\u00c6p\u00fd\u00d2`\u00fd\u0087\u001d\u00d4\u00da$\u00b1[\u007f\u0083X\u00ea\u009c\f}\u0091@4\u0090\u00044\u009d\u00bb\u00ea\\a\u00d7\u00d9\u00e9\u0014q\u00e7\u008e%\u0088BZ0\u0080P\u0018\u00db:n\u00f4\u00b1\u00dd\u00d3`\u00f4\u00ddM\u008f $\n\u00f9\u008e\u009f+\u00be0m\u00c1'\u00db6\u00be\u0019\u00d7 \u00a1\u0080WD\u001e)\u00fb\u00de\"\u00b8I\u0007\u00c2\u0019\u00e4)\u00f0\u00b2\u00c7\u00a4\u00beR\u00c9\u0086\u00a7/\u000e\u00ce^\u0005\u001f\u00dd\u00b8s~\u00e3\u00fe\u00c7[\u00a7\u00be\u001a\u009c\u00bd\u00b1}\u00ea\u00fc\u00e0\"X\u00e5c\u0088\u0085\u00e1\u000777/}\u0097CN\u000f\u00df\u00ba\u0004\u009f\u00e0\u00d0\u001bw\u00ce\u00c2\u000bX\u000e\u00fc8\u000b\u00b7\u00cd\u008f\u007f\u00cfE\u0014\u00ca2\u0007\u0087\u00dd\u00b8wm\u00f0\u00e3{\u00833\u0080x~pa}\u00f3\u00d2\r\u00d8\r|6\u00ef\u00dd\u00dcxpkp\u00ed<3\u00fa\u00b9\u008d;\u00df\f.|1\u00b8\u00f0\u00d5\u00f0\u00cc{\u0083\u00f3_o\u00dcyk\u00e3\u00ce\u00da\u00f0\u00e6\u0097\u00c3\u000b\u00177\u00af\u00dd\u0005\u00da\u00a9\u0098\u00dbW\u00d6rL$U\u00c4\u00cet\u0016\u00fd\u00b1\u001dy\u009ddnJ\u0010Ds\u00ae7\u00c5wc\u00caA$xv\u00c27\u00a7\u00a0\u000b\u0088\u0013\u00ee\u00c0+\u0087\u000f\u00ec?j\u00a6\u00c1+\u001d~\u00f9\u00d0!\u00b3\u00a6(\u00d2K\u00cf\u00be\u00f2\u00fa\u000b\u00cf\u00bex\u00c8\u00d4\u0094\u001c\u00f3i\u0013\u00d4:\u00e7\u0084v\u00b7\r\u00cd\u0083\u00bc@\u0093\u0003>\u00c5\u00d7\u00e7V^t\u0004\u00cf\u0011s\u00c4_\u009a\u00c7\u0094\u00e5\u00aaf@\u00b6n\u0018\u0092\u00b2\\W+\u00f5j\u00b5\u00a1\u00c2\u00abU\u00b3\u0015\u00d7\u00b2]x\u00a5\r\u00ab\u00e6X\u00a4\u0006\u00af\u0095FM\u00b7\u00b5\u009a\u0005\u00af\u00b5\u0086\u00ab\u00aa\u00aa\u008b\u00b8\r\u00ad\u00e2\u001a\u001a\u00a9\u00c2+\u00b1T\u00bbF\u001d\u00c4u\f\u00a5N\b\u00a3\u00abjF\u00a5f)\u0088\u00abU+\u00aaQ\u00b3(R\u00a8)v\u00dd\u00b1+\u00c8X\u00b3h\u00cd\u00a9#\u0005Cq\u00a8\u00a5\u00ba\u0088\u00d0\u00b0\u001c[\u00d1I\u001d^m\u00b5a\u00b9*C\u00a0\u00d5\u0086\u00a57l$F]\u008bV\u00eb\u0086\u000e\u00af\u008a\u000b(\u008e\u00ad3\u0016\u008aMT\u00db\u00c6W\u00876 \u007f\u00e3)\u00aa\u00a4^5\u00aa\u0084 c\u00dbR\b #c\u001dNn8\bm\u0018\u0015ZSk\u001a\u009e\u00c2\u00a8\u00a8\u00b6\u00ae;\u00a8\u0007E\u00a9hu\u001bOa\u00b9\u00b5F\u00dd\u00b5\u00998:U\u0014\u00cbE\u00d1\u009d\u001a\u00a97\u00d4*B\u0015\u00dd&z\u00a5\u0086\u0092\u00a9U\u00ad\u00a15t\u0084ju\u00ab\u00ae\u0010\u0003U\u00a2Q\u00d5\u00d2\u00d4\n\u0012\u00ab: \u0097\u00e3\u00a2\f\u00b5J\u0005\u000e\u00ad\"1\u00bd\u00a6\u0090z\u00a5Ve\u0092\u00e9D!\u0016\u00aa\u00daPm\u00cdnhL%Z]\u00d3lF\u008ch\u0096K\r\u00a22yU\u00a2\u00ebU\u00c4\u00b5\u00b5\u00aae\u0000C|\u00ad\u00ebvM%LH(\u0011\u00d4P\u001b\u00f8\u00aa7\u001a\u008a\u00ae!\u000b\u00b7\u00aa\u00d0J\u008d\u0011SA\u00cfDa\u00db\u00d4\u0006\u00a9\u00da\u00aa\u008a\u009aTi\u0005h(\u0006;E\u00d5\u00a8\u00d7\u00ab(o\u00a5j)\u0096m\u00a5\u00fe\u00a0\u00da\u008am!\u008b*u\fB\u00aaL\u00bfV\u00c3\u00b6I\u0015\u00b5\u00ae\u001b\u001a\u00d5]\u00a6( \u0000^B\u00f1\u0014u\u0083\u00d4\u00f4\n3\u008bQ\u00b5\u008d\u00ba\u00a12\u00cb\u00dbv\u001d\u009a\u0004\u00e4\u00d6P,\n%\u0018\u0089\u0091j\r\u00f4J\u00f1l\u0000k\u0090\u008a\u009b\u001a\u00a0\u00ae\u00d6\rW\u009b\u00cf]9\n\u0093\u00c8\u0014\u0096\u00a5\u0000\u00e2GX\u009e\u009b\u009b\u000b\u00c4UayvV\u00a8h\u00e5@\u0004\u008fw\u00bb\u0081\u008de\u0086\u0083\u00cc\f\u00e9[\u00b0\u00ba\u00ae\u00d8K\u00f7\u00fa&|\u00c8\u00d6JB\u000f\u00d1`\u0001Z\u00eb\u0083\u0018\u0017\u00a0\u00fe\u0006\u00d5\u0099\t-K\u00af\u0013\u00ca\u0014U\u0001\u00d3\u00bb\u0095:\u00f3\u0092Z\u00d5uk\u0015vbU\u00a15\u00ad\u00ee2\u00a7Uj\u00baa\u00a0\u00a2T\u00d7\u00a88\r\u00c2\u00a2\u00c5\u00a2\u008a\rV\u0098\u0097,\u00df\u0014\u0004\u00bfd\u0088ss\u00baXR\u00a5\u008e\u0019\u00d0%\u00ee7\u00d0\u008e\u0018\u00cfF\u0011Y\u0011,\u00ff\u0019\u00bd*6;2$\"ar\r\u0084\u0086\u00a5c\u00fe\u00bc\u0089\u0091\u00d2L\u00e5w\u0016\u0019\u008d\u00e7IB\u00fe\u0019F\u0007\u00a1#\u0003\u009eK#Q\u00b2\u00bc\u00c4\u00f4\u009f1\u009a\u00ce\"RCB\u0015-eP6\u00a4\u0097H\u00d2\u0092\u00a1\u00bb\f#\u0001\u00f0\u00a6\u00d1\t\u00b2\u00ff\u0080\u00c7.;\u00aaH\u000e4\u00ab\u0088\u0019\u00df\u00a5B\u00f4\u008a\u0096\u00ca\u0087\u0082\u00bb@\u00cf\u0087\u001c\u00ea\u0099J\u00d3\u009b\u00b5\u00fc\u00a6W*\u00e5\u009a"
+  },
+  "status_before": {
+   "name": "step1-netzero-status-before",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.02,
+   "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-status-before.headers",
+   "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-status-before.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 63\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 200,
+   "content_type": "text/plain",
+   "content_encoding": null,
+   "content_length": "63",
+   "body_len": 63,
+   "body_sha256": "3f06ac1b2266580a661606a90a2971ee85491b392e892417ccc779471b621fa0",
+   "body_text": "stage=idle\nprogress=0\nsha256=\nbrowser_sha256=\nsha_match=absent\n",
+   "kv": {
+    "stage": "idle",
+    "progress": "0",
+    "sha256": "",
+    "browser_sha256": "",
+    "sha_match": "absent"
+   }
+  },
+  "post": {
+   "name": "step1-netzero-post",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 1.634,
+   "status": 200,
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 101\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "body_text": "result=accepted\nsha256=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\nsha_match=ok\n",
+   "kv": {
+    "result": "accepted",
+    "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+    "sha_match": "ok"
+   }
+  },
+  "wait": {
+   "done": true,
+   "status": {
+    "name": "step1-netzero-wait-poll-06",
+    "rc": 0,
+    "stderr": "",
+    "elapsed_s": 0.445,
+    "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-wait-poll-06.headers",
+    "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-wait-poll-06.body",
+    "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 216\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+    "status": 200,
+    "content_type": "text/plain",
+    "content_encoding": null,
+    "content_length": "216",
+    "body_len": 216,
+    "body_sha256": "9c00d1da6d31a5524438a15e05090e23f8b093f7261943165f72b4f915e7494f",
+    "body_text": "stage=done\nprogress=100\ncrc32=0x0721e716\nsha256=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\nbrowser_sha256=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\nsha_match=ok\nresult=ok\n",
+    "kv": {
+     "stage": "done",
+     "progress": "100",
+     "crc32": "0x0721e716",
+     "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+     "browser_sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+     "sha_match": "ok",
+     "result": "ok"
+    }
+   },
+   "polls": [
+    {
+     "t": 0.02,
+     "http": 200,
+     "stage": "staged",
+     "progress": "0",
+     "result": "staged",
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 0.54,
+     "http": 200,
+     "stage": "erase",
+     "progress": "10",
+     "result": null,
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 1.06,
+     "http": 200,
+     "stage": "blank",
+     "progress": "30",
+     "result": null,
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 2.26,
+     "http": 200,
+     "stage": "write",
+     "progress": "45",
+     "result": null,
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 3.44,
+     "http": 200,
+     "stage": "readback",
+     "progress": "80",
+     "result": null,
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 4.46,
+     "http": 200,
+     "stage": "compare",
+     "progress": "90",
+     "result": null,
+     "crc32": "0x0721e716"
+    },
+    {
+     "t": 5.41,
+     "http": 200,
+     "stage": "done",
+     "progress": "100",
+     "result": "ok",
+     "crc32": "0x0721e716"
+    }
+   ],
+   "crc_ok": true,
+   "crc32": "0x0721e716"
+  },
+  "status_after": {
+   "name": "step1-netzero-wait-poll-06",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.445,
+   "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-wait-poll-06.headers",
+   "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step1-netzero-wait-poll-06.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 216\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 200,
+   "content_type": "text/plain",
+   "content_encoding": null,
+   "content_length": "216",
+   "body_len": 216,
+   "body_sha256": "9c00d1da6d31a5524438a15e05090e23f8b093f7261943165f72b4f915e7494f",
+   "body_text": "stage=done\nprogress=100\ncrc32=0x0721e716\nsha256=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\nbrowser_sha256=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\nsha_match=ok\nresult=ok\n",
+   "kv": {
+    "stage": "done",
+    "progress": "100",
+    "crc32": "0x0721e716",
+    "sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+    "browser_sha256": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+    "sha_match": "ok",
+    "result": "ok"
+   }
+  },
+  "done_ok": true
+ },
+ "step2": {
+  "tag": "step2-e4",
+  "body": "/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/e2631-uboot-mtd0.bin",
+  "body_sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+  "want_crc": "0x79ef8c50",
+  "post": {
+   "name": "step2-e4-post",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 1.566,
+   "status": 200,
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 101\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "body_text": "result=accepted\nsha256=8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\nsha_match=ok\n",
+   "kv": {
+    "result": "accepted",
+    "sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+    "sha_match": "ok"
+   }
+  },
+  "wait": {
+   "done": true,
+   "status": {
+    "name": "step2-e4-wait-poll-06",
+    "rc": 0,
+    "stderr": "",
+    "elapsed_s": 0.438,
+    "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step2-e4-wait-poll-06.headers",
+    "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step2-e4-wait-poll-06.body",
+    "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 216\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+    "status": 200,
+    "content_type": "text/plain",
+    "content_encoding": null,
+    "content_length": "216",
+    "body_len": 216,
+    "body_sha256": "6c5e27cfbdfe436d146a87fa2febf93339cfa52f2c2ec827fd4322312f5db3cd",
+    "body_text": "stage=done\nprogress=100\ncrc32=0x79ef8c50\nsha256=8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\nbrowser_sha256=8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\nsha_match=ok\nresult=ok\n",
+    "kv": {
+     "stage": "done",
+     "progress": "100",
+     "crc32": "0x79ef8c50",
+     "sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+     "browser_sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+     "sha_match": "ok",
+     "result": "ok"
+    }
+   },
+   "polls": [
+    {
+     "t": 0.03,
+     "http": 200,
+     "stage": "staged",
+     "progress": "0",
+     "result": "staged",
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 0.58,
+     "http": 200,
+     "stage": "erase",
+     "progress": "10",
+     "result": null,
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 1.1,
+     "http": 200,
+     "stage": "blank",
+     "progress": "30",
+     "result": null,
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 2.25,
+     "http": 200,
+     "stage": "write",
+     "progress": "45",
+     "result": null,
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 3.42,
+     "http": 200,
+     "stage": "readback",
+     "progress": "80",
+     "result": null,
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 4.45,
+     "http": 200,
+     "stage": "compare",
+     "progress": "90",
+     "result": null,
+     "crc32": "0x79ef8c50"
+    },
+    {
+     "t": 5.39,
+     "http": 200,
+     "stage": "done",
+     "progress": "100",
+     "result": "ok",
+     "crc32": "0x79ef8c50"
+    }
+   ],
+   "crc_ok": true,
+   "crc32": "0x79ef8c50"
+  },
+  "status_after": {
+   "name": "step2-e4-wait-poll-06",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.438,
+   "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step2-e4-wait-poll-06.headers",
+   "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/step2-e4-wait-poll-06.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 216\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 200,
+   "content_type": "text/plain",
+   "content_encoding": null,
+   "content_length": "216",
+   "body_len": 216,
+   "body_sha256": "6c5e27cfbdfe436d146a87fa2febf93339cfa52f2c2ec827fd4322312f5db3cd",
+   "body_text": "stage=done\nprogress=100\ncrc32=0x79ef8c50\nsha256=8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\nbrowser_sha256=8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\nsha_match=ok\nresult=ok\n",
+   "kv": {
+    "stage": "done",
+    "progress": "100",
+    "crc32": "0x79ef8c50",
+    "sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+    "browser_sha256": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+    "sha_match": "ok",
+    "result": "ok"
+   }
+  },
+  "done_ok": true
+ },
+ "stop": {
+  "left": true,
+  "prompt": true,
+  "tail": ": erasing block 0x00080000\r\ne2631flash: erasing block 0x000a0000\r\ne2631rescue: writing 655360 bytes to mtd0\r\ne2631rescue: PASS: mtd0 updated, CRC32 0x0721e716\r\ne2631rescue: nothing was rebooted; power-cycle or run reset\r\ne2631rescue: received 655360 bytes, sha256 8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\r\ne2631rescue: image accepted, write queued\r\ne2631rescue: erasing mtd0 0x20000..0xc0000\r\ne2631flash: erasing block 0x00020000\r\ne2631flash: erasing block 0x00040000\r\ne2631flash: erasing block 0x00060000\r\ne2631flash: erasing block 0x00080000\r\ne2631flash: erasing block 0x000a0000\r\ne2631rescue: writing 655360 bytes to mtd0\r\ne2631rescue: PASS: mtd0 updated, CRC32 0x79ef8c50\r\ne2631rescue: nothing was rebooted; power-cycle or run reset\r\ne2631rescue: left the rescue mode\r\n=> "
+ },
+ "readback": {
+  "tag": "final-e4",
+  "addr": "0x46000000",
+  "read_ok": true,
+  "read_tail": "mtd read spi-nand0 0x46000000 0x20000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x00020000\r\n=> ",
+  "crc": "0x79ef8c50",
+  "crc_ok": false
+ },
+ "readback_ok": true,
+ "env": {
+  "read_ok": true,
+  "stored_crc": "0xf95a816e",
+  "region_crc": "0xe826c394"
+ },
+ "secondboot": {
+  "read_ok": true,
+  "crc": "0x9848a667"
+ },
+ "env_ok": true,
+ "secondboot_ok": true,
+ "hold": {
+  "at": "2026-11-28T01:41:16+0800",
+  "ram_prompt": true,
+  "mtd0_expected": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338"
+ },
+ "reset_command": {
+  "cmd": "reset",
+  "sent": "2026-11-28T01:41:16+0800"
+ },
+ "reset_boot_text": "reset\r\nresetting ...\r\n\r\nBoot SPI NAND\r\nstart read bootheader\r\nstart read secondboot\r\nnon secure boot \r\nJump\r\n\r\nenter bootloader...\r\ncrpm init enter\r\ncrpm init done\r\nddr init enter, rate is 1333 Mbps\r\n5ddr init done \r\nserial init start \r\nserial init done \r\nSPI NAND\r\nnon secure uboot \r\nbackup header!!\r\nJump\r\n\r\n\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\n",
+ "reset_banner_seen": true,
+ "reset_stop": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "flash_resident_version_ok": true,
+ "error": "RuntimeError('e2631rescue never printed the HTTP-ready line')",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   422808
+  ],
+  "bootwatch_pids": [
+   422877
+  ],
+  "tty_holders": [
+   422818
+  ],
+  "events_tail": "2026-11-28T01:37:59+08:00 reader-start pid=407072\n2026-11-28T01:42:55+08:00 reader-start pid=422808",
+  "ok": true
+ },
+ "device_after": {
+  "mtd0": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338",
+  "region": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+  "env_block": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "secondboot": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "raw": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338\n8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9\n6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893\n540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd\n"
+ },
+ "postcheck": {
+  "out": "PANICS=0\nOOPS=0\nMT7916=1\nVERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\n{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V"
+ },
+ "audit": {
+  "uboot_commands": [
+   "version",
+   "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "crc32 0x47f00000 0x59530",
+   "version",
+   "mtd read spi-nand0 0x44000000 0xc0000 0x20000",
+   "md 0x44000000 4",
+   "crc32 0x44000000 0x20000",
+   "printenv",
+   "help e2631rescue",
+   "e2631rescue",
+   "mtd read spi-nand0 0x46000000 0x20000 0xa0000",
+   "crc32 0x46000000 0xa0000",
+   "mtd read spi-nand0 0x47000000 0xc0000 0x20000",
+   "md 0x47000000 1",
+   "crc32 0x47000000 0x20000",
+   "mtd read spi-nand0 0x48000000 0x0 0x20000",
+   "crc32 0x48000000 0x20000",
+   "version",
+   "e2631rescue"
+  ],
+  "forbidden": [],
+  "manual_reset": {
+   "cmd": "reset",
+   "sent": "2026-11-28T01:41:16+0800"
+  },
+  "posts": [
+   {
+    "name": "step1-netzero-post",
+    "status": 200,
+    "result": "accepted"
+   },
+   {
+    "name": "step2-e4-post",
+    "status": 200,
+    "result": "accepted"
+   }
+  ]
+ },
+ "checks": {
+  "artifact_pins": true,
+  "staging": true,
+  "ram_banner": true,
+  "env_sanity": true,
+  "step1_done": true,
+  "step2_done": true,
+  "final_readback": true,
+  "env_unchanged": true,
+  "secondboot_unchanged": true,
+  "reset_banner": true,
+  "flash_resident": true,
+  "flash_rescue_page": false,
+  "flash_rescue_status": false,
+  "f1_verdict": null,
+  "mtd0_e4": true,
+  "region_e4": true,
+  "env_after": true,
+  "secondboot_after": true,
+  "panics_zero": true,
+  "oops_zero": true,
+  "mt7916": true,
+  "capture_after": true,
+  "no_error": false,
+  "no_forbidden": true
+ },
+ "verdict": {
+  "session": "ERROR",
+  "step1": "PASS",
+  "step2": "PASS",
+  "reset": "PASS",
+  "flash_rescue": "FAIL",
+  "f1": null,
+  "mtd0": "E4"
+ },
+ "finished": "2026-11-28T01:46:49+0800"
+}

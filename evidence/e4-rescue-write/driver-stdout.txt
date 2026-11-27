@@ -1,0 +1,63 @@
+01:40:24 stage copy 0.26s rc=0
+01:40:25 stage erase 0.83s rc=0
+01:40:25 stage write 0.39s rc=0
+01:40:25 stage readback 0.24s rc=0
+01:40:25 stage sync 0.18s rc=0
+01:40:25 STAGING GREEN: RAM image in userdata and read back
+01:40:42 tcpdump ready=True
+01:40:44 capture paused: {"supervisor_pids": [407072], "bootwatch_pids": [407119], "tty_holders": [407086], "tty_holders_after": [], "free": true}
+01:40:45 serial hub started pid=415663 log=/home/qc233/zte/e2631-p3/e2/e4-rescue/write-run-2/session/serial.log
+01:40:48 banner seen; stopping autoboot
+01:40:51 stop_autoboot: {"banner": true, "prompt": true}
+01:40:51 ub cmd: version ok=True
+01:40:51 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+01:40:51 ub cmd: crc32 0x47f00000 0x59530 ok=True
+01:40:51 banner seen; stopping autoboot
+01:40:54 stop_autoboot: {"banner": true, "prompt": true}
+01:40:54 ub cmd: version ok=True
+01:40:55 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+01:40:55 ub cmd: md 0x44000000 4 ok=True
+01:40:55 ub cmd: crc32 0x44000000 0x20000 ok=True
+01:40:55 env block state=OK stored=0xf95a816e region=0xe826c394
+01:40:55 ub cmd: printenv ok=True
+01:40:55 env sanity ok=True entries=27
+01:40:55 ub cmd: help e2631rescue ok=True
+01:40:55 rescue command present=True
+01:40:55 RAM prompt ready: env sanity OK, rescue present
+01:41:03 write POST step1-netzero-post: http=200 result=accepted dt=1.63s
+01:41:03 status stage=staged progress=0
+01:41:03 status stage=erase progress=10
+01:41:04 status stage=blank progress=30
+01:41:05 status stage=write progress=45
+01:41:06 status stage=readback progress=80
+01:41:07 status stage=compare progress=90
+01:41:08 status stage=done progress=100
+01:41:08 STEP step1-netzero write job done=True crc=0x0721e716 want=0x0721e716 ok=True
+01:41:08 STEP 1 STATUS-DONE: net-zero write verified by the rescue readback/compare
+01:41:10 write POST step2-e4-post: http=200 result=accepted dt=1.57s
+01:41:10 status stage=staged progress=0
+01:41:10 status stage=erase progress=10
+01:41:11 status stage=blank progress=30
+01:41:12 status stage=write progress=45
+01:41:13 status stage=readback progress=80
+01:41:14 status stage=compare progress=90
+01:41:15 status stage=done progress=100
+01:41:15 STEP step2-e4 write job done=True crc=0x79ef8c50 want=0x79ef8c50 ok=True
+01:41:15 STEP 2 STATUS-DONE: E4 write verified by the rescue readback/compare
+01:41:16 ub cmd: mtd read spi-nand0 0x46000000 0x20000 0xa0000 ok=True
+01:41:16 ub cmd: crc32 0x46000000 0xa0000 ok=True
+01:41:16 ub cmd: mtd read spi-nand0 0x47000000 0xc0000 0x20000 ok=True
+01:41:16 ub cmd: md 0x47000000 1 ok=True
+01:41:16 ub cmd: crc32 0x47000000 0x20000 ok=True
+01:41:16 ub cmd: mtd read spi-nand0 0x48000000 0x0 0x20000 ok=True
+01:41:16 ub cmd: crc32 0x48000000 0x20000 ok=True
+01:41:16 INDEPENDENT READBACK GREEN: E4 region CRC matches, env and secondboot intact
+01:41:16 WRITE VERIFIED. HOLD at the RAM prompt; reset follows
+01:41:17 banner seen; stopping autoboot
+01:41:20 stop_autoboot: {"banner": true, "prompt": true}
+01:41:20 ub cmd: version ok=True
+01:41:20 RESET GREEN: flash-resident E4 U-Boot prompt
+01:42:50 SESSION ERROR RuntimeError('e2631rescue never printed the HTTP-ready line')
+01:43:00 capture restore: {"restore_rc": 0, "supervisor_pids": [422808], "bootwatch_pids": [422877], "tty_holders": [422818], "events_tail": "2026-11-28T01:37:59+08:00 reader-start pid=407072\n2026-11-28T01:42:55+08:00 reader-start pid=422808", "ok": true}
+01:46:49 VERDICT {"session": "ERROR", "step1": "PASS", "step2": "PASS", "reset": "PASS", "flash_rescue": "FAIL", "f1": null, "mtd0": "E4"}
+01:46:49 checks: {"artifact_pins": true, "staging": true, "ram_banner": true, "env_sanity": true, "step1_done": true, "step2_done": true, "final_readback": true, "env_unchanged": true, "secondboot_unchanged": true, "reset_banner": true, "flash_resident": true, "flash_rescue_page": false, "flash_rescue_status": false, "f1_verdict": null, "mtd0_e4": true, "region_e4": true, "env_after": true, "secondboot_after": true, "panics_zero": true, "oops_zero": true, "mt7916": true, "capture_after": true, "no_error": false, "no_forbidden": true}

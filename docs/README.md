@@ -76,6 +76,8 @@
 | [../evidence/f2-fixed/](../evidence/f2-fixed/) | F2 修复验证附件：session-results、原始串口字节与探针段、驱动日志、主机 tcpdump（12 个设备 ARP）、产物构建清单、sha256 清单 |
 | [../evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) | E4 救援验收第一阶段（validate-only）run-1 RED -> run-2 PASS：run-2 用 patch 0033（33 patches，banner g30dca5f54503，tree cd67a041…）在 RAM 链上验证——GET / 页面 PASS（gzip 4456 B sha 8f16817b…，解压 9216 B sha 30a8f03e…）、/status PASS、`POST /flash?mode=validate` 返回 200 result=ok sha_match=ok（crc32 0x0721e716）、错误摘要负向 400 `sha256 mismatch` 且 stage 保持 idle；零 mtd0 写入（唯一写 userdata staging），F1 KERNEL_STARTED 8.68 s；run-1 的 400 `unsupported request` 根因（patch 0028 `rescue_name_is()` 头部大小写比较缺陷）与修复记录保留在 §5/§7/§11 |
 | [../evidence/e4-rescue-acceptance/](../evidence/e4-rescue-acceptance/) | E4 救援验收附件：run-1（RED）preflight、串口/控制台原文、tcpdump 与 HTTP 行、页面 gzip/解压、原始响应、根因摘录、净零载荷摘要；run-2（PASS）同套 + 错误摘要负向响应 + 独立 sha256 清单 |
+| [../evidence/e4-rescue-write-acceptance-20261128.md](../evidence/e4-rescue-write-acceptance-20261128.md) | E4 写模式验收（task-79）：E4 镜像（patch 0026-0033，banner g30dca5f54503）RAM 链上同一 rescue 会话完成 STEP-1 净零写（crc32 0x0721e716）与 STEP-2 E4 写（crc32 0x79ef8c50），/status done 后一次 Ctrl-C；独立回读 0x79ef8c50，env stored 0xF95A816E / region 0xe826c394，secondboot 0x9848a667；reset 回 flash E4 启动，postcheck mtd0 d87db54a…、区域 8a38896e…、PANICS=0、MT7916=1；冷启动 e2631rescue 首命令 FAIL（PHY -110，缺 refclk 初始化，patch 0034 修复队列）；驱动在 resident-rescue 阶段退出码 2，session-results 记录 ERROR |
+| [../evidence/e4-rescue-write/](../evidence/e4-rescue-write/) | task-79 附件：驱动日志、串口原始字节、session-results、step1/step2 状态机响应、postcheck、驱动与产物清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|

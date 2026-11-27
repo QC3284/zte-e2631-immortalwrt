@@ -1,0 +1,200 @@
+[  187.458129] br-lan: port 3(lan3) entered disabled state
+[  187.459310] br-lan: port 2(lan2) entered disabled state
+[  187.464934] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[  187.465241] br-lan: port 1(lan1) entered disabled state
+[  187.481616] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x47f00000 0x3f00000 0x80000
+Reading 524288 byte(s) (256 page(s)) at offset 0x03f00000
+=> crc32 0x47f00000 0x59530
+CRC32 for 47f00000 ... 47f5952f ==> 34b252a4
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  8 devices, 8 uclasses, devicetree: embed
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x44000000 0xc0000 0x20000
+Reading 131072 byte(s) (64 page(s)) at offset 0x000c0000
+=> md 0x44000000 4
+44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115
+=> crc32 0x44000000 0x20000
+crc32 for 44000000 ... 4401ffff ==> e826c394
+=> printenv
+baudrate=115200
+bootcmd=e2631boot
+bootdelay=3
+bootfile=uboot.bin
+bootloaderfile=bootloader.bin
+console=ttyAMA0,115200n8
+e2631_flashboot=reset
+e2631_netboot=tftp 0x42000000 e2631-netboot.uImage
+e2631_pocgo=go 0x43000000
+e2631_pocload=tftp 0x43000000 u-boot.bin
+ethact=eth0
+ethaddr=00:41:71:00:00:50
+fdtcontroladdr=4fff2ad0
+fullfile=upgrade.bin
+gatewayip=192.168.1.1
+hostname=unknown
+ipaddr=192.168.1.1
+linuzfile=vmlinuz.bin
+loadaddr=0x42000000
+memsize=256M
+netmask=255.255.255.0
+netretry=5
+serverip=192.168.1.100
+stderr=serial@94404000
+stdin=serial@94404000
+stdout=serial@94404000
+versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00
+
+Environment size: 646/131068 bytes
+=> help e2631rescue
+e2631rescue - serve the web bootloader rescue on lan1
+
+Usage:
+e2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is
+              written until a validated image is uploaded and the
+              X-E2631-Confirm: write header is present. Ctrl-C leaves.
+
+=> e2631rescue
+e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+
+ethernet@92000000 Waiting for PHY auto negotiation to complete........ done
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+e2631rescue: open http://192.168.1.1/ from a lan1 host
+e2631rescue: press Ctrl-C to leave the rescue mode
+e2631rescue: received 655360 bytes, sha256 b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a
+e2631rescue: image accepted, write queued
+e2631rescue: erasing mtd0 0x20000..0xc0000
+e2631flash: erasing block 0x00020000
+e2631flash: erasing block 0x00040000
+e2631flash: erasing block 0x00060000
+e2631flash: erasing block 0x00080000
+e2631flash: erasing block 0x000a0000
+e2631rescue: writing 655360 bytes to mtd0
+e2631rescue: PASS: mtd0 updated, CRC32 0x0721e716
+e2631rescue: nothing was rebooted; power-cycle or run reset
+e2631rescue: received 655360 bytes, sha256 8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9
+e2631rescue: image accepted, write queued
+e2631rescue: erasing mtd0 0x20000..0xc0000
+e2631flash: erasing block 0x00020000
+e2631flash: erasing block 0x00040000
+e2631flash: erasing block 0x00060000
+e2631flash: erasing block 0x00080000
+e2631flash: erasing block 0x000a0000
+e2631rescue: writing 655360 bytes to mtd0
+e2631rescue: PASS: mtd0 updated, CRC32 0x79ef8c50
+e2631rescue: nothing was rebooted; power-cycle or run reset
+e2631rescue: left the rescue mode
+=> mtd read spi-nand0 0x46000000 0x20000 0xa0000
+Reading 655360 byte(s) (320 page(s)) at offset 0x00020000
+=> crc32 0x46000000 0xa0000
+crc32 for 46000000 ... 4609ffff ==> 79ef8c50
+=> mtd read spi-nand0 0x47000000 0xc0000 0x20000
+Reading 131072 byte(s) (64 page(s)) at offset 0x000c0000
+=> md 0x47000000 1
+47000000: f95a816e                             n.Z.
+=> crc32 0x47000000 0x20000
+crc32 for 47000000 ... 4701ffff ==> e826c394
+=> mtd read spi-nand0 0x48000000 0x0 0x20000
+Reading 131072 byte(s) (64 page(s)) at offset 0x00000000
+=> crc32 0x48000000 0x20000
+crc32 for 48000000 ... 4801ffff ==> 9848a667
+=> reset
+resetting ...
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  8 devices, 8 uclasses, devicetree: embed
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> e2631rescue
+e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+
+ethernet@92000000 Waiting for PHY auto negotiation to complete......... TIMEOUT !
+zx279128s: PHY startup failed (-110)
+e2631rescue: no usable Ethernet device
+=> 
