@@ -310,6 +310,14 @@ the hard cap and the CI gate). `node tools/check-workflows.mjs` cross-checks the
 workflow's 8192/645120 values against `uboot-port/README.md`
 (0x9F800/653312/638 KiB) and asserts the gate still runs before mtd0 assembly.
 
+Besides UBOOT-INFO.txt, every build ships `UBOOT-SIZES.txt`: the authoritative
+per-object `.text` table (`arm-none-eabi-size` over all built objects plus the
+linked-image total, sorted by `.text` descending). The pinned U-Boot baseline has
+no `make sizes` target, so the CI step computes the same report from the build
+objects. Use it to size E4 features (DHCP server, web UI): the current big
+contributors are the EFI loader, MMC/FAT, bootflow/PXE and the command set.
+`UBOOT-SIZES.txt` is covered by SHA256SUMS like every other artifact file.
+
 Before adding a U-Boot feature, look at the `u-boot.bin` headroom: a patch that
 would cross the gate must shrink something else first. Do not touch the 8 KiB
 safety margin itself.

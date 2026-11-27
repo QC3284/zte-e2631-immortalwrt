@@ -460,6 +460,14 @@ ok('the U-Boot workflow gates the payload at 653312 - 8192 bytes before assembli
 ok('the payload budget is documented against uboot-port/README.md',
   ['0x9F800', '653312', '638 KiB'].every((s) => has(UBOOT_README, s)) &&
   ['653312', '645120', '0x9F800', '8192', '0x20800..0xBFFFF'].every((s) => has(UBOOT_BUDGET_DOC, s)));
+ok('UBOOT-SIZES.txt reports the per-object .text sizes and is covered by SHA256SUMS',
+  has(UBOOT_WF, 'UBOOT-SIZES.txt') &&
+  has(UBOOT_WF, 'arm-none-eabi-size') &&
+  has(UBOOT_WF, 'xargs -0 -r arm-none-eabi-size') &&
+  has(UBOOT_WF, 'sorted by text desc') &&
+  has(UBOOT_WF, "no 'make sizes' target") &&
+  has(UBOOT_WF, 'expected the full build') &&
+  /sha256sum[^\n]*UBOOT-SIZES\.txt/.test(UBOOT_WF));
 ok('UBOOT-INFO.txt carries the payload footprint table',
   ['payload footprint', 'u-boot.bin bytes:', 'mtd0 image bytes:', 'hard cap bytes:',
     'CI gate bytes:', 'headroom bytes vs hard cap:', 'headroom percent vs hard cap:',
