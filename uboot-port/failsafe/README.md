@@ -65,15 +65,19 @@ bash tools/embed-failsafe.sh \
    并用浏览器端纯 JS SHA-256 计算并显示摘要（在 `http://192.168.1.1` 上 WebCrypto 不可用，
    所以自带实现；对 640 KiB 约 30 ms）。
 2. 两个按钮：
-   - **仅校验**：`POST /flash?mode=validate`，设备读入 RAM 后校验大小/magic/几何/头 CRC，
-     不写 flash；
-   - **写入待命**：`POST /flash?mode=write`，额外带 `X-E2631-Confirm: write` 头；设备在
-     校验通过后进入擦写状态机。
+   - **仅校验**：`POST /flash?mode=validate`，设备读入 RAM 后校验大小/magic/几何/头 CRC 与
+     `X-E2631-SHA256` 摘要，不写 flash；返回 `result=ok`、`sha256=`、`sha_match=`；
+     页面显示设备摘要并与浏览器摘要比对，**只有 `sha_match=ok` 才启用「写入待命」**；
+   - **写入待命**：`POST /flash?mode=write`，额外带 `X-E2631-Confirm: write` 与
+     `X-E2631-SHA256` 头（缺失/格式错/摘要不符都返回 400，不擦除）；设备校验通过后进入
+     擦写状态机，成功响应带 `sha256=`。
 3. 上传用 `XMLHttpRequest`（`xhr.send(file)`，raw body，**不是 multipart**），进度条来自
-   `xhr.upload.onprogress`；POST 返回 `result=staged|accepted` 后，页面每 500 ms 轮询
-   `GET /status`，显示阶段（校验/擦除/擦除校验/写入/回读/比对）与进度。
-4. 成功：显示 CRC32，并明确提示「未自动重启：请按串口提示执行 reset，或断电重启。」
-   页面不调用 `/reboot`，不做任何自动重启。
+   `xhr.upload.onprogress`；POST 返回 `result=ok`（校验）或 `result=accepted`（写入）后，
+   页面每 500 ms 轮询 `GET /status`，显示阶段（校验/擦除/擦除校验/写入/回读/比对）、进度、
+   设备摘要 `sha256=`、`browser_sha256=` 与 `sha_match=ok|mismatch|absent`。
+4. 成功：显示 CRC32，并明确提示「未自动重启：请断电重启（拔电再上电）」；U-Boot 的
+   `reset` 命令当前不可用（patch 0003 的 `reset_cpu()` 只是打印占位的提示，task-76 修复），
+   所以页面与串口都不把 `reset` 作为可靠路径。页面不调用 `/reboot`，不做任何自动重启。
 5. 失败：页面显示设备返回的 `error=` 原因（尺寸不符、magic 不符、擦写/回读/比对失败等），
    按钮恢复可点。连接断开按可重试处理（连续 20 次失败或 10 分钟超时才报错）。
 6. 其他路径一律 404；页面不引用任何外部 URL。
@@ -88,8 +92,9 @@ bash tools/embed-failsafe.sh \
 | `GET /status` | 纯文本行；单线程服务器每次调用推进一步状态机 |
 
 请求头：`Content-Length`（必需，恰好 655360）、`Content-Type: application/octet-stream`
-（设备忽略）、`X-File-Sha256`（设备仅记录/回显，不作为完整性判据）、
-`X-E2631-Confirm: write`（`mode=write` 必需，防误写）。
+（设备忽略）、`X-E2631-SHA256`（64 位小写 hex，对**整个 655,360 B 文件**的 SHA-256；
+`mode=write` 必需，`mode=validate` 建议但可缺省）、`X-E2631-Confirm: write`（`mode=write`
+必需，防误写）。旧 `X-File-Sha256` 仅在 `X-E2631-SHA256` 缺失时作为兼容回退。
 
 响应（`text/plain`，逐行 `key=value`，客户端容忍未知键）：
 
@@ -97,6 +102,9 @@ bash tools/embed-failsafe.sh \
 stage=idle|staged|validating|erase|blank|write|readback|compare|done|error
 progress=<0..100>
 crc32=0x<hex>
+sha256=<设备计算的 64 位 hex>
+browser_sha256=<收到的头值或空>
+sha_match=ok|mismatch|absent
 result=staged|accepted|ok|error
 error=<短原因>        # 仅 result=error 时
 ```
@@ -121,7 +129,9 @@ error=<短原因>        # 仅 result=error 时
 - `uboot-build` 的 "Embed the failsafe rescue page" 步骤绿，产物含
   `E2631-FAILSAFE-ASSET.txt` 且在 `SHA256SUMS` 中。
 - 真机验收（F2 修复后）：`e2631rescue` → 电脑 DHCP 拿地址 → 打开 `http://192.168.1.1/` →
-  仅校验 → 写入待命 → 串口同刻显示五步 → 页面显示成功且不自动重启。
+  仅校验（设备/浏览器摘要一致，`sha_match=ok`）→ 写入待命 → 串口同刻显示五步 →
+  页面显示成功且不会自动重启；返回 Linux 需要断电重启（reset 命令要等 task-76）。
+  无浏览器验收见 evidence/e4-rescue-acceptance-plan-20261127.md 与 tools/e4-rescue-acceptance.sh。
 
 ## 8. 许可
 

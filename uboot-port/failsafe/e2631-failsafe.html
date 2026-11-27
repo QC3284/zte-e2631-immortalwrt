@@ -27,6 +27,8 @@ button:disabled{opacity:.45;cursor:default}
 <input id="file" type="file" accept=".bin,application/octet-stream">
 <p id="meta" class="small">未选择文件</p>
 <p class="small">SHA-256（浏览器端）：<span id="sha" class="mono">—</span></p>
+<p class="small">SHA-256（设备端）：<span id="devsha" class="mono">—</span></p>
+<p class="small">摘要比对：<span id="match" class="mono">—</span></p>
 <button id="validate" disabled>仅校验</button>
 <button id="write" class="alt" disabled>写入待命</button>
 </div>
@@ -34,7 +36,7 @@ button:disabled{opacity:.45;cursor:default}
 <div id="bar"><div id="fill"></div></div>
 <div id="log" aria-live="polite"></div>
 </div>
-<p class="small">写入成功后不会自动重启：请按串口提示执行 reset，或断电重启。写入需串口可用。</p>
+<p class="small">写入成功后不会自动重启：请断电重启（拔电再上电）。U-Boot 的 reset 命令当前不可用（后续修复），串口只打印下一步提示。写入需串口可用。</p>
 </main>
 <script>
 (()=>{
@@ -44,29 +46,32 @@ const $=id=>document.getElementById(id);
 const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
 const rotr=(x,n)=>(x>>>n)|(x<<(32-n));
 function sha256(buf){const l=buf.byteLength,H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19],bl=((l+8)>>6)+1,p=new Uint8Array(bl*64);p.set(new Uint8Array(buf));p[l]=0x80;const dv=new DataView(p.buffer),bit=l*8;dv.setUint32(bl*64-8,Math.floor(bit/0x100000000));dv.setUint32(bl*64-4,bit>>>0);const w=new Uint32Array(64);for(let i=0;i<bl;i++){const off=i*64;for(let t=0;t<16;t++)w[t]=dv.getUint32(off+t*4);for(let t=16;t<64;t++){const s0=rotr(w[t-15],7)^rotr(w[t-15],18)^(w[t-15]>>>3),s1=rotr(w[t-2],17)^rotr(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)>>>0}let a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];for(let t=0;t<64;t++){const S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[t]+w[t])>>>0,S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0}return H.map(x=>x.toString(16).padStart(8,"0")).join("")}
-let file=null,sha="";
+let file=null,sha="",validated=false,deviceSha="";
 const log=(m,c)=>{const d=document.createElement("div");d.textContent=m;if(c)d.className=c;$("log").appendChild(d)};
 const setPct=p=>{$("fill").style.width=(p<0?0:p>100?100:p)+"%"};
-const busy=on=>{$("validate").disabled=on;$("write").disabled=on};
+const busy=on=>{$("validate").disabled=on;$("write").disabled=on||!validated};
 const fail=m=>{log(m,"err");busy(false)};
 function lines(t){const o={};for(const ln of (t||"").split(/\r?\n/)){const m=/^([a-z_]+)=(.*)$/i.exec(ln.trim());if(m)o[m[1].toLowerCase()]=m[2]}return o}
 const STAGE={idle:"空闲",staged:"已上传待命",validating:"校验中",erase:"擦除中",blank:"擦除校验中",write:"写入中",readback:"回读中",compare:"比对中",done:"完成",error:"错误"};
 async function hashFile(f){try{const b=await f.arrayBuffer();const t=performance.now();sha=sha256(b);$("sha").textContent=sha;log("SHA-256 计算完成（"+Math.round(performance.now()-t)+" ms，浏览器端）")}catch(e){$("sha").textContent="计算失败";log("SHA-256 计算失败："+e,"err")}}
 $("file").addEventListener("change",async ev=>{const f=ev.target.files[0];file=f||null;sha="";$("sha").textContent="—";$("log").innerHTML="";setPct(0);if(!f){$("meta").textContent="未选择文件";$("validate").disabled=$("write").disabled=true;return}
-$("meta").textContent=f.name+" · "+f.size+" 字节"+(f.size===EXPECT?"（尺寸正确）":"（期望 "+EXPECT+" 字节，尺寸不符）");$("validate").disabled=$("write").disabled=false;await hashFile(f)});
-function done(r){setPct(100);if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));log("成功："+(r.message||r.msg||"设备已完成"),"ok");log("未自动重启：请按串口提示执行 reset，或断电重启。");busy(false)}
-function poll(){let fails=0,tries=0;const timer=setInterval(async()=>{tries++;if(tries>1200){clearInterval(timer);return fail("等待超时：设备未在 10 分钟内完成")}try{const res=await fetch("/status",{cache:"no-store"});const t=await res.text();const st=lines(t);fails=0;if(st.progress)setPct(Number(st.progress));if(st.stage){$("meta").textContent="阶段："+(STAGE[st.stage]||st.stage)}if(st.crc32)log("CRC32："+st.crc32);if(st.result==="ok"||st.stage==="done"){clearInterval(timer);done(st)}else if(st.result==="error"||st.stage==="error"||st.error){clearInterval(timer);fail(st.error||"设备返回错误")}}catch(e){if(++fails>=MAX_FAIL){clearInterval(timer);return fail("状态查询连续失败："+e)}}},POLL)}
+$("meta").textContent=f.name+" · "+f.size+" 字节"+(f.size===EXPECT?"（尺寸正确）":"（期望 "+EXPECT+" 字节，尺寸不符）");validated=false;deviceSha="";$("devsha").textContent="—";$("match").textContent="—";$("validate").disabled=false;$("write").disabled=true;await hashFile(f)});
+function showDigest(r){if(r.sha256){deviceSha=r.sha256;$("devsha").textContent=deviceSha}if(r.sha_match){$("match").textContent=r.sha_match}return r.sha256||deviceSha}
+function validateDone(r){setPct(100);const d=showDigest(r);if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));const ok=d&&d.toLowerCase()===sha&&(r.sha_match||"ok")==="ok";if(!ok){fail("摘要不一致：设备 "+(d||"?")+" / 浏览器 "+sha+(r.sha_match?"（sha_match="+r.sha_match+"）":""));return}validated=true;busy(false);log("校验通过：设备与浏览器摘要一致（sha_match=ok）","ok");log("可以点“写入待命”；写入过程不得断电。")}
+function done(r){setPct(100);const d=showDigest(r);if(d&&d.toLowerCase()!==sha){fail("写入后摘要不一致：设备 "+(d||"?")+" / 浏览器 "+sha);return}if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));log("成功："+(r.message||r.msg||"设备已完成"),"ok");log("未自动重启：请断电重启（拔电再上电）。U-Boot 的 reset 命令当前不可用（后续修复），串口只打印下一步提示。");busy(false)}
+function poll(){let fails=0,tries=0;const timer=setInterval(async()=>{tries++;if(tries>1200){clearInterval(timer);return fail("等待超时：设备未在 10 分钟内完成")}try{const res=await fetch("/status",{cache:"no-store"});const t=await res.text();const st=lines(t);fails=0;if(st.progress)setPct(Number(st.progress));if(st.stage){$("meta").textContent="阶段："+(STAGE[st.stage]||st.stage)}showDigest(st);if(st.crc32)log("CRC32："+st.crc32);if(st.result==="ok"||st.stage==="done"){clearInterval(timer);done(st)}else if(st.result==="error"||st.stage==="error"||st.error){clearInterval(timer);fail(st.error||"设备返回错误")}}catch(e){if(++fails>=MAX_FAIL){clearInterval(timer);return fail("状态查询连续失败："+e)}}},POLL)}
 function start(mode){if(!file)return;if(file.size!==EXPECT){fail("文件尺寸必须恰为 "+EXPECT+" 字节，当前 "+file.size);return}
 if(!confirm(mode==="validate"?"仅校验：上传并校验镜像，不写入 flash。继续？":"写入待命：上传→校验→擦写 mtd0 镜像区（0x20000..0xC0000）。写入期间不得断电，且需确保串口可用。继续？"))return;
 busy(true);setPct(0);$("log").innerHTML="";log(mode==="validate"?"上传中（仅校验）…":"上传中（写入待命）…");
-const xhr=new XMLHttpRequest();xhr.open("POST","/flash?mode="+mode);xhr.setRequestHeader("Content-Type","application/octet-stream");xhr.setRequestHeader("X-File-Sha256",sha);if(mode==="write")xhr.setRequestHeader("X-E2631-Confirm","write");
+const xhr=new XMLHttpRequest();xhr.open("POST","/flash?mode="+mode);xhr.setRequestHeader("Content-Type","application/octet-stream");xhr.setRequestHeader("X-E2631-SHA256",sha);if(mode==="write")xhr.setRequestHeader("X-E2631-Confirm","write");
 xhr.upload.onprogress=ev=>{if(ev.lengthComputable){const p=ev.loaded/ev.total*100;setPct(p);$("meta").textContent=file.name+" · 上传 "+p.toFixed(1)+"%"}};
 xhr.upload.onload=()=>{log("上传完成，等待设备处理…");setPct(100)};
 xhr.onerror=()=>fail("网络错误：设备未响应（检查网线与设备是否在救援模式）");
 xhr.onload=()=>{const r=lines(xhr.responseText||"");if(xhr.status<200||xhr.status>=300){fail(r.error||"HTTP "+xhr.status);return}
 if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));
 if(r.result==="error"||r.error){fail(r.error||"设备拒绝");return}
-if(r.result==="ok"||r.stage==="done"){done(r);return}
+if(mode==="validate"&&(r.result==="ok"||r.stage==="done")){validateDone(r);return}
+if(r.result==="ok"){validateDone(r);return}
 if(r.result==="staged"||r.result==="accepted"||r.stage){poll();return}
 fail("无法识别的设备响应："+(xhr.responseText||"").slice(0,200).replace(/\s+/g," "))};
 xhr.send(file)}

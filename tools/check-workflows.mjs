@@ -499,7 +499,8 @@ ok('the E4 rescue page is a single self-contained gzip asset within the 6144-byt
   FAILSAFE_PAGE.includes('id="validate"') && FAILSAFE_PAGE.includes('id="write"') &&
   FAILSAFE_PAGE.includes('/flash?mode=') && FAILSAFE_PAGE.includes('/status') &&
   FAILSAFE_PAGE.includes('X-E2631-Confirm') && FAILSAFE_PAGE.includes('655360') &&
-  FAILSAFE_PAGE.includes('X-File-Sha256') && !/https?:\/\//.test(FAILSAFE_PAGE) &&
+  FAILSAFE_PAGE.includes('X-E2631-SHA256') && FAILSAFE_PAGE.includes('sha_match') &&
+  FAILSAFE_PAGE.includes('devsha') && !/https?:\/\//.test(FAILSAFE_PAGE) &&
   !/<script[^>]+src=/.test(FAILSAFE_PAGE) && !/<link[^>]+href=/.test(FAILSAFE_PAGE) &&
   !/\/reboot/.test(FAILSAFE_PAGE),
   failsafeCheck.ok ? 'raw ' + failsafeCheck.raw + ' B, gzip ' + failsafeCheck.gzip + ' B, limit ' + failsafeCheck.limit + ' B' : failsafeCheck.out.slice(0, 200));
@@ -527,8 +528,8 @@ ok('the U-Boot workflow embeds the rescue page after git am, before make, and sh
   'embed at ' + failsafeEmbedAt + ', post-am at ' + failsafePatchAt + ', build at ' + failsafeBuildAt);
 ok('uboot-port/failsafe/README.md documents the frozen interface, the protocol and the size budget',
   ['e2631_failsafe_html_gz', 'e2631_failsafe_html_gz_len', 'POST /flash?mode=validate',
-    'POST /flash?mode=write', 'GET /status', 'X-E2631-Confirm: write', '6144',
-    'tools/embed-failsafe.sh', '--outdir'].every((s) => FAILSAFE_README.includes(s)) &&
+    'POST /flash?mode=write', 'GET /status', 'X-E2631-Confirm: write', 'X-E2631-SHA256',
+    'sha_match', '6144', 'tools/embed-failsafe.sh', '--outdir'].every((s) => FAILSAFE_README.includes(s)) &&
   FAILSAFE_README.includes('仅校验') && FAILSAFE_README.includes('写入待命'));
 
 console.log('');
