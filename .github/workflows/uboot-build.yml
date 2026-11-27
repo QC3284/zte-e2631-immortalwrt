@@ -367,11 +367,19 @@ jobs:
             exit 1
           fi
           echo "E2 Ethernet: driver, arena guard and device tree present"
+          # Multifunction U-Boot space budget: the mtd0 payload window is
+          # 0x20800..0xBFFFF (0x9F800 = 653312 bytes). Keep an 8 KiB safety
+          # margin for the next patches, so the build fails above 645120 bytes
+          # BEFORE the mtd0 image is assembled (this gate lives upstream of
+          # "Package the flashable mtd0 image").
           size=$(stat -c%s build/u-boot.bin)
           max=$((E2631_UBOOT_PAYLOAD_MAX))
-          echo "u-boot.bin: $size bytes, limit $max bytes"
-          if [ "$size" -gt "$max" ]; then
-            echo "::error::u-boot.bin ($size bytes) exceeds the mtd0 payload budget $max bytes"
+          margin=8192
+          gate=$((max - margin))
+          headroom=$((max - size))
+          echo "u-boot.bin: $size bytes, hard cap $max bytes, CI gate $gate bytes ($margin byte safety margin), headroom $headroom bytes"
+          if [ "$size" -gt "$gate" ]; then
+            echo "::error::u-boot.bin is $size bytes, above the CI gate $gate bytes (hard cap $max bytes, $margin byte safety margin); observed $size, limit $gate"
             exit 1
           fi
           # readelf prints the entry point in lowercase hex; the pin is uppercase.
@@ -589,6 +597,12 @@ jobs:
           header_sha=$(sha256sum "$RUNNER_TEMP/mtd0/uboot-header.bin" | awk '{print $1}')
           env_sha=$(sha256sum artifacts/e2631-env-block.bin | awk '{print $1}')
           payload_len=$(stat -c%s build/u-boot.bin)
+          config_sha=$(sha256sum build/.config | awk '{print $1}')
+          payload_max=$((E2631_UBOOT_PAYLOAD_MAX))
+          gate=$((payload_max - 8192))
+          headroom=$((payload_max - size))
+          headroom_pct=$(awk -v h="$headroom" -v m="$payload_max" 'BEGIN { printf "%.2f", 100 * h / m }')
+          gate_headroom=$((gate - size))
           mkdir -p artifacts
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
@@ -654,6 +668,17 @@ jobs:
             echo "mtd0 payload length: $payload_len bytes (0x$(printf '%x' "$payload_len")); mtd0 image bounds 0x20000..0xC0000, env starts at 0xC0000"
             echo "vendor env block (read-only, not written by this image): e2631-env-block.bin, mtd0 0xC0000, 0x20000 bytes, sha256 $env_sha"
             echo "mtd0 image inputs: vendor header block evidence/p2-oob/headblock-0x20000-0x20800.hex, vendor env rebuild evidence/b1-env-current-20261121.txt"
+            echo ""
+            echo "payload footprint (mtd0 payload window 0x20800..0xBFFFF, hard cap $payload_max bytes):"
+            echo "  u-boot.bin bytes: $size"
+            echo "  mtd0 image bytes: $mtd0_size"
+            echo "  hard cap bytes: $payload_max"
+            echo "  CI gate bytes: $gate (hard cap - 8192 safety margin)"
+            echo "  headroom bytes vs hard cap: $headroom"
+            echo "  headroom percent vs hard cap: $headroom_pct%"
+            echo "  headroom bytes vs CI gate: $gate_headroom"
+            echo "  env block sha256: $env_sha"
+            echo "  .config sha256: $config_sha"
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
           } > artifacts/UBOOT-INFO.txt
@@ -671,6 +696,8 @@ jobs:
             echo "- command help: E2631-COMMAND-HELP.txt (static dump of the new commands)"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
+            echo "- payload footprint: u-boot.bin $size / hard cap $payload_max bytes (headroom $headroom bytes, $headroom_pct%); CI gate $gate bytes; mtd0 image $mtd0_size bytes"
+            echo "- env block sha256: $env_sha, .config sha256: $config_sha"
             echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM; the image asset is for the future, user-approved flash stage"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the A1/A2/A3 U-Boot artifact

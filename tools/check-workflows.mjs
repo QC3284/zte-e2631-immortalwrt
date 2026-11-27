@@ -387,6 +387,8 @@ ok('the kit no longer carries overlay/, base/ or apply.sh',
 // the gates that the task-58 evidence recorded.
 const UBOOT_PIN_TEXT = read('uboot-port/commits.env');
 const UBOOT_WF = read('.github/workflows/uboot-build.yml');
+const UBOOT_README = read('uboot-port/README.md');
+const UBOOT_BUDGET_DOC = read('BUILD.md');
 const uboot = {};
 for (const line of UBOOT_PIN_TEXT.split('\n')) {
   const m = /^(E2631_UBOOT_[A-Z0-9_]+)=(.*)$/.exec(line.trim());
@@ -422,7 +424,7 @@ ok('the U-Boot workflow reads every pin from uboot-port/commits.env, hard-codes 
   !/[0-9a-f]{40}/.test(UBOOT_WF_LIVE) &&
   has(UBOOT_WF, "git rev-parse 'HEAD^{tree}'") && has(UBOOT_WF, 'git rev-list --count') &&
   has(UBOOT_WF, 'sha256sum -c') && has(UBOOT_WF, 'readelf -h') &&
-  has(UBOOT_WF, 'u-boot.bin ($size bytes) exceeds the mtd0 payload budget'));
+  has(UBOOT_WF, 'above the CI gate $gate bytes'));
 ok('the U-Boot workflow enforces the D-U1 commands and the single-writer gate',
   ['e2631flash', 'e2631verify', 'e2631slot'].every((c) => has(UBOOT_WF, c)) &&
   has(UBOOT_WF, 'flash an image to SPI-NAND with erase, blank and readback checks') &&
@@ -437,6 +439,32 @@ ok('the U-Boot artifact records the banner, both crc32 values and the command he
   has(UBOOT_WF, 'u-boot.bin crc32:') && has(UBOOT_WF, 'mtd0 image crc32:') &&
   /sha256sum[^\n]*E2631-COMMAND-HELP\.txt/.test(UBOOT_WF) &&
   has(UBOOT_WF, 'UBOOT-INFO.txt'));
+// Payload budget (task-71): the mtd0 window caps the payload at 0x9F800
+// (653312 bytes); CI keeps an 8 KiB margin, so it fails above 645120 bytes and
+// does so before assembling the mtd0 image. The numbers are documented in
+// uboot-port/README.md (hard cap) and BUILD.md (budget table).
+const ubootPayloadMax = parseInt(uboot.E2631_UBOOT_PAYLOAD_MAX, 16);
+const ubootGate = ubootPayloadMax - 8192;
+const ubootGateAt = UBOOT_WF.indexOf('gate=$((max - margin))');
+// lastIndexOf: the gate comment also names the later step, so only the last
+// occurrence is the real "Package the flashable mtd0 image" step.
+const ubootPackAt = UBOOT_WF.lastIndexOf('Package the flashable mtd0 image');
+ok('the U-Boot workflow gates the payload at 653312 - 8192 bytes before assembling mtd0',
+  ubootPayloadMax === 653312 && ubootGate === 645120 &&
+  has(UBOOT_WF, 'margin=8192') && has(UBOOT_WF, 'gate=$((max - margin))') &&
+  has(UBOOT_WF, 'if [ "$size" -gt "$gate" ]') &&
+  has(UBOOT_WF, 'above the CI gate $gate bytes') &&
+  has(UBOOT_WF, 'observed $size, limit $gate') &&
+  ubootGateAt > 0 && ubootPackAt > ubootGateAt,
+  'payload max ' + uboot.E2631_UBOOT_PAYLOAD_MAX + ', gate ' + ubootGate + ', gate before mtd0 packaging');
+ok('the payload budget is documented against uboot-port/README.md',
+  ['0x9F800', '653312', '638 KiB'].every((s) => has(UBOOT_README, s)) &&
+  ['653312', '645120', '0x9F800', '8192', '0x20800..0xBFFFF'].every((s) => has(UBOOT_BUDGET_DOC, s)));
+ok('UBOOT-INFO.txt carries the payload footprint table',
+  ['payload footprint', 'u-boot.bin bytes:', 'mtd0 image bytes:', 'hard cap bytes:',
+    'CI gate bytes:', 'headroom bytes vs hard cap:', 'headroom percent vs hard cap:',
+    'headroom bytes vs CI gate:', 'env block sha256:', '.config sha256:'].every((s) => has(UBOOT_WF, s)) &&
+  has(UBOOT_WF, 'sha256sum build/.config'));
 
 console.log('');
 console.log(fails === 0 ? 'check-workflows: OK - pins, tree-fork content, CI, artifact names and release channel agree'

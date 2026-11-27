@@ -281,3 +281,35 @@ Four rules that exist because breaking them cost hours:
 
 `docs/architecture.md` maps the pieces and `docs/known-issues.md` is the machine-readable
 honest list, including what is still broken on real hardware.
+
+
+## 9. U-Boot payload budget (multifunction U-Boot)
+
+The custom U-Boot eventually goes into the mtd0 image area 0x20000..0xC0000:
+secondboot copies the payload from mtd0 0x20800 using the length field at header
++0x14, the payload area runs to 0xBFFFF, and the environment area starts at
+0xC0000. The payload hard cap is therefore **0x9F800 = 653312 bytes (638 KiB)**.
+A1/A2/A3 run it from RAM, where the cap does not apply, but the same binary must
+fit mtd0 later, so CI enforces the budget up front.
+
+Since E4, space is a first-class constraint: `uboot-build.yml` gates the payload
+*before* the "Package the flashable mtd0 image" step, with a safety margin.
+
+| item | value |
+|---|---|
+| payload window | mtd0 `0x20800..0xBFFFF` (0x9F800) |
+| hard cap | **653312 bytes (638 KiB)** |
+| CI gate | **645120 bytes** (hard cap - 8192 bytes = 8 KiB safety margin) |
+| current `u-boot.bin` (2026-11-22, 22 patches) | 494208 bytes; headroom to the hard cap 159104 bytes (24.35%), headroom to the CI gate 150912 bytes |
+| failure behaviour | above 645120 bytes the build fails and prints both the observed size and the limit |
+
+Every successful build records a footprint table in the artifact's
+`UBOOT-INFO.txt`: `u-boot.bin` bytes, mtd0 image bytes, the environment block
+sha256, the `.config` sha256, and the headroom in bytes and percent (against both
+the hard cap and the CI gate). `node tools/check-workflows.mjs` cross-checks the
+workflow's 8192/645120 values against `uboot-port/README.md`
+(0x9F800/653312/638 KiB) and asserts the gate still runs before mtd0 assembly.
+
+Before adding a U-Boot feature, look at the `u-boot.bin` headroom: a patch that
+would cross the gate must shrink something else first. Do not touch the 8 KiB
+safety margin itself.
