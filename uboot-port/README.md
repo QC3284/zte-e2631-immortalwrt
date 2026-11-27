@@ -629,6 +629,7 @@ U-Boot 网络栈。
 
 ```sh
 md.l 0x92340100 1                      # TM status 基线
+md.l 0x3883c0 1                        # CPU 桥端口（port 0）egress mask 的写前值
 e2631net sbrg                          # 记录 egress 0..4、VLAN 1、learn
 e2631net mode pp;         e2631net tx 3
 e2631net mode pp-alt;     e2631net tx 3
@@ -642,6 +643,8 @@ e2631net                               # 终态
 （或主机收到 60 B 广播 ARP）→ 命中的模式/掩码即根因；若全部不动，保存 `hw tx idx` 前后值、`TM status`
 前后差、`last descriptor` 四字与 `SBRG egress`/VLAN 值，作为与厂商链/Linux 链对照的原始数据。
 本阶段不写 flash、不改 env；`e2631net sbrg allow` 只写桥块 egress 寄存器，断电即复位。
+`md.l 0x3883c0 1` 的写前值必须落进串口日志：它和 `e2631net sbrg allow` 之后的读回值配对，
+才能把「allow 是否真的改了 CPU egress mask」作为数据判读，而不是只看终态。
 
 ### E4 v1 救援模式验收（需要真机会话；会写 mtd0，需用户单独批准）
 

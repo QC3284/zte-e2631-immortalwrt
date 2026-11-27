@@ -76,6 +76,7 @@ e2631net sbrg [allow]     # 打印 SBRG 学习位/端口控制/egress 0..4 + VLA
 
 ```
 md.l 0x92340100 1        # TM status 发送前基线
+md.l 0x3883c0 1          # CPU 桥端口（port 0）egress mask 写前值
 e2631net sbrg            # 记录 egress 0..4、VLAN 1、learn
 e2631net mode pp
 e2631net tx 3            # 记录全量输出；主机看是否有 60 B 广播 ARP
@@ -95,6 +96,8 @@ e2631net                 # 终态；仍然 hw tx idx 不动且 MAC 计数全 0 �
 把命中的模式（以及 `sbrg` 的 egress/VLAN 值）写进本文件 §0；若全部不动，记录 `hw tx idx` 前后值、
 `TM status` 前后差、`last descriptor` 四字、`egress 0..4` 与 VLAN 1，作为与
 “厂商链 + Linux 链”对照的原始数据（C4/C5 的判别材料）。
+`md.l 0x3883c0 1` 的写前值与 `e2631net sbrg allow` 之后的读回值必须成对出现在串口日志里：
+这是判断 C2 时「掩码确实被改动」的唯一数据，不能只记终态。
 
 ## 5. 风险与边界
 
