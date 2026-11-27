@@ -1013,4 +1013,8 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
   patch 0032：把常量改回 17，新增 `e2631net bmu`（TM buffer 窗口/BMU 池/DMA ring 窗口/switch fwd ctrl）
   与每次探测的 BMU 块上报，`0x1fc` 按厂商语义改称 `dma err`，`e2631net sbrg` 每次打印桥块状态、
   `allow` 只回放复位值。真机判据：`e2631net bmu` 的 `switch fwd ctrl` 读回 `0x00000011` 且
-  `e2631net tx 3` 后 MAC TX frames 增长。
+  `e2631net tx 3` 后 MAC TX frames 增长。CI 构建 run `46030383958`（head `739b8e8`，32 个 patch，
+  tree `ae72334756d47f05a247f0dea63f81c0ca7265dc`）全绿：banner `U-Boot 2027.01-rc2-gd38f69c44523`、
+  u-boot.bin 365,872 B sha256 `e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b`
+  crc32 `0966526e`、mtd0 sha256 `4fa8bd4d0e4600fd4c3463848135c7239a21f7e2cdb6f4865c462b888ddcb857`
+  crc32 `1ffd8cb2`、env 块 `6eee153b...` 未变；checkpatch 0E/0W、D-U1 白名单 4 site。

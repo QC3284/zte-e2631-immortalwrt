@@ -163,3 +163,19 @@ SBRG 块正确读地址是 `0x95883c0`（0x92000000 基址 + 0x3883c0），旧�
   `MAC TX frames` 任一端口增长且主机 tcpdump 看到 60 B 广播 ARP。若仍静默，保存 `e2631net bmu` 全部寄存器、
   `dma err` 前后值、`last descriptor` 与 raw `BUF_ID`，作为下一轮（描述符/环归属）的原始数据。
 - 边界：0032 只改一个常量并加只读转储，不改默认 TX 模式/救援/写路径；回滚=还原该常量。
+
+### 8.1 CI 构建身份（run 46030383958，32 个 patch）
+
+| 项 | 值 |
+| --- | --- |
+| 运行 | `E2631 A1/A2/A3 U-Boot - iwrt-adaptation - run 38`，run id `46030383958`，head `739b8e8` |
+| post-am tree | `ae72334756d47f05a247f0dea63f81c0ca7265dc` |
+| banner | `U-Boot 2027.01-rc2-gd38f69c44523 (Nov 19 2026 - 15:44:39 +0000)` |
+| u-boot.bin | 365,872 B sha256 `e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b` crc32 `0966526e` |
+| mtd0 image | 655,360 B sha256 `4fa8bd4d0e4600fd4c3463848135c7239a21f7e2cdb6f4865c462b888ddcb857` crc32 `1ffd8cb2` |
+| 装配后首 0x800 | sha256 `232513cb16f11c15299716b14cdc3c4fb4e4b2d787c6cd10b01309be0acd29c9` |
+| env 块 | `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（未变） |
+| .config | sha256 `d3a8450a810064adce1152741cf563237a587e1c2875ad598eaa6c5f969a7a5a` |
+| 门禁 | checkpatch 0 errors / 0 warnings（24 checks）；`mtd writer sites: 4`；`F2 TX probe gate` 与 `F2 forward-control gate` 均输出；入口 0x47f00000 |
+| 尺寸 | 365,872 B（较 0031 构建 +1,144 B；CI 门限余量 279,248 B，硬上限余量 287,440 B） |
+| 归档 | `/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/`（SHA256SUMS 校验通过） |
