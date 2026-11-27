@@ -299,6 +299,21 @@ jobs:
             exit 1
           fi
           echo "env retry gate: three read attempts and the failure diagnostic are present"
+          # task-78/F2b: the TX probe and the bridge-block dump are the
+          # diagnostic for the F2 hunt (frames complete but never leave).  The
+          # default TX mode must stay the kernel descriptor, and the probe plus
+          # the bridge-block helpers must be linked into the image.
+          eth_c=drivers/net/zx279128s_eth.c
+          grep -q 'static int zx_tx_mode = ZX_TX_MODE_PP;' "$eth_c"
+          grep -q 'zx_tx_mode_names' "$eth_c"
+          grep -q 'ZX_SBRG_EGRESS' drivers/net/zx279128s_eth.h
+          for tx_text in 'e2631net: tx probe' 'SBRG egress before'; do
+            if ! grep -aq "$tx_text" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the F2 TX probe text: $tx_text"
+              exit 1
+            fi
+          done
+          echo "F2 TX probe gate: default mode pp, probe frames and bridge-block dump present"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1

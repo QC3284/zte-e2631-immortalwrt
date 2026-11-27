@@ -1,0 +1,472 @@
+From 85aa99fdf45d5ca244d74d8e0942f9a3374e01d2 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 22:58:38 +0800
+Subject: [PATCH] drivers/net: add the TX probe and the bridge-block dump
+
+The F2 bring-up shows that the traffic manager completes our transmit
+descriptors (the completion poll never fails) while the frames appear
+neither on the wire nor in any MAC port counter.  The two reference
+implementations disagree exactly on the descriptor: the kernel, which this
+port copied, uses the directed-egress queue 40 + port and leaves word 3
+bit 0 set, while the vendor bootloader uses queue 0 and clears that bit.
+
+Make the variant selectable at run time instead of guessing in a rebuild:
+e2631net mode picks it, e2631net tx sends broadcast probe frames through
+the same send path that DHCP and TFTP use, and prints the DMA doorbell,
+the completion counter, the hardware descriptor index, the last
+descriptor, the traffic manager status, the per-port MAC transmit
+counters and the bridge block's egress masks before and after.
+"e2631net sbrg allow" restores the CPU port's egress mask, the one
+permission the switch reset leaves unclear and the only one that can stop
+a CPU-sourced frame from reaching a MAC port.
+
+The default mode keeps the kernel descriptor, so nothing changes for the
+normal boot paths.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ drivers/net/zx279128s_eth.c | 305 ++++++++++++++++++++++++++++++++++--
+ drivers/net/zx279128s_eth.h |  21 +++
+ 2 files changed, 314 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/net/zx279128s_eth.c b/drivers/net/zx279128s_eth.c
+index 0385d6a7..c21501c0 100644
+--- a/drivers/net/zx279128s_eth.c
++++ b/drivers/net/zx279128s_eth.c
+@@ -34,6 +34,7 @@
+ #include <miiphy.h>
+ #include <net.h>
+ #include <phy.h>
++#include <vsprintf.h>
+ 
+ #include "zx279128s_eth.h"
+ 
+@@ -48,6 +49,28 @@ static_assert(ZX_DMA_ARENA_ADDR > CONFIG_SYS_LOAD_ADDR,
+ static_assert(ZX_DMA_ARENA_ADDR + ZX_DMA_ARENA_SIZE <= 0x50000000UL,
+ 	      "the network DMA arena must end below the top of DRAM");
+ 
++/*
++ * TX descriptor variants that the F2 bring-up compares on the device.  The
++ * Linux driver and this port write a directed-egress descriptor (traffic
++ * manager queue 40 + port, word 3 bits 1:0 = 0x3); the vendor bootloader
++ * writes the plain one (queue 0, word 3 = 0x2).  The mode is a run-time
++ * knob so one zero-write session can tell the two apart without a rebuild;
++ * the default is the descriptor the kernel uses.
++ */
++enum zx_tx_mode {
++	ZX_TX_MODE_PP = 0,	/* queue 40 + port, word 3 = 0x3 (Linux) */
++	ZX_TX_MODE_PP_ALT,	/* queue 40 + port, word 3 = 0x2 */
++	ZX_TX_MODE_VENDOR,	/* queue 0, word 3 = 0x2 (vendor U-Boot) */
++	ZX_TX_MODE_VENDOR_ALT,	/* queue 0, word 3 = 0x3 */
++	ZX_TX_MODE_COUNT,
++};
++
++static const char *const zx_tx_mode_names[ZX_TX_MODE_COUNT] = {
++	"pp", "pp-alt", "vendor", "vendor-alt",
++};
++
++static int zx_tx_mode = ZX_TX_MODE_PP;
++
+ #define ZX_TM_POLL_US		1
+ #define ZX_TM_TIMEOUT_US	1000
+ #define ZX_BMU_TIMEOUT_US	1000
+@@ -407,6 +430,9 @@ struct zx279128s_eth_priv {
+ 	bool bmu_alloc_pending;
+ 	u32 bmu_alloc_late;
+ 	u32 bmu_alloc_fail;
++	u32 tx_sent;
++	u32 tx_failed;
++	u32 last_tx_done;
+ };
+ 
+ static struct zx279128s_eth_priv *zx_debug_priv;
+@@ -515,10 +541,31 @@ static const char *zx_bmu_alloc_reason(int err)
+ 	}
+ }
+ 
++/*
++ * Fill one TX descriptor.  The queue field and word 3 bit 0 are the two
++ * words the vendor bootloader and the Linux driver disagree about; see
++ * enum zx_tx_mode.
++ */
++static void zx_tx_descriptor(__le32 *desc, int mode, int switch_port, int bp,
++			     u32 len)
++{
++	bool vendor_queue = mode == ZX_TX_MODE_VENDOR ||
++			    mode == ZX_TX_MODE_VENDOR_ALT;
++	bool flags_two = mode == ZX_TX_MODE_VENDOR || mode == ZX_TX_MODE_PP_ALT;
++	u32 queue = vendor_queue ? 0 : ZX_PORT_TX_QUEUE(switch_port);
++
++	desc[0] = cpu_to_le32(0x80 | (queue << 20));
++	desc[1] = cpu_to_le32(0x10000);
++	desc[2] = cpu_to_le32(0x21000000 | ((len & 0x3fff) << 9));
++	desc[3] = cpu_to_le32((flags_two ? 0x2 : 0x3) | ((len & 0x3fff) << 2));
++	((u8 *)desc)[7] = (u8)((bp & 0x7f) << 1);
++	((u8 *)desc)[8] = (u8)(bp >> 7);
++}
++
+ /* The frame is sent from the fixed arena; caches are off, so no flush. */
+-static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
++static int zx_send_frame(struct zx279128s_eth_priv *priv, const void *packet,
++			 int length, int mode)
+ {
+-	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
+ 	u32 tx_ring = ZX_DMA_ARENA_ADDR + ZX_TX_OFFSET;
+ 	__le32 *desc;
+ 	u32 len, idx, done;
+@@ -543,6 +590,7 @@ static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
+ 		       readl(priv->base + ZX_BMU_BUF_ALLOC),
+ 		       readl(priv->base + ZX_BMU_BUF_ID),
+ 		       readl(priv->base + ZX_BMU_FREE_STATUS));
++		priv->tx_failed++;
+ 		return bp;
+ 	}
+ 
+@@ -552,16 +600,12 @@ static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
+ 
+ 	/*
+ 	 * Directed egress to this port's traffic manager queue; the frame
+-	 * leaves through the packet processor bridge (mode 2 TX).
++	 * leaves through the packet processor bridge (mode 2 TX).  The mode
++	 * only changes the queue field and word 3; see zx_tx_descriptor().
+ 	 */
+ 	idx = priv->tx_idx % ZX_NUM_TX_DESC;
+ 	desc = (__le32 *)(tx_ring + idx * ZX_DESC_SIZE);
+-	desc[0] = cpu_to_le32(0x80 | (ZX_PORT_TX_QUEUE(priv->switch_port) << 20));
+-	desc[1] = cpu_to_le32(0x10000);
+-	desc[2] = cpu_to_le32(0x21000000 | ((len & 0x3fff) << 9));
+-	desc[3] = cpu_to_le32(0x3 | ((len & 0x3fff) << 2));
+-	((u8 *)desc)[7] = (u8)((bp & 0x7f) << 1);
+-	((u8 *)desc)[8] = (u8)(bp >> 7);
++	zx_tx_descriptor(desc, mode, priv->switch_port, bp, len);
+ 
+ 	/* Publish the descriptor before the doorbell. */
+ 	mb();
+@@ -571,14 +615,24 @@ static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
+ 	/* The completion counter clears itself when read. */
+ 	ret = readl_poll_sleep_timeout(priv->base + ZX_DMA_TX_DONE, done,
+ 				       done & 0xffff, 10, 100000);
++	priv->last_tx_done = done & 0xffff;
+ 	if (ret) {
+ 		printf("zx279128s: TX completion timed out\n");
++		priv->tx_failed++;
+ 		return ret;
+ 	}
+ 
++	priv->tx_sent++;
+ 	return 0;
+ }
+ 
++static int zx279128s_eth_send(struct udevice *dev, void *packet, int length)
++{
++	struct zx279128s_eth_priv *priv = dev_get_priv(dev);
++
++	return zx_send_frame(priv, packet, length, zx_tx_mode);
++}
++
+ /*
+  * There is no interrupt handler: the RX queue count is polled.  Queue 0 is
+  * the one the switch puts CPU frames on.  The descriptor is cleared here,
+@@ -788,6 +842,214 @@ U_BOOT_DRIVER(zx279128s_eth) = {
+ 
+ /* ---- Debug command ---------------------------------------------------- */
+ 
++/*
++ * Everything the F2 investigation needs in one place: the DMA doorbell and
++ * completion state, the descriptor that was written last, the traffic manager
++ * status, the transmit counters of every MAC port (a frame that leaves
++ * another port shows up there), and the bridge block's permissions, which are
++ * what decides whether the CPU may hand a frame to a switch port.
++ */
++static void zx_print_tx_state(struct zx279128s_eth_priv *priv)
++{
++	void __iomem *base = priv->base;
++	__le32 *desc;
++	u32 idx;
++	int i;
++
++	printf("e2631net: tx mode %s, sent %u, failed %u\n",
++	       zx_tx_mode_names[zx_tx_mode], priv->tx_sent, priv->tx_failed);
++	printf("e2631net: dma ctrl 0x%08x ring cfg 0x%08x tx ring 0x%08x\n",
++	       readl(base + ZX_DMA_CTRL), readl(base + ZX_DMA_RING_CFG),
++	       readl(base + ZX_DMA_TX_RING));
++	printf("e2631net: tx start 0x%08x tx done 0x%08x hw tx idx 0x%08x last done %u\n",
++	       readl(base + ZX_DMA_TX_START), readl(base + ZX_DMA_TX_DONE),
++	       readl(base + ZX_DMA_TX_INDEX), priv->last_tx_done);
++	idx = priv->tx_idx ? (priv->tx_idx - 1) % ZX_NUM_TX_DESC : 0;
++	desc = (__le32 *)(ZX_DMA_ARENA_ADDR + ZX_TX_OFFSET + idx * ZX_DESC_SIZE);
++	printf("e2631net: last descriptor %08x %08x %08x %08x\n",
++	       le32_to_cpu(desc[0]), le32_to_cpu(desc[1]),
++	       le32_to_cpu(desc[2]), le32_to_cpu(desc[3]));
++	printf("e2631net: TM ctrl 0x%08x TM status 0x%08x\n",
++	       readl(base + ZX_TM_CTRL), readl(base + ZX_TM_INT_STATUS));
++
++	printf("e2631net: MAC TX frames");
++	for (i = 0; i < ZX_NUM_PORTS; i++)
++		printf(" %d:%u", i,
++		       readl(base + ZX_MAC_PORT(i) + ZX_MAC_MIB_TX_FRAMES));
++	printf("\n");
++
++	printf("e2631net: SBRG learn 0x%08x port ctrl 0x%08x egress",
++	       readl(base + ZX_SBRG_LEARN), readl(base + ZX_SBRG_PORT_CTRL));
++	for (i = 0; i <= 4; i++)
++		printf(" %d:0x%02x", i, readl(base + ZX_SBRG_EGRESS(i)) & 0xff);
++	printf("\n");
++
++	printf("e2631net: SPA port en");
++	for (i = 0; i < 7; i++)
++		printf(" %u", readl(base + ZX_SPA_PORT_EN(i)));
++	printf("; SW fwd 0x%08x\n", readl(base + ZX_SW_FWD_CTRL));
++}
++
++/* A 60-byte broadcast ARP request from our own address: no reply needed, it
++ * only has to be a frame the switch has to forward somewhere.
++ */
++static int zx_probe_frame(u8 *frame, int size)
++{
++	static const u8 broadcast[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff,
++						0xff, 0xff };
++	struct eth_pdata *pdata;
++	struct udevice *dev = eth_get_dev();
++	u8 *arp;
++
++	if (size < 60)
++		return -EINVAL;
++	if (!dev)
++		return -ENODEV;
++	pdata = dev_get_plat(dev);
++
++	memset(frame, 0, 60);
++	memcpy(frame, broadcast, ETH_ALEN);
++	memcpy(frame + ETH_ALEN, pdata->enetaddr, ETH_ALEN);
++	frame[12] = 0x08;
++	frame[13] = 0x06;
++	arp = frame + 14;
++	arp[0] = 0x00;
++	arp[1] = 0x01;			/* Ethernet */
++	arp[2] = 0x08;
++	arp[3] = 0x00;			/* IPv4 */
++	arp[4] = ETH_ALEN;
++	arp[5] = 4;
++	arp[6] = 0x00;
++	arp[7] = 0x01;			/* request */
++	memcpy(arp + 8, pdata->enetaddr, ETH_ALEN);
++	return 0;
++}
++
++static int zx_cmd_tx(struct zx279128s_eth_priv *priv, int count)
++{
++	u8 frame[60];
++	u32 idx_before;
++	int i, ret;
++
++	if (!priv->hw_ready) {
++		ret = eth_init();
++		if (ret) {
++			printf("e2631net: eth_init failed (%d)\n", ret);
++			return CMD_RET_FAILURE;
++		}
++	}
++
++	ret = zx_probe_frame(frame, sizeof(frame));
++	if (ret) {
++		printf("e2631net: cannot build a probe frame (%d)\n", ret);
++		return CMD_RET_FAILURE;
++	}
++
++	idx_before = readl(priv->base + ZX_DMA_TX_INDEX);
++	printf("e2631net: tx probe: %d frame(s) in mode %s\n", count,
++	       zx_tx_mode_names[zx_tx_mode]);
++
++	ret = 0;
++	for (i = 0; i < count; i++) {
++		ret = zx_send_frame(priv, frame, sizeof(frame), zx_tx_mode);
++		if (ret)
++			break;
++	}
++
++	printf("e2631net: tx probe: hw tx idx 0x%08x -> 0x%08x\n", idx_before,
++	       readl(priv->base + ZX_DMA_TX_INDEX));
++	zx_print_tx_state(priv);
++
++	return ret ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
++}
++
++static int zx_cmd_mode(int argc, char *const argv[])
++{
++	int i;
++
++	if (argc < 3) {
++		printf("e2631net: tx mode %s, available:", zx_tx_mode_names[zx_tx_mode]);
++		for (i = 0; i < ZX_TX_MODE_COUNT; i++)
++			printf(" %d=%s", i, zx_tx_mode_names[i]);
++		printf("\n");
++		return CMD_RET_SUCCESS;
++	}
++
++	for (i = 0; i < ZX_TX_MODE_COUNT; i++) {
++		if (!strcmp(argv[2], zx_tx_mode_names[i])) {
++			zx_tx_mode = i;
++			printf("e2631net: tx mode %s\n", zx_tx_mode_names[i]);
++			return CMD_RET_SUCCESS;
++		}
++	}
++
++	i = hextoul(argv[2], NULL);
++	if (i < ZX_TX_MODE_COUNT) {
++		zx_tx_mode = i;
++		printf("e2631net: tx mode %s\n", zx_tx_mode_names[i]);
++		return CMD_RET_SUCCESS;
++	}
++
++	printf("e2631net: unknown tx mode %s\n", argv[2]);
++	return CMD_RET_FAILURE;
++}
++
++static int zx_sbrg_vlan_dump(void __iomem *base)
++{
++	u32 val, word[3];
++	int i, ret;
++
++	writel(((u32)ZX_SBRG_MEM_VLAN << 22) | 1 | ZX_SBRG_IND_READ,
++	       base + ZX_SBRG_IND_CMD);
++	ret = readl_poll_sleep_timeout(base + ZX_SBRG_IND_DONE, val, val & 1,
++				       ZX_TM_POLL_US, ZX_TM_TIMEOUT_US);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < 3; i++)
++		word[i] = readl(base + ZX_SBRG_IND_DATA(i));
++	printf("e2631net: SBRG VLAN 1 words %08x %08x %08x\n",
++	       word[0], word[1], word[2]);
++	return 0;
++}
++
++static int zx_cmd_sbrg(struct zx279128s_eth_priv *priv, int argc,
++		       char *const argv[])
++{
++	void __iomem *base = priv->base;
++	int i, ret;
++
++	if (argc > 2 && !strcmp(argv[2], "allow")) {
++		printf("e2631net: SBRG egress before");
++		for (i = 0; i <= 4; i++)
++			printf(" %d:0x%02x", i,
++			       readl(base + ZX_SBRG_EGRESS(i)) & 0xff);
++		printf("\n");
++
++		/*
++		 * The bridge block drops a frame when its source bridge port is
++		 * not in the destination port's egress mask.  The CPU is bridge
++		 * port 0, so ZX_SBRG_EGRESS(0) alone decides whether the CPU
++		 * may send to the switch ports.  Restore the reset value
++		 * explicitly: every other bridge port, the CPU included.
++		 */
++		for (i = 0; i <= 4; i++)
++			writel(0xff & ~BIT(i), base + ZX_SBRG_EGRESS(i));
++
++		printf("e2631net: SBRG egress after ");
++		for (i = 0; i <= 4; i++)
++			printf(" %d:0x%02x", i,
++			       readl(base + ZX_SBRG_EGRESS(i)) & 0xff);
++		printf("\n");
++	}
++
++	ret = zx_sbrg_vlan_dump(base);
++	if (ret)
++		printf("e2631net: SBRG VLAN read timed out (%d)\n", ret);
++
++	return CMD_RET_SUCCESS;
++}
++
+ static int do_e2631net(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		       char *const argv[])
+ {
+@@ -800,6 +1062,18 @@ static int do_e2631net(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		return CMD_RET_FAILURE;
+ 	}
+ 
++	if (argc > 1 && !strcmp(argv[1], "mode"))
++		return zx_cmd_mode(argc, argv);
++
++	if (argc > 1 && !strcmp(argv[1], "tx"))
++		return zx_cmd_tx(priv, argc > 2 ? hextoul(argv[2], NULL) : 1);
++
++	if (argc > 1 && !strcmp(argv[1], "sbrg"))
++		return zx_cmd_sbrg(priv, argc, argv);
++
++	if (argc > 1)
++		return CMD_RET_USAGE;
++
+ 	printf("e2631net: lan1 switch port %d, %s\n", priv->switch_port,
+ 	       priv->hw_ready ? "started" : "stopped");
+ 	if (priv->phydev)
+@@ -826,9 +1100,16 @@ static int do_e2631net(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		printf(" %u", readl(priv->base + ZX_DMA_RX_QUEUE_CNT(i)) & 0xffff);
+ 	printf("\n");
+ 
++	zx_print_tx_state(priv);
++
+ 	return CMD_RET_SUCCESS;
+ }
+ 
+-U_BOOT_CMD(e2631net, 1, 1, do_e2631net,
+-	   "print the zx279128s Ethernet state",
+-	   "");
++U_BOOT_CMD(e2631net, 4, 1, do_e2631net,
++	   "print or probe the zx279128s Ethernet state",
++	   "                - print the link, DMA and bridge-block state\n"
++	   "e2631net tx [count] - send [count] broadcast probe frames and print\n"
++	   "                     the completion state afterwards\n"
++	   "e2631net mode [name]- print or select the TX descriptor variant\n"
++	   "e2631net sbrg [allow] - dump the bridge block and its VLAN entry;\n"
++	   "                     'allow' restores the CPU port's egress mask");
+diff --git a/drivers/net/zx279128s_eth.h b/drivers/net/zx279128s_eth.h
+index 02f19be1..a136f532 100644
+--- a/drivers/net/zx279128s_eth.h
++++ b/drivers/net/zx279128s_eth.h
+@@ -25,6 +25,23 @@
+ #define ZX_SW_FWD_CTRL		0x1cc000
+ #define ZX_SW_FWD_CTRL_ON	BIT(17)
+ 
++/* Bridge block: the ports a source bridge port may send to.  Bridge port 0
++ * is the CPU port, so ZX_SBRG_EGRESS(0) decides whether the CPU may hand a
++ * frame to the switch ports at all.
++ */
++#define ZX_SBRG_PORT_CTRL	0x388004
++#define ZX_SBRG_IND_CMD		0x388014
++#define ZX_SBRG_IND_READ	BIT(27)
++#define ZX_SBRG_IND_DONE	0x388018
++#define ZX_SBRG_IND_DATA(i)	(0x38801c + 4 * (i))
++#define ZX_SBRG_LEARN		0x3881c0
++#define ZX_SBRG_EGRESS(bp)	(0x3883c0 + 4 * (bp))
++#define ZX_SBRG_MEM_VLAN	4
++#define ZX_SBRG_VLAN_VALID	BIT(0)
++#define ZX_SBRG_VLAN_UNTAG(bp)	(1 << (2 * (bp) + 1))
++#define ZX_BRPORT(p)		((p) + 1)
++#define ZX_BRPORT_CPU		0
++
+ /* Switch port attributes */
+ #define ZX_SPA_UP_REG_PKT_EN	0x1d4000
+ #define ZX_SPA_DN_REG_PKT_EN	0x1d4040
+@@ -45,6 +62,9 @@
+ #define ZX_MAC_CTRL_FD		BIT(13)
+ #define ZX_MAC_CTRL_100		BIT(14)
+ #define ZX_MAC_CTRL_MII		BIT(15)
++#define ZX_MAC_MIB_TX_FRAMES	0x768
++#define ZX_MAC_MIB_TX_OCTETS	0x764
++#define ZX_MAC_MIB_RX_UCAST	0x7c4
+ 
+ /* Traffic manager */
+ #define ZX_TM_BASE		0x340000
+@@ -113,6 +133,7 @@
+ #define ZX_DMA_TX_RING		(ZX_DMA_BASE + 0x60)
+ #define ZX_DMA_TX_START		(ZX_DMA_BASE + 0x64)
+ #define ZX_DMA_TX_DONE		(ZX_DMA_BASE + 0x68)
++#define ZX_DMA_TX_INDEX		(ZX_DMA_BASE + 0x1fc)	/* ring slot fetched last */
+ #define ZX_DMA_RX_QUEUE_CNT(q)	(ZX_DMA_BASE + 0x100 + (q) * 4)
+ 
+ /* Packet processor */
+-- 
+2.56.1
+
