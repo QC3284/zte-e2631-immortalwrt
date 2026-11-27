@@ -1,0 +1,12 @@
+02:24:28 stage copy 0.24s rc=0
+02:24:29 stage erase 0.85s rc=0
+02:24:29 stage write 0.38s rc=0
+02:24:29 stage readback 0.24s rc=0
+02:24:29 stage sync 0.18s rc=0
+02:24:29 STAGING GREEN
+02:24:30 capture paused: {"supervisor_pids": [529632], "bootwatch_pids": [529679], "tty_holders": [529642], "tty_holders_after": [], "free": true}
+02:24:30 serial hub started pid=537734 log=/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/serial.log
+02:25:23 stop_autoboot: {"banner": false, "prompt": false}
+02:25:23 SESSION ERROR RuntimeError: no flash U-Boot prompt
+02:25:29 capture restore: {"restore_rc": 0, "supervisor_pids": [540033], "bootwatch_pids": [540080], "tty_holders": [540043], "events_tail": "2026-11-28T02:21:35+08:00 reader-start pid=529632\n2026-11-28T02:25:25+08:00 reader-start pid=540033", "ok": true}
+02:25:30 VERDICT FAIL

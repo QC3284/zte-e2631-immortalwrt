@@ -78,6 +78,8 @@
 | [../evidence/e4-rescue-acceptance/](../evidence/e4-rescue-acceptance/) | E4 救援验收附件：run-1（RED）preflight、串口/控制台原文、tcpdump 与 HTTP 行、页面 gzip/解压、原始响应、根因摘录、净零载荷摘要；run-2（PASS）同套 + 错误摘要负向响应 + 独立 sha256 清单 |
 | [../evidence/e4-rescue-write-acceptance-20261128.md](../evidence/e4-rescue-write-acceptance-20261128.md) | E4 写模式验收（task-79）：E4 镜像（patch 0026-0033，banner g30dca5f54503）RAM 链上同一 rescue 会话完成 STEP-1 净零写（crc32 0x0721e716）与 STEP-2 E4 写（crc32 0x79ef8c50），/status done 后一次 Ctrl-C；独立回读 0x79ef8c50，env stored 0xF95A816E / region 0xe826c394，secondboot 0x9848a667；reset 回 flash E4 启动，postcheck mtd0 d87db54a…、区域 8a38896e…、PANICS=0、MT7916=1；冷启动 e2631rescue 首命令 FAIL（PHY -110，缺 refclk 初始化，patch 0034 修复队列）；驱动在 resident-rescue 阶段退出码 2，session-results 记录 ERROR |
 | [../evidence/e4-rescue-write/](../evidence/e4-rescue-write/) | task-79 附件：驱动日志、串口原始字节、session-results、step1/step2 状态机响应、postcheck、驱动与产物清单、sha256 清单 |
+| [../evidence/e4-coldrescue-0034-20261128.md](../evidence/e4-coldrescue-0034-20261128.md) | patch 0034 冷启动救援顺序修复零写入真机验证（warm reset + RAM 加载）：从当前 flash E4 提示符加载 0034（banner g1673d5c89c7b，u-boot sha b7ea6bbc…）后 e2631rescue 作为第一条网络命令 —— PHY autoneg done、lan1 up 1 Gbps、GET / 页面 gzip 8f16817b…、/status idle、validate 200 result=ok sha_match=ok（crc32 0x1e5ff289）；Ctrl-C + e2631boot 回 Linux；mtd0 d87db54a… / region 8a38896e… 未变，15/15 checks GREEN；真冷启动需 0034 刷写后的第三写验收 |
+| [../evidence/e4-coldrescue-0034/](../evidence/e4-coldrescue-0034/) | patch 0034 冷启动救援验证附件：results.json、驱动/串口/控制台、page/status/validate 响应、首跑失败输出、驱动与产物清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|

@@ -1,0 +1,97 @@
+[  131.124243] br-lan: port 3(lan3) entered disabled state
+[  131.125433] br-lan: port 2(lan2) entered disabled state
+[  131.126345] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[  131.126663] br-lan: port 1(lan1) entered disabled state
+[  131.151271] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  8 devices, 8 uclasses, devicetree: embed
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x47f00000 0x3f00000 0x80000
+Reading 524288 byte(s) (256 page(s)) at offset 0x03f00000
+=> crc32 0x47f00000 0x59530
+crc32 for 47f00000 ... 47f5952f ==> 9f2b707d
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  8 devices, 8 uclasses, devicetree: embed
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> e2631rescue
+e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+
+ethernet@92000000 Waiting for PHY auto negotiation to complete........ done
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+e2631rescue: open http://192.168.1.1/ from a lan1 host
+e2631rescue: press Ctrl-C to leave the rescue mode
+e2631rescue: received 655360 bytes, sha256 23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1
+e2631rescue: left the rescue mode
+=> e2631boot
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+e2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x44fd004a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: running vendor-order CP15 cleanup
+e2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x44fd004a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000
+## Booting kernel from Legacy Image at 42000020 ...
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+Working FDT set to 0
+   Loading Kernel Image to 40008000
+
+Starting kernel ...
+

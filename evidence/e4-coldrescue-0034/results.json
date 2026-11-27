@@ -1,0 +1,236 @@
+{
+ "started": "2026-11-28T02:26:50+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-coldrescue-46046018929/e2631-uboot-46046018929",
+  "u_boot_sha": "b7ea6bbc138e1b3cbea6389fbaae89419d1d7e46e0668ef88637dd2cd14ac33d",
+  "u_boot_crc": "0x9f2b707d",
+  "new_banner": "U-Boot 2027.01-rc2-g1673d5c89c7b",
+  "mtd0_img_sha": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+  "mtd0_img_crc": "0x1e5ff289"
+ },
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "MTD0": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338",
+  "REGION": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+  "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd"
+ },
+ "artifact_facts": {
+  "sha256": "b7ea6bbc138e1b3cbea6389fbaae89419d1d7e46e0668ef88637dd2cd14ac33d",
+  "crc32": "0x9f2b707d",
+  "size": 365872,
+  "banner_token": "U-Boot 2027.01-rc2-g1673d5c89c7b"
+ },
+ "staging": {
+  "method": "ssh-stdin",
+  "padded": {
+   "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/e2-stage-b7ea6bbc.bin",
+   "size": 524288,
+   "sha256": "40fe6c5c86bd651b956c06b52ad706650eec4b00f457143a31f15dbd5d4fd4a4",
+   "payload_crc32": "0x9f2b707d",
+   "payload_size": 365872
+  },
+  "copy": {
+   "rc": 0,
+   "out": "40fe6c5c86bd651b956c06b52ad706650eec4b00f457143a31f15dbd5d4fd4a4  /tmp/e2-uboot-stage.bin\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\r\n",
+   "elapsed_s": 0.23
+  },
+  "copy_bytes": 524288,
+  "erase": {
+   "rc": 0,
+   "out": "ERASE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "elapsed_s": 0.86
+  },
+  "write": {
+   "rc": 0,
+   "out": "WRITE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e2-uboot-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "elapsed_s": 0.38
+  },
+  "readback": {
+   "rc": 0,
+   "out": "40fe6c5c86bd651b956c06b52ad706650eec4b00f457143a31f15dbd5d4fd4a4  -\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.24
+  },
+  "sync": {
+   "rc": 0,
+   "out": "SYNCED\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.17
+  },
+  "ok": true
+ },
+ "capture_pause": {
+  "supervisor_pids": [
+   540033
+  ],
+  "bootwatch_pids": [
+   540080
+  ],
+  "tty_holders": [
+   540043
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 543951,
+ "flash_banner": true,
+ "flash_stop": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g30dca5f54503 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "output": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00000 0x59530",
+   "output": "crc32 0x47f00000 0x59530\r\ncrc32 for 47f00000 ... 47f5952f ==> 9f2b707d\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  }
+ ],
+ "flash_version_ok": true,
+ "staging_read_ok": true,
+ "staging_crc": {
+  "got": "0x9f2b707d",
+  "want": "0x9f2b707d",
+  "ok": true
+ },
+ "go_sent": "2026-11-28T02:27:00+0800",
+ "new_banner": true,
+ "new_stop": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "new_version_ok": true,
+ "commands_before_rescue": [
+  "version",
+  "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+  "crc32 0x47f00000 0x59530",
+  "version"
+ ],
+ "rescue_marker": true,
+ "rescue_tail": "e2631rescue\r\ne2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\r\nethernet@92000000 Waiting for PHY auto negotiation to complete........ done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\ne2631rescue: open http://",
+ "phy_done": true,
+ "phy_timeout": false,
+ "lan1_up": true,
+ "page": {
+  "rc": 0,
+  "status": 200,
+  "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/page.headers",
+  "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/page.body",
+  "body_text": "\u001f\ufffd\b\u0000\u0000\u0000\u0000\u0000\u0002\u0003\ufffd9k\ufffd\ufffdT\ufffd\ufffd\ufffdW(\ufffdIIXVK\ufffd-\ufffd\ufffdV\ufffd \ufffd\n5aHM2[\uc186\ufffd\ufffd\ufffd\u069a\u0212W\ufffd\ufffd1no5\ufffd\ufffdIB\u0002\u0004\ufffd#L`\t\ufffd\f3I\ufffd,\ufffd\ufffd\u0004R\ufffd?%\ufffdvw\u007f\ufffd_\ufffds\ufffd\u001ev;\ufffd\ufffda>-)Z\u04b9\ufffds\ufffdy\ufffd\ufffd\ufffd=\u03ff\ufffd\ufffd\ufffd\u001c>\ufffd\ufffd\ufffd\ufffd?75\u06e6\t\ufffd\ufffd\u0016\ufffdb\ufffd\ufffd|7q\ufffd\u0006\ufffd\ufffd\u0003\u04a6&\ufffd\ufffd\u0465N\u0018%<g\ufffdAB\u0003@[\ufffde:t\u0473i\ufffd}H^\ufffd%\u001e\ufffd\u02f1M|j\ufffdH#\ufffd\u0012\ufffd\ufffd\u001d\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\\\u0018&\ufffd\ufffd\ufffdw\ufffd\u0017\ufffd\ufffd\ufffdN\ufffd\ufffdf\ufffdd\u0005\ufffdV\ufffd\ufffd\\\ufffd>\ufffdV;\ufffd\u04ea\\\ufffd\ufffd8\ufffd\ufffdr\u05d3b\u0012\ufffd\ufffdF\ufffd\ufffdl\ufffdh\ufffd\u000bf\ufffd\ufffdE\ufffd\ufffd\u000bQ\ufffd\n\ufffd\ufffd\ufffd\ufffd*\ufffdk\u06a1\u001fF3Oi\ufffd\u059fj\u0013/\ufffd\ufffdr*\u06cc^U:\ufffd\ufffdf\ufffdt\ufffd\ufffd\ufffd!\ufffd\ufffd\u0005\u000b3\u001a,\ufffd\ufffdZ*c_\ufffd\ufffd\ufffdQ\u0006\u001aa+\\\u00151:\ufffd\f\ufffdw\ufffd9\ufffd?%\ufffd$rz;\ufffdp\u0766\u0015F\u000e\ufffdfT\ufffd\ufffdC\ufffds\ufffd\ufffd\u001c\ufffd\u0260\ufffd8^7\ufffd1\ufffdz\ufffd\u001d\ufffd\u02e9\ufffd\ufffd\ufffd\ufffde\ufffd\ufffda\u0010\ufffd2\ufffd\ufffd\ufffd\ufffd+3]\ufffd\ufffd\ufffd\ufffdCl*\u0015o\u0351\u0638\ufffd\ufffd\u0004\ufffd\ufffdVD\ufffd\ufffd\u0019\ufffd\ufffdL|\ufffd?\ufffdT\ufffd\"\ufffdLA\ufffdZ\n\u0000\u0016\ufffdz-\ufffd-\ufffdR\ufffd\ufffdP(\ufffd\ufffd\t\ufffd\ufffd\u0014.\ufffd\ufffd\ufffd\u00e5\ufffd\ufffd\ufffd84\u00002\ufffd\ufffd\ufffd\u0005\u001dE\ufffdE3U\ufffdN\u0003i\ufffdN-\ufffd\ufffdD`Hp\ufffd0\ufffdaX\ufffd\ufffd\ufffd@\ufffd\u000f\u0017z\u0019\ufffd$\uc32b\ufffdR\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd}\ufffdh\u0016\ufffd\ufffd9\ufffdb\ufffd\ufffdh\ufffd\ufffd\ufffdx~`\u0568\u0013\ufffd\ufffd\ufffd4\ufffdr\ufffd\ufffd(\ufffd\u0006XV7I\ufffd \ufffd</h\ufffd\ufffd%\ufffdi\f\ufffd\ufffd1\ufffd\f~\ufffd\ufffd\ufffd\u0011\u0013\ufffdA\ufffd=n\ufffd\ufffd\u053b(\"\u0013\u0002\ufffd\ufffd\ufffdF1\ufffdwB\u000f\"+\ufffd\u0005\ufffd\ufffd\ufffd<\ufffdZ\ufffd\u007f3\u001a9\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\u000b\ufffd\u001b\ufffddeF\ufffd\ufffdr\ufffd\u000euI\ufffdO@\u0019q\u001b\u07207\ufffd*\u0019A]\ufffd\ufffdS\ufffd\ufffdY$\ufffdb\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\u0003\u072e\ufffd\u000bkS\ufffd\u001d\ufffd\ufffdI\u001c\ufffd<\ufffd\ufffd\ufffdm\ufffd\ufffdip\ufffd\u0014\ufffd\ufffdaNmh\ufffd\ufffd\u001b\ufffd*\ufffd\u007f]{sk\ufffd\ufffd\ufffd\ufffd3\u00f7\ufffd4\ufffd\ufffd\ufffd\ufffd\ufffd\u001f\ufffdv\ufffd(\ufffd\ufffd\ufffdW\u0006\ufffdq\ufffd\ufffd\ufffd\ufffd\ufffd7\ufffd\ufffd\ufffdZ\ufffd\ufffd+\ufffd\ufffd\ufffd\u5b73o>\ufffd\u007ffp\ufffd\ufffd\ufffd\ufffd\ufffd\u000f\u05eel\ufffd;1\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd=\\\ufffd\ufffd\ufffd\ufffds\ufffdk\u001fo=8\ufffd\ufffd'\ufffd\ufffd\ufffd\ufffd\ufffdG\ufffd\u0013_\u000e~:1x\ufffdG@\u0000V\ufffd\ufffd\u001d\u0010\f\ufffd!\u0017\nC\u0014\u0013\ufffd\u0017t\ufffd\t\ufffd9&\u000f\ufffdJy.Y\ufffd\ufffd\ufffd\ufffd\ufffd6\ufffd@J\ufffd-/\ufffdH\ufffd\ufffd{6A\u001f\ufffd\u000e\ud102\ufffd\u0012\ufffd\ufffd6\ufffd\u000e\ufffd\u00040/\ufffd\u0013G\u001f^\ufffd*=\ufffd\ufffd\ufffdS\u001b\ufffdn\ufffdbL\ufffd\ufffd\ufffd\ufffdg\ufffdZM\ufffd3\u007fwa\ub3e7\u0007\u001f\ufffd\ufffd\ufffd\ufffd:\u001c\ufffd\ufffd\ufffd\ufffdg!\ufffd\u0003F\u001e\u2d20\ufffd1\ufffd\ufffd=\\\ufffd\u0004\u0181\ufffd\ufffd\ufffdE7\ufffd\ufffd.D!O\ufffd|\ufffd\ufffdw>\u073a\ufffd\ufffdp\ufffd\ufffd`\ufffd\ufffd\u001d\ufffd\ufffd$\ufffd[\u007f\ufffdX\ufffd\f}\ufffd@4\ufffd\u00044\ufffd\ufffd\ufffd\\a\ufffd\ufffd\ufffd\u0014q\ufffd%\ufffdBZ0\ufffdP\u0018\ufffd:n\ufffd\ufffd\ufffd\ufffd`\ufffd\ufffdM\ufffd $\n\ufffd\ufffd\ufffd+\ufffd0m\ufffd'\ufffd6\ufffd\u0019\ufffd \ufffd\ufffdWD\u001e)\ufffd\ufffd\"\ufffdI\u0007\ufffd\u0019\ufffd)\ufffd\u01e4\ufffdR\u0246\ufffd/\u000e\ufffd^\u0005\u001f\u0778s~\ufffd\ufffd\ufffd[\ufffd\ufffd\u001a\ufffd\ufffd\ufffd}\ufffd\ufffd\ufffd\"X\ufffdc\ufffd\ufffd\ufffd\u000777/}\ufffdCN\u000f\u07fa\u0004\ufffd\ufffd\ufffd\u001bw\ufffd\ufffd\u000bX\u000e\ufffd8\u000b\ufffd\u034f\u007f\ufffdE\u0014\ufffd2\u0007\ufffd\u0778wm\ufffd\ufffd{\ufffd3\ufffdx~pa}\ufffd\ufffd\n\ufffd\n|6\ufffd\ufffd\ufffdxpkp\ufffd<3\ufffd\ufffd\ufffd;\ufffd\f.|1\ufffd\ufffd\ufffd\ufffd\ufffd{\ufffd\ufffd_o\ufffdyk\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\u000b\u00177\ufffd\ufffd\u0005\u06a9\ufffd\ufffdW\ufffdrL$U\ufffd\ufffdt\u0016\ufffd\ufffd\u001dy\ufffddnJ\u0010Ds\ufffd7\ufffdwc\ufffdA$xv\ufffd7\ufffd\ufffd\u000b\ufffd\u0013\ufffd\ufffd+\ufffd\u000f\ufffd?j\ufffd\ufffd+\u001d~\ufffd\ufffd!\ufffd\ufffd(\ufffdK\u03fe\ufffd\ufffd\u000b\u03fex\ufffd\u0514\u001c\ufffdi\u0013\ufffd:\ufffdv\ufffd\n\u0343\ufffd@\ufffd\u0003>\ufffd\ufffd\ufffdV^t\u0004\ufffd\u0011s\ufffd_\ufffd\u01d4\ufffdf@\ufffdn\u0018\ufffd\ufffd\\W+\ufffdj\ufffd\ufffd\u00abU\ufffd\u0015\u05f2]x\ufffd\n\ufffd\ufffdX\ufffd\u0006\ufffd\ufffdFM\ufffd\ufffd\ufffd\u0005\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\n\ufffd\ufffd\u001a\u001a\ufffd\ufffd+\ufffdT\ufffdF\u001d\ufffdu\f\ufffdN\b\ufffd\ufffdjF\ufffdf)\ufffd\ufffdU+\ufffdQ\ufffd(R\ufffd)v\u0771+\ufffdX\ufffdh\u0369#\u0005Cq\ufffd\ufffd\ufffd\ufffd\u0430\u001c[\ufffdI\u001d^m\ufffda\ufffd*C\ufffd\u0546\ufffd7l$F]\ufffdV\ufffd\u000e\ufffd\ufffd\u000b(\ufffd\ufffd3\u0016\ufffdMT\ufffd\ufffdW\ufffd6 \u007f\ufffd)\ufffd\ufffd^5\ufffd\ufffd c\ufffdR\b #c\u001dNn8\bm\u0018\u0015ZSk\u001a\ufffd\u00a8\ufffd\ufffd\ufffd;\ufffd\u0007E\ufffdhu\u001bOa\ufffd\ufffdF\u0775\ufffd8:U\u0014\ufffdE\u045d\u001a\ufffd7\ufffd*B\u0015\ufffd&z\ufffd\ufffd\ufffd\ufffdU\ufffd\ufffd5t\ufffdju\ufffd\ufffd\u0010\u0003U\ufffdQ\ufffd\ufffd\ufffd\n\u0012\ufffd: \ufffd\ufffd\f\ufffdJ\u0005\u000e\ufffd\"1\ufffd\ufffd\ufffdz\ufffdVe\ufffd\ufffdD!\u0016\ufffd\ufffdPm\ufffdnhL%Z]\ufffdlF\ufffdh\ufffdK\n\ufffd2yU\ufffd\ufffdU\u0135\ufffd\ufffde\u0000C|\ufffd\ufffdvM%LH(\u0011\ufffdP\u001b\ufffd\ufffd7\u001a\ufffd\ufffd!\u000b\ufffd\ufffd\ufffdJ\ufffd\u0011SA\ufffdDa\ufffd\ufffd\u0006\ufffd\u06aa\ufffd\ufffdTi\u0005h(\u0006;E\u0568\u05eb(o\ufffdj)\ufffdm\ufffd\ufffd\ufffd\u068am!\ufffd*u\fB\ufffdL\ufffdV\u00f6I\u0015\ufffd\ufffd\u001b\u001a\ufffd]\ufffd( \u0000^B\ufffd\u0014u\ufffd\ufffd\ufffd\n3\ufffdQ\ufffd\ufffd\ufffd\ufffd2\ufffd\ufffdv\u001d\ufffd\u0004\ufffd\ufffdP,\n%\u0018\ufffd\ufffdj\n\ufffdJ\ufffdl\u0000k\ufffd\ufffd\ufffd\u001a\ufffd\ufffd\ufffd\nW\ufffd\ufffd]9\n\ufffd\ufffd\u0014\ufffd\ufffd\u0000\ufffdGX\ufffd\ufffd\ufffd\u000b\ufffdUayvV\ufffdh\ufffd@\u0004\ufffdw\ufffd\ufffd\ufffde\ufffd\ufffd\ufffd\f\ufffd[\ufffd\ufffd\ufffd\ufffdK\ufffd\ufffd&|\ufffd\ufffdJB\u000f\ufffd`\u0001Z\ufffd\u0018\u0017\ufffd\ufffd\u0006\u0559\t-K\ufffd\u0013\ufffd\u0014U\u0001\u04fb\ufffd:\ufffdZ\ufffduk\u0015vbU\ufffd5\ufffd\ufffd2\ufffdUj\ufffda\ufffd\ufffdT\u05e88\n\u00a2\u0162\ufffd\nV\ufffd\ufffd,\ufffd\u0014\u0004\ufffdd\ufffdss\ufffdXR\ufffd\ufffd\u0019\ufffd%\ufffd7\u040e\u0018\ufffdF\u0011Y\u0011,\ufffd\u0019\ufffd*6;2$\"ar\n\ufffd\ufffd\ufffdc\ufffd\ufffd\ufffd\ufffd\ufffdL\ufffdw\u0016\u0019\ufffd\ufffdIB\ufffd\u0019F\u0007\ufffd#\u0003\ufffdK#Q\ufffd\ufffd\ufffd\ufffd\ufffd1\ufffd\ufffd\"RCB\u0015-eP6\ufffd\ufffdH\u0492\ufffd\ufffd\f#\u0001\ufffd\ufffd\t\ufffd\ufffd\ufffd\ufffd.;\ufffdH\u000e4\ufffd\ufffd\u0019\u07e5B\ufffd\u0287\ufffd\ufffd@\u03c7\u001c\ufffdJ\u04db\ufffd\ufffd\ufffdW*\ufffd\u000e]\ufffd\ufffdV\ufffd\ufffd\u0000R2\ufffd\ufffd\ufffd\u0004\ufffd\ufffd\ufffd%\ufffd&0^(\u0018\u0003~)yf\ufffdhb\"\ufffd,PHFTc\ufffdD\ufffd\u000b\ufffd\ufffd\ufffd\ufffd\u697a\ufffd\u068eo\ufffd\u0010_\ufffd?@\ufffd\ufffd(\ufffd\ufffdh\ufffd\u0006\b\ufffd;\ufffdm\ufffd\u0010_\ufffd\u00033\ufffdR\u001a\ufffd|)VJ\ufffdZ\ufffd7UD\ufffd\ufffdQ6b\u001e<\ufffd\ufffd\ufffd\ufffd\ufffdK6<\ufffd\ufffd",
+  "stderr": ""
+ },
+ "status_before": {
+  "rc": 0,
+  "status": 200,
+  "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/status-before.headers",
+  "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/status-before.body",
+  "body_text": "stage=idle\nprogress=0\nsha256=\nbrowser_sha256=\nsha_match=absent\n",
+  "stderr": ""
+ },
+ "status_before_kv": {
+  "stage": "idle",
+  "progress": "0",
+  "sha256": "",
+  "browser_sha256": "",
+  "sha_match": "absent"
+ },
+ "page_facts": {
+  "gzip_sha": "8f16817b30d66197364cf5a67d9cf5ddd2720a7a09975e8d01dd2494d78616d3",
+  "raw_sha": "30a8f03e46867bb066947a2537f738e0539fd214ae579a287c301d5ff9e39bda",
+  "raw_bytes": 9216
+ },
+ "page_ok": true,
+ "validate_curl": {
+  "rc": 0,
+  "out": "",
+  "err": ""
+ },
+ "validate": {
+  "status": 200,
+  "body": "result=ok\nsha256=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\nsha_match=ok\n"
+ },
+ "validate_ok": true,
+ "status_after": {
+  "rc": 0,
+  "status": 200,
+  "headers_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/status-after.headers",
+  "body_path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/status-after.body",
+  "body_text": "stage=idle\nprogress=0\ncrc32=0x1e5ff289\nsha256=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\nbrowser_sha256=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\nsha_match=ok\n",
+  "stderr": ""
+ },
+ "status_after_kv": {
+  "stage": "idle",
+  "progress": "0",
+  "crc32": "0x1e5ff289",
+  "sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+  "browser_sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+  "sha_match": "ok"
+ },
+ "readonly_ok": true,
+ "rescue_left": true,
+ "linux_start": true,
+ "boot_tail": "boot\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\ne2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x44fd004a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: running vendor-order CP15 cleanup\r\ne2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x44fd004a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000\r\n## Booting kernel from Legacy Image at 42000020 ...\r\n   Image Name:   ARM ImmortalWrt Linux-6.18.60\r\n   Image Type:   ARM Linux Kernel Image (uncompressed)\r\n   Data Size:    3491050 Bytes = 3.3 MiB\r\n   Load Address: 40008000\r\n   Entry Point:  40008000\r\n   Verifying Checksum ... OK\r\nWorking FDT set to 0\r\n   Loading Kernel Image to 40008000\r\n\r\nStarting kernel",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   544985
+  ],
+  "bootwatch_pids": [
+   545032
+  ],
+  "tty_holders": [
+   544991
+  ],
+  "events_tail": "2026-11-28T02:25:25+08:00 reader-start pid=540033\n2026-11-28T02:27:18+08:00 reader-start pid=544985",
+  "ok": true
+ },
+ "device_after": {
+  "MTD0": "d87db54ae30af930b67793defe78d3fb64c5b74315306cea69fe952e42fe1338",
+  "REGION": "8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9",
+  "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd"
+ },
+ "checks": {
+  "staging": true,
+  "flash_banner": true,
+  "staging_crc": true,
+  "new_banner": true,
+  "rescue_marker": true,
+  "phy_done": true,
+  "lan1_up": true,
+  "page_ok": true,
+  "validate_ok": true,
+  "readonly_ok": true,
+  "linux_back": true,
+  "mtd0_unchanged": true,
+  "region_unchanged": true,
+  "capture_after": true,
+  "no_error": true
+ },
+ "verdict": "GREEN",
+ "finished": "2026-11-28T02:28:00+0800"
+}

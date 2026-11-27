@@ -1,0 +1,19 @@
+02:26:51 stage copy 0.23s rc=0
+02:26:52 stage erase 0.86s rc=0
+02:26:52 stage write 0.38s rc=0
+02:26:53 stage readback 0.24s rc=0
+02:26:53 stage sync 0.17s rc=0
+02:26:53 STAGING GREEN
+02:26:53 capture paused: {"supervisor_pids": [540033], "bootwatch_pids": [540080], "tty_holders": [540043], "tty_holders_after": [], "free": true}
+02:26:54 serial hub started pid=543951 log=/home/qc233/zte/e2631-p3/e2/e4-rescue/cold-rescue-0034/run-1/serial.log
+02:26:56 banner seen; stopping autoboot
+02:26:59 stop_autoboot: {"banner": true, "prompt": true}
+02:26:59 ub cmd: version ok=True
+02:27:00 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+02:27:00 ub cmd: crc32 0x47f00000 0x59530 ok=True
+02:27:00 banner seen; stopping autoboot
+02:27:03 stop_autoboot: {"banner": true, "prompt": true}
+02:27:03 ub cmd: version ok=True
+02:27:03 RESCUE-FIRST: sending e2631rescue without e2631net
+02:27:22 capture restore: {"restore_rc": 0, "supervisor_pids": [544985], "bootwatch_pids": [545032], "tty_holders": [544991], "events_tail": "2026-11-28T02:25:25+08:00 reader-start pid=540033\n2026-11-28T02:27:18+08:00 reader-start pid=544985", "ok": true}
+02:28:00 VERDICT GREEN
