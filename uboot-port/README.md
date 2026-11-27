@@ -988,4 +988,8 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
   egress mask（0x3883c0，U-Boot 从未写过）这一可丢包点。新增 patch 0031：TX 描述符变体运行期开关（默认仍是
   内核描述符）、`e2631net tx [count]` 广播探测帧、`e2631net mode`、`e2631net sbrg [allow]`（含 VLAN 1 读取与
   CPU 端口 egress mask 恢复），输出固定打印 DMA/TM/描述符/各 MAC 端口 TX 计数/桥块掩码；零写入真机检查单见 §5
-  「F2 TX 出口诊断」。本 patch 不写 flash、不改默认发送路径；**尚未 CI 构建**（按 Lead 指示等下一次统一 dispatch）。
+  「F2 TX 出口诊断」。本 patch 不写 flash、不改默认发送路径。CI 构建 run `46022545621`（head `642e9b0`，
+31 个 patch，tree `55aebf1afad2406965e5ee77a470f5b79f527eb2`）全绿：banner `U-Boot 2027.01-rc2-ge84e13107885`、
+`u-boot.bin` 364,728 B sha256 `d493042d…` crc32 `1c354a00`、mtd0 镜像 sha256 `e1e5ceb3…` crc32 `48bf0511`、
+装配后首 0x800 sha256 `e9ec454f…`、env 块 `6eee153b…` 未变、白名单 4 site、checkpatch 0 errors / 0 warnings
+（24 条既有 CHECK 不阻断）；证据见 [evidence/uboot-f2-tx-probe-20261127.md](../evidence/uboot-f2-tx-probe-20261127.md) §7。

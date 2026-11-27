@@ -117,3 +117,23 @@ e2631net                 # 终态；仍然 hw tx idx 不动且 MAC 计数全 0 �
   `zx279128s-switch.c`（egress mask/VLAN）、`zx279128s-eth.h`（SBRG 寄存器）
 - 厂商反汇编：`evidence/p2-oob/vendor-uboot-ram.bin` @ 0x47F00000（`0x47f30a10` 描述符构造、
   `0x47f304ac` 门铃、`0x47f2f314` 板级 GPIO/SBRG 初始化）
+
+## 7. CI 构建与产物（run 46022545621，31 个 patch）
+
+- kit head `642e9b0`（iwrt-adaptation），workflow `uboot-build.yml` run `46022545621`（run 37）SUCCESS；
+  post-am tree `55aebf1afad2406965e5ee77a470f5b79f527eb2`，31 个 patch。
+- 可复现项：`git am --committer-date-is-author-date` + `SOURCE_DATE_EPOCH=1795103079`（UBOOT-INFO 记录）。
+- banner：`U-Boot 2027.01-rc2-ge84e13107885 (Nov 19 2026 - 15:44:39 +0000)`。
+- `u-boot.bin` 364,728 B（上限 653,312），sha256 `d493042d98ecea79e11cfa4a3e6b3a31e661851299802a440954963059206380`，
+  crc32 `1c354a00`。
+- mtd0 镜像 655,360 B sha256 `e1e5ceb3944fd0eb100911dc813a9d2ad9a950cc976c3f02ca245e6badcb99bc`，
+  crc32 `48bf0511`；装配后首 0x800 sha256 `e9ec454fdae871f44526b6df30c05dabed97dcbd4e7d7e2259419ef4983df344`。
+- env 块 sha256 `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（未变）。
+- D-U1：构建日志 `mtd writer sites: 4 (e2631flash and the e2631env writer; -O2 inlines the static helpers)`；
+  `e2631flash safety guards: present`。
+- 新增门禁输出：`F2 TX probe gate: default mode pp, probe frames and bridge-block dump present`；
+  checkpatch 0 errors / 0 warnings（24 checks，全部为既有 0026 代码的 CHECK）。
+- 尺寸：比 E4 修复构建（361,448 B）多 3,280 B（+0.91%）；比 defconfig 瘦身版（320,848 B）多 43,880 B（+13.68%）；
+  距 CI 门禁 645,120 B 余 280,392 B。
+- 构建产物本地：`/home/qc233/zte/e2631-t5-artifacts/uboot-task78-46022545621/e2631-uboot-46022545621/`
+  （SHA256SUMS 11/11 校验通过）。
