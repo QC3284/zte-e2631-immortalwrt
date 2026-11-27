@@ -1,0 +1,153 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s20u1u4u2c2, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+16:30:14.243114 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+16:30:14.307396 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+16:30:14.358479 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+16:30:14.404953 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+16:30:14.405685 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)
+16:30:14.471866 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)
+16:30:14.488397 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+16:30:14.502674 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 62: 192.168.1.191 > 224.0.0.22: igmp v3 report, 2 group record(s)
+16:30:14.504269 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+16:30:14.737928 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+16:30:14.988641 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+16:30:15.136313 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+16:30:15.137837 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype ARP (0x0806), length 60: Reply 192.168.1.1 is-at 00:41:71:00:00:50, length 46
+16:30:15.137866 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 74: 192.168.1.191.40742 > 192.168.1.1.80: Flags [S], seq 2946141129, win 64240, options [mss 1460,sackOK,TS val 2226548958 ecr 0,nop,wscale 10], length 0
+16:30:15.139491 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40742: Flags [S.], seq 2917632, ack 2946141130, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.139540 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.139610 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 129: 192.168.1.191.40742 > 192.168.1.1.80: Flags [P.], seq 1:76, ack 1, win 63, length 75: HTTP: GET / HTTP/1.1
+16:30:15.140068 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40742: Flags [S.], seq 2917632, ack 2946141130, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.140092 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.142542 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 1514: 192.168.1.1.80 > 192.168.1.191.40742: Flags [.], seq 1:1461, ack 76, win 65535, length 1460: HTTP: HTTP/1.1 200 OK
+16:30:15.142624 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 1461, win 66, length 0
+16:30:15.143306 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 1514: 192.168.1.1.80 > 192.168.1.191.40742: Flags [.], seq 1461:2921, ack 76, win 65535, length 1460: HTTP
+16:30:15.143349 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 2921, win 69, length 0
+16:30:15.144095 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 1514: 192.168.1.1.80 > 192.168.1.191.40742: Flags [.], seq 2921:4381, ack 76, win 65535, length 1460: HTTP
+16:30:15.144133 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 4381, win 72, length 0
+16:30:15.144837 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 300: 192.168.1.1.80 > 192.168.1.191.40742: Flags [P.], seq 4381:4627, ack 76, win 65535, length 246: HTTP
+16:30:15.144885 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 4627, win 74, length 0
+16:30:15.144955 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [F.], seq 76, ack 4627, win 74, length 0
+16:30:15.146597 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40742: Flags [F.], seq 4627, ack 77, win 65535, length 0
+16:30:15.146640 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40742 > 192.168.1.1.80: Flags [.], ack 4628, win 74, length 0
+16:30:15.156383 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 74: 192.168.1.191.40754 > 192.168.1.1.80: Flags [S], seq 1147263433, win 64240, options [mss 1460,sackOK,TS val 25633462 ecr 0,nop,wscale 10], length 0
+16:30:15.158112 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40754: Flags [S.], seq 2920064, ack 1147263434, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.158186 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40754 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.158266 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 135: 192.168.1.191.40754 > 192.168.1.1.80: Flags [P.], seq 1:82, ack 1, win 63, length 81: HTTP: GET /status HTTP/1.1
+16:30:15.158936 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40754: Flags [S.], seq 2920064, ack 1147263434, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.158956 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40754 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.160795 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40754: Flags [P.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK
+16:30:15.160849 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40754 > 192.168.1.1.80: Flags [.], ack 194, win 63, length 0
+16:30:15.161046 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40754 > 192.168.1.1.80: Flags [F.], seq 82, ack 194, win 63, length 0
+16:30:15.162496 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40754: Flags [F.], seq 194, ack 83, win 65535, length 0
+16:30:15.162541 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40754 > 192.168.1.1.80: Flags [.], ack 195, win 63, length 0
+16:30:15.189174 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8" (244)
+16:30:15.219854 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 74: 192.168.1.191.40762 > 192.168.1.1.80: Flags [S], seq 2740621464, win 64240, options [mss 1460,sackOK,TS val 778440878 ecr 0,nop,wscale 10], length 0
+16:30:15.221543 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40762: Flags [S.], seq 2928128, ack 2740621465, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.221585 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.221805 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40762: Flags [S.], seq 2928128, ack 2740621465, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.221813 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 1:1461, ack 1, win 63, length 1460: HTTP: POST /flash?mode=validate HTTP/1.1
+16:30:15.221816 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 1461:2921, ack 1, win 63, length 1460: HTTP
+16:30:15.221820 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 2921:4381, ack 1, win 63, length 1460: HTTP
+16:30:15.221821 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 4381:5841, ack 1, win 63, length 1460: HTTP
+16:30:15.221833 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 5841:7301, ack 1, win 63, length 1460: HTTP
+16:30:15.221849 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 7301:8761, ack 1, win 63, length 1460: HTTP
+16:30:15.221851 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 8761:10221, ack 1, win 63, length 1460: HTTP
+16:30:15.221852 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 10221:11681, ack 1, win 63, length 1460: HTTP
+16:30:15.221853 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 11681:13141, ack 1, win 63, length 1460: HTTP
+16:30:15.221865 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 13141:14601, ack 1, win 63, length 1460: HTTP
+16:30:15.221878 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.222797 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40762: Flags [S.], seq 2928128, ack 2740621465, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.229116 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 232: 192.168.1.1.80 > 192.168.1.191.40762: Flags [P.], seq 1:179, ack 14601, win 65535, length 178: HTTP: HTTP/1.1 400 Bad Request
+16:30:15.229197 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 14601:16061, ack 179, win 63, length 1460: HTTP
+16:30:15.229204 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 16061:17521, ack 179, win 63, length 1460: HTTP
+16:30:15.229206 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 17521:18981, ack 179, win 63, length 1460: HTTP
+16:30:15.229207 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 18981:20441, ack 179, win 63, length 1460: HTTP
+16:30:15.229208 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 20441:21901, ack 179, win 63, length 1460: HTTP
+16:30:15.229209 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 21901:23361, ack 179, win 63, length 1460: HTTP
+16:30:15.229210 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 23361:24821, ack 179, win 63, length 1460: HTTP
+16:30:15.229211 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 24821:26281, ack 179, win 63, length 1460: HTTP
+16:30:15.229212 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 26281:27741, ack 179, win 63, length 1460: HTTP
+16:30:15.229213 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 27741:29201, ack 179, win 63, length 1460: HTTP
+16:30:15.229232 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 29201:30661, ack 179, win 63, length 1460: HTTP
+16:30:15.229241 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 30661:32121, ack 179, win 63, length 1460: HTTP
+16:30:15.229245 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 32121:33581, ack 179, win 63, length 1460: HTTP
+16:30:15.229247 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 33581:35041, ack 179, win 63, length 1460: HTTP
+16:30:15.229248 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 35041:36501, ack 179, win 63, length 1460: HTTP
+16:30:15.229249 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 36501:37961, ack 179, win 63, length 1460: HTTP
+16:30:15.229250 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 37961:39421, ack 179, win 63, length 1460: HTTP
+16:30:15.229251 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 39421:40881, ack 179, win 63, length 1460: HTTP
+16:30:15.229253 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 40881:42341, ack 179, win 63, length 1460: HTTP
+16:30:15.229254 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 42341:43801, ack 179, win 63, length 1460: HTTP
+16:30:15.238496 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40762: Flags [.], ack 43801, win 65535, length 0
+16:30:15.238582 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 43801:45261, ack 179, win 63, length 1460: HTTP
+16:30:15.238592 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 45261:46721, ack 179, win 63, length 1460: HTTP
+16:30:15.238594 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 46721:48181, ack 179, win 63, length 1460: HTTP
+16:30:15.238595 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 48181:49641, ack 179, win 63, length 1460: HTTP
+16:30:15.238597 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 49641:51101, ack 179, win 63, length 1460: HTTP
+16:30:15.238598 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 51101:52561, ack 179, win 63, length 1460: HTTP
+16:30:15.238600 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 52561:54021, ack 179, win 63, length 1460: HTTP
+16:30:15.238601 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 54021:55481, ack 179, win 63, length 1460: HTTP
+16:30:15.238603 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 55481:56941, ack 179, win 63, length 1460: HTTP
+16:30:15.238604 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 56941:58401, ack 179, win 63, length 1460: HTTP
+16:30:15.238606 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 58401:59861, ack 179, win 63, length 1460: HTTP
+16:30:15.238613 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 59861:61321, ack 179, win 63, length 1460: HTTP
+16:30:15.238618 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 61321:62781, ack 179, win 63, length 1460: HTTP
+16:30:15.238619 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 62781:64241, ack 179, win 63, length 1460: HTTP
+16:30:15.238621 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 64241:65701, ack 179, win 63, length 1460: HTTP
+16:30:15.238622 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 65701:67161, ack 179, win 63, length 1460: HTTP
+16:30:15.238624 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 67161:68621, ack 179, win 63, length 1460: HTTP
+16:30:15.238625 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 68621:70081, ack 179, win 63, length 1460: HTTP
+16:30:15.238626 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 70081:71541, ack 179, win 63, length 1460: HTTP
+16:30:15.238628 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 71541:73001, ack 179, win 63, length 1460: HTTP
+16:30:15.238674 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 73001:74461, ack 179, win 63, length 1460: HTTP
+16:30:15.238680 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 74461:75921, ack 179, win 63, length 1460: HTTP
+16:30:15.238684 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 75921:77381, ack 179, win 63, length 1460: HTTP
+16:30:15.238685 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 77381:78841, ack 179, win 63, length 1460: HTTP
+16:30:15.238687 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 78841:80301, ack 179, win 63, length 1460: HTTP
+16:30:15.238688 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 80301:81761, ack 179, win 63, length 1460: HTTP
+16:30:15.238689 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 81761:83221, ack 179, win 63, length 1460: HTTP
+16:30:15.238690 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 83221:84681, ack 179, win 63, length 1460: HTTP
+16:30:15.238691 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 84681:86141, ack 179, win 63, length 1460: HTTP
+16:30:15.238693 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 86141:87601, ack 179, win 63, length 1460: HTTP
+16:30:15.238694 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 87601:89061, ack 179, win 63, length 1460: HTTP
+16:30:15.238697 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 89061:90521, ack 179, win 63, length 1460: HTTP
+16:30:15.238701 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 90521:91981, ack 179, win 63, length 1460: HTTP
+16:30:15.238703 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 91981:93441, ack 179, win 63, length 1460: HTTP
+16:30:15.238704 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 93441:94901, ack 179, win 63, length 1460: HTTP
+16:30:15.238705 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 94901:96361, ack 179, win 63, length 1460: HTTP
+16:30:15.238706 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 96361:97821, ack 179, win 63, length 1460: HTTP
+16:30:15.238707 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 97821:99281, ack 179, win 63, length 1460: HTTP
+16:30:15.238708 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 99281:100741, ack 179, win 63, length 1460: HTTP
+16:30:15.238710 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [P.], seq 100741:102201, ack 179, win 63, length 1460: HTTP
+16:30:15.238727 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40762: Flags [F.], seq 179, ack 43801, win 65535, length 0
+16:30:15.238743 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], ack 180, win 63, length 0
+16:30:15.240956 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 74: 192.168.1.191.40774 > 192.168.1.1.80: Flags [S], seq 4115415366, win 64240, options [mss 1460,sackOK,TS val 3124409776 ecr 0,nop,wscale 10], length 0
+16:30:15.256725 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40774: Flags [S.], seq 2932608, ack 4115415367, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.256780 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.256855 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 135: 192.168.1.191.40774 > 192.168.1.1.80: Flags [P.], seq 1:82, ack 1, win 63, length 81: HTTP: GET /status HTTP/1.1
+16:30:15.258079 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 62: 192.168.1.1.80 > 192.168.1.191.40774: Flags [S.], seq 2932608, ack 4115415367, win 65535, options [mss 1460,wscale 0,eol], length 0
+16:30:15.258106 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [.], ack 1, win 63, length 0
+16:30:15.259504 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40774: Flags [P.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK
+16:30:15.259535 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [.], ack 194, win 63, length 0
+16:30:15.259777 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [F.], seq 82, ack 194, win 63, length 0
+16:30:15.260109 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40774: Flags [.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK
+16:30:15.260131 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [.], ack 194, win 63, length 0
+16:30:15.261557 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40774: Flags [F.], seq 194, ack 83, win 65535, length 0
+16:30:15.261594 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 54: 192.168.1.191.40774 > 192.168.1.1.80: Flags [.], ack 195, win 63, length 0
+16:30:15.262999 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40762: Flags [R.], seq 180, ack 43801, win 65535, length 0
+16:30:15.263109 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 60: 192.168.1.1.80 > 192.168.1.191.40774: Flags [R.], seq 194, ack 82, win 65535, length 0
+16:30:15.392672 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)
+16:30:15.504829 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+16:30:15.506017 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)
+16:30:16.223049 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8" (244)
+16:30:16.405199 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+16:30:17.505704 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+16:30:17.539909 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 292: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 5/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local., (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8", (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191 (250)
+16:30:18.257119 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8" (244)
+16:30:18.405332 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+16:30:21.507892 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+16:30:29.512902 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+16:30:38.602943 e0:b6:68:ac:f3:d8 > 33:33:00:00:00:16, ethertype IPv6 (0x86dd), length 90: :: > ff02::16: HBH ICMP6, multicast listener report v2, 1 group record(s), length 28
+16:30:38.713173 e0:b6:68:ac:f3:d8 > 33:33:00:00:00:16, ethertype IPv6 (0x86dd), length 90: :: > ff02::16: HBH ICMP6, multicast listener report v2, 1 group record(s), length 28
+16:30:39.283160 e0:b6:68:ac:f3:d8 > 33:33:ff:ac:f3:d8, ethertype IPv6 (0x86dd), length 86: :: > ff02::1:ffac:f3d8: ICMP6, neighbor solicitation, who has fe80::e2b6:68ff:feac:f3d8, length 32

@@ -1,0 +1,45 @@
+00:29:46 stage copy 0.25s rc=0
+00:29:47 stage erase 0.88s rc=0
+00:29:48 stage write 0.42s rc=0
+00:29:48 stage readback 0.25s rc=0
+00:29:48 stage sync 0.19s rc=0
+00:29:48 PHASE 1 GREEN: artifact staged in userdata and read back
+00:29:49 capture paused: {"supervisor_pids": [328331], "bootwatch_pids": [328338], "tty_holders": [328337], "tty_holders_after": [], "free": true}
+00:29:49 serial hub started pid=339718 log=/home/qc233/zte/e2631-p3/e2/e4-rescue/run-1/serial.log
+00:29:50 reboot -f requested; waiting for the flash U-Boot banner
+00:29:52 banner seen; stopping autoboot
+00:29:55 stop_autoboot: {"banner": true, "prompt": true}
+00:29:55 ub cmd: version ok=True
+00:29:55 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+00:29:56 ub cmd: crc32 0x47f00000 0x59530 ok=True
+00:29:56 gate: staged image crc32 == 0x0966526e
+00:29:56 banner seen; stopping autoboot
+00:29:59 stop_autoboot: {"banner": true, "prompt": true}
+00:29:59 ub cmd: version ok=True
+00:29:59 PHASE 2 GREEN: new image banner and prompt
+00:29:59 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+00:29:59 ub cmd: md 0x44000000 4 ok=True
+00:29:59 ub cmd: crc32 0x44000000 0x20000 ok=True
+00:29:59 env block state=OK stored=0xf95a816e region=0xe826c394
+00:29:59 ub cmd: printenv ok=True
+00:29:59 env sanity ok=True entries=27
+00:29:59 ub cmd: help e2631rescue ok=True
+00:29:59 rescue command present=True
+00:29:59 ub cmd: help e2631rescue ok=True
+00:30:10 tcpdump ready=True
+00:30:15 ub cmd: e2631net ok=True
+00:30:15 ub cmd: e2631net bmu ok=True
+00:30:15 RESCUE verdict RESCUE_FAIL pass=False
+00:30:15 rescue checks: {"help_ok": true, "page_200": true, "page_gzip": true, "page_gzip_sha": true, "page_raw_sha": false, "page_repo_match": false, "status_initial_idle": true, "validate_200": false, "validate_result_ok": false, "validate_sha": false, "validate_sha_match": false, "status_after_idle": true, "status_after_sha": false, "status_after_browser_sha": false, "status_after_sha_match": false, "status_after_crc": false, "no_write_stage": true, "rx_tcp": true, "rx_http": false, "rx_device_mac": true, "rescue_left": true, "prompt_back": true}
+00:30:20 ub cmd: e2631boot load ok=True
+00:30:20 ub cmd: md 0x47f00000 8 ok=True
+00:30:20 ub cmd: md 0x47f00020 8 ok=True
+00:30:20 ub cmd: crc32 0x47f00020 0x40 ok=True
+00:30:20 ub cmd: iminfo 0x47f00000 ok=True
+00:30:20 ub cmd: iminfo 0x47f00020 ok=True
+00:30:29 bootm attempt e2631boot outcome=kernel dt=8.63
+00:30:40 F1 verdict KERNEL_STARTED
+00:30:47 capture restore: {"restore_rc": 0, "supervisor_pids": [339948], "bootwatch_pids": [339958], "tty_holders": [339955], "events_tail": "2026-11-28T00:14:35+08:00 reader-start pid=328331\n2026-11-28T00:30:43+08:00 reader-start pid=339948", "ok": true}
+00:30:47 ROUTE TRAP: reconnecting the USB NIC
+00:31:39 VERDICT {"session": "GREEN", "env_sanity": "OK", "env_retry": "not-needed", "rescue": "RESCUE_FAIL", "f2": "SKIPPED", "t74": null, "f1": "KERNEL_STARTED"}
+00:31:39 checks: {"artifact_pins": true, "load_path": "userdata", "loading": true, "loading_gate": true, "env_block": "OK", "new_banner": true, "new_version": true, "env_sanity": true, "t74_recorded": true, "rescue_recorded": true, "f2_verdict": "SKIPPED", "f1_verdict": "KERNEL_STARTED", "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "kernel_nic_view": true, "capture_after": true, "no_error": true, "rescue": "RESCUE_FAIL"}

@@ -1,0 +1,9 @@
+19:16:30:15.139610 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 129: 192.168.1.191.40742 > 192.168.1.1.80: Flags [P.], seq 1:76, ack 1, win 63, length 75: HTTP: GET / HTTP/1.1
+22:16:30:15.142542 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 1514: 192.168.1.1.80 > 192.168.1.191.40742: Flags [.], seq 1:1461, ack 76, win 65535, length 1460: HTTP: HTTP/1.1 200 OK
+36:16:30:15.158266 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 135: 192.168.1.191.40754 > 192.168.1.1.80: Flags [P.], seq 1:82, ack 1, win 63, length 81: HTTP: GET /status HTTP/1.1
+39:16:30:15.160795 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40754: Flags [P.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK
+49:16:30:15.221813 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 1514: 192.168.1.191.40762 > 192.168.1.1.80: Flags [.], seq 1:1461, ack 1, win 63, length 1460: HTTP: POST /flash?mode=validate HTTP/1.1
+61:16:30:15.229116 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 232: 192.168.1.1.80 > 192.168.1.191.40762: Flags [P.], seq 1:179, ack 14601, win 65535, length 178: HTTP: HTTP/1.1 400 Bad Request
+128:16:30:15.256855 f8:e4:3b:21:b2:a5 > 00:41:71:00:00:50, ethertype IPv4 (0x0800), length 135: 192.168.1.191.40774 > 192.168.1.1.80: Flags [P.], seq 1:82, ack 1, win 63, length 81: HTTP: GET /status HTTP/1.1
+131:16:30:15.259504 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40774: Flags [P.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK
+134:16:30:15.260109 00:41:71:00:00:50 > f8:e4:3b:21:b2:a5, ethertype IPv4 (0x0800), length 247: 192.168.1.1.80 > 192.168.1.191.40774: Flags [.], seq 1:194, ack 82, win 65535, length 193: HTTP: HTTP/1.1 200 OK

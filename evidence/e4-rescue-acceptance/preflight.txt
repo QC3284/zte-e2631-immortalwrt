@@ -1,0 +1,76 @@
+{
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/u-boot.bin",
+  "size": 365872,
+  "size_hex": "0x59530",
+  "sha256": "e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b",
+  "crc32": "0x0966526e",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-gd38f69c44523",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "expected": {
+  "sha256": "e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b",
+  "banner_token": "U-Boot 2027.01-rc2-gd38f69c44523",
+  "size": 365872,
+  "crc32": "0x0966526e",
+  "info_path": "/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/UBOOT-INFO.txt",
+  "mtd0_sha": "4fa8bd4d0e4600fd4c3463848135c7239a21f7e2cdb6f4865c462b888ddcb857",
+  "tree": "ae72334756d47f05a247f0dea63f81c0ca7265dc"
+ },
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true,
+  "size_ok": true,
+  "size": 365872,
+  "crc32": "0x0966526e",
+  "banner": "U-Boot 2027.01-rc2-gd38f69c44523"
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/e4-rescue/run-1/e2-stage-e87a8580.bin",
+  "size": 524288,
+  "sha256": "bdf14c1d1f68d33317966d5fe6e377275cc54d255590637d1db4c224c8ce7792",
+  "payload_crc32": "0x0966526e",
+  "payload_size": 365872
+ },
+ "testfile": {
+  "name": "e2-test.bin",
+  "size": 65536,
+  "size_hex": "0x10000",
+  "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32": "0x695b8eb2",
+  "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)",
+  "path": "/home/qc233/zte/e2631-p3/e2/tftp/e2-test.bin",
+  "present": true,
+  "sha256_file": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32_file": "0x695b8eb2"
+ },
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "capture_chain": {
+  "supervisor": [
+   339948
+  ],
+  "bootwatch": [
+   339958
+  ],
+  "tty": [
+   339955
+  ]
+ },
+ "device": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n625\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "region_sha": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+ "ok": true
+}

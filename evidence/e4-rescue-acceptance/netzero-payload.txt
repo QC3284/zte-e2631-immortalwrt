@@ -1,0 +1,9 @@
+net-zero payload used for POST /flash?mode=validate in run-1
+
+Extraction (read-only, live device): dd if=/dev/mtd0 bs=4096 skip=32 count=160
+Offset: 0x20000 .. 0xC0000 (655360 bytes)
+sha256: b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a
+crc32:  0x0721e716
+
+The 655360-byte binary itself is not committed; it is exactly the current
+flash image region and must be re-extracted for each run.

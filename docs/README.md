@@ -74,6 +74,8 @@
 | [../evidence/f2-probe/](../evidence/f2-probe/) | task-78 探针附件：session-results、原始串口字节与探针段、驱动与日志、主机 tcpdump、产物构建清单、sha256 清单 |
 | [../evidence/f2-fixed-20261128.md](../evidence/f2-fixed-20261128.md) | F2 修复验证（task-78 构建 patch 0032）：F2_FIXED——第一次 e2631net tx 3（pp）后 MAC TX frames 端口 2 = 3、网线出现 3 个 60 字节广播 ARP（源 00:41:71:00:00:50）；最终 fwd ctrl 0x00000011、MAC TX frames 0:0 1:0 2:12 3:0 4:0、12 个设备 ARP；vendor-alt 描述符变体未发送（独立观察，默认 pp 不受影响）；F1 KERNEL_STARTED 8.68 s；mtd0 f9239040… / 镜像区 b1ea9a48… 前后一致，唯一写入 userdata staging |
 | [../evidence/f2-fixed/](../evidence/f2-fixed/) | F2 修复验证附件：session-results、原始串口字节与探针段、驱动日志、主机 tcpdump（12 个设备 ARP）、产物构建清单、sha256 清单 |
+| [../evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) | E4 救援模式验收第一阶段（validate-only）RED：F2-fixed 32-patch 产物（banner gd38f69c44523）RAM 链 GREEN——GET / 页面 PASS（gzip 4456 B sha 8f16817b…，解压 9216 B sha 30a8f03e… = e2631-failsafe.html）、GET /status PASS、TCP/RX 已证实（tcpdump 完整握手 + GET 200 + POST 请求/400 响应）；POST /flash?mode=validate 返回 400 `unsupported request`，根因 patch 0028 `rescue_name_is()` 只把收到的头部行转小写却与混合大小写名字比较（Content-Length/X-E2631-SHA256/X-E2631-Confirm 永不可匹配），validate 与 write 均被阻塞；零 mtd0 写入（唯一写 userdata staging），F1 KERNEL_STARTED 8.63 s；附驱动侧 gzip/tcpdump flush 修复与错误摘要负向用例（下一轮） |
+| [../evidence/e4-rescue-acceptance/](../evidence/e4-rescue-acceptance/) | E4 救援验收 run-1 附件：preflight、串口/控制台原文、主机 tcpdump 与 HTTP 行摘录、页面 gzip/解压文件、/status 与 validate 原始响应、session-results、驱动、产物清单、根因代码摘录、净零载荷摘要、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|
