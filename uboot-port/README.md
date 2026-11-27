@@ -1045,3 +1045,7 @@ GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步
   u-boot.bin 365,872 B sha256 `3dbbfc49e7fa580fe5327f9b0f11cddc0fe0d0f92e5a9fde9c37a7efdf133bb6` crc32 `34b252a4`、
   mtd0 sha256 `8a38896e9164faa7aca4e9c2737e9d0c2b720f5576ce3ee3ef147109aa0b2bb9` crc32 `79ef8c50`、
   env 块 `6eee153b...` 未变；`rescue header fixture: PASS`、`mtd writer sites: 4`、checkpatch 0E/0W。
+  真机复测（2026-11-28，零写入 RAM 会话）：`POST /flash?mode=validate` 返回 HTTP 200 `result=ok`、
+  错误摘要返回 HTTP 400 `error=sha256 mismatch` 且 `/status` 保持 idle（零擦写），`GET /`、`/status`、F1 全 PASS，
+  证据见 [evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) §11（run-2）；
+  写模式验收仍待用户单独批准。

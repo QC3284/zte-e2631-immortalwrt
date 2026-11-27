@@ -164,6 +164,14 @@ CRC32（或页面显示校验通过），`/status` 保持 idle，mtd0 不变。w
 | 门禁 | `rescue header fixture: PASS (mixed-case GET/POST blocks resolve)`；`rescue header gate`；`mtd writer sites: 4`；checkpatch `0 errors / 0 warnings`；入口 0x47f00000 |
 | 归档 | `/home/qc233/zte/e2631-t5-artifacts/uboot-e4hdr-46036894542/e2631-uboot-46036894542/`（SHA256SUMS 校验通过） |
 
+真机验证（verify-docs，2026-11-28 00:55–00:57，RESCUE_PASS）：同一产物经 userdata 暂存 → flash 15-patch
+U-Boot `g85df6772a444` → `mtd read` 暂存镜像 + `crc32 0x34b252a4` → `go` → 新 banner `g30dca5f54503`；
+`POST /flash?mode=validate` 返回 HTTP 200 `result=ok sha_match=ok`（此后 `/status` 仍 `stage=idle`），错误摘要
+（64 个 `0`）返回 HTTP 400 `error=sha256 mismatch` 且不进入 erase/write；`GET /`、`/status`、F1 Linux 启动
+全部 PASS；mtd0 `f9239040…` / region `b1ea9a48…` / env `6e2c01da…` 前后不变，U-Boot 写命令零调用。
+证据见 [evidence/e4-rescue-acceptance-20261128.md](../evidence/e4-rescue-acceptance-20261128.md) §11 与
+`evidence/e4-rescue-acceptance/run-2/`（kit 提交 `589b4d4`）。写模式验收仍需用户单独批准。
+
 ## 6. 风险与边界
 
 - 写窗口只在 mtd0 U-Boot 区，固件槽位与 env 不在救援范围内（用户裁决：v1/v2 都不刷固件镜像）。
