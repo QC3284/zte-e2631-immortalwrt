@@ -389,6 +389,9 @@ const UBOOT_PIN_TEXT = read('uboot-port/commits.env');
 const UBOOT_WF = read('.github/workflows/uboot-build.yml');
 const UBOOT_README = read('uboot-port/README.md');
 const UBOOT_BUDGET_DOC = read('BUILD.md');
+const FAILSAFE_PAGE = read('uboot-port/failsafe/e2631-failsafe.html');
+const FAILSAFE_README = read('uboot-port/failsafe/README.md');
+const FAILSAFE_EMBED = read('tools/embed-failsafe.sh');
 const uboot = {};
 for (const line of UBOOT_PIN_TEXT.split('\n')) {
   const m = /^(E2631_UBOOT_[A-Z0-9_]+)=(.*)$/.exec(line.trim());
@@ -473,6 +476,57 @@ ok('UBOOT-INFO.txt carries the payload footprint table',
     'CI gate bytes:', 'headroom bytes vs hard cap:', 'headroom percent vs hard cap:',
     'headroom bytes vs CI gate:', 'env block sha256:', '.config sha256:'].every((s) => has(UBOOT_WF, s)) &&
   has(UBOOT_WF, 'sha256sum build/.config'));
+
+// E4 v1 (task-73): the rescue page is one self-contained HTML file that the
+// build gzip-embeds into the U-Boot tree; the page talks to the rescue HTTP
+// server with a raw POST body and polls /status. The page, the embed tool, the
+// frozen symbols and the workflow hook are pinned here so that an external
+// dependency, a multipart regression or a symbol rename cannot land silently.
+const failsafeCheck = (() => {
+  try {
+    const out = execFileSync('bash', [path.join(REPO, 'tools/embed-failsafe.sh'), '--check'], { encoding: 'utf8' });
+    const m = /raw (\d+) B, gzip (\d+) B \(limit (\d+) B\)/.exec(out);
+    return m ? { out, raw: Number(m[1]), gzip: Number(m[2]), limit: Number(m[3]), ok: true } : { out, ok: false };
+  } catch (e) {
+    return { out: String(e.stdout || e.message), ok: false };
+  }
+})();
+ok('the E4 rescue page is a single self-contained gzip asset within the 6144-byte v1 budget',
+  failsafeCheck.ok && failsafeCheck.limit === 6144 && failsafeCheck.gzip <= failsafeCheck.limit &&
+  failsafeCheck.raw > failsafeCheck.gzip &&
+  FAILSAFE_PAGE.includes('xhr.send(file)') && !/FormData|multipart/.test(FAILSAFE_PAGE) &&
+  FAILSAFE_PAGE.includes('upload.onprogress') && FAILSAFE_PAGE.includes('function sha256(') &&
+  FAILSAFE_PAGE.includes('id="validate"') && FAILSAFE_PAGE.includes('id="write"') &&
+  FAILSAFE_PAGE.includes('/flash?mode=') && FAILSAFE_PAGE.includes('/status') &&
+  FAILSAFE_PAGE.includes('X-E2631-Confirm') && FAILSAFE_PAGE.includes('655360') &&
+  FAILSAFE_PAGE.includes('X-File-Sha256') && !/https?:\/\//.test(FAILSAFE_PAGE) &&
+  !/<script[^>]+src=/.test(FAILSAFE_PAGE) && !/<link[^>]+href=/.test(FAILSAFE_PAGE) &&
+  !/\/reboot/.test(FAILSAFE_PAGE),
+  failsafeCheck.ok ? 'raw ' + failsafeCheck.raw + ' B, gzip ' + failsafeCheck.gzip + ' B, limit ' + failsafeCheck.limit + ' B' : failsafeCheck.out.slice(0, 200));
+ok('tools/embed-failsafe.sh defines the frozen symbols and emits deterministic asset files',
+  FAILSAFE_EMBED.includes('e2631_failsafe_html_gz[]') &&
+  FAILSAFE_EMBED.includes('e2631_failsafe_html_gz_len') &&
+  FAILSAFE_EMBED.includes('gzip -9 -n') && FAILSAFE_EMBED.includes('--check') &&
+  FAILSAFE_EMBED.includes('e2631_failsafe_asset.c') &&
+  FAILSAFE_EMBED.includes('e2631_failsafe_asset.h') &&
+  FAILSAFE_EMBED.includes('Deterministic') // emitter comment: no timestamps/paths
+  && !/\$\(date|date \+/.test(FAILSAFE_EMBED));
+const failsafeEmbedAt = UBOOT_WF.indexOf('Embed the failsafe rescue page');
+const failsafePatchAt = UBOOT_WF.indexOf('post-am:');
+const failsafeBuildAt = UBOOT_WF.indexOf('Configure and build with the ARM cross toolchain');
+ok('the U-Boot workflow embeds the rescue page after git am, before make, and ships the size stats',
+  failsafeEmbedAt > 0 && failsafeEmbedAt > failsafePatchAt && failsafeEmbedAt < failsafeBuildAt &&
+  UBOOT_WF.includes('tools/embed-failsafe.sh') &&
+  UBOOT_WF.includes('--outdir "$UBOOT_DIR/board/zte/zxhn-e2631"') &&
+  UBOOT_WF.includes('--stats "$UBOOT_DIR/artifacts/E2631-FAILSAFE-ASSET.txt"') &&
+  /sha256sum[^\n]*E2631-FAILSAFE-ASSET\.txt/.test(UBOOT_WF) &&
+  UBOOT_WF.includes('failsafe rescue page (E4 v1, task-73):'),
+  'embed at ' + failsafeEmbedAt + ', post-am at ' + failsafePatchAt + ', build at ' + failsafeBuildAt);
+ok('uboot-port/failsafe/README.md documents the frozen interface, the protocol and the size budget',
+  ['e2631_failsafe_html_gz', 'e2631_failsafe_html_gz_len', 'POST /flash?mode=validate',
+    'POST /flash?mode=write', 'GET /status', 'X-E2631-Confirm: write', '6144',
+    'tools/embed-failsafe.sh', '--outdir'].every((s) => FAILSAFE_README.includes(s)) &&
+  FAILSAFE_README.includes('仅校验') && FAILSAFE_README.includes('写入待命'));
 
 console.log('');
 console.log(fails === 0 ? 'check-workflows: OK - pins, tree-fork content, CI, artifact names and release channel agree'
