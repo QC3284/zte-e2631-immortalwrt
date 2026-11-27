@@ -493,9 +493,16 @@ elif kind == 'badpadding':
     assert off < 0xA0000
     d[off] = 0x00
 elif kind == 'nobanner':
+    # The E4 payload carries two 'U-Boot 20' probe strings, so flip every
+    # occurrence in the payload; flipping only the first one would leave the
+    # image acceptable to the device banner probe.
+    hits = 0
     i = d.find(b'U-Boot 20', 0x800)
-    assert i > 0
-    d[i] = ord('X')
+    while i > 0:
+        d[i] = ord('X')
+        hits += 1
+        i = d.find(b'U-Boot 20', i + 1)
+    assert hits >= 1
 elif kind == 'payloadflip':
     d[0x30000] ^= 0x01
 else:
