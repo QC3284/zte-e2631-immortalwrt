@@ -1,0 +1,6 @@
+source=uboot-port/failsafe/e2631-failsafe.html
+raw_bytes=9216
+gzip_bytes=4456
+limit_bytes=6144
+gzip_sha256=8f16817b30d66197364cf5a67d9cf5ddd2720a7a09975e8d01dd2494d78616d3
+symbols=e2631_failsafe_html_gz,e2631_failsafe_html_gz_len
