@@ -1,0 +1,1041 @@
+[  442.947467] br-lan: port 3(lan3) entered disabled state
+[  442.948845] br-lan: port 2(lan2) entered disabled state
+[  442.960221] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[  442.960541] br-lan: port 1(lan1) entered disabled state
+[  442.977835] reboot: Restarting system
+
+Boot SPI NAND
+start read bootheader
+start read secondboot
+non secure boot 
+Jump
+
+enter bootloader...
+crpm init enter
+crpm init done
+ddr init enter, rate is 1333 Mbps
+5ddr init done 
+serial init start 
+serial init done 
+SPI NAND
+non secure uboot 
+backup header!!
+Jump
+
+
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  10 devices, 8 uclasses, devicetree: embed
+MMC:   
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   No ethernet found.
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x47f00000 0x3f00000 0x80000
+Reading 524288 byte(s) (256 page(s)) at offset 0x03f00000
+=> crc32 0x47f00000 0x583e8
+CRC32 for 47f00000 ... 47f583e7 ==> 4139ba37
+=> go 0x47f00000
+## Starting application at 0x47F00000 ...
+
+
+U-Boot 2027.01-rc2-g6db632ad6e5b (Nov 19 2026 - 15:44:39 +0000)
+
+Model: ZTE ZXHN E2631 (ZX279128S)
+DRAM:  256 MiB
+WARNING: Caches not enabled
+Core:  8 devices, 8 uclasses, devicetree: embed
+Loading Environment from MTD...Loading Environment from MTD... OK
+In:    serial@94404000
+Out:   serial@94404000
+Err:   serial@94404000
+Net:   eth0: ethernet@92000000
+[2KHit any key to stop autoboot: 3[2KHit any key to stop autoboot: 0
+=>                    version
+U-Boot 2027.01-rc2-g6db632ad6e5b (Nov 19 2026 - 15:44:39 +0000)
+
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+GNU ld (2.42-1ubuntu1+23) 2.42
+=> mtd read spi-nand0 0x44000000 0xc0000 0x20000
+Reading 131072 byte(s) (64 page(s)) at offset 0x000c0000
+=> md 0x44000000 4
+44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115
+=> crc32 0x44000000 0x20000
+crc32 for 44000000 ... 4401ffff ==> e826c394
+=> printenv
+baudrate=115200
+bootcmd=e2631boot
+bootdelay=3
+bootfile=uboot.bin
+bootloaderfile=bootloader.bin
+console=ttyAMA0,115200n8
+e2631_flashboot=reset
+e2631_netboot=tftp 0x42000000 e2631-netboot.uImage
+e2631_pocgo=go 0x43000000
+e2631_pocload=tftp 0x43000000 u-boot.bin
+ethact=eth0
+ethaddr=00:41:71:00:00:50
+fdtcontroladdr=4fff2b40
+fullfile=upgrade.bin
+gatewayip=192.168.1.1
+hostname=unknown
+ipaddr=192.168.1.1
+linuzfile=vmlinuz.bin
+loadaddr=0x42000000
+memsize=256M
+netmask=255.255.255.0
+netretry=5
+serverip=192.168.1.100
+stderr=serial@94404000
+stdin=serial@94404000
+stdout=serial@94404000
+versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00
+
+Environment size: 646/131068 bytes
+=> help e2631rescue
+e2631rescue - serve the web bootloader rescue on lan1
+
+Usage:
+e2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is
+              written until a validated image is uploaded and the
+              X-E2631-Confirm: write header is present. Ctrl-C leaves.
+
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92280000 1
+92280000: 00000000                             ....
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000100                             ....
+=> md 0x92340100 1
+92340100: 00005500                             .U..
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 01000100                             ....
+=> md 0x92350060 1
+92350060: 00000000                             ....
+=> md 0x92350064 1
+92350064: 00000000                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00000000                             ....
+=> md 0x921d428c 5
+921d428c: 00000000 00000000 00000000 00000000  ................
+921d429c: 00000000                             ....
+=> mii info
+PHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+PHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92280000 1
+92280000: 00000000                             ....
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000100                             ....
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 01000100                             ....
+=> md 0x92350060 1
+92350060: 00000000                             ....
+=> md 0x92350064 1
+92350064: 00000000                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00000000                             ....
+=> md 0x921d428c 5
+921d428c: 00000000 00000000 00000000 00000000  ................
+921d429c: 00000000                             ....
+=> e2631net
+e2631net: lan1 switch port 2, stopped
+e2631net: MAC ctrl 0x00000000, TM int 0x00000000, BMU free 0x00000110, TX done 0
+e2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000
+e2631net: RX queue counts 0 0 0 0 0 0 0 0
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92280000 1
+92280000: 00000000                             ....
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000100                             ....
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 01000100                             ....
+=> md 0x92350060 1
+92350060: 00000000                             ....
+=> md 0x92350064 1
+92350064: 00000000                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00000000                             ....
+=> md 0x921d428c 5
+921d428c: 00000000 00000000 00000000 00000000  ................
+921d429c: 00000000                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92280000 1
+92280000: 00000000                             ....
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000100                             ....
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000110                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 01000100                             ....
+=> md 0x92350060 1
+92350060: 00000000                             ....
+=> md 0x92350064 1
+92350064: 00000000                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00000000                             ....
+=> md 0x921d428c 5
+921d428c: 00000000 00000000 00000000 00000000  ................
+921d429c: 00000000                             ....
+=> dhcp
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+BOOTP broadcast 8
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92280000 1
+92280000: 00bb2000                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00007700                             .w..
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92350000 1
+92350000: 00306564                             de0.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> md 0x92280000 1
+92280000: 00bb2000                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92350000 1
+92350000: 00306564                             de0.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> setenv netretry 1
+=> dhcp
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+
+Retry time exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+BOOTP broadcast 1
+BOOTP broadcast 2
+BOOTP broadcast 3
+BOOTP broadcast 4
+BOOTP broadcast 5
+BOOTP broadcast 6
+BOOTP broadcast 7
+BOOTP broadcast 8
+
+Retry time exceeded; starting again
+=> md 0x92280000 1
+92280000: 00bb2000                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00002700                             .'..
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 80000111                             ....
+=> md 0x92350000 1
+92350000: 00306564                             de0.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> setenv netretry 5
+=> setenv ipaddr 192.168.1.50
+=> setenv netmask 255.255.255.0
+=> setenv serverip 192.168.1.191
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 80000111                             ....
+=> md 0x92280000 1
+92280000: 00bb2000                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 80000111                             ....
+=> md 0x92350000 1
+92350000: 00306564                             de0.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> ping 192.168.1.191
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+Using ethernet@92000000 device
+
+ARP Retry count exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+ping failed; host 192.168.1.191 is not alive
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92280000 1
+92280000: 00bb2003                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00002700                             .'..
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92280000 1
+92280000: 00bb2003                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00000000                             ....
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 00000111                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> tftp 0x43000000 e2-test.bin
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+Using ethernet@92000000 device
+TFTP from server 192.168.1.191; our IP address is 192.168.1.50
+Filename 'e2-test.bin'.
+Load address: 0x43000000
+Loading: *
+ARP Retry count exceeded; starting again
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+=> md.l 0x9234800c 1
+9234800c: 00000000                             ....
+=> md.l 0x92348014 1
+92348014: 00000000                             ....
+=> md.l 0x923480dc 1
+923480dc: 80000111                             ....
+=> md 0x92280000 1
+92280000: 00bb2003                             . ..
+=> md 0x92280764 1
+92280764: 00000000                             ....
+=> md 0x92280768 1
+92280768: 00000000                             ....
+=> md 0x922807c4 1
+922807c4: 00000000                             ....
+=> md 0x92340000 1
+92340000: 00000140                             @...
+=> md 0x92340100 1
+92340100: 00002700                             .'..
+=> md 0x92340104 1
+92340104: ffffffff                             ....
+=> md 0x92348014 1
+92348014: 00000000                             ....
+=> md 0x9234800c 1
+9234800c: 00000000                             ....
+=> md 0x923480dc 1
+923480dc: 80000111                             ....
+=> md 0x92350000 1
+92350000: 003f6564                             de?.
+=> md 0x9235003c 1
+9235003c: 00400040                             @.@.
+=> md 0x92350060 1
+92350060: 45c00000                             ...E
+=> md 0x92350064 1
+92350064: 00000001                             ....
+=> md 0x92350068 1
+92350068: 00000000                             ....
+=> md 0x92350100 8
+92350100: 00000000 00000000 00000000 00000000  ................
+92350110: 00000000 00000000 00000000 00000000  ................
+=> md 0x921cc000 1
+921cc000: 00020000                             ....
+=> md 0x921d428c 5
+921d428c: 00000001 00000001 00000001 00000001  ................
+921d429c: 00000001                             ....
+=> crc32 0x43000000 0x10000
+crc32 for 43000000 ... 4300ffff ==> 394c9ef2
+=> bdinfo
+boot_params = 0x40000100
+DRAM bank   = 0x00000000
+-> start    = 0x40000000
+-> size     = 0x10000000
+flashstart  = 0x00000000
+flashsize   = 0x00000000
+flashoffset = 0x00000000
+baudrate    = 115200 bps
+relocaddr   = 0x4ffa8000
+reloc off   = 0x080a8000
+Build       = 32-bit
+current eth = ethernet@92000000
+ethaddr     = 00:41:71:00:00:50
+IP addr     = 192.168.1.50
+fdt_blob    = 0x4fff2b40
+lmb_dump_all:
+ memory.count = 0x1
+ memory[0]	[0x40000000-0x4fffffff], 0x10000000 bytes, flags: none
+ reserved.count = 0x1
+ reserved[0]	[0x4eb87ed0-0x4fffffff], 0x1478130 bytes, flags: no-overwrite
+devicetree  = embed
+serial addr = 0x94404000
+ width      = 0x00000004
+ shift      = 0x00000002
+ offset     = 0x00000000
+ clock      = 0x00000000
+arch_number = 0x00000000
+irq_sp      = 0x4fb87ee0
+sp start    = 0x4fb87ed0
+Early malloc usage: 194 / 800
+=> md 0x42000000 8
+42000000: 00000001 00000000 c16d4268 c09565c0  ........hBm..e..
+42000010: c179e641 c17ac7f8 c17a18a8 00000000  A.y...z...z.....
+=> md 0x42000000 0x10
+42000000: 00000001 00000000 c16d4268 c09565c0  ........hBm..e..
+42000010: c179e641 c17ac7f8 c17a18a8 00000000  A.y...z...z.....
+42000020: 0e6105c4 a1ff0014 c17a4e18 00000000  ..a......Nz.....
+42000030: 00000000 00000000 00000000 00000000  ................
+=> mw 0x42000000 0x11223344 0x10
+=> md 0x42000000 0x10
+42000000: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+42000010: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+42000020: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+42000030: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+=> crc32 0x42000000 0x40
+crc32 for 42000000 ... 4200003f ==> 997fa966
+=> md 0x4c000000 0x10
+4c000000: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000010: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000020: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000030: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+=> mw 0x4c000000 0x11223344 0x10
+=> md 0x4c000000 0x10
+4c000000: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000010: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000020: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4c000030: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+=> crc32 0x4c000000 0x40
+crc32 for 4c000000 ... 4c00003f ==> 997fa966
+=> md 0x4a000000 0x10
+4a000000: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000010: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000020: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000030: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+=> mw 0x4a000000 0x11223344 0x10
+=> md 0x4a000000 0x10
+4a000000: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000010: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000020: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+4a000030: 11223344 11223344 11223344 11223344  D3".D3".D3".D3".
+=> crc32 0x4a000000 0x40
+crc32 for 4a000000 ... 4a00003f ==> 997fa966
+=> mtd read spi-nand0 0x42000000 0x2300000 0x800
+Reading 2048 byte(s) (1 page(s)) at offset 0x02300000
+=> md 0x42000000 8
+42000000: 33333333 cccccccc 88888888 dddddddd  3333............
+42000010: ffffffff ffffffff ffffffff ffffffff  ................
+=> md 0x42000020 8
+42000020: 56190527 c23645f7 9eb1006b ea443500  '..V.E6.k....5D.
+42000030: 00800040 00800040 f6c6a962 00020205  @...@...b.......
+=> crc32 0x42000000 0x20
+crc32 for 42000000 ... 4200001f ==> 5076ace3
+=> iminfo 0x42000020
+
+## Checking Image at 42000020 ...
+   Legacy image found
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ...    Bad Data CRC
+=> bdinfo
+boot_params = 0x40000100
+DRAM bank   = 0x00000000
+-> start    = 0x40000000
+-> size     = 0x10000000
+flashstart  = 0x00000000
+flashsize   = 0x00000000
+flashoffset = 0x00000000
+baudrate    = 115200 bps
+relocaddr   = 0x4ffa8000
+reloc off   = 0x080a8000
+Build       = 32-bit
+current eth = ethernet@92000000
+ethaddr     = 00:41:71:00:00:50
+IP addr     = 192.168.1.50
+fdt_blob    = 0x4fff2b40
+lmb_dump_all:
+ memory.count = 0x1
+ memory[0]	[0x40000000-0x4fffffff], 0x10000000 bytes, flags: none
+ reserved.count = 0x1
+ reserved[0]	[0x4eb87ed0-0x4fffffff], 0x1478130 bytes, flags: no-overwrite
+devicetree  = embed
+serial addr = 0x94404000
+ width      = 0x00000004
+ shift      = 0x00000002
+ offset     = 0x00000000
+ clock      = 0x00000000
+arch_number = 0x00000000
+irq_sp      = 0x4fb87ee0
+sp start    = 0x4fb87ed0
+Early malloc usage: 194 / 800
+=> mtd read spi-nand0 0x42000000 0x2300000 0x800
+Reading 2048 byte(s) (1 page(s)) at offset 0x02300000
+=> md 0x42000000 8
+42000000: 33333333 cccccccc 88888888 dddddddd  3333............
+42000010: ffffffff ffffffff ffffffff ffffffff  ................
+=> md 0x42000020 8
+42000020: 56190527 c23645f7 9eb1006b ea443500  '..V.E6.k....5D.
+42000030: 00800040 00800040 f6c6a962 00020205  @...@...b.......
+=> crc32 0x42000000 0x20
+crc32 for 42000000 ... 4200001f ==> 5076ace3
+=> iminfo 0x42000020
+
+## Checking Image at 42000020 ...
+   Legacy image found
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ...    Bad Data CRC
+=> md 0x42000000 8
+42000000: 33333333 cccccccc 88888888 dddddddd  3333............
+42000010: ffffffff ffffffff ffffffff ffffffff  ................
+=> e2631boot load
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+=> md 0x420000 8
+00420000: 00000000 00000000 00000000 00000000  ................
+00420010: 00000000 00000000 00000000 00000000  ................
+=> md 0x420020 8
+00420020: 00000000 00000000 00000000 00000000  ................
+00420030: 00000000 00000000 00000000 00000000  ................
+=> crc32 0x420020 0x40
+crc32 for 00420020 ... 0042005f ==> 758d6336
+=> iminfo 0x420000
+
+## Checking Image at 00420000 ...
+Unknown image format!
+=> iminfo 0x420020
+
+## Checking Image at 00420020 ...
+Unknown image format!
+=> e2631boot
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000
+e2631boot: cspboot would boot slot1
+e2631boot: slot1 uImage "ARM ImmortalWrt Linux-6.18.60": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000
+e2631boot: header and data CRCs are good
+e2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45da004a VBAR=0x4ffa8000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: running vendor-order CP15 cleanup
+e2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45da004a VBAR=0x4ffa8000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019
+e2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000
+## Booting kernel from Legacy Image at 42000020 ...
+   Image Name:   ARM ImmortalWrt Linux-6.18.60
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3491050 Bytes = 3.3 MiB
+   Load Address: 40008000
+   Entry Point:  40008000
+   Verifying Checksum ... OK
+Working FDT set to 0
+   Loading Kernel Image to 40008000
+
+Starting kernel ...
+
+[    0.152965] printk: console [ttyAMA0] enabled
+[    0.157366] printk: legacy bootconsole [pl11] disabled
+[    0.164194] 94405000.serial: ttyAMA1 at MMIO 0x94405000 (irq = 27, base_baud = 0) is a PL011 rev1
+[    0.172252] zx279128s-pcie f000000.pcie: host bridge /soc/pcie@f000000 ranges:
+[    0.172296] zx279128s-pcie f000000.pcie:      MEM 0x0010000000..0x0017ffffff -> 0x0010000000
+[    0.172322] zx279128s-pcie f000000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000
+[    0.489718] zx279128s-pcie f000000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G
+[    0.589319] zx279128s-pcie f000000.pcie: PCIe Gen.1 x1 link up
+[    0.589560] zx279128s-pcie f000000.pcie: PCI host bridge to bus 0000:00
+[    0.589578] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.589589] pci_bus 0000:00: root bus resource [mem 0x10000000-0x17ffffff]
+[    0.589624] pci 0000:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port
+[    0.589652] pci 0000:00:00.0: BAR 0 [mem 0x00000000-0x000fffff]
+[    0.589662] pci 0000:00:00.0: BAR 1 [mem 0x00000000-0x000fffff]
+[    0.589670] pci 0000:00:00.0: PCI bridge to [bus 01-ff]
+[    0.589681] pci 0000:00:00.0:   bridge window [io  0x0000-0x0fff]
+[    0.589690] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff]
+[    0.589700] pci 0000:00:00.0:   bridge window [mem 0x00000000-0x000fffff pref]
+[    0.589754] pci 0000:00:00.0: supports D1
+[    0.589761] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
+[    0.590795] PCI: bus0: Fast back to back transfers disabled
+[    0.591081] pci 0000:01:00.0: [14c3:7906] type 00 class 0x028000 PCIe Endpoint
+[    0.591451] pci 0000:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+[    0.591483] pci 0000:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+[    0.591509] pci 0000:01:00.0: BAR 4 [mem 0x00000000-0x00000fff 64bit pref]
+[    0.592113] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+[    0.592451] pci 0000:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5 GT/s PCIe x1 link at 0000:00:00.0 (capable of 8.000 Gb/s with 5.0 GT/s PCIe x2 link)
+[    0.592782] PCI: bus1: Fast back to back transfers disabled
+[    0.592815] pci 0000:00:00.0: BAR 0 [mem 0x10000000-0x100fffff]: assigned
+[    0.592831] pci 0000:00:00.0: BAR 1 [mem 0x10100000-0x101fffff]: assigned
+[    0.592841] pci 0000:00:00.0: bridge window [mem 0x10200000-0x102fffff]: assigned
+[    0.592850] pci 0000:00:00.0: bridge window [mem 0x10300000-0x104fffff pref]: assigned
+[    0.592864] pci 0000:01:00.0: BAR 0 [mem 0x10300000-0x103fffff 64bit pref]: assigned
+[    0.592945] pci 0000:01:00.0: BAR 2 [mem 0x10200000-0x10207fff 64bit]: assigned
+[    0.593022] pci 0000:01:00.0: BAR 4 [mem 0x10400000-0x10400fff 64bit pref]: assigned
+[    0.593099] pci 0000:00:00.0: PCI bridge to [bus 01-ff]
+[    0.593110] pci 0000:00:00.0:   bridge window [mem 0x10200000-0x102fffff]
+[    0.593119] pci 0000:00:00.0:   bridge window [mem 0x10300000-0x104fffff pref]
+[    0.593130] pci_bus 0000:00: resource 4 [mem 0x10000000-0x17ffffff]
+[    0.593139] pci_bus 0000:01: resource 1 [mem 0x10200000-0x102fffff]
+[    0.593147] pci_bus 0000:01: resource 2 [mem 0x10300000-0x104fffff pref]
+[    0.593542] pcieport 0000:00:00.0: PME: Signaling with IRQ 28
+[    0.594401] pcieport 0000:00:00.0: AER: enabled with IRQ 28
+[    0.595854] zx279128s-pcie f100000.pcie: host bridge /soc/pcie@f100000 ranges:
+[    0.595898] zx279128s-pcie f100000.pcie:      MEM 0x0020000000..0x0027ffffff -> 0x0020000000
+[    0.595924] zx279128s-pcie f100000.pcie:   IB MEM 0x0040000000..0x005fffffff -> 0x0040000000
+[    0.597670] zx279128s-pcie f100000.pcie: iATU: unroll F, 5 ob, 5 ib, align 64K, limit 4G
+[    0.699337] zx279128s-pcie f100000.pcie: PCIe Gen.1 x1 link up
+[    0.699524] zx279128s-pcie f100000.pcie: PCI host bridge to bus 0001:00
+[    0.699540] pci_bus 0001:00: root bus resource [bus 00-ff]
+[    0.699551] pci_bus 0001:00: root bus resource [mem 0x20000000-0x27ffffff]
+[    0.699588] pci 0001:00:00.0: [1cf2:6830] type 01 class 0x060400 PCIe Root Port
+[    0.699615] pci 0001:00:00.0: BAR 0 [mem 0x00000000-0x000fffff]
+[    0.699625] pci 0001:00:00.0: BAR 1 [mem 0x00000000-0x000fffff]
+[    0.699633] pci 0001:00:00.0: PCI bridge to [bus 01-ff]
+[    0.699643] pci 0001:00:00.0:   bridge window [io  0x0000-0x0fff]
+[    0.699651] pci 0001:00:00.0:   bridge window [mem 0x00000000-0x000fffff]
+[    0.699662] pci 0001:00:00.0:   bridge window [mem 0x00000000-0x000fffff pref]
+[    0.699742] pci 0001:00:00.0: supports D1
+[    0.699751] pci 0001:00:00.0: PME# supported from D0 D1 D3hot
+[    0.700813] PCI: bus0: Fast back to back transfers disabled
+[    0.701073] pci 0001:01:00.0: [14c3:790a] type 00 class 0x028000 PCIe Endpoint
+[    0.701456] pci 0001:01:00.0: BAR 0 [mem 0x00000000-0x000fffff 64bit pref]
+[    0.701487] pci 0001:01:00.0: BAR 2 [mem 0x00000000-0x00007fff 64bit]
+[    0.701514] pci 0001:01:00.0: BAR 4 [mem 0x00000000-0x00000fff 64bit pref]
+[    0.702136] pci 0001:01:00.0: PME# supported from D0 D3hot D3cold
+[    0.702486] pci 0001:01:00.0: 2.000 Gb/s available PCIe bandwidth, limited by 2.5 GT/s PCIe x1 link at 0001:00:00.0 (capable of 4.000 Gb/s with 5.0 GT/s PCIe x1 link)
+[    0.702834] PCI: bus1: Fast back to back transfers disabled
+[    0.702866] pci 0001:00:00.0: BAR 0 [mem 0x20000000-0x200fffff]: assigned
+[    0.702881] pci 0001:00:00.0: BAR 1 [mem 0x20100000-0x201fffff]: assigned
+[    0.702892] pci 0001:00:00.0: bridge window [mem 0x20200000-0x202fffff]: assigned
+[    0.702901] pci 0001:00:00.0: bridge window [mem 0x20300000-0x204fffff pref]: assigned
+[    0.702914] pci 0001:01:00.0: BAR 0 [mem 0x20300000-0x203fffff 64bit pref]: assigned
+[    0.702997] pci 0001:01:00.0: BAR 2 [mem 0x20200000-0x20207fff 64bit]: assigned
+[    0.703077] pci 0001:01:00.0: BAR 4 [mem 0x20400000-0x20400fff 64bit pref]: assigned
+[    0.703156] pci 0001:00:00.0: PCI bridge to [bus 01-ff]
+[    0.703166] pci 0001:00:00.0:   bridge window [mem 0x20200000-0x202fffff]
+[    0.703176] pci 0001:00:00.0:   bridge window [mem 0x20300000-0x204fffff pref]
+[    0.703187] pci_bus 0001:00: resource 4 [mem 0x20000000-0x27ffffff]
+[    0.703196] pci_bus 0001:01: resource 1 [mem 0x20200000-0x202fffff]
+[    0.703203] pci_bus 0001:01: resource 2 [mem 0x20300000-0x204fffff pref]
+[    0.703591] pcieport 0001:00:00.0: PME: Signaling with IRQ 29
+[    0.704623] pcieport 0001:00:00.0: AER: enabled with IRQ 29
+[    0.855470] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)
+[    0.856411] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)
+[    0.857409] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)
+[    0.858383] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)
+[    0.863019] clk: Disabling unused clocks
+[    0.863873] check access for rdinit=/init failed: -2, ignoring
+[    0.864057] mtdblock: MTD device 'rootfs' is NAND, please consider using UBI block devices instead.
+[    0.869583] VFS: Mounted root (squashfs filesystem) readonly on device 31:7.
+[    0.872951] Freeing unused kernel image (initmem) memory: 1024K
+[    0.878157] Run /sbin/init as init process
+[    1.446397] init: Console is alive
+[    2.405252] kmodloader: loading kernel modules from /etc/modules-boot.d/*
+[    2.507713] gpio_button_hotplug: loading out-of-tree module taints kernel.
+[    2.512096] kmodloader: done loading kernel modules from /etc/modules-boot.d/*
+[    2.524384] init: - preinit -
+[    7.059326] random: crng init done
+[    7.589787] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode
+Press the [f] key and hit [enter] to enter failsafe mode
+Press the [1], [2], [3] or [4] key and hit [enter] to select the debug level
+[   11.759603] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off
+[   11.926482] ubi0: attaching mtd10
+[   12.013435] ubi0: scanning is finished
+[   12.013465] ubi0 error: ubi_read_volume_table: the layout volume was not found
+[   12.049457] ubi0 error: ubi_attach_mtd_dev: failed to attach mtd10, error -22
+[   12.180136] mount_root: loading kmods from internal overlay
+[   12.195492] kmodloader: loading kernel modules from //etc/modules-boot.d/*
+[   12.200551] kmodloader: done loading kernel modules from //etc/modules-boot.d/*
+[   12.306886] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.335915] block: attempting to load /etc/config/fstab
+[   12.395011] block: extroot: not configured
+[   12.395329] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes
+[   12.477809] jffs2: notice: (569) jffs2_build_xattr_subsystem: complete building xattr subsystem, 39 of xdatum (0 unchecked, 22 orphan) and 67 of xref (43 dead, 0 orphan) found.
+[   12.496936] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab
+[   12.498050] block: extroot: not configured
+[   12.500029] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes
+[   12.582715] jffs2: notice: (567) jffs2_build_xattr_subsystem: complete building xattr subsystem, 39 of xdatum (0 unchecked, 22 orphan) and 67 of xref (43 dead, 0 orphan) found.
+[   12.587159] mount_root: loading kmods from internal overlay
+[   12.614234] kmodloader: loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*
+[   12.618218] kmodloader: done loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*
+[   12.625905] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.665265] block: attempting to load /tmp/overlay/upper/etc/config/fstab
+[   12.666382] block: extroot: not configured
+[   12.666834] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab
+[   12.667299] block: extroot: not configured
+[   12.669018] mount_root: switching to jffs2 overlay
+[   12.678031] overlayfs: upper fs does not support tmpfile.
+[   12.682690] urandom-seed: Seeding with /etc/urandom.seed
+[   12.800348] zx279128s-eth 92000000.ethernet lan1: Link is Down
+[   12.806728] procd: - early -
+[   12.933727] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   12.994884] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.046830] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.098691] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.150494] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.201709] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.262138] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.313127] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.
+[   13.361812] procd: - ubus -
+[   13.574519] procd: - init -
+Please press Enter to activate this console.

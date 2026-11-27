@@ -1,0 +1,8 @@
+{
+ "name": "e2-test.bin",
+ "size": 65536,
+ "size_hex": "0x10000",
+ "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+ "crc32": "0x695b8eb2",
+ "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)"
+}

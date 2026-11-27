@@ -67,6 +67,8 @@
 | [../evidence/e2b-session/](../evidence/e2b-session/) | task-67 会话附件：session-results、驱动/串口原始字节、tcpdump、dnsmasq/http、f1diag 与 5 轮只读探针结果、产物构建清单、sha256 清单 |
 | [../evidence/e2b-session/thin-run2/](../evidence/e2b-session/thin-run2/) | task-67 thin 会话附件：run-2 session-results、原始串口字节、驱动日志、主机 tcpdump（U-Boot MAC 0 帧 / BOOTP 0 行）、dnsmasq/http、run-1 端口冲突失败记录、thin 产物构建清单、驱动脚本、sha256 清单 |
 | [../evidence/e4-rescue-acceptance-plan-20261127.md](../evidence/e4-rescue-acceptance-plan-20261127.md) | E4-验1（task-75）：救援模式验收方案 + 无浏览器脚本——零净载荷钉死为当前镜像区 sha256 b1ea9a48…（整 mtd0 f9239040…），Phase 1 userdata 暂存 + mtd read + go 的 RAM 链、S0–S9 步骤、拒绝矩阵（size±1/坏 magic/长度/ padding/banner/摘要不符/payload-flip）、X-E2631-SHA256 传输完整性 vs --expected-sha 权威性、默认 validate-only + 双开关写入、mock 自测 37/50 PASS |
+| [../evidence/t74-f2-session-20261127.md](../evidence/t74-f2-session-20261127.md) | task-74 / T74-F2 真机会话：E4 组合产物（patch 0026-0030，banner g6db632ad6e5b）RAM 链 GREEN——ENV OK（env 回归未复现、patch-0030 重试未触发、H1 升级）、F2 NO_WIRE_FRAMES（57 次 BOOTP 无地址；tcpdump 39 帧全为主机、U-Boot MAC 0 帧；DMA 环/TX start/端口使能已置但 MAC TX frames 恒 0，patch-0023 重试路径未被触发）、T74 NO_ANOMALY（写/读/mtd read 全正常，历史 0x42/0x48 可见性异常关闭为探针地址缩写错误）、F1 KERNEL_STARTED 8.31 s；零 mtd0 写入（282 条 U-Boot 命令审计，唯一写为 userdata staging） |
+| [../evidence/t74-f2/](../evidence/t74-f2/) | task-74 附件：run-2/run-1 session-results、驱动与原始串口字节、主机 tcpdump、dnsmasq/http、修正版驱动、产物校验清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|

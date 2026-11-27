@@ -1,0 +1,41 @@
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enp0s20u1u4u2c2, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+14:12:11.815219 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+14:12:11.873387 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+14:12:11.906687 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 0.0.0.0, length 28
+14:12:11.953202 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+14:12:11.955676 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)
+14:12:12.008671 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 62: 192.168.1.191 > 224.0.0.22: igmp v3 report, 2 group record(s)
+14:12:12.053426 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 82: 192.168.1.191.5353 > 224.0.0.251.5353: 0 PTR (QM)? _kdeconnect._udp.local. (40)
+14:12:12.086645 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+14:12:12.089980 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)
+14:12:12.337583 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+14:12:12.588711 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)
+14:12:12.768692 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)
+14:12:12.789670 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)
+14:12:13.053197 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:12:13.173307 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)
+14:12:13.872832 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)
+14:12:13.953284 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+14:12:15.053886 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:12:15.257531 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 292: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 5/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local., (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8", (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191 (250)
+14:12:15.953376 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28
+14:12:15.956114 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT "id=16a45779a898493e818a196a3ef802ce" "name=ASUS-X550VC" "type=desktop" "protocol=8", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)
+14:12:19.055897 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:12:27.060911 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:12:43.075859 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:13:15.106987 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:14:19.110199 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)
+14:14:22.083032 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:23.136675 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:24.160669 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:25.269302 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:26.272672 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:27.296660 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:28.396990 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:29.408684 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:14:30.432677 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:15:02.986233 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:15:04.033725 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:15:05.056664 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.1 tell 192.168.1.191, length 28
+14:16:27.193224 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)

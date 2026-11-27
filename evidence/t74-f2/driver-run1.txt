@@ -1,0 +1,89 @@
+22:03:22 stage copy 0.51s rc=0
+22:03:23 stage erase 0.85s rc=0
+22:03:23 stage write 0.39s rc=0
+22:03:23 stage readback 0.24s rc=0
+22:03:24 stage sync 0.21s rc=0
+22:03:24 PHASE 1 GREEN: artifact staged in userdata and read back
+22:03:24 capture paused: {"supervisor_pids": [211735], "bootwatch_pids": [211747], "tty_holders": [211741], "tty_holders_after": [], "free": true}
+22:03:25 serial hub started pid=282576 log=/home/qc233/zte/e2631-p3/e2/t74/run-1/serial.log
+22:03:26 reboot -f requested; waiting for the flash U-Boot banner
+22:03:28 banner seen; stopping autoboot
+22:03:31 stop_autoboot: {"banner": true, "prompt": true}
+22:03:31 ub cmd: version ok=True
+22:03:31 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+22:03:32 ub cmd: crc32 0x47f00000 0x583e8 ok=True
+22:03:32 gate: staged image crc32 == 0x4139ba37
+22:03:32 banner seen; stopping autoboot
+22:03:35 stop_autoboot: {"banner": true, "prompt": true}
+22:03:35 ub cmd: version ok=True
+22:03:35 PHASE 2 GREEN: new image banner and prompt
+22:03:35 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+22:03:35 ub cmd: md 0x44000000 4 ok=True
+22:03:35 ub cmd: crc32 0x44000000 0x20000 ok=True
+22:03:35 env block state=OK stored=0xf95a816e region=0xe826c394
+22:03:35 ub cmd: printenv ok=True
+22:03:35 env sanity ok=False entries=27
+22:03:35 ENV BAD on the first RAM boot; retrying with an in-session loadx reload
+22:04:10 xmodem_cmd loadx 0x47f00000 block=1024 ok=True elapsed=34.3s
+22:04:11 md_check loadx-start: OK
+22:04:11 md_check loadx-banner: OK
+22:04:11 md_check loadx-tail: OK
+22:04:11 loadx verify ok=True
+22:04:11 banner seen; stopping autoboot
+22:04:14 stop_autoboot: {"banner": true, "prompt": true}
+22:04:14 ub cmd: version ok=True
+22:04:15 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+22:04:15 ub cmd: md 0x44000000 4 ok=True
+22:04:15 ub cmd: crc32 0x44000000 0x20000 ok=True
+22:04:15 env block state=OK stored=0xf95a816e region=0xe826c394
+22:04:15 ub cmd: printenv ok=True
+22:04:15 env sanity ok=False entries=27
+22:04:15 env retry complete, env sanity ok=False
+22:04:15 ub cmd: help e2631rescue ok=True
+22:04:15 rescue command present=True
+22:04:15 F2 skipped: env sanity failed, F2 data would be taken under the default env
+22:04:15 ub cmd: bdinfo ok=True
+22:04:15 ub cmd: md 0x42000000 8 ok=True
+22:04:15 ub cmd: md 0x42000000 8 ok=True
+22:04:15 ub cmd: mw 0x42000000 0x11223344 0x10 ok=True
+22:04:15 ub cmd: md 0x42000000 8 ok=True
+22:04:15 ub cmd: crc32 0x42000000 0x40 ok=True
+22:04:15 T74 mw/md suspect-42000000 0x42000000 readback_ok=False crc_ok=True
+22:04:15 ub cmd: md 0x4c000000 8 ok=True
+22:04:15 ub cmd: mw 0x4c000000 0x11223344 0x10 ok=True
+22:04:15 ub cmd: md 0x4c000000 8 ok=True
+22:04:15 ub cmd: crc32 0x4c000000 0x40 ok=True
+22:04:15 T74 mw/md control-4C000000 0x4c000000 readback_ok=False crc_ok=True
+22:04:15 ub cmd: md 0x4a000000 8 ok=True
+22:04:15 ub cmd: mw 0x4a000000 0x11223344 0x10 ok=True
+22:04:15 ub cmd: md 0x4a000000 8 ok=True
+22:04:16 ub cmd: crc32 0x4a000000 0x40 ok=True
+22:04:16 T74 mw/md control-4A000000 0x4a000000 readback_ok=False crc_ok=True
+22:04:16 ub cmd: mtd read spi-nand0 0x42000000 0x2300000 0x800 ok=True
+22:04:16 ub cmd: md 0x42000000 8 ok=True
+22:04:16 ub cmd: md 0x42000020 8 ok=True
+22:04:16 ub cmd: crc32 0x42000000 0x20 ok=True
+22:04:16 ub cmd: iminfo 0x42000020 ok=True
+22:04:16 T74 mtd read suspect-42000000 0x42000000 read_ok=True marker_words=True marker_crc=True iminfo_ok=True
+22:04:17 ub cmd: bdinfo ok=True
+22:04:17 ub cmd: mtd read spi-nand0 0x42000000 0x2300000 0x800 ok=True
+22:04:17 ub cmd: md 0x42000000 8 ok=True
+22:04:17 ub cmd: md 0x42000020 8 ok=True
+22:04:17 ub cmd: crc32 0x42000000 0x20 ok=True
+22:04:18 ub cmd: iminfo 0x42000020 ok=True
+22:04:18 T74 mtd read suspect-42000000-after-bdinfo 0x42000000 read_ok=True marker_words=True marker_crc=True iminfo_ok=True
+22:04:18 ub cmd: md 0x42000000 8 ok=True
+22:04:18 T74 classification PARTIAL reloc_dependent=False
+22:04:23 ub cmd: e2631boot load ok=True
+22:04:23 ub cmd: md 0x420000 8 ok=True
+22:04:23 ub cmd: md 0x420020 8 ok=True
+22:04:23 ub cmd: crc32 0x420020 0x40 ok=True
+22:04:23 ub cmd: iminfo 0x420000 ok=True
+22:04:23 ub cmd: iminfo 0x420020 ok=True
+22:04:31 bootm attempt e2631boot outcome=kernel dt=8.21
+22:04:43 F1 verdict KERNEL_STARTED
+22:04:52 capture restore: {"restore_rc": 0, "supervisor_pids": [282927], "bootwatch_pids": [282934], "tty_holders": [282933], "events_tail": "2026-11-27T20:01:21+08:00 reader-start pid=211735\n2026-11-27T22:04:47+08:00 reader-start pid=282927", "ok": true}
+22:04:54 host services stopped rc=0
+22:04:54 ROUTE TRAP: reconnecting the USB NIC
+22:05:41 VERDICT {"session": "FAIL", "env_sanity": "BAD", "env_retry": "failed", "rescue": "present", "f2": "SKIPPED_ENV_BAD", "t74": "PARTIAL", "f1": "KERNEL_STARTED"}
+22:05:41 checks: {"artifact_pins": true, "load_path": "userdata", "loading": true, "loading_gate": true, "env_block": "OK", "new_banner": true, "new_version": true, "env_sanity": false, "t74_recorded": true, "f2_verdict": "SKIPPED_ENV_BAD", "f1_verdict": "KERNEL_STARTED", "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "kernel_nic_view": true, "capture_after": true, "no_error": true}

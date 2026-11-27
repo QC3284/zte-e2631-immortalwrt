@@ -1,0 +1,325 @@
+22:11:47 stage copy 0.37s rc=0
+22:11:48 stage erase 0.81s rc=0
+22:11:48 stage write 0.38s rc=0
+22:11:49 stage readback 0.24s rc=0
+22:11:49 stage sync 0.18s rc=0
+22:11:49 PHASE 1 GREEN: artifact staged in userdata and read back
+22:11:50 capture paused: {"supervisor_pids": [282927], "bootwatch_pids": [282934], "tty_holders": [282933], "tty_holders_after": [], "free": true}
+22:11:51 serial hub started pid=285399 log=/home/qc233/zte/e2631-p3/e2/t74/run-2/serial.log
+22:11:52 reboot -f requested; waiting for the flash U-Boot banner
+22:11:54 banner seen; stopping autoboot
+22:11:57 stop_autoboot: {"banner": true, "prompt": true}
+22:11:57 ub cmd: version ok=True
+22:11:58 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+22:11:58 ub cmd: crc32 0x47f00000 0x583e8 ok=True
+22:11:58 gate: staged image crc32 == 0x4139ba37
+22:11:58 banner seen; stopping autoboot
+22:12:01 stop_autoboot: {"banner": true, "prompt": true}
+22:12:01 ub cmd: version ok=True
+22:12:01 PHASE 2 GREEN: new image banner and prompt
+22:12:01 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+22:12:01 ub cmd: md 0x44000000 4 ok=True
+22:12:01 ub cmd: crc32 0x44000000 0x20000 ok=True
+22:12:01 env block state=OK stored=0xf95a816e region=0xe826c394
+22:12:01 ub cmd: printenv ok=True
+22:12:01 env sanity ok=True entries=27
+22:12:01 ub cmd: help e2631rescue ok=True
+22:12:01 rescue command present=True
+22:12:07 tcpdump ready=True
+22:12:07 ub cmd: md.l 0x9234800c 1 ok=True
+22:12:07 ub cmd: md.l 0x92348014 1 ok=True
+22:12:07 ub cmd: md.l 0x923480dc 1 ok=True
+22:12:07 BMU snapshot before_mii {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+22:12:07 ub cmd: md 0x92280000 1 ok=True
+22:12:07 ub cmd: md 0x92280764 1 ok=True
+22:12:07 ub cmd: md 0x92280768 1 ok=True
+22:12:07 ub cmd: md 0x922807c4 1 ok=True
+22:12:07 ub cmd: md 0x92340000 1 ok=True
+22:12:08 ub cmd: md 0x92340100 1 ok=True
+22:12:08 ub cmd: md 0x92340104 1 ok=True
+22:12:08 ub cmd: md 0x92348014 1 ok=True
+22:12:08 ub cmd: md 0x9234800c 1 ok=True
+22:12:08 ub cmd: md 0x923480dc 1 ok=True
+22:12:08 ub cmd: md 0x92350000 1 ok=True
+22:12:08 ub cmd: md 0x9235003c 1 ok=True
+22:12:08 ub cmd: md 0x92350060 1 ok=True
+22:12:08 ub cmd: md 0x92350064 1 ok=True
+22:12:08 ub cmd: md 0x92350068 1 ok=True
+22:12:08 ub cmd: md 0x92350100 8 ok=True
+22:12:08 ub cmd: md 0x921cc000 1 ok=True
+22:12:08 ub cmd: md 0x921d428c 5 ok=True
+22:12:09 ub cmd: mii info ok=True
+22:12:09 ub cmd: md.l 0x9234800c 1 ok=True
+22:12:09 ub cmd: md.l 0x92348014 1 ok=True
+22:12:09 ub cmd: md.l 0x923480dc 1 ok=True
+22:12:09 BMU snapshot after_mii {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+22:12:09 ub cmd: md.l 0x9234800c 1 ok=True
+22:12:09 ub cmd: md.l 0x92348014 1 ok=True
+22:12:09 ub cmd: md.l 0x923480dc 1 ok=True
+22:12:09 BMU snapshot before_e2631net {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+22:12:09 ub cmd: md 0x92280000 1 ok=True
+22:12:09 ub cmd: md 0x92280764 1 ok=True
+22:12:09 ub cmd: md 0x92280768 1 ok=True
+22:12:09 ub cmd: md 0x922807c4 1 ok=True
+22:12:09 ub cmd: md 0x92340000 1 ok=True
+22:12:10 ub cmd: md 0x92340100 1 ok=True
+22:12:10 ub cmd: md 0x92340104 1 ok=True
+22:12:10 ub cmd: md 0x92348014 1 ok=True
+22:12:10 ub cmd: md 0x9234800c 1 ok=True
+22:12:10 ub cmd: md 0x923480dc 1 ok=True
+22:12:10 ub cmd: md 0x92350000 1 ok=True
+22:12:10 ub cmd: md 0x9235003c 1 ok=True
+22:12:10 ub cmd: md 0x92350060 1 ok=True
+22:12:10 ub cmd: md 0x92350064 1 ok=True
+22:12:10 ub cmd: md 0x92350068 1 ok=True
+22:12:10 ub cmd: md 0x92350100 8 ok=True
+22:12:10 ub cmd: md 0x921cc000 1 ok=True
+22:12:10 ub cmd: md 0x921d428c 5 ok=True
+22:12:10 ub cmd: e2631net ok=True
+22:12:10 ub cmd: md.l 0x9234800c 1 ok=True
+22:12:10 ub cmd: md.l 0x92348014 1 ok=True
+22:12:10 ub cmd: md.l 0x923480dc 1 ok=True
+22:12:10 BMU snapshot after_e2631net {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+22:12:10 ub cmd: md 0x92280000 1 ok=True
+22:12:10 ub cmd: md 0x92280764 1 ok=True
+22:12:10 ub cmd: md 0x92280768 1 ok=True
+22:12:11 ub cmd: md 0x922807c4 1 ok=True
+22:12:11 ub cmd: md 0x92340000 1 ok=True
+22:12:11 ub cmd: md 0x92340100 1 ok=True
+22:12:11 ub cmd: md 0x92340104 1 ok=True
+22:12:11 ub cmd: md 0x92348014 1 ok=True
+22:12:11 ub cmd: md 0x9234800c 1 ok=True
+22:12:11 ub cmd: md 0x923480dc 1 ok=True
+22:12:11 ub cmd: md 0x92350000 1 ok=True
+22:12:11 ub cmd: md 0x9235003c 1 ok=True
+22:12:11 ub cmd: md 0x92350060 1 ok=True
+22:12:11 ub cmd: md 0x92350064 1 ok=True
+22:12:11 ub cmd: md 0x92350068 1 ok=True
+22:12:11 ub cmd: md 0x92350100 8 ok=True
+22:12:11 ub cmd: md 0x921cc000 1 ok=True
+22:12:11 ub cmd: md 0x921d428c 5 ok=True
+22:12:11 ub cmd: md.l 0x9234800c 1 ok=True
+22:12:11 ub cmd: md.l 0x92348014 1 ok=True
+22:12:11 ub cmd: md.l 0x923480dc 1 ok=True
+22:12:11 BMU snapshot before_dhcp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000110"}
+22:12:11 ub cmd: md 0x92280000 1 ok=True
+22:12:11 ub cmd: md 0x92280764 1 ok=True
+22:12:12 ub cmd: md 0x92280768 1 ok=True
+22:12:12 ub cmd: md 0x922807c4 1 ok=True
+22:12:12 ub cmd: md 0x92340000 1 ok=True
+22:12:12 ub cmd: md 0x92340100 1 ok=True
+22:12:12 ub cmd: md 0x92340104 1 ok=True
+22:12:12 ub cmd: md 0x92348014 1 ok=True
+22:12:12 ub cmd: md 0x9234800c 1 ok=True
+22:12:12 ub cmd: md 0x923480dc 1 ok=True
+22:12:12 ub cmd: md 0x92350000 1 ok=True
+22:12:12 ub cmd: md 0x9235003c 1 ok=True
+22:12:12 ub cmd: md 0x92350060 1 ok=True
+22:12:12 ub cmd: md 0x92350064 1 ok=True
+22:12:12 ub cmd: md 0x92350068 1 ok=True
+22:12:12 ub cmd: md 0x92350100 8 ok=True
+22:12:12 ub cmd: md 0x921cc000 1 ok=True
+22:12:12 ub cmd: md 0x921d428c 5 ok=True
+22:16:40 dhcp prompt=True ip=None dt=267.39
+22:16:40 ub cmd: md.l 0x9234800c 1 ok=True
+22:16:40 ub cmd: md.l 0x92348014 1 ok=True
+22:16:40 ub cmd: md.l 0x923480dc 1 ok=True
+22:16:40 BMU snapshot after_dhcp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+22:16:40 ub cmd: md 0x92280000 1 ok=True
+22:16:40 ub cmd: md 0x92280764 1 ok=True
+22:16:40 ub cmd: md 0x92280768 1 ok=True
+22:16:40 ub cmd: md 0x922807c4 1 ok=True
+22:16:40 ub cmd: md 0x92340000 1 ok=True
+22:16:40 ub cmd: md 0x92340100 1 ok=True
+22:16:40 ub cmd: md 0x92340104 1 ok=True
+22:16:40 ub cmd: md 0x92348014 1 ok=True
+22:16:40 ub cmd: md 0x9234800c 1 ok=True
+22:16:40 ub cmd: md 0x923480dc 1 ok=True
+22:16:40 ub cmd: md 0x92350000 1 ok=True
+22:16:40 ub cmd: md 0x9235003c 1 ok=True
+22:16:41 ub cmd: md 0x92350060 1 ok=True
+22:16:41 ub cmd: md 0x92350064 1 ok=True
+22:16:41 ub cmd: md 0x92350068 1 ok=True
+22:16:41 ub cmd: md 0x92350100 8 ok=True
+22:16:41 ub cmd: md 0x921cc000 1 ok=True
+22:16:41 ub cmd: md 0x921d428c 5 ok=True
+22:16:41 ub cmd: md 0x92280000 1 ok=True
+22:16:41 ub cmd: md 0x92280764 1 ok=True
+22:16:41 ub cmd: md 0x92280768 1 ok=True
+22:16:41 ub cmd: md 0x922807c4 1 ok=True
+22:16:41 ub cmd: md 0x92340000 1 ok=True
+22:16:41 ub cmd: md 0x92340100 1 ok=True
+22:16:41 ub cmd: md 0x92340104 1 ok=True
+22:16:41 ub cmd: md 0x92348014 1 ok=True
+22:16:41 ub cmd: md 0x9234800c 1 ok=True
+22:16:41 ub cmd: md 0x923480dc 1 ok=True
+22:16:41 ub cmd: md 0x92350000 1 ok=True
+22:16:41 ub cmd: md 0x9235003c 1 ok=True
+22:16:41 ub cmd: md 0x92350060 1 ok=True
+22:16:42 ub cmd: md 0x92350064 1 ok=True
+22:16:42 ub cmd: md 0x92350068 1 ok=True
+22:16:42 ub cmd: md 0x92350100 8 ok=True
+22:16:42 ub cmd: md 0x921cc000 1 ok=True
+22:16:42 ub cmd: md 0x921d428c 5 ok=True
+22:16:42 ub cmd: setenv netretry 1 ok=True
+22:18:19 dhcp prompt=True ip=None dt=97.63
+22:18:19 ub cmd: md 0x92280000 1 ok=True
+22:18:19 ub cmd: md 0x92280764 1 ok=True
+22:18:20 ub cmd: md 0x92280768 1 ok=True
+22:18:20 ub cmd: md 0x922807c4 1 ok=True
+22:18:20 ub cmd: md 0x92340000 1 ok=True
+22:18:20 ub cmd: md 0x92340100 1 ok=True
+22:18:20 ub cmd: md 0x92340104 1 ok=True
+22:18:20 ub cmd: md 0x92348014 1 ok=True
+22:18:20 ub cmd: md 0x9234800c 1 ok=True
+22:18:20 ub cmd: md 0x923480dc 1 ok=True
+22:18:20 ub cmd: md 0x92350000 1 ok=True
+22:18:20 ub cmd: md 0x9235003c 1 ok=True
+22:18:20 ub cmd: md 0x92350060 1 ok=True
+22:18:20 ub cmd: md 0x92350064 1 ok=True
+22:18:20 ub cmd: md 0x92350068 1 ok=True
+22:18:20 ub cmd: md 0x92350100 8 ok=True
+22:18:20 ub cmd: md 0x921cc000 1 ok=True
+22:18:20 ub cmd: md 0x921d428c 5 ok=True
+22:18:20 ub cmd: setenv netretry 5 ok=True
+22:18:20 dhcp gave no address; setting RAM-only static addresses for ping/tftp
+22:18:20 ub cmd: setenv ipaddr 192.168.1.50 ok=True
+22:18:20 ub cmd: setenv netmask 255.255.255.0 ok=True
+22:18:21 ub cmd: setenv serverip 192.168.1.191 ok=True
+22:18:21 ub cmd: md.l 0x9234800c 1 ok=True
+22:18:21 ub cmd: md.l 0x92348014 1 ok=True
+22:18:21 ub cmd: md.l 0x923480dc 1 ok=True
+22:18:21 BMU snapshot before_ping {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "80000111"}
+22:18:21 ub cmd: md 0x92280000 1 ok=True
+22:18:21 ub cmd: md 0x92280764 1 ok=True
+22:18:21 ub cmd: md 0x92280768 1 ok=True
+22:18:21 ub cmd: md 0x922807c4 1 ok=True
+22:18:21 ub cmd: md 0x92340000 1 ok=True
+22:18:21 ub cmd: md 0x92340100 1 ok=True
+22:18:21 ub cmd: md 0x92340104 1 ok=True
+22:18:21 ub cmd: md 0x92348014 1 ok=True
+22:18:21 ub cmd: md 0x9234800c 1 ok=True
+22:18:21 ub cmd: md 0x923480dc 1 ok=True
+22:18:21 ub cmd: md 0x92350000 1 ok=True
+22:18:21 ub cmd: md 0x9235003c 1 ok=True
+22:18:21 ub cmd: md 0x92350060 1 ok=True
+22:18:21 ub cmd: md 0x92350064 1 ok=True
+22:18:21 ub cmd: md 0x92350068 1 ok=True
+22:18:21 ub cmd: md 0x92350100 8 ok=True
+22:18:22 ub cmd: md 0x921cc000 1 ok=True
+22:18:22 ub cmd: md 0x921d428c 5 ok=True
+22:18:42 ub cmd: ping 192.168.1.191 ok=True
+22:18:42 ub cmd: md.l 0x9234800c 1 ok=True
+22:18:42 ub cmd: md.l 0x92348014 1 ok=True
+22:18:42 ub cmd: md.l 0x923480dc 1 ok=True
+22:18:42 BMU snapshot after_ping {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+22:18:42 ub cmd: md 0x92280000 1 ok=True
+22:18:42 ub cmd: md 0x92280764 1 ok=True
+22:18:42 ub cmd: md 0x92280768 1 ok=True
+22:18:42 ub cmd: md 0x922807c4 1 ok=True
+22:18:42 ub cmd: md 0x92340000 1 ok=True
+22:18:42 ub cmd: md 0x92340100 1 ok=True
+22:18:42 ub cmd: md 0x92340104 1 ok=True
+22:18:42 ub cmd: md 0x92348014 1 ok=True
+22:18:42 ub cmd: md 0x9234800c 1 ok=True
+22:18:42 ub cmd: md 0x923480dc 1 ok=True
+22:18:42 ub cmd: md 0x92350000 1 ok=True
+22:18:43 ub cmd: md 0x9235003c 1 ok=True
+22:18:43 ub cmd: md 0x92350060 1 ok=True
+22:18:43 ub cmd: md 0x92350064 1 ok=True
+22:18:43 ub cmd: md 0x92350068 1 ok=True
+22:18:43 ub cmd: md 0x92350100 8 ok=True
+22:18:43 ub cmd: md 0x921cc000 1 ok=True
+22:18:43 ub cmd: md 0x921d428c 5 ok=True
+22:18:43 ub cmd: md.l 0x9234800c 1 ok=True
+22:18:43 ub cmd: md.l 0x92348014 1 ok=True
+22:18:43 ub cmd: md.l 0x923480dc 1 ok=True
+22:18:43 BMU snapshot before_tftp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "00000111"}
+22:18:43 ub cmd: md 0x92280000 1 ok=True
+22:18:43 ub cmd: md 0x92280764 1 ok=True
+22:18:43 ub cmd: md 0x92280768 1 ok=True
+22:18:43 ub cmd: md 0x922807c4 1 ok=True
+22:18:43 ub cmd: md 0x92340000 1 ok=True
+22:18:43 ub cmd: md 0x92340100 1 ok=True
+22:18:43 ub cmd: md 0x92340104 1 ok=True
+22:18:43 ub cmd: md 0x92348014 1 ok=True
+22:18:43 ub cmd: md 0x9234800c 1 ok=True
+22:18:43 ub cmd: md 0x923480dc 1 ok=True
+22:18:44 ub cmd: md 0x92350000 1 ok=True
+22:18:44 ub cmd: md 0x9235003c 1 ok=True
+22:18:44 ub cmd: md 0x92350060 1 ok=True
+22:18:44 ub cmd: md 0x92350064 1 ok=True
+22:18:44 ub cmd: md 0x92350068 1 ok=True
+22:18:44 ub cmd: md 0x92350100 8 ok=True
+22:18:44 ub cmd: md 0x921cc000 1 ok=True
+22:18:44 ub cmd: md 0x921d428c 5 ok=True
+22:19:04 ub cmd: tftp 0x43000000 e2-test.bin ok=True
+22:19:04 ub cmd: md.l 0x9234800c 1 ok=True
+22:19:04 ub cmd: md.l 0x92348014 1 ok=True
+22:19:04 ub cmd: md.l 0x923480dc 1 ok=True
+22:19:04 BMU snapshot after_tftp {"BUF_ID": "00000000", "BUF_ALLOC": "00000000", "FREE_STATUS": "80000111"}
+22:19:04 ub cmd: md 0x92280000 1 ok=True
+22:19:04 ub cmd: md 0x92280764 1 ok=True
+22:19:04 ub cmd: md 0x92280768 1 ok=True
+22:19:04 ub cmd: md 0x922807c4 1 ok=True
+22:19:05 ub cmd: md 0x92340000 1 ok=True
+22:19:05 ub cmd: md 0x92340100 1 ok=True
+22:19:05 ub cmd: md 0x92340104 1 ok=True
+22:19:05 ub cmd: md 0x92348014 1 ok=True
+22:19:05 ub cmd: md 0x9234800c 1 ok=True
+22:19:05 ub cmd: md 0x923480dc 1 ok=True
+22:19:05 ub cmd: md 0x92350000 1 ok=True
+22:19:05 ub cmd: md 0x9235003c 1 ok=True
+22:19:05 ub cmd: md 0x92350060 1 ok=True
+22:19:05 ub cmd: md 0x92350064 1 ok=True
+22:19:05 ub cmd: md 0x92350068 1 ok=True
+22:19:05 ub cmd: md 0x92350100 8 ok=True
+22:19:05 ub cmd: md 0x921cc000 1 ok=True
+22:19:05 ub cmd: md 0x921d428c 5 ok=True
+22:19:06 ub cmd: crc32 0x43000000 0x10000 ok=True
+22:19:08 F2 verdict NO_WIRE_FRAMES {"path": "/home/qc233/zte/e2631-p3/e2/t74/run-2/tcpdump.log", "present": true, "lines": 41, "frames": 39, "uboot_mac": 0, "bootp": 0, "dhcp": 0, "device_mac": 0, "random_mac": 0} egress={"tx_frames_after_e2631net": 0, "tx_frames_after_dhcp": 0, "tx_frames_after_dhcp_short": 0, "tx_frames_after_ping": 0, "tx_frames_after_tftp": 0, "mac_tx_advanced": false}
+22:19:09 ub cmd: bdinfo ok=True
+22:19:09 ub cmd: md 0x42000000 8 ok=True
+22:19:09 ub cmd: md 0x42000000 0x10 ok=True
+22:19:09 ub cmd: mw 0x42000000 0x11223344 0x10 ok=True
+22:19:09 ub cmd: md 0x42000000 0x10 ok=True
+22:19:09 ub cmd: crc32 0x42000000 0x40 ok=True
+22:19:09 T74 mw/md suspect-42000000 0x42000000 readback_ok=True crc_ok=True
+22:19:09 ub cmd: md 0x4c000000 0x10 ok=True
+22:19:09 ub cmd: mw 0x4c000000 0x11223344 0x10 ok=True
+22:19:09 ub cmd: md 0x4c000000 0x10 ok=True
+22:19:09 ub cmd: crc32 0x4c000000 0x40 ok=True
+22:19:09 T74 mw/md control-4C000000 0x4c000000 readback_ok=True crc_ok=True
+22:19:09 ub cmd: md 0x4a000000 0x10 ok=True
+22:19:09 ub cmd: mw 0x4a000000 0x11223344 0x10 ok=True
+22:19:09 ub cmd: md 0x4a000000 0x10 ok=True
+22:19:09 ub cmd: crc32 0x4a000000 0x40 ok=True
+22:19:09 T74 mw/md control-4A000000 0x4a000000 readback_ok=True crc_ok=True
+22:19:09 ub cmd: mtd read spi-nand0 0x42000000 0x2300000 0x800 ok=True
+22:19:09 ub cmd: md 0x42000000 8 ok=True
+22:19:09 ub cmd: md 0x42000020 8 ok=True
+22:19:09 ub cmd: crc32 0x42000000 0x20 ok=True
+22:19:10 ub cmd: iminfo 0x42000020 ok=True
+22:19:10 T74 mtd read suspect-42000000 0x42000000 read_ok=True marker_words=True marker_crc=True iminfo_ok=True
+22:19:10 ub cmd: bdinfo ok=True
+22:19:10 ub cmd: mtd read spi-nand0 0x42000000 0x2300000 0x800 ok=True
+22:19:10 ub cmd: md 0x42000000 8 ok=True
+22:19:10 ub cmd: md 0x42000020 8 ok=True
+22:19:10 ub cmd: crc32 0x42000000 0x20 ok=True
+22:19:11 ub cmd: iminfo 0x42000020 ok=True
+22:19:11 T74 mtd read suspect-42000000-after-bdinfo 0x42000000 read_ok=True marker_words=True marker_crc=True iminfo_ok=True
+22:19:11 ub cmd: md 0x42000000 8 ok=True
+22:19:11 T74 classification NO_ANOMALY reloc_dependent=False
+22:19:16 ub cmd: e2631boot load ok=True
+22:19:16 ub cmd: md 0x420000 8 ok=True
+22:19:16 ub cmd: md 0x420020 8 ok=True
+22:19:16 ub cmd: crc32 0x420020 0x40 ok=True
+22:19:16 ub cmd: iminfo 0x420000 ok=True
+22:19:16 ub cmd: iminfo 0x420020 ok=True
+22:19:24 bootm attempt e2631boot outcome=kernel dt=8.31
+22:19:37 F1 verdict KERNEL_STARTED
+22:19:43 capture restore: {"restore_rc": 0, "supervisor_pids": [286848], "bootwatch_pids": [286856], "tty_holders": [286854], "events_tail": "2026-11-27T22:04:47+08:00 reader-start pid=282927\n2026-11-27T22:19:39+08:00 reader-start pid=286848", "ok": true}
+22:19:44 host services stopped rc=0
+22:19:44 ROUTE TRAP: reconnecting the USB NIC
+22:20:31 VERDICT {"session": "GREEN", "env_sanity": "OK", "env_retry": "not-needed", "rescue": "present", "f2": "NO_WIRE_FRAMES", "t74": "NO_ANOMALY", "f1": "KERNEL_STARTED"}
+22:20:31 checks: {"artifact_pins": true, "load_path": "userdata", "loading": true, "loading_gate": true, "env_block": "OK", "new_banner": true, "new_version": true, "env_sanity": true, "t74_recorded": true, "f2_verdict": "NO_WIRE_FRAMES", "f1_verdict": "KERNEL_STARTED", "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "kernel_nic_view": true, "capture_after": true, "no_error": true}
