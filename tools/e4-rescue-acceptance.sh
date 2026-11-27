@@ -48,7 +48,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEFAULT_EXPECTED_IMAGE_SHA=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a
 EXPECTED_IMAGE_SHA=$DEFAULT_EXPECTED_IMAGE_SHA
 EXPECTED_IMAGE_SIZE=655360
-WRITE_APPROVAL_TOKEN=E4-RESCUE-WRITE-APPROVED
+E4_APPROVAL_VALUE=E4-RESCUE-WRITE-APPROVED
 
 HOST=192.168.1.1
 IFACE=""
@@ -79,7 +79,7 @@ failcase() {
 fatal() { printf '[e4-accept] ERROR: %s\n' "$*" >&2; exit 2; }
 
 usage() {
-	printf '%s\n' "usage: tools/e4-rescue-acceptance.sh --image <file> [options]" "options:" "  --host IP           device address (default 192.168.1.1)" "  --iface IFACE       host interface on the rescue link" "  --dhcp              run dhclient -1 on --iface (needs root)" "  --page PATH         local page for the served-page comparison" "  --asset-stats PATH  E2631-FAILSAFE-ASSET.txt from the build artifact" "  --write             enable the NET-ZERO write phase" "  --approval TOKEN    required with --write: $WRITE_APPROVAL_TOKEN" "  --skip-matrix       skip the rejection matrix" "  --expected-sha SHA  expected net-zero payload sha256 (default: the 15-patch image region b1ea9a48...)" "  --require-digest    fail if the device does not enforce X-E2631-SHA256" "  --timeout SECS      write-phase poll timeout (default 600)" "  --keep-tmp          keep temporary files" "  -h, --help          this help"
+	printf '%s\n' "usage: tools/e4-rescue-acceptance.sh --image <file> [options]" "options:" "  --host IP           device address (default 192.168.1.1)" "  --iface IFACE       host interface on the rescue link" "  --dhcp              run dhclient -1 on --iface (needs root)" "  --page PATH         local page for the served-page comparison" "  --asset-stats PATH  E2631-FAILSAFE-ASSET.txt from the build artifact" "  --write             enable the NET-ZERO write phase" "  --approval TOKEN    required with --write: $E4_APPROVAL_VALUE" "  --skip-matrix       skip the rejection matrix" "  --expected-sha SHA  expected net-zero payload sha256 (default: the 15-patch image region b1ea9a48...)" "  --require-digest    fail if the device does not enforce X-E2631-SHA256" "  --timeout SECS      write-phase poll timeout (default 600)" "  --keep-tmp          keep temporary files" "  -h, --help          this help"
 	exit 0
 }
 
@@ -161,9 +161,9 @@ done
 
 [ -n "$IMAGE" ] || fatal "--image is required"
 
-if [ "$WRITE" = 1 ] && [ "$APPROVAL" != "$WRITE_APPROVAL_TOKEN" ]; then
+if [ "$WRITE" = 1 ] && [ "$APPROVAL" != "$E4_APPROVAL_VALUE" ]; then
 	printf '[e4-accept] WRITE REFUSED: --write requires --approval %s (Lead approval must be explicit)\n' \
-		"$WRITE_APPROVAL_TOKEN" >&2
+		"$E4_APPROVAL_VALUE" >&2
 	exit 3
 fi
 
@@ -511,7 +511,7 @@ fi
 # --------------------------------------------------------------- write phase
 
 if [ "$WRITE" = 0 ]; then
-	log "write phase skipped (default validate-only); pass --write --approval $WRITE_APPROVAL_TOKEN after Lead approval"
+	log "write phase skipped (default validate-only); pass --write --approval $E4_APPROVAL_VALUE after Lead approval"
 else
 	write_sha=$(sha256sum "$IMAGE" | awk '{print $1}')
 	if [ "$write_sha" != "$EXPECTED_IMAGE_SHA" ]; then
