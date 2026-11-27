@@ -1,0 +1,166 @@
+memsize=256M
+netmask=255.255.255.0
+netretry=5
+serverip=192.168.1.100
+stderr=serial@94404000
+stdin=serial@94404000
+stdout=serial@94404000
+versioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00
+
+Environment size: 646/131068 bytes
+=> help e2631rescue
+e2631rescue - serve the web bootloader rescue on lan1
+
+Usage:
+e2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is
+              written until a validated image is uploaded and the
+              X-E2631-Confirm: write header is present. Ctrl-C leaves.
+
+=> md.l 0x92340100 1
+92340100: 00005500                             .U..
+=> e2631net bmu
+e2631net: TM tab0 0x50000000 tab1 0x50008000 buf_f0 0x50009000
+e2631net: TM buf start 0x52009000 end 0x54009000 tab limit 0x28000800 start 0x00000010
+e2631net: BMU ctrl 0x00000000 cfg1 0x0005c040 cfg2 0x0005c040
+e2631net: BMU limit1 0x00000100 limit2 0x00000100 thres1 0x00000000 thres2 0x00000000
+e2631net: BMU free status 0x00000110 alloc 0x00000000 buf id 0x00000000
+e2631net: DMA ctrl 0x003f6564 ring cfg 0x01000100 area50 0x00000000 tx ring 0x00000000
+e2631net: DMA tx start 0x00000000 tx done 0x00000000 dma err 0x00000000
+e2631net: switch fwd ctrl 0x00000000 (expected 0x00000011)
+e2631net: arena 0x45000000, last bp 0, raw BUF_ID 0x00000000
+=> e2631net sbrg
+e2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SBRG VLAN 1 words 00000000 00000000 00000000
+=> e2631net
+e2631net: lan1 switch port 2, stopped
+e2631net: MAC ctrl 0x00000000, TM int 0x00000000, BMU free 0x00000110, TX done 0
+e2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000
+e2631net: RX queue counts 0 0 0 0 0 0 0 0
+e2631net: tx mode pp, sent 0, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x01000100 tx ring 0x00000000
+e2631net: tx start 0x00000000 tx done 0x00000000 dma err 0x00000000 last done 0
+e2631net: last bp 0, raw BUF_ID 0x00000000
+e2631net: last descriptor 00000000 00000000 00000000 00000000
+e2631net: TM ctrl 0x00000100 TM status 0x00000000
+e2631net: MAC TX frames 0:0 1:0 2:0 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 0 0 0 0 0 0 0; SW fwd 0x00000000
+=> e2631net mode pp
+e2631net: tx mode pp
+=> e2631net tx 3
+ethernet@92000000 Waiting for PHY auto negotiation to complete...... done
+zx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50
+e2631net: tx probe: 3 frame(s) in mode pp
+e2631net: tx probe: dma err 0x00000000 -> 0x00000000
+e2631net: tx mode pp, sent 3, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 0, raw BUF_ID 0x80000000
+e2631net: last descriptor 02a00080 00010000 21007800 000000f3
+e2631net: TM ctrl 0x00000140 TM status 0x00003202
+e2631net: MAC TX frames 0:0 1:0 2:3 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631net mode pp-alt
+e2631net: tx mode pp-alt
+=> e2631net tx 3
+e2631net: tx probe: 3 frame(s) in mode pp-alt
+e2631net: tx probe: dma err 0x00000000 -> 0x00000000
+e2631net: tx mode pp-alt, sent 6, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 257, raw BUF_ID 0x80000101
+e2631net: last descriptor 02a00080 02010000 21007802 000000f2
+e2631net: TM ctrl 0x00000140 TM status 0x00000002
+e2631net: MAC TX frames 0:0 1:0 2:6 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631net mode vendor
+e2631net: tx mode vendor
+=> e2631net tx 3
+e2631net: tx probe: 3 frame(s) in mode vendor
+e2631net: tx probe: dma err 0x00000000 -> 0x00000000
+e2631net: tx mode vendor, sent 9, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 2561, raw BUF_ID 0x80000a01
+e2631net: last descriptor 00000080 02010000 21007814 000000f2
+e2631net: TM ctrl 0x00000140 TM status 0x00000002
+e2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631net mode vendor-alt
+e2631net: tx mode vendor-alt
+=> e2631net tx 3
+e2631net: tx probe: 3 frame(s) in mode vendor-alt
+e2631net: tx probe: dma err 0x00000000 -> 0x00000000
+e2631net: tx mode vendor-alt, sent 12, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 3841, raw BUF_ID 0x80000f01
+e2631net: last descriptor 00000080 02010000 2100781e 000000f3
+e2631net: TM ctrl 0x00000140 TM status 0x00000002
+e2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631net sbrg allow
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SBRG egress after  0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SBRG VLAN 1 words 00000000 00000000 00000000
+=> e2631net mode pp
+e2631net: tx mode pp
+=> e2631net tx 3
+e2631net: tx probe: 3 frame(s) in mode pp
+e2631net: tx probe: dma err 0x00000000 -> 0x00000000
+e2631net: tx mode pp, sent 15, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 770, raw BUF_ID 0x80000302
+e2631net: last descriptor 02a00080 04010000 21007806 000000f3
+e2631net: TM ctrl 0x00000140 TM status 0x00000002
+e2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631net
+e2631net: lan1 switch port 2, started
+e2631net: PHY 12 link up, 1000 Mbit/s full duplex
+e2631net: MAC ctrl 0x00bb2003, TM int 0x00000002, BMU free 0x70000111, TX done 0
+e2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000
+e2631net: RX queue counts 17 0 0 0 0 0 0 0
+e2631net: tx mode pp, sent 15, failed 0
+e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000
+e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1
+e2631net: last bp 770, raw BUF_ID 0x80000302
+e2631net: last descriptor 02a00080 04010000 21007806 000000f3
+e2631net: TM ctrl 0x00000140 TM status 0x00000002
+e2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011
+=> e2631net bmu
+e2631net: TM tab0 0x45800000 tab1 0x45808000 buf_f0 0x45a00000
+e2631net: TM buf start 0x45000000 end 0x45800000 tab limit 0x08000800 start 0x00000010
+e2631net: BMU ctrl 0x00000001 cfg1 0x0104c040 cfg2 0x0104c040
+e2631net: BMU limit1 0x00000080 limit2 0x00000010 thres1 0x00000420 thres2 0x00000000
+e2631net: BMU free status 0x70000111 alloc 0x00000000 buf id 0x00000000
+e2631net: DMA ctrl 0x003f6564 ring cfg 0x00400040 area50 0x45b00000 tx ring 0x45c00000
+e2631net: DMA tx start 0x00000001 tx done 0x00000000 dma err 0x00000000
+e2631net: switch fwd ctrl 0x00000011 (expected 0x00000011)
+e2631net: arena 0x45000000, last bp 770, raw BUF_ID 0x80000302
+=> e2631net sbrg
+e2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef
+e2631net: SBRG VLAN 1 words 00000000 00000000 00000000
+=> md.l 0x92340100 1
+92340100: 00000002                             ....
+=> e2631boot load
+e2631boot: slot0 at 0x00700000: serial 7, version "V1.0.0.7B5.8000", header 0x01c60000
+e2631boot: slot1 at 0x02300000: serial 12, version "ImmortalWrt v1.10.0", header 0x03800000

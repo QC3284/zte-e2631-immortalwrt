@@ -1,0 +1,75 @@
+00:13:15 stage copy 0.25s rc=0
+00:13:16 stage erase 0.87s rc=0
+00:13:17 stage write 0.39s rc=0
+00:13:17 stage readback 0.27s rc=0
+00:13:17 stage sync 0.25s rc=0
+00:13:17 PHASE 1 GREEN: artifact staged in userdata and read back
+00:13:18 capture paused: {"supervisor_pids": [308464], "bootwatch_pids": [308476], "tty_holders": [308470], "tty_holders_after": [], "free": true}
+00:13:18 serial hub started pid=327900 log=/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/serial.log
+00:13:19 reboot -f requested; waiting for the flash U-Boot banner
+00:13:21 banner seen; stopping autoboot
+00:13:24 stop_autoboot: {"banner": true, "prompt": true}
+00:13:24 ub cmd: version ok=True
+00:13:25 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+00:13:25 ub cmd: crc32 0x47f00000 0x59530 ok=True
+00:13:25 gate: staged image crc32 == 0x0966526e
+00:13:25 banner seen; stopping autoboot
+00:13:28 stop_autoboot: {"banner": true, "prompt": true}
+00:13:28 ub cmd: version ok=True
+00:13:28 PHASE 2 GREEN: new image banner and prompt
+00:13:28 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+00:13:28 ub cmd: md 0x44000000 4 ok=True
+00:13:28 ub cmd: crc32 0x44000000 0x20000 ok=True
+00:13:28 env block state=OK stored=0xf95a816e region=0xe826c394
+00:13:28 ub cmd: printenv ok=True
+00:13:28 env sanity ok=True entries=27
+00:13:28 ub cmd: help e2631rescue ok=True
+00:13:28 rescue command present=True
+00:13:28 ub cmd: md.l 0x92340100 1 ok=True
+00:13:29 ub cmd: e2631net bmu ok=True
+00:13:29 ub cmd: e2631net sbrg ok=True
+00:13:29 ub cmd: e2631net ok=True
+00:13:42 tcpdump ready=True
+00:13:42 probe: tcpdump ready, starting the mode sweep
+00:13:42 ub cmd: e2631net mode pp ok=True
+00:13:42 probe: mode pp -> tx 3
+00:13:46 ub cmd: e2631net tx 3 ok=True
+00:13:48 ub cmd: md.l 0x92340100 1 ok=True
+00:13:48 probe: mode pp tx_frames=[0, 0, 3, 0, 0] sent_failed={"sent": 3, "failed": 0} wire={"frames": 20, "uboot_mac": 3, "arp60_broadcast": 3, "random_mac": 0, "device_frames": 3, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log", "start": 162, "tail": ")? 191.1.168.192.in-addr.arpa. (262)\n16:13:46.689986 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:46.912676 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)\n16:13:46.962475 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n16:13:47.063865 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)\n16:13:47.765950 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:47.863407 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28"}
+00:13:48 ub cmd: e2631net mode pp-alt ok=True
+00:13:48 probe: mode pp-alt -> tx 3
+00:13:48 ub cmd: e2631net tx 3 ok=True
+00:13:50 ub cmd: md.l 0x92340100 1 ok=True
+00:13:50 probe: mode pp-alt tx_frames=[0, 0, 6, 0, 0] sent_failed={"sent": 6, "failed": 0} wire={"frames": 7, "uboot_mac": 3, "arp60_broadcast": 3, "random_mac": 0, "device_frames": 3, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log", "start": 4190, "tail": " ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.174362 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.174402 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.963864 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n16:13:49.140427 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 292: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 5/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local., (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191 (250)\n16:13:49.841387 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:49.863757 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28"}
+00:13:50 ub cmd: e2631net mode vendor ok=True
+00:13:50 probe: mode vendor -> tx 3
+00:13:50 ub cmd: e2631net tx 3 ok=True
+00:13:52 ub cmd: md.l 0x92340100 1 ok=True
+00:13:52 probe: mode vendor tx_frames=[0, 0, 9, 0, 0] sent_failed={"sent": 9, "failed": 0} wire={"frames": 3, "uboot_mac": 3, "arp60_broadcast": 3, "random_mac": 0, "device_frames": 3, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log", "start": 5726, "tail": "16:13:50.377761 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:50.377819 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:50.377889 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46"}
+00:13:52 ub cmd: e2631net mode vendor-alt ok=True
+00:13:52 probe: mode vendor-alt -> tx 3
+00:13:52 ub cmd: e2631net tx 3 ok=True
+00:13:54 ub cmd: md.l 0x92340100 1 ok=True
+00:13:54 probe: mode vendor-alt tx_frames=[0, 0, 9, 0, 0] sent_failed={"sent": 12, "failed": 0} wire={"frames": 1, "uboot_mac": 0, "arp60_broadcast": 0, "random_mac": 0, "device_frames": 0, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log", "start": 6140, "tail": "16:13:52.965956 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)"}
+00:13:54 ub cmd: e2631net sbrg allow ok=True
+00:13:54 ub cmd: e2631net mode pp ok=True
+00:13:54 probe: egress allow replayed, mode pp -> tx 3
+00:13:54 ub cmd: e2631net tx 3 ok=True
+00:13:58 ub cmd: md.l 0x92340100 1 ok=True
+00:13:58 ub cmd: e2631net ok=True
+00:13:58 ub cmd: e2631net bmu ok=True
+00:13:58 ub cmd: e2631net sbrg ok=True
+00:13:59 ub cmd: md.l 0x92340100 1 ok=True
+00:13:59 F2 probe verdict F2_FIXED totals={"frames": 34, "uboot_mac": 12, "arp60_broadcast": 12, "device_frames": 12, "random_mac": 0} hit_modes=["pp", "pp-alt", "vendor", "pp+allow"] fwd_ctrl=0
+00:14:03 ub cmd: e2631boot load ok=True
+00:14:04 ub cmd: md 0x47f00000 8 ok=True
+00:14:04 ub cmd: md 0x47f00020 8 ok=True
+00:14:04 ub cmd: crc32 0x47f00020 0x40 ok=True
+00:14:04 ub cmd: iminfo 0x47f00000 ok=True
+00:14:04 ub cmd: iminfo 0x47f00020 ok=True
+00:14:12 bootm attempt e2631boot outcome=kernel dt=8.74
+00:14:25 F1 verdict KERNEL_STARTED
+00:14:39 capture restore: {"restore_rc": 0, "supervisor_pids": [328331], "bootwatch_pids": [328338], "tty_holders": [328337], "events_tail": "2026-11-27T23:20:03+08:00 reader-start pid=308464\n2026-11-28T00:14:35+08:00 reader-start pid=328331", "ok": true}
+00:14:39 ROUTE TRAP: reconnecting the USB NIC
+00:15:20 VERDICT {"session": "GREEN", "env_sanity": "OK", "env_retry": "not-needed", "rescue": "present", "f2": "SKIPPED", "t74": null, "f1": "KERNEL_STARTED", "probe": "F2_FIXED"}
+00:15:20 checks: {"artifact_pins": true, "load_path": "userdata", "loading": true, "loading_gate": true, "env_block": "OK", "new_banner": true, "new_version": true, "env_sanity": true, "t74_recorded": true, "probe_recorded": true, "f2_verdict": "SKIPPED", "f1_verdict": "KERNEL_STARTED", "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "kernel_nic_view": true, "capture_after": true, "no_error": true, "probe": "F2_FIXED"}

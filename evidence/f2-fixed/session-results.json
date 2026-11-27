@@ -1,0 +1,853 @@
+{
+ "mode": "e2631-f2-probe2-session",
+ "with_f2": false,
+ "started": "2026-11-28T00:13:13+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/u-boot.bin",
+  "size": 365872,
+  "size_hex": "0x59530",
+  "sha256": "e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b",
+  "crc32": "0x0966526e",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-gd38f69c44523",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "expected": {
+  "sha256": "e87a858046b865acfd8e83f1bfbd14cae262a3b16c9738a9edc321cc6a1adc6b",
+  "banner_token": "U-Boot 2027.01-rc2-gd38f69c44523",
+  "size": 365872,
+  "crc32": "0x0966526e",
+  "info_path": "/home/qc233/zte/e2631-t5-artifacts/uboot-f2-fix-46030383958/e2631-uboot-46030383958/UBOOT-INFO.txt",
+  "mtd0_sha": "4fa8bd4d0e4600fd4c3463848135c7239a21f7e2cdb6f4865c462b888ddcb857",
+  "tree": "ae72334756d47f05a247f0dea63f81c0ca7265dc"
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/e2-stage-e87a8580.bin",
+  "size": 524288,
+  "sha256": "bdf14c1d1f68d33317966d5fe6e377275cc54d255590637d1db4c224c8ce7792",
+  "payload_crc32": "0x0966526e",
+  "payload_size": 365872
+ },
+ "testfile": {
+  "name": "e2-test.bin",
+  "size": 65536,
+  "size_hex": "0x10000",
+  "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32": "0x695b8eb2",
+  "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)",
+  "path": "/home/qc233/zte/e2631-p3/e2/tftp/e2-test.bin",
+  "present": true,
+  "sha256_file": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32_file": "0x695b8eb2"
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "output": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00000 0x59530",
+   "output": "crc32 0x47f00000 0x59530\r\nCRC32 for 47f00000 ... 47f5952f ==> 0966526e\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-gd38f69c44523 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x44000000 0xc0000 0x20000",
+   "output": "mtd read spi-nand0 0x44000000 0xc0000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x000c0000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x44000000 4",
+   "output": "md 0x44000000 4\r\n44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x44000000 0x20000",
+   "output": "crc32 0x44000000 0x20000\r\ncrc32 for 44000000 ... 4401ffff ==> e826c394\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "printenv",
+   "output": "printenv\r\nbaudrate=115200\r\nbootcmd=e2631boot\r\nbootdelay=3\r\nbootfile=uboot.bin\r\nbootloaderfile=bootloader.bin\r\nconsole=ttyAMA0,115200n8\r\ne2631_flashboot=reset\r\ne2631_netboot=tftp 0x42000000 e2631-netboot.uImage\r\ne2631_pocgo=go 0x43000000\r\ne2631_pocload=tftp 0x43000000 u-boot.bin\r\nethact=eth0\r\nethaddr=00:41:71:00:00:50\r\nfdtcontroladdr=4fff2ad0\r\nfullfile=upgrade.bin\r\ngatewayip=192.168.1.1\r\nhostname=unknown\r\nipaddr=192.168.1.1\r\nlinuzfile=vmlinuz.bin\r\nloadaddr=0x42000000\r\nmemsize=256M\r\nnetmask=255.255.255.0\r\nnetretry=5\r\nserverip=192.168.1.100\r\nstderr=serial@94404000\r\nstdin=serial@94404000\r\nstdout=serial@94404000\r\nversioninfo=U-Boot V1.0.0 20230828191152 0x2300000 0x1 0xaf 0x00\r\n\r\nEnvironment size: 646/131068 bytes\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "help e2631rescue",
+   "output": "help e2631rescue\r\ne2631rescue - serve the web bootloader rescue on lan1\r\n\r\nUsage:\r\ne2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is\r\n              written until a validated image is uploaded and the\r\n              X-E2631-Confirm: write header is present. Ctrl-C leaves.\r\n\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00005500                             .U..\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net bmu",
+   "output": "e2631net bmu\r\ne2631net: TM tab0 0x50000000 tab1 0x50008000 buf_f0 0x50009000\r\ne2631net: TM buf start 0x52009000 end 0x54009000 tab limit 0x28000800 start 0x00000010\r\ne2631net: BMU ctrl 0x00000000 cfg1 0x0005c040 cfg2 0x0005c040\r\ne2631net: BMU limit1 0x00000100 limit2 0x00000100 thres1 0x00000000 thres2 0x00000000\r\ne2631net: BMU free status 0x00000110 alloc 0x00000000 buf id 0x00000000\r\ne2631net: DMA ctrl 0x003f6564 ring cfg 0x01000100 area50 0x00000000 tx ring 0x00000000\r\ne2631net: DMA tx start 0x00000000 tx done 0x00000000 dma err 0x00000000\r\ne2631net: switch fwd ctrl 0x00000000 (expected 0x00000011)\r\ne2631net: arena 0x45000000, last bp 0, raw BUF_ID 0x00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net sbrg",
+   "output": "e2631net sbrg\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net",
+   "output": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00000000, BMU free 0x00000110, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\ne2631net: tx mode pp, sent 0, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x01000100 tx ring 0x00000000\r\ne2631net: tx start 0x00000000 tx done 0x00000000 dma err 0x00000000 last done 0\r\ne2631net: last bp 0, raw BUF_ID 0x00000000\r\ne2631net: last descriptor 00000000 00000000 00000000 00000000\r\ne2631net: TM ctrl 0x00000100 TM status 0x00000000\r\ne2631net: MAC TX frames 0:0 1:0 2:0 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 0 0 0 0 0 0 0; SW fwd 0x00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net mode pp",
+   "output": "e2631net mode pp\r\ne2631net: tx mode pp\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net tx 3",
+   "output": "e2631net tx 3\r\nethernet@92000000 Waiting for PHY auto negotiation to complete...... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\ne2631net: tx probe: 3 frame(s) in mode pp\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp, sent 3, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 0, raw BUF_ID 0x80000000\r\ne2631net: last descriptor 02a00080 00010000 21007800 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00003202\r\ne2631net: MAC TX frames 0:0 1:0 2:3 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net mode pp-alt",
+   "output": "e2631net mode pp-alt\r\ne2631net: tx mode pp-alt\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net tx 3",
+   "output": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode pp-alt\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp-alt, sent 6, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 257, raw BUF_ID 0x80000101\r\ne2631net: last descriptor 02a00080 02010000 21007802 000000f2\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:6 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net mode vendor",
+   "output": "e2631net mode vendor\r\ne2631net: tx mode vendor\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net tx 3",
+   "output": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode vendor\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode vendor, sent 9, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 2561, raw BUF_ID 0x80000a01\r\ne2631net: last descriptor 00000080 02010000 21007814 000000f2\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net mode vendor-alt",
+   "output": "e2631net mode vendor-alt\r\ne2631net: tx mode vendor-alt\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net tx 3",
+   "output": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode vendor-alt\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode vendor-alt, sent 12, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 3841, raw BUF_ID 0x80000f01\r\ne2631net: last descriptor 00000080 02010000 2100781e 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net sbrg allow",
+   "output": "e2631net sbrg allow\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG egress after  0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net mode pp",
+   "output": "e2631net mode pp\r\ne2631net: tx mode pp\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net tx 3",
+   "output": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode pp\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp, sent 15, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 770, raw BUF_ID 0x80000302\r\ne2631net: last descriptor 02a00080 04010000 21007806 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net",
+   "output": "e2631net\r\ne2631net: lan1 switch port 2, started\r\ne2631net: PHY 12 link up, 1000 Mbit/s full duplex\r\ne2631net: MAC ctrl 0x00bb2003, TM int 0x00000002, BMU free 0x70000111, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 17 0 0 0 0 0 0 0\r\ne2631net: tx mode pp, sent 15, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 770, raw BUF_ID 0x80000302\r\ne2631net: last descriptor 02a00080 04010000 21007806 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net bmu",
+   "output": "e2631net bmu\r\ne2631net: TM tab0 0x45800000 tab1 0x45808000 buf_f0 0x45a00000\r\ne2631net: TM buf start 0x45000000 end 0x45800000 tab limit 0x08000800 start 0x00000010\r\ne2631net: BMU ctrl 0x00000001 cfg1 0x0104c040 cfg2 0x0104c040\r\ne2631net: BMU limit1 0x00000080 limit2 0x00000010 thres1 0x00000420 thres2 0x00000000\r\ne2631net: BMU free status 0x70000111 alloc 0x00000000 buf id 0x00000000\r\ne2631net: DMA ctrl 0x003f6564 ring cfg 0x00400040 area50 0x45b00000 tx ring 0x45c00000\r\ne2631net: DMA tx start 0x00000001 tx done 0x00000000 dma err 0x00000000\r\ne2631net: switch fwd ctrl 0x00000011 (expected 0x00000011)\r\ne2631net: arena 0x45000000, last bp 770, raw BUF_ID 0x80000302\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net sbrg",
+   "output": "e2631net sbrg\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92340100 1",
+   "output": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631boot load",
+   "output": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x47f00000 8",
+   "output": "md 0x47f00000 8\r\n47f00000: ea0000b8 e59ff014 e59ff014 e59ff014  ................\r\n47f00010: e59ff014 e59ff014 e59ff014 e59ff014  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x47f00020 8",
+   "output": "md 0x47f00020 8\r\n47f00020: 47f00060 47f000c0 47f00120 47f00180  `..G...G ..G...G\r\n47f00030: 47f001e0 47f00240 47f002a0 deadbeef  ...G@..G...G....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00020 0x40",
+   "output": "crc32 0x47f00020 0x40\r\ncrc32 for 47f00020 ... 47f0005f ==> 025908dc\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x47f00000",
+   "output": "iminfo 0x47f00000\r\n\r\n## Checking Image at 47f00000 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x47f00020",
+   "output": "iminfo 0x47f00020\r\n\r\n## Checking Image at 47f00020 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631boot",
+   "output": "e2631boot\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\ne2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4615804a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: running vendor-order CP15 cleanup\r\ne2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4615804a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000\r\n## Booting kernel from Legacy Image at 42000020 ...\r\n   Image Name:   ARM ImmortalWrt Linux-6.18.60\r\n   Image Type:   ARM Linux Kernel Image (uncompressed)\r\n   Data Size:    3491050 Bytes = 3.3 MiB\r\n   Load Address: 40008000\r\n   Entry Point:  40008000\r\n   Verifying Checksum ... OK\r\nWorking FDT set to 0\r\n   Loading Kernel Image to 40008000\r\n\r\nStarting kernel ...\r\n\r\n",
+   "ok": true
+  }
+ ],
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true,
+  "size_ok": true
+ },
+ "host_before": {
+  "mtd0": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "region": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "raw": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nb1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n"
+ },
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n3210\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "host_before2": {
+  "mtd0": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "region": "b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a",
+  "raw": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nb1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n"
+ },
+ "capture_chain_before": {
+  "supervisor": [
+   308464
+  ],
+  "bootwatch": [
+   308476
+  ],
+  "tty": [
+   308470
+  ]
+ },
+ "load_path": "userdata",
+ "staging_http": {
+  "skipped": "staging goes over SSH stdin (host 18080/18081 may be held)"
+ },
+ "staging": {
+  "method": "ssh-stdin",
+  "padded": {
+   "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/e2-stage-e87a8580.bin",
+   "size": 524288,
+   "sha256": "bdf14c1d1f68d33317966d5fe6e377275cc54d255590637d1db4c224c8ce7792",
+   "payload_crc32": "0x0966526e",
+   "payload_size": 365872
+  },
+  "copy": {
+   "rc": 0,
+   "out": "bdf14c1d1f68d33317966d5fe6e377275cc54d255590637d1db4c224c8ce7792  /tmp/e2-uboot-stage.bin\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\r\n",
+   "elapsed_s": 0.25
+  },
+  "copy_bytes": 524288,
+  "erase": {
+   "rc": 0,
+   "out": "ERASE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "elapsed_s": 0.87
+  },
+  "write": {
+   "rc": 0,
+   "out": "WRITE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e2-uboot-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "elapsed_s": 0.39
+  },
+  "readback": {
+   "rc": 0,
+   "out": "bdf14c1d1f68d33317966d5fe6e377275cc54d255590637d1db4c224c8ce7792  -\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.27
+  },
+  "sync": {
+   "rc": 0,
+   "out": "SYNCED\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.25
+  },
+  "ok": true
+ },
+ "capture_pause": {
+  "supervisor_pids": [
+   308464
+  ],
+  "bootwatch_pids": [
+   308476
+  ],
+  "tty_holders": [
+   308470
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 327900,
+ "flash_banner_seen": true,
+ "flash_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "flash_version_ok": true,
+ "read_staging": {
+  "ok": true,
+  "tail": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> "
+ },
+ "staging_crc": {
+  "got": "0x0966526e",
+  "want": "0x0966526e",
+  "ok": true
+ },
+ "go_sent": "2026-11-28T00:13:25+0800",
+ "new_banner_seen": true,
+ "new_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "new_version_ok": true,
+ "env_block": {
+  "offset": "0xc0000",
+  "length": "0x20000",
+  "addr": "0x44000000",
+  "expected": {
+   "path": "/home/qc233/zte/e2631-p3/b1-env-session/resume-1/target-env-block.bin",
+   "sha256": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "crc": 3894854548,
+   "stored": 4183458158
+  },
+  "read_tail": "mtd read spi-nand0 0x44000000 0xc0000 0x20000\r\nReading 131072 byte(s) (64 page(s)) at offset 0x000c0000\r\n=> ",
+  "read_ok": true,
+  "md": "md 0x44000000 4\r\n44000000: f95a816e 64756162 65746172 3531313d  n.Z.baudrate=115\r\n=> ",
+  "stored_crc": "0xf95a816e",
+  "region_crc": "0xe826c394",
+  "want_region_crc": "0xe826c394",
+  "want_stored_crc": "0xf95a816e",
+  "want_block_sha": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "stored_ok": true,
+  "region_ok": true,
+  "state": "OK"
+ },
+ "env_sanity": {
+  "boot_text_tail": "go 0x47f00000\r\n## Starting application at 0x47F00000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-gd38f69c44523 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  8 devices, 8 uclasses, devicetree: embed\r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   eth0: ethernet@92000000\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=>                    version\r\nU-Boot 2027.01-rc2-gd38f69c44523 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+  "boot_env_ok": true,
+  "entries": 27,
+  "expected_entries": 26,
+  "expected_entries_effective": 26,
+  "runtime_extras": [
+   "fdtcontroladdr"
+  ],
+  "unexpected": [],
+  "entry_count_ok": true,
+  "missing": [],
+  "mismatched": [],
+  "values_ok": true,
+  "ethaddr": "00:41:71:00:00:50",
+  "ethaddr_ok": true,
+  "random_mac_absent": true,
+  "bootdelay_ok": true,
+  "bootcmd_ok": true,
+  "stdio_ok": true,
+  "env_sanity_ok": true
+ },
+ "rescue": {
+  "help_text": "help e2631rescue\r\ne2631rescue - serve the web bootloader rescue on lan1\r\n\r\nUsage:\r\ne2631rescue e2631rescue - start DHCP and the HTTP rescue page; no flash is\r\n              written until a validated image is uploaded and the\r\n              X-E2631-Confirm: write header is present. Ctrl-C leaves.\r\n\r\n=> ",
+  "present": true,
+  "short_help": true
+ },
+ "probe": {
+  "enabled": true,
+  "mode_order": [
+   "pp",
+   "pp-alt",
+   "vendor",
+   "vendor-alt"
+  ],
+  "expected_fwd_ctrl": "0x00000011",
+  "tm_status_before": "md.l 0x92340100 1\r\n92340100: 00005500                             .U..\r\n=> ",
+  "bmu": "e2631net bmu\r\ne2631net: TM tab0 0x50000000 tab1 0x50008000 buf_f0 0x50009000\r\ne2631net: TM buf start 0x52009000 end 0x54009000 tab limit 0x28000800 start 0x00000010\r\ne2631net: BMU ctrl 0x00000000 cfg1 0x0005c040 cfg2 0x0005c040\r\ne2631net: BMU limit1 0x00000100 limit2 0x00000100 thres1 0x00000000 thres2 0x00000000\r\ne2631net: BMU free status 0x00000110 alloc 0x00000000 buf id 0x00000000\r\ne2631net: DMA ctrl 0x003f6564 ring cfg 0x01000100 area50 0x00000000 tx ring 0x00000000\r\ne2631net: DMA tx start 0x00000000 tx done 0x00000000 dma err 0x00000000\r\ne2631net: switch fwd ctrl 0x00000000 (expected 0x00000011)\r\ne2631net: arena 0x45000000, last bp 0, raw BUF_ID 0x00000000\r\n=> ",
+  "fwd_ctrl": 0,
+  "fwd_ctrl_ok": false,
+  "fwd_ctrl_line": "e2631net: switch fwd ctrl 0x00000000 (expected 0x00000011)",
+  "bmu_raw_buf_id": 0,
+  "sbrg_before": "e2631net sbrg\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+  "state_before": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00000000, BMU free 0x00000110, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\ne2631net: tx mode pp, sent 0, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x01000100 tx ring 0x00000000\r\ne2631net: tx start 0x00000000 tx done 0x00000000 dma err 0x00000000 last done 0\r\ne2631net: last bp 0, raw BUF_ID 0x00000000\r\ne2631net: last descriptor 00000000 00000000 00000000 00000000\r\ne2631net: TM ctrl 0x00000100 TM status 0x00000000\r\ne2631net: MAC TX frames 0:0 1:0 2:0 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x08000000 egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 0 0 0 0 0 0 0; SW fwd 0x00000000\r\n=> ",
+  "tx_frames_before": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "tcpdump": {
+   "rc": 0,
+   "container": "e5fefe883826dbfedb1096587ea8ac345dbe8fa921a5108ba61e80f3c27acb29",
+   "stderr": "",
+   "ready": true
+  },
+  "segments": [
+   {
+    "mode": "pp",
+    "mode_out": "e2631net mode pp\r\ne2631net: tx mode pp\r\n=> ",
+    "tx_out": "e2631net tx 3\r\nethernet@92000000 Waiting for PHY auto negotiation to complete...... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\ne2631net: tx probe: 3 frame(s) in mode pp\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp, sent 3, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 0, raw BUF_ID 0x80000000\r\ne2631net: last descriptor 02a00080 00010000 21007800 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00003202\r\ne2631net: MAC TX frames 0:0 1:0 2:3 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+    "tx_frames": [
+     0,
+     0,
+     3,
+     0,
+     0
+    ],
+    "sent_failed": {
+     "sent": 3,
+     "failed": 0
+    },
+    "dma_err_line": "e2631net: tx probe: dma err 0x00000000 -> 0x00000000",
+    "last_descriptor": [
+     44040320,
+     65536,
+     553678848,
+     243
+    ],
+    "raw_buf_id": 2147483648,
+    "last_bp": 0,
+    "tx_state": [
+     "e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000",
+     "e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1",
+     "e2631net: last bp 0, raw BUF_ID 0x80000000",
+     "e2631net: last descriptor 02a00080 00010000 21007800 000000f3",
+     "e2631net: MAC TX frames 0:0 1:0 2:3 3:0 4:0"
+    ],
+    "tm_status_after": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+    "wire": {
+     "frames": 20,
+     "uboot_mac": 3,
+     "arp60_broadcast": 3,
+     "random_mac": 0,
+     "device_frames": 3,
+     "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log",
+     "start": 162,
+     "tail": ")? 191.1.168.192.in-addr.arpa. (262)\n16:13:46.689986 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:46.912676 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)\n16:13:46.962475 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n16:13:47.063865 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)\n16:13:47.765950 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:47.863407 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28"
+    },
+    "tx_frames_grew": true
+   },
+   {
+    "mode": "pp-alt",
+    "mode_out": "e2631net mode pp-alt\r\ne2631net: tx mode pp-alt\r\n=> ",
+    "tx_out": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode pp-alt\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp-alt, sent 6, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 257, raw BUF_ID 0x80000101\r\ne2631net: last descriptor 02a00080 02010000 21007802 000000f2\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:6 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+    "tx_frames": [
+     0,
+     0,
+     6,
+     0,
+     0
+    ],
+    "sent_failed": {
+     "sent": 6,
+     "failed": 0
+    },
+    "dma_err_line": "e2631net: tx probe: dma err 0x00000000 -> 0x00000000",
+    "last_descriptor": [
+     44040320,
+     33619968,
+     553678850,
+     242
+    ],
+    "raw_buf_id": 2147483905,
+    "last_bp": 257,
+    "tx_state": [
+     "e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000",
+     "e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1",
+     "e2631net: last bp 257, raw BUF_ID 0x80000101",
+     "e2631net: last descriptor 02a00080 02010000 21007802 000000f2",
+     "e2631net: MAC TX frames 0:0 1:0 2:6 3:0 4:0"
+    ],
+    "tm_status_after": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+    "wire": {
+     "frames": 7,
+     "uboot_mac": 3,
+     "arp60_broadcast": 3,
+     "random_mac": 0,
+     "device_frames": 3,
+     "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log",
+     "start": 4190,
+     "tail": " ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.174362 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.174402 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:48.963864 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n16:13:49.140427 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 292: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 5/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local., (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191 (250)\n16:13:49.841387 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n16:13:49.863757 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28"
+    },
+    "tx_frames_grew": true
+   },
+   {
+    "mode": "vendor",
+    "mode_out": "e2631net mode vendor\r\ne2631net: tx mode vendor\r\n=> ",
+    "tx_out": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode vendor\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode vendor, sent 9, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 2561, raw BUF_ID 0x80000a01\r\ne2631net: last descriptor 00000080 02010000 21007814 000000f2\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+    "tx_frames": [
+     0,
+     0,
+     9,
+     0,
+     0
+    ],
+    "sent_failed": {
+     "sent": 9,
+     "failed": 0
+    },
+    "dma_err_line": "e2631net: tx probe: dma err 0x00000000 -> 0x00000000",
+    "last_descriptor": [
+     128,
+     33619968,
+     553678868,
+     242
+    ],
+    "raw_buf_id": 2147486209,
+    "last_bp": 2561,
+    "tx_state": [
+     "e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000",
+     "e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1",
+     "e2631net: last bp 2561, raw BUF_ID 0x80000a01",
+     "e2631net: last descriptor 00000080 02010000 21007814 000000f2",
+     "e2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0"
+    ],
+    "tm_status_after": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+    "wire": {
+     "frames": 3,
+     "uboot_mac": 3,
+     "arp60_broadcast": 3,
+     "random_mac": 0,
+     "device_frames": 3,
+     "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log",
+     "start": 5726,
+     "tail": "16:13:50.377761 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:50.377819 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:50.377889 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46"
+    },
+    "tx_frames_grew": true
+   },
+   {
+    "mode": "vendor-alt",
+    "mode_out": "e2631net mode vendor-alt\r\ne2631net: tx mode vendor-alt\r\n=> ",
+    "tx_out": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode vendor-alt\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode vendor-alt, sent 12, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 3841, raw BUF_ID 0x80000f01\r\ne2631net: last descriptor 00000080 02010000 2100781e 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+    "tx_frames": [
+     0,
+     0,
+     9,
+     0,
+     0
+    ],
+    "sent_failed": {
+     "sent": 12,
+     "failed": 0
+    },
+    "dma_err_line": "e2631net: tx probe: dma err 0x00000000 -> 0x00000000",
+    "last_descriptor": [
+     128,
+     33619968,
+     553678878,
+     243
+    ],
+    "raw_buf_id": 2147487489,
+    "last_bp": 3841,
+    "tx_state": [
+     "e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000",
+     "e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1",
+     "e2631net: last bp 3841, raw BUF_ID 0x80000f01",
+     "e2631net: last descriptor 00000080 02010000 2100781e 000000f3",
+     "e2631net: MAC TX frames 0:0 1:0 2:9 3:0 4:0"
+    ],
+    "tm_status_after": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+    "wire": {
+     "frames": 1,
+     "uboot_mac": 0,
+     "arp60_broadcast": 0,
+     "random_mac": 0,
+     "device_frames": 0,
+     "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log",
+     "start": 6140,
+     "tail": "16:13:52.965956 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)"
+    },
+    "tx_frames_grew": false
+   },
+   {
+    "mode": "pp+allow",
+    "allow_out": "e2631net sbrg allow\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG egress after  0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+    "mode_out": "e2631net mode pp\r\ne2631net: tx mode pp\r\n=> ",
+    "tx_out": "e2631net tx 3\r\ne2631net: tx probe: 3 frame(s) in mode pp\r\ne2631net: tx probe: dma err 0x00000000 -> 0x00000000\r\ne2631net: tx mode pp, sent 15, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 770, raw BUF_ID 0x80000302\r\ne2631net: last descriptor 02a00080 04010000 21007806 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+    "tx_frames": [
+     0,
+     0,
+     12,
+     0,
+     0
+    ],
+    "sent_failed": {
+     "sent": 15,
+     "failed": 0
+    },
+    "dma_err_line": "e2631net: tx probe: dma err 0x00000000 -> 0x00000000",
+    "last_descriptor": [
+     44040320,
+     67174400,
+     553678854,
+     243
+    ],
+    "raw_buf_id": 2147484418,
+    "last_bp": 770,
+    "tx_state": [
+     "e2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000",
+     "e2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1",
+     "e2631net: last bp 770, raw BUF_ID 0x80000302",
+     "e2631net: last descriptor 02a00080 04010000 21007806 000000f3",
+     "e2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0"
+    ],
+    "tm_status_after": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+    "wire": {
+     "frames": 3,
+     "uboot_mac": 3,
+     "arp60_broadcast": 3,
+     "random_mac": 0,
+     "device_frames": 3,
+     "path": "/home/qc233/zte/e2631-p3/e2/f2-probe2/run-1/tcpdump.log",
+     "start": 6317,
+     "tail": "16:13:54.830815 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:54.830850 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46\n16:13:54.830898 00:41:71:00:00:50 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 60: Request who-has 0.0.0.0 tell 0.0.0.0, length 46"
+    },
+    "tx_frames_grew": true
+   }
+  ],
+  "final_state": "e2631net\r\ne2631net: lan1 switch port 2, started\r\ne2631net: PHY 12 link up, 1000 Mbit/s full duplex\r\ne2631net: MAC ctrl 0x00bb2003, TM int 0x00000002, BMU free 0x70000111, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 17 0 0 0 0 0 0 0\r\ne2631net: tx mode pp, sent 15, failed 0\r\ne2631net: dma ctrl 0x003f6564 ring cfg 0x00400040 tx ring 0x45c00000\r\ne2631net: tx start 0x00000001 tx done 0x00000000 dma err 0x00000000 last done 1\r\ne2631net: last bp 770, raw BUF_ID 0x80000302\r\ne2631net: last descriptor 02a00080 04010000 21007806 000000f3\r\ne2631net: TM ctrl 0x00000140 TM status 0x00000002\r\ne2631net: MAC TX frames 0:0 1:0 2:12 3:0 4:0\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SPA port en 1 1 1 1 1 1 1; SW fwd 0x00000011\r\n=> ",
+  "final_bmu": "e2631net bmu\r\ne2631net: TM tab0 0x45800000 tab1 0x45808000 buf_f0 0x45a00000\r\ne2631net: TM buf start 0x45000000 end 0x45800000 tab limit 0x08000800 start 0x00000010\r\ne2631net: BMU ctrl 0x00000001 cfg1 0x0104c040 cfg2 0x0104c040\r\ne2631net: BMU limit1 0x00000080 limit2 0x00000010 thres1 0x00000420 thres2 0x00000000\r\ne2631net: BMU free status 0x70000111 alloc 0x00000000 buf id 0x00000000\r\ne2631net: DMA ctrl 0x003f6564 ring cfg 0x00400040 area50 0x45b00000 tx ring 0x45c00000\r\ne2631net: DMA tx start 0x00000001 tx done 0x00000000 dma err 0x00000000\r\ne2631net: switch fwd ctrl 0x00000011 (expected 0x00000011)\r\ne2631net: arena 0x45000000, last bp 770, raw BUF_ID 0x80000302\r\n=> ",
+  "final_fwd_ctrl": 17,
+  "final_sbrg": "e2631net sbrg\r\ne2631net: SBRG learn 0x00000000 port ctrl 0x000200ff egress 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef\r\ne2631net: SBRG VLAN 1 words 00000000 00000000 00000000\r\n=> ",
+  "final_tm_status": "md.l 0x92340100 1\r\n92340100: 00000002                             ....\r\n=> ",
+  "final_tx_frames": [
+   0,
+   0,
+   12,
+   0,
+   0
+  ],
+  "wire_totals": {
+   "frames": 34,
+   "uboot_mac": 12,
+   "arp60_broadcast": 12,
+   "device_frames": 12,
+   "random_mac": 0
+  },
+  "tx_frames_max": 12,
+  "hit_modes": [
+   "pp",
+   "pp-alt",
+   "vendor",
+   "pp+allow"
+  ],
+  "f2_fixed": true,
+  "verdict": "F2_FIXED",
+  "localisation": {
+   "stage": "forwarding",
+   "modes": [
+    "pp",
+    "pp-alt",
+    "vendor",
+    "pp+allow"
+   ],
+   "fwd_ctrl_ok": false
+  }
+ },
+ "t74": {
+  "skipped": "probe session: T74 discriminators disabled"
+ },
+ "linux_marker": "Please press Enter",
+ "f1": {
+  "load": {
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "crc_good": true
+  },
+  "md_marker": "md 0x47f00000 8\r\n47f00000: ea0000b8 e59ff014 e59ff014 e59ff014  ................\r\n47f00010: e59ff014 e59ff014 e59ff014 e59ff014  ................\r\n=> ",
+  "md_header": "md 0x47f00020 8\r\n47f00020: 47f00060 47f000c0 47f00120 47f00180  `..G...G ..G...G\r\n47f00030: 47f001e0 47f00240 47f002a0 deadbeef  ...G@..G...G....\r\n=> ",
+  "crc32_header": "crc32 0x47f00020 0x40\r\ncrc32 for 47f00020 ... 47f0005f ==> 025908dc\r\n=> ",
+  "iminfo_marker": "iminfo 0x47f00000\r\n\r\n## Checking Image at 47f00000 ...\r\nUnknown image format!\r\n=> ",
+  "iminfo_uimage": "iminfo 0x47f00020\r\n\r\n## Checking Image at 47f00020 ...\r\nUnknown image format!\r\n=> ",
+  "boot": {
+   "cmd": "e2631boot",
+   "outcome": "kernel",
+   "dt": 8.68,
+   "out": "e2631boot\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\ne2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4615804a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: running vendor-order CP15 cleanup\r\ne2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x4615804a VBAR=0x4ffa7000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000\r\n## Booting kernel from Legacy Image at 42000020 ...\r\n   Image Name:   ARM ImmortalWrt Linux-6.18.60\r\n   Image Type:   ARM Linux Kernel Image (uncompressed)\r\n   Data Size:    3491050 Bytes = 3.3 MiB\r\n   Load Address: 40008000\r\n   Entry Point:  40008000\r\n   Verifying Checksum ... OK\r\nWorking FDT set to 0\r\n   Loading Kernel Image to 40008000\r\n\r\nStarting kernel ...\r\n\r\n"
+  },
+  "verdict": "KERNEL_STARTED"
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   328331
+  ],
+  "bootwatch_pids": [
+   328338
+  ],
+  "tty_holders": [
+   328337
+  ],
+  "events_tail": "2026-11-27T23:20:03+08:00 reader-start pid=308464\n2026-11-28T00:14:35+08:00 reader-start pid=328331",
+  "ok": true
+ },
+ "device_after": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n61\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "postcheck": {
+  "rc": 0,
+  "out": "VERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\nPANICS=0\nOOPS=0\nMT7916=0\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nREGION=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V",
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+ },
+ "kernel_nic_view": {
+  "rc": 0,
+  "out": "NIC_BEGIN\n[    0.000000] Booting Linux on physical CPU 0x0\n[    0.855487] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)\n[    0.856421] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)\n[    0.857355] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)\n[    0.858286] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)\n[    7.685567] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode\n[   11.840594] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off\n[   12.864813] zx279128s-eth 92000000.ethernet lan1: Link is Down\n[   33.329196] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode\n[   33.345176] zx279128s-eth 92000000.ethernet lan1: entered allmulticast mode\n[   33.345486] zx279128s-eth 92000000.ethernet lan1: entered promiscuous mode\n[   33.395008] zx279128s-eth 92000000.ethernet lan2: configuring for phy/internal link mode\n[   33.396357] zx279128s-eth 92000000.ethernet lan2: entered allmulticast mode\n[   33.396631] zx279128s-eth 92000000.ethernet lan2: entered promiscuous mode\n[   33.403601] zx279128s-eth 92000000.ethernet lan3: configuring for phy/internal link mode\n[   33.404622] zx279128s-eth 92000000.ethernet lan3: entered allmulticast mode\n[   33.404832] zx279128s-eth 92000000.ethernet lan3: entered promiscuous mode\n[   33.414585] zx279128s-eth 92000000.ethernet wan: configuring for phy/internal link mode\n[   34.450459] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\n[   34.477978] zx279128s-eth 92000000.ethernet: hardware flow offload disabled\n[   34.895917] zx279128s-eth 92000000.ethernet: hardware flow offload enabled\n[   38.562358] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off\n[   66.932251] mt7915e 0000:01:00.0: registering led 'mt76-phy0'\n[   66.991265] mt7915e 0000:01:00.0: registering led 'mt76-phy1'\nNIC_END\n",
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+ },
+ "audit": {
+  "uboot_commands": [
+   "version",
+   "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "crc32 0x47f00000 0x59530",
+   "version",
+   "mtd read spi-nand0 0x44000000 0xc0000 0x20000",
+   "md 0x44000000 4",
+   "crc32 0x44000000 0x20000",
+   "printenv",
+   "help e2631rescue",
+   "md.l 0x92340100 1",
+   "e2631net bmu",
+   "e2631net sbrg",
+   "e2631net",
+   "e2631net mode pp",
+   "e2631net tx 3",
+   "md.l 0x92340100 1",
+   "e2631net mode pp-alt",
+   "e2631net tx 3",
+   "md.l 0x92340100 1",
+   "e2631net mode vendor",
+   "e2631net tx 3",
+   "md.l 0x92340100 1",
+   "e2631net mode vendor-alt",
+   "e2631net tx 3",
+   "md.l 0x92340100 1",
+   "e2631net sbrg allow",
+   "e2631net mode pp",
+   "e2631net tx 3",
+   "md.l 0x92340100 1",
+   "e2631net",
+   "e2631net bmu",
+   "e2631net sbrg",
+   "md.l 0x92340100 1",
+   "e2631boot load",
+   "md 0x47f00000 8",
+   "md 0x47f00020 8",
+   "crc32 0x47f00020 0x40",
+   "iminfo 0x47f00000",
+   "iminfo 0x47f00020",
+   "e2631boot"
+  ],
+  "forbidden": [],
+  "staging_ops": {
+   "erase": 0,
+   "write": 0,
+   "readback": 0,
+   "sync": 0
+  },
+  "staging_cmds": [
+   "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "mtd read spi-nand0 0x44000000 0xc0000 0x20000"
+  ]
+ },
+ "checks": {
+  "artifact_pins": true,
+  "load_path": "userdata",
+  "loading": true,
+  "loading_gate": true,
+  "env_block": "OK",
+  "new_banner": true,
+  "new_version": true,
+  "env_sanity": true,
+  "t74_recorded": true,
+  "probe_recorded": true,
+  "f2_verdict": "SKIPPED",
+  "f1_verdict": "KERNEL_STARTED",
+  "no_uboot_flash_writes": true,
+  "mtd0_unchanged": true,
+  "region_unchanged": true,
+  "no_panics": true,
+  "kernel_nic_view": true,
+  "capture_after": true,
+  "no_error": true,
+  "probe": "F2_FIXED"
+ },
+ "verdict": {
+  "session": "GREEN",
+  "env_sanity": "OK",
+  "env_retry": "not-needed",
+  "rescue": "present",
+  "f2": "SKIPPED",
+  "t74": null,
+  "f1": "KERNEL_STARTED",
+  "probe": "F2_FIXED"
+ },
+ "finished": "2026-11-28T00:15:20+0800"
+}

@@ -72,6 +72,8 @@
 | [../evidence/t74-f2/](../evidence/t74-f2/) | task-74 附件：run-2/run-1 session-results、驱动与原始串口字节、主机 tcpdump、dnsmasq/http、修正版驱动、产物校验清单、sha256 清单 |
 | [../evidence/f2-probe-20261127.md](../evidence/f2-probe-20261127.md) | F2 TX 探针真机会话（task-78 构建）：31 补丁 U-Boot（banner ge84e13107885，u-boot.bin sha256 d493042d…）RAM 链验证——F2_PROBE_NO_MOVE（pp / pp-alt / vendor / vendor-alt / allow 重跑全部无 MAC TX 帧、网线 0 设备帧）；C2 排除（SBRG egress 复位值 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef，allow 为 no-op）；C3 VLAN1 三 word 全 0 仍未排除；hw tx idx 恒 0、第 11 帧起 TX completion timed out、tx done 读清 0x10000/0x20000；两处修正（md.l 0x003883c0 非 SBRG 寄存器，实际为 0x92000000+0x3883c0；sbrg 不带 allow 只打印 VLAN1）；env/mtd0/镜像区零变化，F1 KERNEL_STARTED，唯一写入为 userdata staging |
 | [../evidence/f2-probe/](../evidence/f2-probe/) | task-78 探针附件：session-results、原始串口字节与探针段、驱动与日志、主机 tcpdump、产物构建清单、sha256 清单 |
+| [../evidence/f2-fixed-20261128.md](../evidence/f2-fixed-20261128.md) | F2 修复验证（task-78 构建 patch 0032）：F2_FIXED——第一次 e2631net tx 3（pp）后 MAC TX frames 端口 2 = 3、网线出现 3 个 60 字节广播 ARP（源 00:41:71:00:00:50）；最终 fwd ctrl 0x00000011、MAC TX frames 0:0 1:0 2:12 3:0 4:0、12 个设备 ARP；vendor-alt 描述符变体未发送（独立观察，默认 pp 不受影响）；F1 KERNEL_STARTED 8.68 s；mtd0 f9239040… / 镜像区 b1ea9a48… 前后一致，唯一写入 userdata staging |
+| [../evidence/f2-fixed/](../evidence/f2-fixed/) | F2 修复验证附件：session-results、原始串口字节与探针段、驱动日志、主机 tcpdump（12 个设备 ARP）、产物构建清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|
