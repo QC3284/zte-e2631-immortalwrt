@@ -264,6 +264,41 @@ jobs:
             exit 1
           fi
           echo "E4 rescue gates: command, digest contract and shared writer present"
+          # E4 v1 window regression (task-78): the rescue write must program the
+          # whole U-Boot area 0x20000..0xC0000 from the image base, and the
+          # erase/write/compare windows must be the same one.
+          rescue_c=board/zte/zxhn-e2631/e2631rescue.c
+          grep -qE '^#define E2631_RESCUE_FLASH_OFF[[:space:]]+0x20000UL' "$rescue_c"
+          grep -qE '^#define E2631_RESCUE_FLASH_LEN[[:space:]]+0xA0000UL' "$rescue_c"
+          grep -qE '^#define E2631_RESCUE_MTD0_END[[:space:]]+0xC0000UL' "$rescue_c"
+          grep -q 'static_assert(E2631_RESCUE_FLASH_OFF + E2631_RESCUE_FLASH_LEN ==' "$rescue_c"
+          grep -q 'static_assert(E2631_RESCUE_MTD0_END == CONFIG_ENV_OFFSET' "$rescue_c"
+          grep -q 'static_assert(E2631_RESCUE_FLASH_LEN == E2631_RESCUE_IMG_LEN' "$rescue_c"
+          grep -q 'e2631_flash_begin(E2631_RESCUE_FLASH_OFF,' "$rescue_c"
+          grep -q 'E2631_RESCUE_FLASH_LEN, img);' "$rescue_c"
+          grep -q 'e2631_flash_write_image(rescue_image());' "$rescue_c"
+          grep -q 'e2631_flash_compare(rescue_image(),' "$rescue_c"
+          if grep -q 'img + E2631_RESCUE_FLASH_OFF' "$rescue_c"; then
+            echo "::error::the rescue write source must be the image base, not img + 0x20000"
+            exit 1
+          fi
+          if grep -q 'rescue_image() +' "$rescue_c"; then
+            echo "::error::the rescue write/compare source must be rescue_image(), not a shifted pointer"
+            exit 1
+          fi
+          echo "E4 rescue window gate: source is the image base, window 0x20000..0xC0000, one window for erase/write/compare"
+          # task-77/U-0031: the environment read retries before it falls back, and
+          # the final failure prints the diagnostic that identifies a bad read.
+          env_c=env/mtd.c
+          grep -q 'define ENV_MTD_READ_RETRIES[[:space:]]*3' "$env_c"
+          grep -q 'static int env_mtd_read_block' "$env_c"
+          grep -q 'static void env_mtd_dump_failure' "$env_c"
+          grep -q 'env_mtd: stored crc 0x%08x, data crc 0x%08x' "$env_c"
+          if ! grep -q 'for (attempt = 1; attempt <= ENV_MTD_READ_RETRIES; attempt++)' "$env_c"; then
+            echo "::error::env_mtd_load() does not retry the read"
+            exit 1
+          fi
+          echo "env retry gate: three read attempts and the failure diagnostic are present"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1
@@ -737,6 +772,9 @@ jobs:
           mtd0_sha=$(sha256sum artifacts/e2631-uboot-mtd0.bin | awk '{print $1}')
           mtd0_size=$(stat -c%s artifacts/e2631-uboot-mtd0.bin)
           header_sha=$(sha256sum "$RUNNER_TEMP/mtd0/uboot-header.bin" | awk '{print $1}')
+          # task-78: the assembled first 0x800 differs from the vendor template
+          # (the +0x14 length field is rewritten), so report both, labelled.
+          image_header_sha=$(head -c 2048 artifacts/e2631-uboot-mtd0.bin | sha256sum | awk '{print $1}')
           env_sha=$(sha256sum artifacts/e2631-env-block.bin | awk '{print $1}')
           payload_len=$(stat -c%s build/u-boot.bin)
           config_sha=$(sha256sum build/.config | awk '{print $1}')
@@ -754,7 +792,9 @@ jobs:
              board/zte/zxhn-e2631/e2631_failsafe_asset.h artifacts/
           cp build/checkpatch.txt artifacts/ 2>/dev/null || true
           patch_shas=$(env | grep '^E2631_UBOOT_PATCH_SHA256_[0-9][0-9][0-9][0-9]=' | sort | sed 's/^[^=]*=//' | tr '\n' ' ')
-          banner=$(strings -a build/u-boot.bin | grep -m1 -E '^U-Boot 20' || true)
+          # task-78: match the whole banner token, not a prefix such as
+          # "U-Boot 20" that a partial embedded string can satisfy.
+          banner=$(strings -a build/u-boot.bin | grep -m1 -E '^U-Boot [0-9]{4}\.[0-9]{2}-rc[0-9]+-g[0-9a-f]+ ' || true)
           if [ -z "$banner" ]; then
             echo "::error::u-boot.bin has no U-Boot banner string"
             exit 1
@@ -811,7 +851,8 @@ jobs:
             echo "mtd0 image crc32: $mtd0_crc"
             echo "command help: E2631-COMMAND-HELP.txt (static U_BOOT_CMD dump + binary strings)"
             echo "mtd0 image: e2631-uboot-mtd0.bin, mtd0 0x20000..0xC0000 ($mtd0_size bytes), sha256 $mtd0_sha"
-            echo "mtd0 image header: 0x800 bytes copied from the vendor U-Boot header block, sha256 $header_sha"
+            echo "mtd0 image header (assembled, first 0x800 bytes): sha256 $image_header_sha"
+            echo "mtd0 image header source: 0x800-byte vendor template block evidence/p2-oob/headblock-0x20000-0x20800.hex, template sha256 $header_sha (the +0x14 length field is rewritten)"
             echo "mtd0 payload length: $payload_len bytes (0x$(printf '%x' "$payload_len")); mtd0 image bounds 0x20000..0xC0000, env starts at 0xC0000"
             echo "vendor env block (read-only, not written by this image): e2631-env-block.bin, mtd0 0xC0000, 0x20000 bytes, sha256 $env_sha"
             echo "mtd0 image inputs: vendor header block evidence/p2-oob/headblock-0x20000-0x20800.hex, vendor env rebuild evidence/b1-env-current-20261121.txt"

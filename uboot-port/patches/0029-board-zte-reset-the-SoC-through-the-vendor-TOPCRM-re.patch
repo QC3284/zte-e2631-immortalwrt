@@ -1,4 +1,4 @@
-From 04b94aab046bc8097947aaa9cc375678b6f1b45e Mon Sep 17 00:00:00 2001
+From 073ab59b2b4fd20468ae6e8876c67daba4c96678 Mon Sep 17 00:00:00 2001
 From: QC3284 <2078725082@qq.com>
 Date: Fri, 27 Nov 2026 20:20:00 +0800
 Subject: [PATCH 29/29] board: zte: reset the SoC through the vendor TOPCRM

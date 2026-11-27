@@ -2,8 +2,10 @@
 
 ## 0. 结论
 
-- E4 v1（救援模式）与厂商复位已作为 patch 0026-0029 进入 kit；29 个 patch 的 post-am tree 为
-  `e7dc246351aba6b8c946967addc0971b4f4e97f4`，uboot-build run `46002766353`（head `c91e976`）全绿。
+- E4 v1（救援模式）与厂商复位已作为 patch 0026-0029 进入 kit；首个构建 run `46002766353`（head `c91e976`）
+  全绿，但随后 verify-docs 审出 patch 0028 的写窗口/源指针缺陷（§2.1），已修正；task-77 又给 env 读取加了
+  重试与失败现场打印（patch 0030）。合并后的 30 个 patch 的 post-am tree 是
+  `3be7118d0e192cc2157ce2f734a5496d6d8738c1`，构建身份见 §4.1。
 - 镜像：banner `U-Boot 2027.01-rc2-ga9d4df78ce6e (Nov 19 2026 - 15:44:39 +0000)`，`u-boot.bin` 360,624 B
   （sha256 `49acded8d7b7a664dab7f45aab683b020cc583004aa423c3c47d996c064354e6`，crc32 `b431eb15`），
   mtd0 镜像 sha256 `79dab60d3ce0e3eb72037cd6afb3431b89071824c6449df377d62cb233095a28`，env 块保持
@@ -21,8 +23,9 @@
 | --- | --- |
 | 0026 | 最小 TCP 栈 + DHCP 服务器（bl-mt798x-dhcpd，GPL-2.0，`e4cf4dc7`），适配本树 legacy net API；新增 `arp_wait_clear()` 与 `CONFIG_MTK_TCP` 的 `PROT_TCP` 钩子 |
 | 0027 | `e2631flash.h` 五步写 job API（begin/erase/blank_check/write_image/readback/compare/end），救援页复用 |
-| 0028 | `e2631rescue`：DHCP + 极简 HTTP + gzip 救援页 + SHA-256/确认头契约 + 结构校验 + mtd0 五步写 |
+| 0028 | `e2631rescue`：DHCP + 极简 HTTP + gzip 救援页 + SHA-256/确认头契约 + 结构校验 + mtd0 五步写（task-78 修正窗口/源指针） |
 | 0029 | 厂商 TOPCRM 软复位：`mdelay(50)` 后向 `0x94000044` 写 1，替换占位 `reset_cpu()` |
+| 0030 | task-77：`env_mtd_load()` 读+import 重试 3 次；最终失败打印偏移、CRC32 与前 64 字节，env 仍只读 |
 
 ## 2. 运行契约（v1 冻结）
 
@@ -36,8 +39,18 @@
   `X-E2631-SHA256`（小写 hex，整文件 SHA-256）与 `X-E2631-Confirm: write`；校验/结构检查失败一律 HTTP 400 +
   `result=error`，不进入擦除。结构检查：size、`+0x10` 内层 magic `0x73383231`、`+0x14` payload 长度窗口、
   padding 全 0xFF、payload 含 `U-Boot 20`。v1 没有 header CRC（保持厂商头格式与 net-zero 字节一致）。
-- 写窗口：mtd0 `0x20000..0xA0000`（U-Boot 区）；secondboot `0x0..0x20000`、env `0xC0000..0xE0000`、保留区
-  `0xE0000..0xFFFFF` 一律不碰；成功后不自动重启，串口/页面都提示手动 `reset` 或断电。
+- 写窗口：mtd0 `0x20000..0xC0000`（U-Boot 区 655360 B，写长度 0xA0000，源指针=镜像首地址，到 env 前为止）；
+  secondboot `0x0..0x20000`、env `0xC0000..0xE0000`、保留区 `0xE0000..0xFFFFF` 一律不碰；成功后不自动重启，
+  串口/页面都提示手动 `reset` 或断电。
+
+### 2.1 task-78 写窗口修正（设备写入前）
+
+首个构建的 0028 写的是 `0x20000..0xA0000`、长度 `0x80000`，并且 begin/write/compare 的源指针误加了
+`0x20000`：头 0x800 字节永远不会落盘，payload 被整体前移，erase 窗口也短了 0x20000，而回读比较用的
+是同一条错位的源——会打印 PASS 并损坏 flash。修正为 OFF=0x20000、LEN=0xA0000、MTD0_END=0xC0000
+（= `CONFIG_ENV_OFFSET`），三处源指针都改成镜像首地址，并用编译期断言 + CI 回归门禁锁死
+（源=镜像首地址、erase/write/compare 同窗、窗口 0x20000..0xC0000）。本文件后续的构建身份与验收步骤
+都以修正后的镜像为准。
 
 ## 3. CI 门禁（新增/沿用）
 

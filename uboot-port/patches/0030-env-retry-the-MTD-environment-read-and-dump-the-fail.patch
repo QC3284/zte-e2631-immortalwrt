@@ -1,0 +1,188 @@
+From 0e1bc053e37306db0db1c707c09cffec49694051 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 21:41:57 +0800
+Subject: [PATCH] env: retry the MTD environment read and dump the failed bytes
+
+The thin E4 build once read a bad CRC from the environment block and
+fell back to the default environment, losing the vendor keys (MAC
+address).  The read is a single pass today, so one transient SPI read
+error or one torn first read is enough.
+
+Retry the whole env_mtd_load() read and import cycle up to three times.
+On the final failure print the actual mtd0 offset, the stored and
+computed CRC32, the buffer CRC32 and the first 64 bytes as a hexdump
+before falling back to the default environment: all-FF bytes identify
+the bad-block skip path, garbled bytes a wrong read, and a clean CRC on
+a retry an intermittent read.  The environment stays read-only here;
+no flash write is added.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ env/mtd.c | 125 ++++++++++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 102 insertions(+), 23 deletions(-)
+
+diff --git a/env/mtd.c b/env/mtd.c
+index 4b3886c0..c6f2014f 100644
+--- a/env/mtd.c
++++ b/env/mtd.c
+@@ -139,55 +139,134 @@ done:
+ 	return ret;
+ }
+ 
+-static int env_mtd_load(void)
++#define ENV_MTD_READ_RETRIES	3
++
++/*
++ * Read the whole environment area into buf.  The retry loop in
++ * env_mtd_load() re-runs this from scratch so a transient SPI read error or
++ * a torn first read cannot land on the default environment.
++ */
++static int env_mtd_read_block(struct mtd_info *mtd_env, char *buf,
++			      unsigned int *bad_skipped)
+ {
+-	struct mtd_info *mtd_env = NULL;
+-	char *buf, *tmp;
+ 	size_t ret_len;
+ 	int remaining;
+ 	u32 sect_size;
+ 	u32 offset;
+ 	int ret;
+ 
+-	buf = (char *)memalign(ARCH_DMA_MINALIGN, CONFIG_ENV_SIZE);
+-	if (!buf) {
+-		env_set_default("memalign() failed", 0);
+-		return -EIO;
+-	}
+-
+-	ret = setup_mtd_device(&mtd_env);
+-	if (ret)
+-		goto out;
+-
+ 	sect_size = mtd_env->erasesize;
+ 
+ 	offset = CONFIG_ENV_OFFSET;
+ 	remaining = CONFIG_ENV_SIZE;
+-	tmp = buf;
+ 
+ 	while (remaining) {
+ 		/* Skip the block if it is bad */
+ 		if (!(offset % sect_size) &&
+ 		    mtd_block_isbad(mtd_env, offset)) {
++			(*bad_skipped)++;
+ 			offset += sect_size;
+ 			continue;
+ 		}
+ 
+ 		ret = mtd_read(mtd_env, offset, mtd_env->writesize,
+-			       &ret_len, tmp);
+-		if (ret) {
+-			env_set_default("mtd_read() failed", 1);
+-			goto out;
+-		}
++			       &ret_len, buf + CONFIG_ENV_SIZE - remaining);
++		if (ret)
++			return ret;
+ 
+-		tmp += ret_len;
+ 		offset += ret_len;
+ 		remaining -= ret_len;
+ 	}
+ 
+-	ret = env_import(buf, 1, H_EXTERNAL);
+-	if (!ret)
+-		gd->env_valid = ENV_VALID;
++	return 0;
++}
++
++/*
++ * Last-resort diagnostic: the device session needs to tell a blank/garbled
++ * read from a bad-block skip without another rebuild.  All-FF bytes point at
++ * the bad-block skip path, random bytes at a wrong read.
++ */
++static void env_mtd_dump_failure(const char *why, const char *buf,
++				 unsigned int bad_skipped)
++{
++	const unsigned char *bytes = (const unsigned char *)buf;
++	u32 stored;
++	int i;
++
++	memcpy(&stored, buf, sizeof(stored));
++
++	printf("\nenv_mtd: %s after %d attempts at mtd0 offset 0x%08x (size 0x%08x)\n",
++	       why, ENV_MTD_READ_RETRIES, (unsigned int)CONFIG_ENV_OFFSET,
++	       (unsigned int)CONFIG_ENV_SIZE);
++	printf("env_mtd: stored crc 0x%08x, data crc 0x%08x over 0x%08x bytes, bad blocks skipped %u\n",
++	       stored, crc32(0, bytes + sizeof(stored), ENV_SIZE),
++	       (unsigned int)ENV_SIZE, bad_skipped);
++	printf("env_mtd: buffer crc32 0x%08x over 0x%08x bytes\n",
++	       crc32(0, bytes, CONFIG_ENV_SIZE),
++	       (unsigned int)CONFIG_ENV_SIZE);
++	printf("env_mtd: first 64 bytes:");
++	for (i = 0; i < 64; i++) {
++		if (!(i % 16))
++			printf("\n");
++		printf(" %02x", bytes[i]);
++	}
++	printf("\n");
++}
++
++static int env_mtd_load(void)
++{
++	struct mtd_info *mtd_env = NULL;
++	char *buf;
++	unsigned int bad_skipped = 0;
++	u32 stored, crc;
++	int attempt, ret = 0;
++
++	buf = (char *)memalign(ARCH_DMA_MINALIGN, CONFIG_ENV_SIZE);
++	if (!buf) {
++		env_set_default("memalign() failed", 0);
++		return -EIO;
++	}
++
++	ret = setup_mtd_device(&mtd_env);
++	if (ret)
++		goto out;
++
++	for (attempt = 1; attempt <= ENV_MTD_READ_RETRIES; attempt++) {
++		env_t *ep = (env_t *)buf;
++
++		bad_skipped = 0;
++		ret = env_mtd_read_block(mtd_env, buf, &bad_skipped);
++		if (ret) {
++			if (attempt < ENV_MTD_READ_RETRIES) {
++				printf("\nenv_mtd: read attempt %d/%d failed (%d), retrying\n",
++				       attempt, ENV_MTD_READ_RETRIES, ret);
++				continue;
++			}
++			env_mtd_dump_failure("mtd_read() failed", buf,
++					     bad_skipped);
++			env_set_default("mtd_read() failed", 1);
++			break;
++		}
++
++		memcpy(&stored, &ep->crc, sizeof(stored));
++		crc = crc32(0, ep->data, ENV_SIZE);
++		if (crc != stored) {
++			if (attempt < ENV_MTD_READ_RETRIES) {
++				printf("\nenv_mtd: CRC mismatch on attempt %d/%d, retrying\n",
++				       attempt, ENV_MTD_READ_RETRIES);
++				continue;
++			}
++			env_mtd_dump_failure("bad CRC", buf, bad_skipped);
++			env_set_default("bad CRC", 0);
++			ret = -ENOMSG;
++			break;
++		}
++
++		ret = env_import(buf, 0, H_EXTERNAL);
++		if (!ret)
++			gd->env_valid = ENV_VALID;
++		break;
++	}
+ 
+ out:
+ 	if (mtd_env)
+-- 
+2.56.1
+
