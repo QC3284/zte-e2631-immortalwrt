@@ -1,0 +1,150 @@
+{
+ "mode": "e2t-session",
+ "started": "2026-11-27T19:54:29+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-defconfig-45988430055/e2631-uboot-45988430055/u-boot.bin",
+  "size": 320848,
+  "size_hex": "0x4e550",
+  "sha256": "339289583f80bd60b7214fa65ad9a4b5a3ca68eb37d95bd1bad65215265ee2fa",
+  "crc32": "0x92257c50",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-ge6678e875e60",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true,
+  "crc32": "0x92257c50"
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/session3/run-1/e2-stage-33928958.bin",
+  "size": 524288,
+  "sha256": "247c86d2d4d5feecb890522c4a05c82a1dbfc125c22a52eac2bde53c3618415b",
+  "payload_crc32": "0x92257c50",
+  "payload_size": 320848
+ },
+ "testfile": {
+  "name": "e2-test.bin",
+  "size": 65536,
+  "size_hex": "0x10000",
+  "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32": "0x695b8eb2",
+  "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)",
+  "path": "/home/qc233/zte/e2631-p3/e2/tftp/e2-test.bin",
+  "present": true,
+  "sha256_file": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32_file": "0x695b8eb2"
+ },
+ "host_before": {
+  "error": "AttributeError(\"'dict' object has no attribute 'strip'\")"
+ },
+ "uboot_commands": [],
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n662\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "capture_chain_before": {
+  "supervisor": [
+   121113
+  ],
+  "bootwatch": [
+   121164
+  ],
+  "tty": [
+   177400
+  ]
+ },
+ "services": {
+  "rc": 0,
+  "stdout": "HTTP FAILED\nDNSMASQ OK (67/69 bound, container e2631-e2-dhcp)",
+  "stderr": "",
+  "dhcp_tftp": [
+   "UNCONN 0      0                               0.0.0.0%enp0s20u1u4u2c2:67         0.0.0.0:*",
+   "UNCONN 0      0                                             127.0.0.1:69         0.0.0.0:*",
+   "UNCONN 0      0                                         192.168.1.191:69         0.0.0.0:*",
+   "UNCONN 0      0                                                 [::1]:69            [::]:*"
+  ],
+  "http": [
+   "LISTEN 0      5                                               0.0.0.0:18080      0.0.0.0:*"
+  ],
+  "ok": true
+ },
+ "staging_http": {
+  "pid": "202086",
+  "port": 18081,
+  "bound": true,
+  "log": "/home/qc233/zte/e2631-p3/e2/session3/run-1/staging-http.log",
+  "rc": 0,
+  "err": ""
+ },
+ "error": "RuntimeError('staged file sha256 mismatch after wget')",
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   121113
+  ],
+  "bootwatch_pids": [
+   121164,
+   202120
+  ],
+  "tty_holders": [
+   177400
+  ],
+  "events_tail": "2026-11-27T19:41:54+08:00 reader-start pid=121113\n2026-11-27T19:54:44+08:00 supervisor-002-already-running pid=202115",
+  "ok": true
+ },
+ "device_after": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n683\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "postcheck": {
+  "rc": 0,
+  "out": "VERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\nPANICS=0\nOOPS=0\nMT7916=1\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nREGION=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V",
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+ },
+ "audit": {
+  "uboot_commands": [],
+  "uboot_flash_writes": [],
+  "staging_linux_writes": [],
+  "net_cmds": [],
+  "staging_ops": {
+   "erase": null,
+   "write": null,
+   "readback": null,
+   "wget": null,
+   "sync": null
+  }
+ },
+ "finished": "2026-11-27T19:54:57+0800",
+ "checks": {
+  "artifact_pins": true,
+  "staging": false,
+  "staging_crc_gate": null,
+  "new_banner": null,
+  "new_version": null,
+  "f1_verdict": null,
+  "f2_recorded": false,
+  "no_uboot_flash_writes": true,
+  "mtd0_unchanged": true,
+  "region_unchanged": true,
+  "no_panics": true,
+  "capture_after": true,
+  "no_error": false
+ },
+ "verdict": "FAIL"
+}

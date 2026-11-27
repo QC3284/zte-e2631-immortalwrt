@@ -1,0 +1,35 @@
+E2631 A1/A2/A3 custom U-Boot (slot boot, flash commands, env write-back)
+Repository: https://github.com/u-boot/u-boot
+Branch: master
+Baseline commit: c1958b5f6cce03956d309ce422b5d9f819955d4a
+Baseline tree: 62f07967f69e656689266ee1f3e7116cf4b5fd10
+Port patches sha256: 1e051c226bb0a5fcd44ded121c73acf03b76b7881d46aad7fd1247c19948c535 71fdce39af5700bd440f87fbe1d50ce7fe97a1c2ab15a44e009d47af09250003 d16e7b563adc8693ea59e23900870b07a168f44136218d740c3ba49e44c7b395 ce6a01ef5b0c1c47f213a79a30bc3bb13f0b8cdeec10ebb4395ce988b5e746ca 43dcac25fe9c57e36898bcdbe7e4462c7bd865826bd7b72e389c7fa5d562f70f 35ba682af0a5b5c71ff41c94c104a99afca609087c3bf42e4721370d6dde26ca bf54aa985373952cac402dafacc2b49f9876993b8150541ec13a10d94f800f97 d75f809f91f7cfcca08de5b04a6ec4c77e77df6f64c14a9f73544515a7c20748 4bf75d5afe821f0e58dce01c88fa326a3adf4a33c708f5d7c4712d243ad14e91 57ce9d808cc771854bb68b03020d9da854d24b0bd621b5971b882e342ff079a0 98aa4b3914ff1741e0621116b4d630ab43f448d7d0ca31496c2001e815b51095 9c075c60f5cd6282e8b507d7ee0e02b4fc68544d0f55f4d1b4c43a8f187ed87b f6d52c559973dad5cc4e375f72e7dd3ce57b63c8b15f1ca95e5bb011346d5f2c 0bfb4302fec14b6d0d2549cebe4a1ddf311bd50f044849d0bdaf09c1ed943110 84bfc65f5bb335d5a6d33b93ccfb8e367e210d0af155ddc6ab82eb14fa6c8f3b 7838e8a22dd46996c9ccb31f9fe116e194641d2a26f548e9854548bfefc62461 da21478e0fe7c53fdf14f59e81ea3da86733b63998926f25e84b3675f96eca0d 9a1e079b740d8f253f5c4c9a323a618a5820b8100ccbcff56fae84557d215a9c 3e615397a428781683f753f42374a74b100d739819de64a63408616b557b4a3f d8b9eb9f93125798c4d17a2fc09b621a5d9f139706263dcbd9160ba6b3e1416a c66643e1eca8c5cc2313e0136636b0ea22822f38f7207236b41786ba93ab7976 680435c34a4b6ca5154debb0ace1caea7fd7000641e5e572c6477f22b6959b72 e38d0545d0463101e19a26760a29fc7ebbc6b8b5782cce836ffc9d5e725c87d3 8bf4e048b1726c795b04ebb92ec361e7a91814fded24f83b3e1432a88b0f79e1 af158e9fb09bc1853a0ff7bf5a32d7201b9ebf8dd04a02a1087e0cccf76218d4 
+Post-am tree: ac98701595404b43ecd48ea43d6ff7f3cf7676fb
+Reproducible: git am --committer-date-is-author-date, SOURCE_DATE_EPOCH=1795103079
+Defconfig: zx279128s_zte_zxhn-e2631_defconfig
+Toolchain: arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+u-boot.bin size: 320848 bytes (limit 0x9F800 = 653312 bytes)
+Entry point: 0x47f00000
+Banner: U-Boot 2027.01-rc2-ge6678e875e60 (Nov 19 2026 - 15:44:39 +0000)
+u-boot.bin crc32: 92257c50
+u-boot.bin sha256: 339289583f80bd60b7214fa65ad9a4b5a3ca68eb37d95bd1bad65215265ee2fa
+mtd0 image crc32: 13051599
+command help: E2631-COMMAND-HELP.txt (static U_BOOT_CMD dump + binary strings)
+mtd0 image: e2631-uboot-mtd0.bin, mtd0 0x20000..0xC0000 (655360 bytes), sha256 99886ea0966877fa4978faad2b52df58ceb698ad627a049763957ddbb92bfe51
+mtd0 image header: 0x800 bytes copied from the vendor U-Boot header block, sha256 19a9d54614e9d5cdfb7573495609448cdf1a740e470fbebcac5783c8e9b93510
+mtd0 payload length: 320848 bytes (0x4e550); mtd0 image bounds 0x20000..0xC0000, env starts at 0xC0000
+vendor env block (read-only, not written by this image): e2631-env-block.bin, mtd0 0xC0000, 0x20000 bytes, sha256 6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426
+mtd0 image inputs: vendor header block evidence/p2-oob/headblock-0x20000-0x20800.hex, vendor env rebuild evidence/b1-env-current-20261121.txt
+
+payload footprint (mtd0 payload window 0x20800..0xBFFFF, hard cap 653312 bytes):
+  u-boot.bin bytes: 320848
+  mtd0 image bytes: 655360
+  hard cap bytes: 653312
+  CI gate bytes: 645120 (hard cap - 8192 safety margin)
+  headroom bytes vs hard cap: 332464
+  headroom percent vs hard cap: 50.89%
+  headroom bytes vs CI gate: 324272
+  env block sha256: 6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426
+  .config sha256: 5bc9f529b06e0cde78f6147abe14ddcfb114c58eaf14aeb5ba636a0e003cdfb1
+Run: https://github.com/QC3284/zte-e2631-immortalwrt/actions/runs/45988430055
+Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)

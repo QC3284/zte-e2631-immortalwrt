@@ -1,0 +1,7 @@
+19:54:40 staging HTTP {"pid": "202086", "port": 18081, "bound": true, "log": "/home/qc233/zte/e2631-p3/e2/session3/run-1/staging-http.log", "rc": 0, "err": ""}
+19:54:41 stage wget 1.24s rc=1: wget -O /tmp/e2-uboot-stage.bin http://192.168.1.191:18081/e2-stage-33928958.bin 2>&1 | tail -3; sha
+19:54:41 SESSION ERROR RuntimeError('staged file sha256 mismatch after wget')
+19:54:48 capture restore: {"restore_rc": 0, "supervisor_pids": [121113], "bootwatch_pids": [121164, 202120], "tty_holders": [177400], "events_tail": "2026-11-27T19:41:54+08:00 reader-start pid=121113\n2026-11-27T19:54:44+08:00 supervisor-002-already-running pid=202115", "ok": true}
+19:54:50 host services stopped rc=0
+19:54:57 VERDICT FAIL
+19:54:57 checks: {"artifact_pins": true, "staging": false, "staging_crc_gate": null, "new_banner": null, "new_version": null, "f1_verdict": null, "f2_recorded": false, "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "capture_after": true, "no_error": false}

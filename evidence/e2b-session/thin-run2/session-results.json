@@ -1,0 +1,844 @@
+{
+ "mode": "e2t-session",
+ "started": "2026-11-27T19:58:52+0800",
+ "artifact": {
+  "path": "/home/qc233/zte/e2631-t5-artifacts/uboot-defconfig-45988430055/e2631-uboot-45988430055/u-boot.bin",
+  "size": 320848,
+  "size_hex": "0x4e550",
+  "sha256": "339289583f80bd60b7214fa65ad9a4b5a3ca68eb37d95bd1bad65215265ee2fa",
+  "crc32": "0x92257c50",
+  "entry_bytes": "b80000ea14f09fe5",
+  "banner_token": "U-Boot 2027.01-rc2-ge6678e875e60",
+  "within_limit": true,
+  "pad_to": 524288
+ },
+ "artifact_pins": {
+  "sha_ok": true,
+  "crc_ok": true,
+  "banner_ok": true,
+  "crc32": "0x92257c50"
+ },
+ "padded": {
+  "path": "/home/qc233/zte/e2631-p3/e2/session3/run-2/e2-stage-33928958.bin",
+  "size": 524288,
+  "sha256": "247c86d2d4d5feecb890522c4a05c82a1dbfc125c22a52eac2bde53c3618415b",
+  "payload_crc32": "0x92257c50",
+  "payload_size": 320848
+ },
+ "testfile": {
+  "name": "e2-test.bin",
+  "size": 65536,
+  "size_hex": "0x10000",
+  "sha256": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32": "0x695b8eb2",
+  "pattern": "byte[i] = (i*7+11) & 0xff, i in [0,65536)",
+  "path": "/home/qc233/zte/e2631-p3/e2/tftp/e2-test.bin",
+  "present": true,
+  "sha256_file": "e024d98638d5644241da2a8159a2f1f7c7718c2cfa721141b1e8125759e51319",
+  "crc32_file": "0x695b8eb2"
+ },
+ "host_before": {
+  "error": "AttributeError(\"'dict' object has no attribute 'strip'\")"
+ },
+ "uboot_commands": [
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-g85df6772a444 (Nov 21 2026 - 20:01:16 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "output": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x47f00000 0x4e550",
+   "output": "crc32 0x47f00000 0x4e550\r\nCRC32 for 47f00000 ... 47f4e54f ==> 92257c50\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "version",
+   "output": "version\r\nU-Boot 2027.01-rc2-ge6678e875e60 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mtd read spi-nand0 0x48000000 0x2300000 0x800",
+   "output": "mtd read spi-nand0 0x48000000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x480000 4",
+   "output": "md 0x480000 4\r\n00480000: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x480020 8",
+   "output": "md 0x480020 8\r\n00480020: 00000000 00000000 00000000 00000000  ................\r\n00480030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x480020 0x40",
+   "output": "crc32 0x480020 0x40\r\nCRC32 for 00480020 ... 0048005f ==> 758d6336\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x480020",
+   "output": "iminfo 0x480020\r\n\r\n## Checking Image at 00480020 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "mii info",
+   "output": "mii info\r\nPHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631net",
+   "output": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "dhcp",
+   "output": "dhcp\r\nethernet@92000000 Waiting for PHY auto negotiation to complete...... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 70000111                             ...p\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv ipaddr 192.168.1.50",
+   "output": "setenv ipaddr 192.168.1.50\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv netmask 255.255.255.0",
+   "output": "setenv netmask 255.255.255.0\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "setenv serverip 192.168.1.191",
+   "output": "setenv serverip 192.168.1.191\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 70000111                             ...p\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "ping 192.168.1.191",
+   "output": "ping 192.168.1.191\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nUsing ethernet@92000000 device\r\n\r\nARP Retry count exceeded; starting again\r\nping failed; host 192.168.1.191 is not alive\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "tftp 0x43000000 e2-test.bin",
+   "output": "tftp 0x43000000 e2-test.bin\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nUsing ethernet@92000000 device\r\nTFTP from server 192.168.1.191; our IP address is 192.168.1.50\r\nFilename 'e2-test.bin'.\r\nLoad address: 0x43000000\r\nLoading: *\b\r\nARP Retry count exceeded; starting again\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x9234800c 1",
+   "output": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x92348014 1",
+   "output": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md.l 0x923480dc 1",
+   "output": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x43000000 0x10000",
+   "output": "crc32 0x43000000 0x10000\r\nCRC32 for 43000000 ... 4300ffff ==> 75bfa56a\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631boot load",
+   "output": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x420000 8",
+   "output": "md 0x420000 8\r\n00420000: 00000000 00000000 00000000 00000000  ................\r\n00420010: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "md 0x420020 8",
+   "output": "md 0x420020 8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "crc32 0x420020 0x40",
+   "output": "crc32 0x420020 0x40\r\nCRC32 for 00420020 ... 0042005f ==> 758d6336\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x420000",
+   "output": "iminfo 0x420000\r\n\r\n## Checking Image at 00420000 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "iminfo 0x420020",
+   "output": "iminfo 0x420020\r\n\r\n## Checking Image at 00420020 ...\r\nUnknown image format!\r\n=> ",
+   "ok": true
+  },
+  {
+   "cmd": "e2631boot",
+   "output": "e2631boot\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\ne2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45df804a VBAR=0x4ffb1000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: running vendor-order CP15 cleanup\r\ne2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45df804a VBAR=0x4ffb1000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000\r\n## Booting kernel from Legacy Image at 42000020 ...\r\n   Image Name:   ARM ImmortalWrt Linux-6.18.60\r\n   Image Type:   ARM Linux Kernel Image (uncompressed)\r\n   Data Size:    3491050 Bytes = 3.3 MiB\r\n   Load Address: 40008000\r\n   Entry Point:  40008000\r\n   Verifying Checksum ... OK\r\nWorking FDT set to 0\r\n   Loading Kernel Image to 40008000\r\n\r\nStarting kernel ...\r\n\r\n",
+   "ok": true
+  }
+ ],
+ "route": {
+  "ok": true,
+  "action": "none",
+  "raw": "192.168.1.1 dev enp0s20u1u4u2c2 src 192.168.1.191 uid 1000"
+ },
+ "device_before": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n925\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "capture_chain_before": {
+  "supervisor": [
+   121113
+  ],
+  "bootwatch": [
+   121164
+  ],
+  "tty": [
+   177400
+  ]
+ },
+ "services": {
+  "rc": 0,
+  "stdout": "HTTP FAILED\nDNSMASQ OK (67/69 bound, container e2631-e2-dhcp)",
+  "stderr": "",
+  "dhcp_tftp": [
+   "UNCONN 0      0                               0.0.0.0%enp0s20u1u4u2c2:67         0.0.0.0:*",
+   "UNCONN 0      0                                             127.0.0.1:69         0.0.0.0:*",
+   "UNCONN 0      0                                         192.168.1.191:69         0.0.0.0:*",
+   "UNCONN 0      0                                                 [::1]:69            [::]:*"
+  ],
+  "http": [
+   "LISTEN 0      5                                               0.0.0.0:18080      0.0.0.0:*"
+  ],
+  "ok": true
+ },
+ "staging_http": {
+  "skipped": "host 18080/18081 are held by another live tool; staging goes over SSH stdin"
+ },
+ "staging": {
+  "method": "ssh-stdin",
+  "padded": {
+   "path": "/home/qc233/zte/e2631-p3/e2/session3/run-2/e2-stage-33928958.bin",
+   "size": 524288,
+   "sha256": "247c86d2d4d5feecb890522c4a05c82a1dbfc125c22a52eac2bde53c3618415b",
+   "payload_crc32": "0x92257c50",
+   "payload_size": 320848
+  },
+  "copy": {
+   "rc": 0,
+   "out": "247c86d2d4d5feecb890522c4a05c82a1dbfc125c22a52eac2bde53c3618415b  /tmp/e2-uboot-stage.bin\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\r\n",
+   "elapsed_s": 0.29
+  },
+  "copy_bytes": 524288,
+  "erase": {
+   "rc": 0,
+   "out": "ERASE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "elapsed_s": 0.92
+  },
+  "write": {
+   "rc": 0,
+   "out": "WRITE_RC=0\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e2-uboot-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "elapsed_s": 0.42
+  },
+  "readback": {
+   "rc": 0,
+   "out": "247c86d2d4d5feecb890522c4a05c82a1dbfc125c22a52eac2bde53c3618415b  -\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.29
+  },
+  "sync": {
+   "rc": 0,
+   "out": "SYNCED\n",
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "elapsed_s": 0.24
+  },
+  "ok": true
+ },
+ "tcpdump": {
+  "rc": 0,
+  "container": "7047131d7a0ad0462b958d58969239d5d78b4ac82363b74322f4a9e899a5bf93",
+  "stderr": "",
+  "ready": true
+ },
+ "capture_pause": {
+  "supervisor_pids": [
+   121113
+  ],
+  "bootwatch_pids": [
+   121164
+  ],
+  "tty_holders": [
+   177400
+  ],
+  "tty_holders_after": [],
+  "free": true
+ },
+ "hub_pid": 209006,
+ "flash_banner_seen": true,
+ "flash_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "flash_version_ok": true,
+ "read_staging": {
+  "ok": true,
+  "tail": "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000\r\nReading 524288 byte(s) (256 page(s)) at offset 0x03f00000\r\n=> "
+ },
+ "staging_crc": {
+  "got": "0x92257c50",
+  "want": "0x92257c50",
+  "ok": true
+ },
+ "go_sent": "2026-11-27T19:59:24+0800",
+ "new_banner_seen": true,
+ "new_stop_autoboot": {
+  "banner_seen": true,
+  "spaces_sent": 20,
+  "prompt": true
+ },
+ "new_version_ok": true,
+ "anomaly": {
+  "read_48000000": {
+   "ok": true,
+   "tail": "mtd read spi-nand0 0x48000000 0x2300000 0x800\r\nReading 2048 byte(s) (1 page(s)) at offset 0x02300000\r\n=> "
+  },
+  "md_480000": "md 0x480000 4\r\n00480000: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+  "md_480020": "md 0x480020 8\r\n00480020: 00000000 00000000 00000000 00000000  ................\r\n00480030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+  "crc32_480020": "crc32 0x480020 0x40\r\nCRC32 for 00480020 ... 0048005f ==> 758d6336\r\n=> ",
+  "iminfo_480020": "iminfo 0x480020\r\n\r\n## Checking Image at 00480020 ...\r\nUnknown image format!\r\n=> "
+ },
+ "f2": {
+  "mii_info": {
+   "snapshot": {
+    "label": "before_mii",
+    "t": "2026-11-27T19:59:27+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "mii info\r\nPHY 0x0A: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0B: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0C: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\nPHY 0x0D: OUI = 0x212E54, Model = 0x03, Rev = 0x01,  10baseT, HDX\r\n=> ",
+   "after": {
+    "label": "after_mii",
+    "t": "2026-11-27T19:59:28+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "e2631net": {
+   "snapshot": {
+    "label": "before_e2631net",
+    "t": "2026-11-27T19:59:28+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "e2631net\r\ne2631net: lan1 switch port 2, stopped\r\ne2631net: MAC ctrl 0x00000000, TM int 0x00005500, BMU free 0x00000110, TX done 0\r\ne2631net: BMU alloc 0 failed, 0 late, pending 0; BUF_ALLOC 0x00000000, BUF_ID 0x00000000\r\ne2631net: RX queue counts 0 0 0 0 0 0 0 0\r\n=> ",
+   "after": {
+    "label": "after_e2631net",
+    "t": "2026-11-27T19:59:28+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "dhcp": {
+   "snapshot": {
+    "label": "before_dhcp",
+    "t": "2026-11-27T19:59:29+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000110",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000110                             ....\r\n=> "
+     }
+    }
+   },
+   "result": {
+    "cmd": "dhcp",
+    "prompt": true,
+    "ip": null,
+    "dt": 35.58,
+    "out": "dhcp\r\nethernet@92000000 Waiting for PHY auto negotiation to complete...... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nBOOTP broadcast 1\r\nBOOTP broadcast 2\r\nBOOTP broadcast 3\r\nBOOTP broadcast 4\r\nBOOTP broadcast 5\r\nBOOTP broadcast 6\r\nBOOTP broadcast 7\r\n\r\nRetry time exceeded; starting again\r\n=> "
+   },
+   "after": {
+    "label": "after_dhcp",
+    "t": "2026-11-27T20:00:04+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "70000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 70000111                             ...p\r\n=> "
+     }
+    }
+   }
+  },
+  "static_fallback": true,
+  "ping": {
+   "snapshot": {
+    "label": "before_ping",
+    "t": "2026-11-27T20:00:05+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "70000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 70000111                             ...p\r\n=> "
+     }
+    }
+   },
+   "out": "ping 192.168.1.191\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nUsing ethernet@92000000 device\r\n\r\nARP Retry count exceeded; starting again\r\nping failed; host 192.168.1.191 is not alive\r\n=> ",
+   "after": {
+    "label": "after_ping",
+    "t": "2026-11-27T20:00:25+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   }
+  },
+  "tftp": {
+   "snapshot": {
+    "label": "before_tftp",
+    "t": "2026-11-27T20:00:25+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   },
+   "out": "tftp 0x43000000 e2-test.bin\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 26:a1:2f:29:78:ac\r\nUsing ethernet@92000000 device\r\nTFTP from server 192.168.1.191; our IP address is 192.168.1.50\r\nFilename 'e2-test.bin'.\r\nLoad address: 0x43000000\r\nLoading: *\b\r\nARP Retry count exceeded; starting again\r\n=> ",
+   "after": {
+    "label": "after_tftp",
+    "t": "2026-11-27T20:00:45+0800",
+    "regs": {
+     "BUF_ID": {
+      "addr": "0x9234800c",
+      "value": "00000000",
+      "tail": "md.l 0x9234800c 1\r\n9234800c: 00000000                             ....\r\n=> "
+     },
+     "BUF_ALLOC": {
+      "addr": "0x92348014",
+      "value": "00000000",
+      "tail": "md.l 0x92348014 1\r\n92348014: 00000000                             ....\r\n=> "
+     },
+     "FREE_STATUS": {
+      "addr": "0x923480dc",
+      "value": "00000111",
+      "tail": "md.l 0x923480dc 1\r\n923480dc: 00000111                             ....\r\n=> "
+     }
+    }
+   },
+   "bytes": null,
+   "size": 65536,
+   "crc": {
+    "out": "crc32 0x43000000 0x10000\r\nCRC32 for 43000000 ... 4300ffff ==> 75bfa56a\r\n=> ",
+    "got": "0x75bfa56a",
+    "want": "0x695b8eb2"
+   }
+  }
+ },
+ "linux_marker": "Please press Enter",
+ "f1": {
+  "load": {
+   "out": "e2631boot load\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\n=> ",
+   "crc_good": true
+  },
+  "md_marker": "md 0x420000 8\r\n00420000: 00000000 00000000 00000000 00000000  ................\r\n00420010: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+  "md_header": "md 0x420020 8\r\n00420020: 00000000 00000000 00000000 00000000  ................\r\n00420030: 00000000 00000000 00000000 00000000  ................\r\n=> ",
+  "crc32_header": "crc32 0x420020 0x40\r\nCRC32 for 00420020 ... 0042005f ==> 758d6336\r\n=> ",
+  "iminfo_marker_addr": "iminfo 0x420000\r\n\r\n## Checking Image at 00420000 ...\r\nUnknown image format!\r\n=> ",
+  "iminfo_uimage_addr": "iminfo 0x420020\r\n\r\n## Checking Image at 00420020 ...\r\nUnknown image format!\r\n=> ",
+  "boot": {
+   "cmd": "e2631boot",
+   "outcome": "kernel",
+   "dt": 9.58,
+   "out": "e2631boot\r\ne2631boot: slot0 at 0x00700000: serial 7, version \"V1.0.0.7B5.8000\", header 0x01c60000\r\ne2631boot: slot1 at 0x02300000: serial 12, version \"ImmortalWrt v1.10.0\", header 0x03800000\r\ne2631boot: cspboot would boot slot1\r\ne2631boot: slot1 uImage \"ARM ImmortalWrt Linux-6.18.60\": load 0x40008000 entry 0x40008000, 3491146 bytes at 0x42000000\r\ne2631boot: header and data CRCs are good\r\ne2631soc: before  SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45df804a VBAR=0x4ffb1000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: running vendor-order CP15 cleanup\r\ne2631soc: after   SCTLR=0x08c5087a (M=0 C=0 I=0) CLIDR=0x09200003 TTBR0=0x45df804a VBAR=0x4ffb1000 ACTLR=0x00000000 DACR=0x00000055 CCSIDR=0x701fe019\r\ne2631soc: read-only L2/SCU: PL310 0x00c00000 ctrl=0x00000000 aux=0x02030000 SCU 0x00800000 ctrl=0x00000000\r\n## Booting kernel from Legacy Image at 42000020 ...\r\n   Image Name:   ARM ImmortalWrt Linux-6.18.60\r\n   Image Type:   ARM Linux Kernel Image (uncompressed)\r\n   Data Size:    3491050 Bytes = 3.3 MiB\r\n   Load Address: 40008000\r\n   Entry Point:  40008000\r\n   Verifying Checksum ... OK\r\nWorking FDT set to 0\r\n   Loading Kernel Image to 40008000\r\n\r\nStarting kernel ...\r\n\r\n"
+  },
+  "verdict": "KERNEL_STARTED"
+ },
+ "capture_after": {
+  "restore_rc": 0,
+  "supervisor_pids": [
+   211735
+  ],
+  "bootwatch_pids": [
+   211747
+  ],
+  "tty_holders": [
+   211741
+  ],
+  "events_tail": "2026-11-27T19:54:44+08:00 supervisor-002-already-running pid=202115\n2026-11-27T20:01:21+08:00 reader-start pid=211735",
+  "ok": true
+ },
+ "device_after": {
+  "raw": "ImmortalWrt v1.10.0\n6.18.60\n63\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nUSERDATA_MOUNTED=0\nMTD10= 02f00000 00020000 \"userdata\"\n",
+  "rc": 0,
+  "stderr": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "mtd0_sha": "f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4",
+  "userdata_mounted": "0",
+  "version": "ImmortalWrt v1.10.0"
+ },
+ "postcheck": {
+  "rc": 0,
+  "out": "VERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\nPANICS=0\nOOPS=0\nMT7916=1\nMTD0=f923904049dd6bc5ed2a8b2598e2cbdf992ab2d7d5dc8c388ab2569237f659f4\nREGION=b1ea9a48f4b9c95f8764fcb0ffc5b088cd25c7064d27cb78321ffd3344bdf63a\n{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V",
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n"
+ },
+ "audit": {
+  "uboot_commands": [
+   "version",
+   "mtd read spi-nand0 0x47f00000 0x3f00000 0x80000",
+   "crc32 0x47f00000 0x4e550",
+   "version",
+   "mtd read spi-nand0 0x48000000 0x2300000 0x800",
+   "md 0x480000 4",
+   "md 0x480020 8",
+   "crc32 0x480020 0x40",
+   "iminfo 0x480020",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "mii info",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "e2631net",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "dhcp",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "setenv ipaddr 192.168.1.50",
+   "setenv netmask 255.255.255.0",
+   "setenv serverip 192.168.1.191",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "ping 192.168.1.191",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "tftp 0x43000000 e2-test.bin",
+   "md.l 0x9234800c 1",
+   "md.l 0x92348014 1",
+   "md.l 0x923480dc 1",
+   "crc32 0x43000000 0x10000",
+   "e2631boot load",
+   "md 0x420000 8",
+   "md 0x420020 8",
+   "crc32 0x420020 0x40",
+   "iminfo 0x420000",
+   "iminfo 0x420020",
+   "e2631boot"
+  ],
+  "uboot_flash_writes": [],
+  "staging_linux_writes": [],
+  "net_cmds": [
+   "crc32 0x47f00000 0x4e550",
+   "crc32 0x480020 0x40",
+   "mii info",
+   "e2631net",
+   "dhcp",
+   "setenv ipaddr 192.168.1.50",
+   "setenv netmask 255.255.255.0",
+   "setenv serverip 192.168.1.191",
+   "ping 192.168.1.191",
+   "tftp 0x43000000 e2-test.bin",
+   "crc32 0x43000000 0x10000",
+   "crc32 0x420020 0x40"
+  ],
+  "staging_ops": {
+   "erase": 0,
+   "write": 0,
+   "readback": 0,
+   "wget": null,
+   "sync": 0
+  }
+ },
+ "finished": "2026-11-27T20:02:16+0800",
+ "checks": {
+  "artifact_pins": true,
+  "staging": true,
+  "staging_crc_gate": true,
+  "new_banner": true,
+  "new_version": true,
+  "f1_verdict": "KERNEL_STARTED",
+  "f2_recorded": true,
+  "no_uboot_flash_writes": true,
+  "mtd0_unchanged": true,
+  "region_unchanged": true,
+  "no_panics": true,
+  "capture_after": true,
+  "no_error": true
+ },
+ "verdict": "GREEN"
+}
