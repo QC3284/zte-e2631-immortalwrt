@@ -1,0 +1,44 @@
+From 1fc96469b3013b5d61410ac2c00b922f7485cf79 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Fri, 27 Nov 2026 19:01:28 +0800
+Subject: [PATCH] configs: zxhn-e2631: drop the unused EFI, MMC, FAT and
+ standard boot
+
+CONFIG_MMC defaults to y on ARM, and selecting it selects BLK.  With BLK
+enabled EFI_LOADER (default y on armv7) and BOOTSTD (default y if BLK)
+come along by default, and EFI_LOADER pulls in FS_FAT/FAT_WRITE plus a
+pile of EFI, event, SMBIOS, SHA1 and UUID code.  None of it can be used
+on the E2631: there is no MMC/SD slot, no FAT medium and the board boots
+through e2631boot + bootm, not through the standard boot flow.
+
+Disabling MMC therefore drops BLK and with it the EFI loader, standard
+boot, FAT, block cache and their helper libraries: 56 symbols disappear
+from .config and nothing is added.  The console loses bootefi (and its
+bootmgr/binary variants), eficonfig, bootflow and bcb; the FAT, MMC and
+PXE commands were never built.  e2631boot, e2631flash, e2631env, the
+network driver, bootm, MTD, dhcp/tftp/ping/mii and the environment
+layout are untouched.
+
+No symbol we keep force-selects any of the dropped ones, so this stays a
+one-line defconfig change rather than Kconfig fighting.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 364558ff..5ebb5862 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -33,6 +33,7 @@ CONFIG_ENV_IS_IN_MTD=y
+ CONFIG_ENV_MTD_DEV="spi-nand0"
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_CLK=y
++# CONFIG_MMC is not set
+ CONFIG_MTD=y
+ CONFIG_DM_MTD=y
+ CONFIG_MTD_SPI_NAND=y
+-- 
+2.56.1
+

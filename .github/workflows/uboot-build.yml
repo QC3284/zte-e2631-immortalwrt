@@ -417,6 +417,36 @@ jobs:
             exit 1
           fi
           echo "entry point: $entry"
+      - name: Assert the unused EFI/MMC/FAT/standard-boot stack stays compiled out
+        # task-69 defconfig drop: CONFIG_MMC=n also clears BLK, and BLK is what
+        # brought back EFI_LOADER (default y on armv7) and BOOTSTD (default y if
+        # BLK); FS_FAT/FAT_WRITE followed from EFI_LOADER. Assert the symptom
+        # (the EFI/MMC/FAT/BOOTSTD/block stack is gone) and the command set we
+        # must keep, so re-enabling BLK later fails here instead of silently
+        # charging the payload budget for a subsystem this board cannot use.
+        run: |
+          set -euo pipefail
+          cd "$UBOOT_DIR"
+          grep -qx '# CONFIG_MMC is not set' configs/zx279128s_zte_zxhn-e2631_defconfig
+          for notset in '# CONFIG_MMC is not set' '# CONFIG_FS_FAT is not set' '# CONFIG_BOOTSTD is not set' '# CONFIG_CMD_PXE is not set'; do
+            grep -qx "$notset" build/.config || {
+              echo "::error::build/.config is missing $notset"
+              exit 1
+            }
+          done
+          for gone in CONFIG_EFI_LOADER CONFIG_EFI CONFIG_BLK CONFIG_FAT_WRITE CONFIG_CMD_BOOTEFI CONFIG_CMD_BOOTFLOW CONFIG_CMD_EFICONFIG CONFIG_CMD_BLOCK_CACHE; do
+            if grep -qx "$gone=y" build/.config; then
+              echo "::error::build/.config still enables $gone"
+              exit 1
+            fi
+          done
+          for kept in CONFIG_CMD_BOOTM=y CONFIG_CMD_MTD=y CONFIG_CMD_DHCP=y CONFIG_CMD_TFTPBOOT=y CONFIG_CMD_MII=y CONFIG_CMD_PING=y CONFIG_OF_LIBFDT=y CONFIG_LMB=y; do
+            grep -qx "$kept" build/.config || {
+              echo "::error::build/.config lost $kept"
+              exit 1
+            }
+          done
+          echo "slim config: no EFI/MMC/FAT/standard-boot symbols; bootm, MTD and the net commands kept"
       - name: Assert e2631flash and e2631env are the only MTD writers (D-U1)
         # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out; the
         # call-site allowlist then proves every mtd_write()/mtd_erase() call in

@@ -4,7 +4,7 @@
 （0001/0002 为 A1 移植，0003 为首个 CI 构建暴露的链接修复，0004 为 A1 串口修复，0005 为 A2 的 SPIFC +
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
-的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）、
+的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -103,7 +103,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0023 sha256 | `e38d0545d0463101e19a26760a29fc7ebbc6b8b5782cce836ffc9d5e725c87d3` |
 | patch 0024 | `uboot-port/patches/0024-board-zte-assert-the-staging-kernel-copy-and-DMA-arena-geometry.patch`（防御性 geometry：staging / kernel copy / DMA arena 的编译期断言） |
 | patch 0024 sha256 | `8bf4e048b1726c795b04ebb92ec361e7a91814fded24f83b3e1432a88b0f79e1` |
-| am 之后 tree | `721bb82538df42dca98fd633b98faa0582256850`（与机器无关，24 个 patch） |
+| patch 0025 | `uboot-port/patches/0025-configs-zxhn-e2631-drop-the-unused-EFI-MMC-FAT-and-standard-boot.patch`（defconfig 瘦身：`# CONFIG_MMC is not set` → 级联丢掉 EFI/标准启动/FAT/块缓存） |
+| patch 0025 sha256 | `af158e9fb09bc1853a0ff7bf5a32d7201b9ebf8dd04a02a1087e0cccf76218d4` |
+| am 之后 tree | `ac98701595404b43ecd48ea43d6ff7f3cf7676fb`（与机器无关，25 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -461,6 +463,14 @@ make O=build -j"$(nproc)"
     `dhcp` 失败若由 BMU 分配引起，串口出现该行与 BUF_ALLOC/BUF_ID/FREE_STATUS，`e2631net` 的计数可以区分
     “从未发出”和“发出但没回”；`0x4554xxxx` 的旧说法已按实测更正为 `0x4235454A`（见 §3 内存图）。
 
+17. defconfig 瘦身（task-69，patch 0025）：只加一行 `# CONFIG_MMC is not set`。MMC 在 ARM 上默认 y 且 `select BLK`，
+    BLK 又让 `EFI_LOADER`（armv7 默认 y）和 `BOOTSTD`（`default y if BLK`）回来，`FS_FAT`/`FAT_WRITE` 由
+    `EFI_LOADER` imply——这些在 E2631 上都没有用武之地（无 eMMC/SD、无 FAT 介质，启动走 `e2631boot` + `bootm`）。
+    级联结果：`.config` 少 56 个 `=y` 符号、0 个新增；控制台少 `bootefi`（含 bootmgr/binary 变体）、
+    `eficonfig`、`bootflow`、`bcb`（FAT/MMC/PXE 命令本来就没编进去）。CI 断言 `.config` 与 defconfig 不再出现
+    MMC/BLK/EFI/BOOTSTD/FAT 栈，并保留 `CMD_BOOTM`/`CMD_MTD`/`CMD_DHCP`/`CMD_TFTPBOOT`/`CMD_MII`/`CMD_PING`/
+    `OF_LIBFDT`/`LMB`；`e2631boot`/`e2631flash`/`e2631env`/网络驱动与 MTD 写白名单不变。真机签名：串口命令表
+    里不再有上述命令，`bootm` 与全部 `e2631*` 命令仍在。
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
 前置：串口线接 UART0（115200 8N1），进入厂商 U-Boot 控制台（控制台密码见救砖手册）。
@@ -816,3 +826,9 @@ U-Boot 网络栈。
   `c45baf4fd1831ec90b501f78dc1c02f18da0fd2bae80ba9f142a1a9a81895ae7` crc32 `e6a2274e`、env 块 `6eee153b…`
   未变、checkpatch 0 errors / 0 warnings（3 条既有 CHECK 不阻断）；证据见
   [evidence/uboot-e2-fix-20261127.md](../evidence/uboot-e2-fix-20261127.md)。
+- 2026-11-27（task-69 defconfig 瘦身，patch 0025）：加一行 `# CONFIG_MMC is not set`；MMC=n 连带 BLK=n，于是
+  EFI loader、标准启动（BOOTSTD）、FAT、块缓存及其 helper 库（event/SMBIOS/SHA1/UUID 等）全部消失——`.config`
+  少 56 个 `=y` 符号、0 个新增；控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm`、`e2631boot`、
+  `e2631flash`、`e2631env`、网络驱动与 MTD 写白名单不变。重钉后 tree `ac98701595404b43ecd48ea43d6ff7f3cf7676fb`
+  （25 个 patch；0025 sha256 `af158e9f…`）。CI 与尺寸结果见 evidence 与下方 run 记录。
+
