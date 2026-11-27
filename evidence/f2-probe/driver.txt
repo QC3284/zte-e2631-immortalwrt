@@ -1,0 +1,75 @@
+23:18:46 stage copy 0.28s rc=0
+23:18:47 stage erase 0.84s rc=0
+23:18:47 stage write 0.40s rc=0
+23:18:47 stage readback 0.25s rc=0
+23:18:47 stage sync 0.20s rc=0
+23:18:47 PHASE 1 GREEN: artifact staged in userdata and read back
+23:18:48 capture paused: {"supervisor_pids": [286848], "bootwatch_pids": [286856], "tty_holders": [286854], "tty_holders_after": [], "free": true}
+23:18:49 serial hub started pid=308042 log=/home/qc233/zte/e2631-p3/e2/f2-probe/run-1/serial.log
+23:18:49 reboot -f requested; waiting for the flash U-Boot banner
+23:18:51 banner seen; stopping autoboot
+23:18:54 stop_autoboot: {"banner": true, "prompt": true}
+23:18:54 ub cmd: version ok=True
+23:18:55 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+23:18:55 ub cmd: crc32 0x47f00000 0x590b8 ok=True
+23:18:55 gate: staged image crc32 == 0x1c354a00
+23:18:55 banner seen; stopping autoboot
+23:18:58 stop_autoboot: {"banner": true, "prompt": true}
+23:18:58 ub cmd: version ok=True
+23:18:58 PHASE 2 GREEN: new image banner and prompt
+23:18:58 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+23:18:58 ub cmd: md 0x44000000 4 ok=True
+23:18:58 ub cmd: crc32 0x44000000 0x20000 ok=True
+23:18:58 env block state=OK stored=0xf95a816e region=0xe826c394
+23:18:58 ub cmd: printenv ok=True
+23:18:58 env sanity ok=True entries=27
+23:18:59 ub cmd: help e2631rescue ok=True
+23:18:59 rescue command present=True
+23:18:59 ub cmd: md.l 0x92340100 1 ok=True
+23:18:59 ub cmd: md.l 0x003883c0 1 ok=True
+23:18:59 ub cmd: e2631net sbrg ok=True
+23:18:59 ub cmd: e2631net ok=True
+23:19:15 tcpdump ready=True
+23:19:15 probe: tcpdump ready, starting the mode sweep
+23:19:15 ub cmd: e2631net mode pp ok=True
+23:19:15 probe: mode pp -> tx 3
+23:19:19 ub cmd: e2631net tx 3 ok=True
+23:19:21 ub cmd: md.l 0x92340100 1 ok=True
+23:19:21 probe: mode pp tx_frames=[0, 0, 0, 0, 0] wire={"frames": 16, "uboot_mac": 0, "arp60_broadcast": 0, "random_mac": 0, "device_frames": 0, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe/run-1/tcpdump.log", "start": 162, "tail": ".110796 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)\n15:19:20.360968 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 304: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [3q] [4n] ANY (QM)? 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. ANY (QM)? ASUS-X550VC.local. ANY (QM)? 191.1.168.192.in-addr.arpa. (262)\n15:19:20.416689 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:16, ethertype IPv4 (0x0800), length 54: 192.168.1.191 > 224.0.0.22: igmp v3 report, 1 group record(s)\n15:19:20.561513 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\" (244)\n15:19:20.874184 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n15:19:20.881401 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 155: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 2/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local. (113)"}
+23:19:21 ub cmd: e2631net mode pp-alt ok=True
+23:19:21 probe: mode pp-alt -> tx 3
+23:19:21 ub cmd: e2631net tx 3 ok=True
+23:19:23 ub cmd: md.l 0x92340100 1 ok=True
+23:19:23 probe: mode pp-alt tx_frames=[0, 0, 0, 0, 0] wire={"frames": 4, "uboot_mac": 0, "arp60_broadcast": 0, "random_mac": 0, "device_frames": 0, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe/run-1/tcpdump.log", "start": 3414, "tail": "15:19:21.597543 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\" (244)\n15:19:21.769128 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28\n15:19:22.874896 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)\n15:19:22.917221 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 292: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 5/0/0 PTR _kdeconnect._udp.local., PTR 16a45779a898493e818a196a3ef802ce._kdeconnect._udp.local., (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) SRV ASUS-X550VC.local.:1716 0 0, (Cache flush) A 192.168.1.191 (250)"}
+23:19:23 ub cmd: e2631net mode vendor ok=True
+23:19:23 probe: mode vendor -> tx 3
+23:19:23 ub cmd: e2631net tx 3 ok=True
+23:19:25 ub cmd: md.l 0x92340100 1 ok=True
+23:19:25 probe: mode vendor tx_frames=[0, 0, 0, 0, 0] wire={"frames": 2, "uboot_mac": 0, "arp60_broadcast": 0, "random_mac": 0, "device_frames": 0, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe/run-1/tcpdump.log", "start": 4536, "tail": "15:19:23.634139 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 286: 192.168.1.191.5353 > 224.0.0.251.5353: 0*- [0q] 4/0/0 (Cache flush) TXT \"id=16a45779a898493e818a196a3ef802ce\" \"name=ASUS-X550VC\" \"type=desktop\" \"protocol=8\", (Cache flush) A 192.168.1.191, (Cache flush) PTR ASUS-X550VC.local., (Cache flush) SRV ASUS-X550VC.local.:1716 0 0 (244)\n15:19:23.769242 f8:e4:3b:21:b2:a5 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.1.191 tell 192.168.1.191, length 28"}
+23:19:25 ub cmd: e2631net mode vendor-alt ok=True
+23:19:25 probe: mode vendor-alt -> tx 3
+23:19:25 ub cmd: e2631net tx 3 ok=True
+23:19:28 ub cmd: md.l 0x92340100 1 ok=True
+23:19:28 probe: mode vendor-alt tx_frames=[0, 0, 0, 0, 0] wire={"frames": 1, "uboot_mac": 0, "arp60_broadcast": 0, "random_mac": 0, "device_frames": 0, "path": "/home/qc233/zte/e2631-p3/e2/f2-probe/run-1/tcpdump.log", "start": 5057, "tail": "15:19:26.875854 f8:e4:3b:21:b2:a5 > 01:00:5e:00:00:fb, ethertype IPv4 (0x0800), length 129: 192.168.1.191.5353 > 224.0.0.251.5353: 0 [1a] PTR (QM)? _kdeconnect._udp.local. (87)"}
+23:19:28 ub cmd: e2631net sbrg allow ok=True
+23:19:28 ub cmd: e2631net mode pp ok=True
+23:19:28 probe: egress allow applied, mode pp -> tx 3
+23:19:28 ub cmd: e2631net tx 3 ok=True
+23:19:30 ub cmd: md.l 0x92340100 1 ok=True
+23:19:30 ub cmd: e2631net ok=True
+23:19:30 ub cmd: md.l 0x92340100 1 ok=True
+23:19:30 ub cmd: md.l 0x003883c0 5 ok=True
+23:19:30 ub cmd: md.l 0x923501fc 1 ok=True
+23:19:30 F2 probe verdict F2_PROBE_NO_MOVE totals={"frames": 23, "uboot_mac": 0, "arp60_broadcast": 0, "device_frames": 0, "random_mac": 0} hit_modes=[]
+23:19:36 ub cmd: e2631boot load ok=True
+23:19:36 ub cmd: md 0x47f00000 8 ok=True
+23:19:36 ub cmd: md 0x47f00020 8 ok=True
+23:19:36 ub cmd: crc32 0x47f00020 0x40 ok=True
+23:19:36 ub cmd: iminfo 0x47f00000 ok=True
+23:19:36 ub cmd: iminfo 0x47f00020 ok=True
+23:19:45 bootm attempt e2631boot outcome=kernel dt=9.28
+23:19:59 F1 verdict KERNEL_STARTED
+23:20:08 capture restore: {"restore_rc": 0, "supervisor_pids": [308464], "bootwatch_pids": [308476], "tty_holders": [308470], "events_tail": "2026-11-27T22:19:39+08:00 reader-start pid=286848\n2026-11-27T23:20:03+08:00 reader-start pid=308464", "ok": true}
+23:20:08 ROUTE TRAP: reconnecting the USB NIC
+23:20:56 VERDICT {"session": "GREEN", "env_sanity": "OK", "env_retry": "not-needed", "rescue": "present", "f2": "SKIPPED", "t74": null, "f1": "KERNEL_STARTED", "probe": "F2_PROBE_NO_MOVE"}
+23:20:56 checks: {"artifact_pins": true, "load_path": "userdata", "loading": true, "loading_gate": true, "env_block": "OK", "new_banner": true, "new_version": true, "env_sanity": true, "t74_recorded": true, "probe_recorded": true, "f2_verdict": "SKIPPED", "f1_verdict": "KERNEL_STARTED", "no_uboot_flash_writes": true, "mtd0_unchanged": true, "region_unchanged": true, "no_panics": true, "kernel_nic_view": true, "capture_after": true, "no_error": true, "probe": "F2_PROBE_NO_MOVE"}

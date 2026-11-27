@@ -70,6 +70,8 @@
 | [../evidence/e4-rescue-acceptance-plan-20261127.md](../evidence/e4-rescue-acceptance-plan-20261127.md) | E4-验1（task-75）：救援模式验收方案 + 无浏览器脚本——零净载荷钉死为当前镜像区 sha256 b1ea9a48…（整 mtd0 f9239040…），Phase 1 userdata 暂存 + mtd read + go 的 RAM 链、S0–S9 步骤、拒绝矩阵（size±1/坏 magic/长度/ padding/banner/摘要不符/payload-flip）、X-E2631-SHA256 传输完整性 vs --expected-sha 权威性、默认 validate-only + 双开关写入、mock 自测 37/50 PASS |
 | [../evidence/t74-f2-session-20261127.md](../evidence/t74-f2-session-20261127.md) | task-74 / T74-F2 真机会话：E4 组合产物（patch 0026-0030，banner g6db632ad6e5b）RAM 链 GREEN——ENV OK（env 回归未复现、patch-0030 重试未触发、H1 升级）、F2 NO_WIRE_FRAMES（57 次 BOOTP 无地址；tcpdump 39 帧全为主机、U-Boot MAC 0 帧；DMA 环/TX start/端口使能已置但 MAC TX frames 恒 0，patch-0023 重试路径未被触发）、T74 NO_ANOMALY（写/读/mtd read 全正常，历史 0x42/0x48 可见性异常关闭为探针地址缩写错误）、F1 KERNEL_STARTED 8.31 s；零 mtd0 写入（282 条 U-Boot 命令审计，唯一写为 userdata staging） |
 | [../evidence/t74-f2/](../evidence/t74-f2/) | task-74 附件：run-2/run-1 session-results、驱动与原始串口字节、主机 tcpdump、dnsmasq/http、修正版驱动、产物校验清单、sha256 清单 |
+| [../evidence/f2-probe-20261127.md](../evidence/f2-probe-20261127.md) | F2 TX 探针真机会话（task-78 构建）：31 补丁 U-Boot（banner ge84e13107885，u-boot.bin sha256 d493042d…）RAM 链验证——F2_PROBE_NO_MOVE（pp / pp-alt / vendor / vendor-alt / allow 重跑全部无 MAC TX 帧、网线 0 设备帧）；C2 排除（SBRG egress 复位值 0:0xfe 1:0xfd 2:0xfb 3:0xf7 4:0xef，allow 为 no-op）；C3 VLAN1 三 word 全 0 仍未排除；hw tx idx 恒 0、第 11 帧起 TX completion timed out、tx done 读清 0x10000/0x20000；两处修正（md.l 0x003883c0 非 SBRG 寄存器，实际为 0x92000000+0x3883c0；sbrg 不带 allow 只打印 VLAN1）；env/mtd0/镜像区零变化，F1 KERNEL_STARTED，唯一写入为 userdata staging |
+| [../evidence/f2-probe/](../evidence/f2-probe/) | task-78 探针附件：session-results、原始串口字节与探针段、驱动与日志、主机 tcpdump、产物构建清单、sha256 清单 |
 
 | 文件 | 内容 |
 |---|---|
