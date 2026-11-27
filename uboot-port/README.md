@@ -121,7 +121,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0031 sha256 | `d431d1fb805da056a2ac2f851f31cf45f14e6fc37de8d20d5ff95023af001fc3` |
 | patch 0032 | `uboot-port/patches/0032-drivers-net-write-17-to-the-switch-forward-control.patch`（task-78/F2c：交换转发控制 `0x1cc000` 写 `17`（与内核驱动/厂商 U-Boot 一致），修正误植的 `BIT(17)`；新增 `e2631net bmu` 转储，`0x1fc` 按厂商语义改称 `dma err`，SBRG 状态常显） |
 | patch 0032 sha256 | `8d1d11fdeae32fef0e2cccd364ffe1cad0dcaf3fc38f90728f8b5250e68d58a5` |
-| am 之后 tree | `ae72334756d47f05a247f0dea63f81c0ca7265dc`（与机器无关，32 个 patch） |
+| patch 0033 | `uboot-port/patches/0033-board-zte-match-the-rescue-HTTP-header-names-case-in.patch`（task-78/E4 phase-1：请求头名比较两侧都折成小写；头名/头值辅助函数移入无依赖的 `e2631http.h`；主机侧 fixture `uboot-port/tests/rescue_headers_test.c` 在 CI 回放混合大小写请求） |
+| patch 0033 sha256 | `5657f596688825f2111fd3fea3108fbe93e2973231f28947d0c2faa56d2e21ca` |
+| am 之后 tree | `cd67a0414737dcbb860072ddbaaf3de16a306b46`（与机器无关，33 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -139,7 +141,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = ae72334756d47f05a247f0dea63f81c0ca7265dc
+test "$(git rev-parse HEAD^{tree})" = cd67a0414737dcbb860072ddbaaf3de16a306b46
 ```
 
 ## 2. 新增/修改的文件
@@ -165,6 +167,8 @@ test "$(git rev-parse HEAD^{tree})" = ae72334756d47f05a247f0dea63f81c0ca7265dc
 | `board/zte/zxhn-e2631/zxhn-e2631.c` | `dram_init`/`dram_init_banksize` 从内嵌 DT 读 256 MiB；0029 起 `reset_cpu()` 走厂商 TOPCRM 软复位（`mdelay(50)` + `writel(1, 0x94000044)`，写后自旋） |
 | `board/zte/zxhn-e2631/e2631flash.h` | E4 起暴露五步写 job API（`e2631_flash_begin/erase/blank_check/write_image/readback/compare/end`），救援页只经它写 mtd0，不新增第二个 MTD 写实现 |
 | `board/zte/zxhn-e2631/e2631rescue.c` | E4 v1：`e2631rescue` 命令（DHCP + 极简 HTTP + gzip 救援页）；GET `/`、GET `/status`、POST `/flash?mode=validate|write`（655360 B 原始 body、`X-E2631-SHA256`/`X-E2631-Confirm: write` 契约、结构校验），校验通过后经 `e2631_flash_*` 五步写 mtd0 `0x20000..0xC0000`（源指针=镜像首地址，写长度 0xA0000）；不写 env/保留区、不自动重启 |
+| `board/zte/zxhn-e2631/e2631http.h` | E4 phase-1（0033）：无依赖的 HTTP/1.x 头名/头值辅助函数（头名大小写不敏感，RFC 7230 §3.2）；`e2631rescue.c` 与主机 fixture 共用同一份实现 |
+| `uboot-port/tests/rescue_headers_test.c` | E4 phase-1（0033）：kit 仓库侧主机 fixture（不进树），用捕获的混合大小写 GET/POST 头块回放真实辅助函数；CI 在 `git am` 之后用宿主机 gcc 编译运行 |
 | `net/mtk_tcp.c` / `net/mtk_tcp_priv.h` / `include/net/mtk_tcp.h` | E4：从 bl-mt798x-dhcpd（GPL-2.0，`e4cf4dc7`）移植的最小 TCP 栈，公开 API 头与私有协议头分开 |
 | `net/mtk_dhcpd.c` / `include/net/mtk_dhcpd.h` | E4：从同一上游移植的 DHCP 服务器（去掉自带 console 命令，只留 start/stop/is_running） |
 | `net/arp.c` / `net/arp.h`；`net/net.c`；`net/Kconfig` / `net/Makefile` | E4：新增 `arp_wait_clear()`；`CONFIG_MTK_TCP` 时在 `PROT_TCP` 分发处把包交给 `mtk_receive_tcp()`；新增 `MTK_TCP`/`MTK_TCP_VERBOSE`/`MTK_DHCPD` Kconfig 与 Makefile 条目 |
@@ -408,7 +412,7 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `ae72334756d47f05a247f0dea63f81c0ca7265dc`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `cd67a0414737dcbb860072ddbaaf3de16a306b46`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 31）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
@@ -539,6 +543,9 @@ make O=build -j"$(nproc)"
     与 `e2631net: switch fwd ctrl 0x%08x (expected 0x%08x)`，二进制含 `switch fwd ctrl` 与
     `dump the traffic manager, BMU and DMA registers`；真机 `e2631net bmu` 的 `switch fwd ctrl` 应读回
     `0x00000011`，且 `e2631net tx 3` 后 `MAC TX frames` 必须增长。
+21. E4 救援请求头修复（0033，task-78/E4 phase-1）：`rescue_headers_test.c` 主机 fixture 在 `git am` 之后、
+    交叉编译之前编译运行并打印 `rescue header fixture: PASS`；源码含 `e2631_http_header_value`（`e2631rescue.c`）
+    与 `e2631_http_name_is`（`e2631http.h`）。二进制里头的比较两侧必须都走大小写折叠。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -662,6 +669,10 @@ SBRG 块在 `0x92000000` 基址上：原始读地址是 `0x95883c0`，旧清单�
 `mtd0` 全盘 sha256 与 0xC0000 env 块 sha256；整个过程不写 env、不写 secondboot、不自动重启。写入前必须先让
 verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` 通过（30 项检查；kit tree 不一致会失败），
 再申请用户批准。
+
+E4 phase-1（2026-11-28）：0033 修复了所有 POST `/flash` 因请求头大小写不匹配而返回 `unsupported request`
+的缺陷；每次构建都会先跑主机侧 fixture（`uboot-port/tests/rescue_headers_test.c`），回放混合大小写的
+GET/POST 头块，失败即中止构建。真机复测按下面第 1、2、3 步做只读校验即可。
 
 1. U-Boot 提示符执行 `e2631rescue`：串口应打印监听 lan1、本机 IP（192.168.1.1）以及 DHCP/HTTP 启动行；
    接在 lan1 的 PC 应能从 DHCP 拿到 192.168.1.100 起的地址。
@@ -1023,3 +1034,10 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
   真机验证（同上，零写入 RAM 会话，2026-11-28）：`switch fwd ctrl` 0x00000000 → 0x00000011，`e2631net tx 3`
   让 MAC TX frames 端口 2 从 0 涨到 3（后续 6/9/12），主机抓到 12 个 60 B 广播 ARP，mtd0 未变——
   F2 根因确认，见 [evidence/uboot-f2-tx-probe-20261127.md](../evidence/uboot-f2-tx-probe-20261127.md) §8.2。
+
+- 2026-11-28（task-78/E4 phase-1，救援请求头名修复）：E4 v1 阶段一验收发现所有 `POST /flash` 都返回 HTTP 400
+  `unsupported request`：`rescue_name_is()` 只把收到的请求头行折成小写，却拿调用方的混合大小写字面量
+  （`Content-Length`/`X-E2631-SHA256`/`X-E2631-Confirm`）去比较，`'c' != 'C'` 使任何请求头都匹配不上；
+  `GET /` 与 `/status` 不读请求头所以看起来正常。新增 patch 0033：比较两侧都折成小写，头名/头值辅助函数
+  移入无依赖的 `e2631http.h`；新增主机 fixture `uboot-port/tests/rescue_headers_test.c`，CI 在 `git am` 之后、
+  交叉编译之前编译运行（失败即中止），防止同类缺陷再进镜像。CI 构建身份见后续条目。

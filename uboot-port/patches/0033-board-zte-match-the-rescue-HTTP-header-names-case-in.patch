@@ -1,0 +1,199 @@
+From d0b3afd960133e8074235db29ebbe31dd078451f Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 00:42:30 +0800
+Subject: [PATCH] board: zte: match the rescue HTTP header names
+ case-insensitively
+
+The E4 phase-1 acceptance of the web rescue found every POST
+/flash rejected with "unsupported request": rescue_name_is() folded
+the received header line to lower case but compared it against the
+caller's mixed-case literal, so "Content-Length" could never match
+"content-length" and rescue_header_value() always failed. GET / and
+GET /status kept working because they do not read request headers,
+and the TCP stack was fine (full handshake, request received, 400
+replied), so the defect blocked both validate and write without any
+visible transport error.
+
+Fold both comparison sides inside e2631_http_name_is() and move the
+header helpers into the dependency-free e2631http.h, so the rescue
+server keeps its readable mixed-case spelling and no caller can
+reintroduce the mismatch. uboot-port/tests/rescue_headers_test.c
+replays a captured mixed-case GET/POST header block through the same
+helpers, and the build workflow compiles and runs that fixture on
+every series, so the case rule cannot silently regress.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631http.h   | 92 ++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631rescue.c | 46 +--------------
+ 2 files changed, 95 insertions(+), 43 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631http.h
+
+diff --git a/board/zte/zxhn-e2631/e2631http.h b/board/zte/zxhn-e2631/e2631http.h
+new file mode 100644
+index 00000000..ed58b25f
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631http.h
+@@ -0,0 +1,92 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Case-insensitive HTTP/1.x request header helpers for the E2631 rescue
++ * server.
++ *
++ * The helpers are dependency free (no U-Boot or libc headers) so the same
++ * header is compiled into the host-side fixture in uboot-port/tests and CI
++ * can prove the case rule without a board. Request header names are
++ * case-insensitive (RFC 7230 section 3.2), so both comparison sides are
++ * folded to lower case here and the caller may keep the mixed-case spelling
++ * that HTTP uses on the wire.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631_HTTP_H
++#define __E2631_HTTP_H
++
++static inline char e2631_http_lower(char c)
++{
++	if (c >= 'A' && c <= 'Z')
++		return c - 'A' + 'a';
++
++	return c;
++}
++
++/*
++ * e2631_http_name_is() - does @line start with header field name @name?
++ *
++ * Matches case-insensitively and requires the ':' terminator, so it matches
++ * the whole field name and never a longer prefix.
++ *
++ * Returns 1 on a match, 0 otherwise.
++ */
++static inline int e2631_http_name_is(const char *line, const char *name)
++{
++	unsigned int i = 0;
++
++	while (name[i]) {
++		if (!line[i] ||
++		    e2631_http_lower(line[i]) != e2631_http_lower(name[i]))
++			return 0;
++		i++;
++	}
++
++	return line[i] == ':';
++}
++
++/*
++ * e2631_http_header_value() - copy the value of header @name out of @hdr
++ *
++ * @hdr is a NUL-terminated CRLF separated header block. The first matching
++ * field's value is copied without the leading white space and without the
++ * trailing CR/LF; @out is NUL terminated when @outsz is non-zero.
++ *
++ * Returns 1 when the header was found, 0 otherwise.
++ */
++static inline int e2631_http_header_value(const char *hdr, const char *name,
++					  char *out, unsigned int outsz)
++{
++	const char *p = hdr;
++	unsigned int n = 0;
++	unsigned int i;
++
++	while (*p) {
++		if (e2631_http_name_is(p, name)) {
++			const char *v = p;
++
++			i = 0;
++			while (name[i])
++				i++;
++			v += i + 1;
++			while (*v == ' ' || *v == '\t')
++				v++;
++			while (*v && *v != '\r' && *v != '\n' && n + 1 < outsz)
++				out[n++] = *v++;
++			if (outsz)
++				out[n] = 0;
++			return 1;
++		}
++
++		while (*p && *p != '\n')
++			p++;
++		if (!*p)
++			break;
++		p++;
++	}
++
++	return 0;
++}
++
++#endif /* __E2631_HTTP_H */
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index f9ea84ba..5632153e 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -50,6 +50,7 @@
+ #include <net/mtk_tcp.h>
+ 
+ #include "e2631flash.h"
++#include "e2631http.h"
+ 
+ /* Upload staging: see the memory map in uboot-port/README.md. */
+ #define E2631_RESCUE_IMG_ADDR	0x46000000UL
+@@ -253,52 +254,11 @@ static void rescue_hex_lower(const char *in, char *out)
+ 	out[SHA256_SUM_LEN * 2] = 0;
+ }
+ 
+-static char rescue_lower(char c)
+-{
+-	if (c >= 'A' && c <= 'Z')
+-		return c - 'A' + 'a';
+-	return c;
+-}
+-
+-static bool rescue_name_is(const char *line, const char *name)
+-{
+-	unsigned int i;
+-
+-	for (i = 0; name[i]; i++) {
+-		if (!line[i] || rescue_lower(line[i]) != name[i])
+-			return false;
+-	}
+-
+-	return line[i] == ':';
+-}
+-
+ static bool rescue_header_value(const char *hdr, const char *name, char *out,
+ 				size_t outsz)
+ {
+-	const char *p = hdr;
+-	size_t n = 0;
+-
+-	while (*p) {
+-		const char *eol = strchr(p, '\n');
+-		const char *v;
+-
+-		if (!rescue_name_is(p, name)) {
+-			if (!eol)
+-				break;
+-			p = eol + 1;
+-			continue;
+-		}
+-
+-		v = p + strlen(name) + 1;
+-		while (*v == ' ' || *v == '\t')
+-			v++;
+-		while (*v && *v != '\r' && *v != '\n' && n + 1 < outsz)
+-			out[n++] = *v++;
+-		out[n] = 0;
+-		return true;
+-	}
+-
+-	return false;
++	return e2631_http_header_value(hdr, name, out,
++				       (unsigned int)outsz) != 0;
+ }
+ 
+ static int rescue_tcp_send(struct e2631_rescue_conn *c, const void *data,
+-- 
+2.56.1
+

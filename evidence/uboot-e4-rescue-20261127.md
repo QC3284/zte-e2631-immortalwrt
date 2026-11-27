@@ -126,6 +126,30 @@
    复核写后 mtd0 sha 与预期一致（新镜像 `79dab60d...`），再执行 `reset`。
 5. 若写中途失败/断电：串口仍是唯一恢复通道，按 task-54 的 rescue ladder 处理；救援页不自动重启。
 
+## 5.1 E4 phase-1 验收缺陷与修复（patch 0033，2026-11-28）
+
+E4 v1 阶段一（只读：`GET /` + `/status` + POST validate）在 F2 修复构建（banner `gd38f69c44523`）上
+暴露一个固件缺陷：`GET /` 与 `GET /status` 正常，但 `POST /flash?mode=validate`（655360 B net-zero body +
+`X-E2631-SHA256`）返回 HTTP 400 `result=error error=unsupported request`。tcpdump 证明 TCP 握手、GET 200
+与 POST 请求都已到达，问题在请求处理而不是传输。
+
+根因：`rescue_name_is()` 把收到的头行字符逐个折成小写（`rescue_lower(line[i])`），却与调用方传入的
+**混合大小写**字面量比较（`rescue_lower(line[i]) != name[i]`）。`'c' != 'C'`，于是
+`rescue_header_value(hdr, "Content-Length", ...)` 永远返回 false，`rescue_handle_request()` 直接落到
+`goto bad` → “unsupported request”，validate 与 write 两条路径都被阻断。GET 不读请求头，所以此前
+看起来正常，TCP 栈也从未有问题。
+
+修复（patch 0033）：比较两侧都折成小写（`e2631_http_lower(line[i]) != e2631_http_lower(name[i])`），
+调用方保留可读的 HTTP 拼写；头名与头值辅助函数移进无依赖的 `board/zte/zxhn-e2631/e2631http.h`，
+`e2631rescue.c` 只留 `rescue_header_value()` 包装。新增主机侧 fixture
+`uboot-port/tests/rescue_headers_test.c`：用捕获的混合大小写 GET/POST 头块（`Content-Length`、
+`X-E2631-SHA256`、`X-E2631-Confirm`、全小写变体，以及错误前缀/缺冒号/方法行等反例）回放真实辅助函数；
+CI 在 `git am` 之后、交叉编译之前用宿主机 gcc `-Wall -Wextra -Werror` 编译运行，输出
+`rescue header fixture: PASS (mixed-case GET/POST blocks resolve)`，失败即中止构建。
+
+真机复测（patch 0033 构建）：按 §5 的第 1、2、3 步重跑；成功签名是 POST validate 返回 `result=ok` +
+CRC32（或页面显示校验通过），`/status` 保持 idle，mtd0 不变。write 验收仍需用户单独批准。
+
 ## 6. 风险与边界
 
 - 写窗口只在 mtd0 U-Boot 区，固件槽位与 env 不在救援范围内（用户裁决：v1/v2 都不刷固件镜像）。

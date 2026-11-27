@@ -133,6 +133,19 @@ jobs:
             exit 1
           fi
           echo "post-am: $commits commits, tree $tree"
+      - name: Compile and run the rescue HTTP header fixture
+        # task-78/E4 phase-1: e2631rescue must accept request header names in
+        # any case (RFC 7230 section 3.2). The fixture replays a captured
+        # mixed-case POST /flash block through the same header helpers
+        # (board/zte/zxhn-e2631/e2631http.h) that the server uses, so a case
+        # comparison regression fails here instead of on the board.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/rescue_headers_test.c" \
+            -o "$RUNNER_TEMP/rescue-headers-test"
+          "$RUNNER_TEMP/rescue-headers-test"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before
@@ -332,6 +345,10 @@ jobs:
             exit 1
           fi
           echo "F2 forward-control gate: value 17, the bmu dump and the new SBRG text are present"
+          # task-78/E4 phase-1: the header helpers are shared, not duplicated.
+          grep -q 'e2631_http_header_value' board/zte/zxhn-e2631/e2631rescue.c
+          grep -q 'e2631_http_name_is' board/zte/zxhn-e2631/e2631http.h
+          echo "rescue header gate: the case-insensitive helpers are in the image"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1
