@@ -5,7 +5,7 @@
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
 的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）
-、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 恢复 CPU 端口 egress mask；只加诊断，不改默认发送路径）、
+、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -119,7 +119,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0030 sha256 | `5c171e5965b295df0dc16c06eb49684cd7504d1a97bcf06de1b02682ef56994a` |
 | patch 0031 | `uboot-port/patches/0031-drivers-net-add-the-TX-probe-and-the-bridge-block-dump.patch`（task-78/F2b：TX 描述符变体运行期开关 + `e2631net tx/mode/sbrg` 探针；默认仍是内核描述符，不新增写路径） |
 | patch 0031 sha256 | `d431d1fb805da056a2ac2f851f31cf45f14e6fc37de8d20d5ff95023af001fc3` |
-| am 之后 tree | `55aebf1afad2406965e5ee77a470f5b79f527eb2`（与机器无关，31 个 patch） |
+| patch 0032 | `uboot-port/patches/0032-drivers-net-write-17-to-the-switch-forward-control.patch`（task-78/F2c：交换转发控制 `0x1cc000` 写 `17`（与内核驱动/厂商 U-Boot 一致），修正误植的 `BIT(17)`；新增 `e2631net bmu` 转储，`0x1fc` 按厂商语义改称 `dma err`，SBRG 状态常显） |
+| patch 0032 sha256 | `8d1d11fdeae32fef0e2cccd364ffe1cad0dcaf3fc38f90728f8b5250e68d58a5` |
+| am 之后 tree | `ae72334756d47f05a247f0dea63f81c0ca7265dc`（与机器无关，32 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -137,7 +139,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = 55aebf1afad2406965e5ee77a470f5b79f527eb2
+test "$(git rev-parse HEAD^{tree})" = ae72334756d47f05a247f0dea63f81c0ca7265dc
 ```
 
 ## 2. 新增/修改的文件
@@ -406,7 +408,7 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `55aebf1afad2406965e5ee77a470f5b79f527eb2`；每个 patch 的 sha256 与 §1 一致，
+1. `git rev-parse HEAD^{tree}` == `ae72334756d47f05a247f0dea63f81c0ca7265dc`；每个 patch 的 sha256 与 §1 一致，
    且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 31）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
@@ -530,9 +532,13 @@ make O=build -j"$(nproc)"
     `036d5dc72ee0d0fd020e1a542ee7b93ab750ec3ba1cc700e402ba9acd6ce0f4a`（模板 `19a9d546...`），env 块未变，
     D-U1 白名单仍 4 个 site；`E4 rescue window gate` / `env retry gate` 均通过，checkpatch 0/0（24 CHECK 均既有）。
 19. F2 TX 诊断（0031，task-78）：默认 TX 模式必须仍是内核描述符（源码 `static int zx_tx_mode = ZX_TX_MODE_PP;`），
-    源码含 `zx_tx_mode_names` 与 `ZX_SBRG_EGRESS`，二进制含 `e2631net: tx probe` 与 `SBRG egress before`；
+    源码含 `zx_tx_mode_names` 与 `ZX_SBRG_EGRESS`，二进制含 `e2631net: tx probe`、`switch fwd ctrl` 与 `dump the traffic manager, BMU and DMA registers`；
     D-U1 白名单与救援/env 语义不变。真机签名见 §5 的「F2 TX 出口诊断」小节：`e2631net tx 3` 在某个模式下
     使 `MAC TX frames` 增长/主机抓到广播 ARP，即定位成功。
+20. F2 根因修复（0032，task-78）：`ZX_SW_FWD_CTRL_ON` 必须是 `17`（不是 `BIT(17)`），源码含 `zx_cmd_bmu`
+    与 `e2631net: switch fwd ctrl 0x%08x (expected 0x%08x)`，二进制含 `switch fwd ctrl` 与
+    `dump the traffic manager, BMU and DMA registers`；真机 `e2631net bmu` 的 `switch fwd ctrl` 应读回
+    `0x00000011`，且 `e2631net tx 3` 后 `MAC TX frames` 必须增长。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -629,22 +635,24 @@ U-Boot 网络栈。
 
 ```sh
 md.l 0x92340100 1                      # TM status 基线
-md.l 0x3883c0 1                        # CPU 桥端口（port 0）egress mask 的写前值
+e2631net bmu                          # switch fwd ctrl 应为 0x00000011；TM/BMU/DMA 窗口
 e2631net sbrg                          # 记录 egress 0..4、VLAN 1、learn
 e2631net mode pp;         e2631net tx 3
 e2631net mode pp-alt;     e2631net tx 3
 e2631net mode vendor;     e2631net tx 3
 e2631net mode vendor-alt; e2631net tx 3
 e2631net sbrg allow;      e2631net mode pp; e2631net tx 3
-e2631net                               # 终态
+e2631net                               # 终态；MAC TX frames 增长即修复生效
 ```
 
 主机在 lan1 上 `tcpdump -e -n` 记录。判据：任意一次 `e2631net tx` 之后 `MAC TX frames` 有端口增长
-（或主机收到 60 B 广播 ARP）→ 命中的模式/掩码即根因；若全部不动，保存 `hw tx idx` 前后值、`TM status`
+（或主机收到 60 B 广播 ARP）→ 命中的模式/掩码即根因；若全部不动，保存 `dma err` 前后值、`TM status`
 前后差、`last descriptor` 四字与 `SBRG egress`/VLAN 值，作为与厂商链/Linux 链对照的原始数据。
 本阶段不写 flash、不改 env；`e2631net sbrg allow` 只写桥块 egress 寄存器，断电即复位。
-`md.l 0x3883c0 1` 的写前值必须落进串口日志：它和 `e2631net sbrg allow` 之后的读回值配对，
-才能把「allow 是否真的改了 CPU egress mask」作为数据判读，而不是只看终态。
+SBRG 块在 `0x92000000` 基址上：原始读地址是 `0x95883c0`，旧清单里的 `md.l 0x3883c0 1` 读的是错误
+地址（会话里读到 0，无意义），0032 起以 `e2631net sbrg` 的输出为准（learn/port ctrl/egress 每次
+都会打印）。C2（CPU egress mask）已被现场数据否定，修复窗口的首要判据是 `e2631net bmu` 的
+`switch fwd ctrl = 0x00000011`。
 
 ### E4 v1 救援模式验收（需要真机会话；会写 mtd0，需用户单独批准）
 
@@ -670,6 +678,9 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
 
 - **F2 的诊断开关是临时的**：0031 的 TX 模式默认等于内核描述符，`e2631net tx/mode/sbrg` 只在控制台显式调用时
   才行动；定位完成后若最终需要改默认描述符或 DMA arena 地址，另开补丁并重钉 pin，不在本 patch 里改默认行为。
+- **F2 根因修复（0032）是单点常量改动**：`ZX_SW_FWD_CTRL_ON` 由误植的 `BIT(17)` 改为 `17`（内核驱动与
+  厂商 U-Boot 都写 17，证据见 [evidence/uboot-f2-tx-probe-20261127.md](../evidence/uboot-f2-tx-probe-20261127.md) §8）。
+  真机若仍不上线，先看 `e2631net bmu` 的 `switch fwd ctrl` 回读；回滚只需还原该常量，不涉及其它寄存器。
 - **交接状态已显式归一化，但入口配置改动影响所有链**：0011 起 `CONFIG_SKIP_LOWLEVEL_INIT` 关闭并增加
   `bootm` 前 CP15 清理，语义对齐厂商路径；代价是 RAM 链（厂商 `go`）也会多跑一次入口归一化，需要 C1b-0
   的 RAM 链验收先确认 banner/`e2631boot` 不受影响，再谈 flash 写。若真机异常，先用 `e2631soc` 的前后
@@ -985,7 +996,8 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
 - 2026-11-27（task-78/F2b，TX 出口死路诊断）：F2 会话确认「TM 收下描述符、帧不上线且本机任何 MAC 端口计数不动」，
   且发送错误诊断（BMU 分配失败/TX completion 超时）从未触发；静态对照显示 U-Boot 的初始化与 TX 描述符是内核
   驱动的逐行移植，而厂商 U-Boot 的描述符只在两处不同（queue 0 而非 40+port、word3 bit0=0），另有 CPU 桥端口
-  egress mask（0x3883c0，U-Boot 从未写过）这一可丢包点。新增 patch 0031：TX 描述符变体运行期开关（默认仍是
+  egress mask（0x3883c0，U-Boot 从未写过）这一可丢包点（后来 A 会话证明掩码原本就是复位值、该假设被否定，
+  见 0032 条目）。新增 patch 0031：TX 描述符变体运行期开关（默认仍是
   内核描述符）、`e2631net tx [count]` 广播探测帧、`e2631net mode`、`e2631net sbrg [allow]`（含 VLAN 1 读取与
   CPU 端口 egress mask 恢复），输出固定打印 DMA/TM/描述符/各 MAC 端口 TX 计数/桥块掩码；零写入真机检查单见 §5
   「F2 TX 出口诊断」。本 patch 不写 flash、不改默认发送路径。CI 构建 run `46022545621`（head `642e9b0`，
@@ -993,3 +1005,12 @@ verify-docs 的离线门禁 `e4_prewrite_check.py --archive <artifact 目录>` �
 `u-boot.bin` 364,728 B sha256 `d493042d…` crc32 `1c354a00`、mtd0 镜像 sha256 `e1e5ceb3…` crc32 `48bf0511`、
 装配后首 0x800 sha256 `e9ec454f…`、env 块 `6eee153b…` 未变、白名单 4 site、checkpatch 0 errors / 0 warnings
 （24 条既有 CHECK 不阻断）；证据见 [evidence/uboot-f2-tx-probe-20261127.md](../evidence/uboot-f2-tx-probe-20261127.md) §7。
+
+- 2026-11-28（task-78/F2c，F2 根因）：把 F2 的「TM 收下描述符、帧不上线」定位到交换转发控制
+  `0x1cc000`：U-Boot 移植时把内核的 `ZX_SW_FWD_CTRL_ON = 17` 误写成 `BIT(17)`（写 0x00020000）。
+  内核 `zx279128s-main.c` 的 switch 初始化写 17，厂商 U-Boot 也在其 switch 初始化里写同一个 17
+  （payload `0x47f310c8`，由 `0x47f2ff6c` 从以太网初始化调用）；三份实现里只有我们的值不同。新增
+  patch 0032：把常量改回 17，新增 `e2631net bmu`（TM buffer 窗口/BMU 池/DMA ring 窗口/switch fwd ctrl）
+  与每次探测的 BMU 块上报，`0x1fc` 按厂商语义改称 `dma err`，`e2631net sbrg` 每次打印桥块状态、
+  `allow` 只回放复位值。真机判据：`e2631net bmu` 的 `switch fwd ctrl` 读回 `0x00000011` 且
+  `e2631net tx 3` 后 MAC TX frames 增长。

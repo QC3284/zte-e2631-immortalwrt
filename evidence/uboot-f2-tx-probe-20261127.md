@@ -31,9 +31,10 @@ U-Boot 提示符下一次全会话里逐一排除的探针，**不改默认发�
   并从 `0x923501FC & 3` 读“硬件取到的环槽号”，门铃仍是 `0x92350064=1`。
 - 厂商初始化在 SBRG 块写 `0x3881c0 = 0xff`（学习开），内核/U-Boot 写 0（学习关，交给 Linux 网桥）；
   厂商还写 `0x1d4000/0x1d4040` 等 SPA 块，我们的值与内核一致。
-- 桥块语义（内核 zx279128s-switch.c 注释）：egress mask 决定“源桥端口能把帧发给哪些目的端口”，
-  桥端口 0 是 CPU 端口；内核只在网桥事件里改写它，U-Boot 从不写 `0x3883c0`（CPU 源端口的 mask）。
-  一旦开关复位把它清 0，CPU 发出的帧就只会在桥块里被丢掉——与现场“TM 收下、MAC 计数不动”吻合。
+- 桥块语义（内核 `zx279128s-eth.h` 注释）：桥端口 1-5 是交换端口 0-4（`ZX_BRPORT(p) = p+1`），0 是 PON
+  侧；egress mask 是「源桥端口能发给哪些目的端口」。设计初稿怀疑过 CPU egress mask，但 A 会话已实测：
+  5 个 mask 都是复位值 `0xfe/0xfd/0xfb/0xf7/0xef`，`sbrg allow` 写回同值（无变化），C2 否定。
+  另：SBRG 块的原始地址是 `0x92000000 + 0x3883c0 = 0x95883c0`，旧清单里的 `md.l 0x3883c0 1` 读错地址。
 
 ## 2. 候选与判别方法（按成本排序）
 
@@ -42,7 +43,7 @@ U-Boot 提示符下一次全会话里逐一排除的探针，**不改默认发�
 | C1 | 描述符变体（queue 40+p vs queue 0；word3 bit0） | `e2631net mode pp/pp-alt/vendor/vendor-alt` + `e2631net tx 3` | 某个模式下 MAC TX frames 增长且主机抓到广播 ARP |
 | C2 | CPU 桥端口 egress mask | `e2631net sbrg` 读 0..4；`e2631net sbrg allow` 后重发 | `egress 0:0x00` → allow 后变 0xfe 且帧出现 |
 | C3 | VLAN 1 成员 | `e2631net sbrg` 打印 VLAN 1 三个 word | word0 bit0（VALID）或 untag 位缺失 |
-| C4 | TM 是否真的取走环 | `e2631net`/`e2631net tx` 打印 `hw tx idx (0x923501FC)` | 发送前后指针前进 |
+| C4 | TM 是否真的取走环 | `e2631net`/`e2631net tx` 打印 `dma err (0x923501FC)` | 发送前后无 DMA 错误（0032 起按厂商语义命名） |
 | C5 | TM 状态位含义 | 发送前后 `TM status`、与厂商链/Linux 对照 | 位模式差异说明是完成还是错误 |
 | C6 | DMA 地址窗口（arena 0x45000000 vs 厂商 0x41000000） | 仅在前 5 项都排除后考虑下移 arena（需新构建） | 帧出现 |
 | C7 | 学习开关（vendor 0xff vs 内核 0） | 记录对照；directed-egress 不应依赖 | 仅作参考 |
@@ -62,7 +63,7 @@ e2631net sbrg [allow]     # 打印 SBRG 学习位/端口控制/egress 0..4 + VLA
 输出字段（节选）：
 
 - `tx mode <name>, sent N, failed M`
-- `dma ctrl / ring cfg / tx ring`、`tx start / tx done / hw tx idx / last done`
+- `dma ctrl / ring cfg / tx ring`、`tx start / tx done / dma err / last done`
 - `last descriptor <w0 w1 w2 w3>`（发送的最后一帧的描述符原文）
 - `TM ctrl / TM status`
 - `MAC TX frames 0:.. 1:.. 2:.. 3:.. 4:..`（帧若从别的端口出去会在这里显形）
@@ -76,7 +77,7 @@ e2631net sbrg [allow]     # 打印 SBRG 学习位/端口控制/egress 0..4 + VLA
 
 ```
 md.l 0x92340100 1        # TM status 发送前基线
-md.l 0x3883c0 1          # CPU 桥端口（port 0）egress mask 写前值
+e2631net bmu             # TM/BMU/DMA 窗口与 switch fwd ctrl（应为 0x00000011）
 e2631net sbrg            # 记录 egress 0..4、VLAN 1、learn
 e2631net mode pp
 e2631net tx 3            # 记录全量输出；主机看是否有 60 B 广播 ARP
@@ -89,21 +90,23 @@ e2631net tx 3
 e2631net sbrg allow
 e2631net mode pp
 e2631net tx 3
-e2631net                 # 终态；仍然 hw tx idx 不动且 MAC 计数全 0 → 记录后停
+e2631net                 # 终态；MAC TX frames 增长即修复生效
 ```
 
 判读：只要某个 `e2631net tx` 之后 `MAC TX frames` 有任意端口增长（主机也收到帧），C1/C2 即定位成功，
-把命中的模式（以及 `sbrg` 的 egress/VLAN 值）写进本文件 §0；若全部不动，记录 `hw tx idx` 前后值、
+把命中的模式（以及 `sbrg` 的 egress/VLAN 值）写进本文件 §0；若全部不动，记录 `dma err` 前后值、
 `TM status` 前后差、`last descriptor` 四字、`egress 0..4` 与 VLAN 1，作为与
 “厂商链 + Linux 链”对照的原始数据（C4/C5 的判别材料）。
-`md.l 0x3883c0 1` 的写前值与 `e2631net sbrg allow` 之后的读回值必须成对出现在串口日志里：
-这是判断 C2 时「掩码确实被改动」的唯一数据，不能只记终态。
+SBRG 块正确读地址是 `0x95883c0`（0x92000000 基址 + 0x3883c0），旧清单的 `md.l 0x3883c0 1` 读的是错地址；
+0032 起 `e2631net sbrg` 每次都打印 learn/port ctrl/egress，C2 已由会话数据否定，判据改为
+`e2631net bmu` 的 `switch fwd ctrl = 0x00000011` 与 `e2631net tx` 后 `MAC TX frames` 是否增长。
 
 ## 5. 风险与边界
 
 - 只加诊断命令与一个运行期开关；默认 TX 路径、`e2631boot`/`e2631flash`/`e2631env`/救援模式语义不变，
   不新增 MTD 写路径（D-U1 白名单仍是 4 个 site）。
-- `e2631net sbrg allow` 只写桥块 5 个 egress 寄存器（`0x3883c0..0x3883d0`），不写 flash；
+- `e2631net sbrg allow` 只把桥块 5 个 egress 寄存器（`0x3883c0..0x3883d0`）回放成复位值，不写 flash
+  （0032 起）；A 会话数据表明它们本来就是复位值，C2 已否定；
   断电/复位即恢复原值，不影响后续启动。
 - 探测帧是 60 B 广播 ARP，不依赖 IP 配置；唯一副作用是主机侧可能看到几条 ARP 广播。
 - 若最终确认需要改 arena 地址或默认描述符，另开补丁并重钉 pin；本 patch 不动默认行为。
@@ -137,3 +140,26 @@ e2631net                 # 终态；仍然 hw tx idx 不动且 MAC 计数全 0 �
   距 CI 门禁 645,120 B 余 280,392 B。
 - 构建产物本地：`/home/qc233/zte/e2631-t5-artifacts/uboot-task78-46022545621/e2631-uboot-46022545621/`
   （SHA256SUMS 11/11 校验通过）。
+
+## 8. 根因与修复（task-78 第三轮，patch 0032，2026-11-27）
+
+结论：F2 的根因是**交换转发控制寄存器 `0x1cc000` 的写入值错误**，不是描述符、BMU 块或 DMA 窗口。
+
+- 内核证据：`target/linux/zx279128/files/drivers/net/ethernet/zte/zx279128s-eth.h:40-41` 定义
+  `ZX_SW_FWD_CTRL 0x1cc000` / `ZX_SW_FWD_CTRL_ON 17`；`zx279128s-main.c:515` 在 `zx_hw_init()` 第 6 步
+  （"Switch: enable forwarding"）写这个值。Linux 在真机上 DHCP/TFTP 正常，即 17 是已知可用值。
+- 厂商 U-Boot 证据：以太网初始化尾函数（payload `0x47f2ff60`）依次调用 `0x47f30540`（TM/DMA/BMU）、
+  `0x47f30cc8`（PP/MAC）、`0x47f310dc`（switch 初始化）；其中 `0x47f310dc` 调用 `0x47f310c8`，后者
+  `ldr r3,=0x921cc000; mov r2,#0x11; str r2,[r3]` 即写 17。同一尾函数还把 `0x11` 写到 `0x923a00e0`
+  （与内核 `writel(17, base + 0x3a00e0)` 一致）。厂商链 TFTP/DHCP 可用，即 17 也是厂商可用值。
+- 我们的缺陷：U-Boot 移植把内核常量误写成 `BIT(17)`（`0x00020000`）。A6 会话输出的 `SW fwd 0x00020000`
+  正把错误值写进硬件。机制上：TM 会取描述符并置完成位（`TX_DONE`/轮询"成功"），但交换机不转发
+  CPU 交给交换端口的帧，于是 MAC 计数与线缆都无帧、也无错误——与 F2 的全部现场现象吻合。
+- 修复（patch 0032）：常量改为 `17`；新增 `e2631net bmu` 打印 TM buffer 窗口（TAB0/TAB1/BUF_F0/
+  BUF_START/BUF_END/TAB_LIMIT/CONFIG_START）、BMU 池寄存器、DMA 窗口与 `switch fwd ctrl`，每次探测上报
+  BMU 返回块号与 raw `BUF_ID`；`0x1fc` 按厂商语义改称 `dma err`（厂商门铃读它，非零打印 "dma err: val=%d"）；
+  `e2631net sbrg` 每次打印 learn/port ctrl/egress，`allow` 只回放复位值。
+- 真机判据（零写入 RAM 会话）：`e2631net bmu` 的 `switch fwd ctrl` 读回 `0x00000011`；`e2631net tx 3` 后
+  `MAC TX frames` 任一端口增长且主机 tcpdump 看到 60 B 广播 ARP。若仍静默，保存 `e2631net bmu` 全部寄存器、
+  `dma err` 前后值、`last descriptor` 与 raw `BUF_ID`，作为下一轮（描述符/环归属）的原始数据。
+- 边界：0032 只改一个常量并加只读转储，不改默认 TX 模式/救援/写路径；回滚=还原该常量。

@@ -307,13 +307,31 @@ jobs:
           grep -q 'static int zx_tx_mode = ZX_TX_MODE_PP;' "$eth_c"
           grep -q 'zx_tx_mode_names' "$eth_c"
           grep -q 'ZX_SBRG_EGRESS' drivers/net/zx279128s_eth.h
-          for tx_text in 'e2631net: tx probe' 'SBRG egress before'; do
+          for tx_text in 'e2631net: tx probe' 'switch fwd ctrl' 'dump the traffic manager, BMU and DMA registers'; do
             if ! grep -aq "$tx_text" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing the F2 TX probe text: $tx_text"
               exit 1
             fi
           done
           echo "F2 TX probe gate: default mode pp, probe frames and bridge-block dump present"
+          # F2 root cause (patch 0032): the switch forward control must carry
+          # the value the kernel driver and the vendor bootloader write (17),
+          # never BIT(17); the bmu dump is what proves the value on the board.
+          if ! grep -q '#define ZX_SW_FWD_CTRL_ON[[:space:]]*17' drivers/net/zx279128s_eth.h; then
+            echo "::error::the switch forward control is not 17 (F2 regression)"
+            exit 1
+          fi
+          if grep -q '#define ZX_SW_FWD_CTRL_ON[[:space:]]*BIT' drivers/net/zx279128s_eth.h; then
+            echo "::error::the switch forward control uses BIT(17) again (F2 regression)"
+            exit 1
+          fi
+          grep -q 'zx_cmd_bmu' "$eth_c"
+          grep -q 'e2631net: switch fwd ctrl 0x%08x (expected 0x%08x)' "$eth_c"
+          if grep -aq 'SBRG egress before' build/u-boot.bin; then
+            echo "::error::u-boot.bin still carries the old sbrg text"
+            exit 1
+          fi
+          echo "F2 forward-control gate: value 17, the bmu dump and the new SBRG text are present"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1
