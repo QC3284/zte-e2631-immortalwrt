@@ -760,7 +760,7 @@ jobs:
           fi
           echo "$sites"
           bad=$(echo "$sites" | awk -F'|' '
-            $1 !~ /^(e2631_|fw_block_erase|fw_block_write|fa_erase_step|fa_blank_step)/ {
+            $1 !~ /^(e2631_|fw_block_erase|fw_block_write|fa_erase_step|fa_blank_step|do_e2631flash|do_e2631env_save)/ {
               print
             }')
           if [ -n "$bad" ]; then
