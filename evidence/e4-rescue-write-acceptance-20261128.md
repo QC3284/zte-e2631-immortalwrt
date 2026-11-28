@@ -1,9 +1,9 @@
-# E4 救援写模式验收（task-79）—— 写入 PASS、复位 PASS、patch-0034 最终写入与 flash 提示符救援 GREEN
+# E4 救援写模式验收（task-79）—— 写入 PASS、patch-0034 最终写入、flash 提示符救援与真冷启动 GREEN
 
 日期：2026-11-28（CST）
 设备：ZTE ZXHN E2631 / ZX279128S，ImmortalWrt v1.10.0，kernel 6.18.60
 产物：旧 E4 镜像（run 46036894542，patch 0026-0033，tree cd67a041…）；最终 0034 镜像（run 46046018929，patch 0026-0034，tree 0480ef83…）
-结论：旧 E4 镜像的 STEP-1 净零写入、STEP-2 真实写入、独立回读、reset 与 flash 启动均 PASS；从 flash 提示符直接运行 e2631rescue 暴露 PHY/refclk 缺口（§8），patch 0034 修复后，最终把 0034 镜像写入 mtd0 的第三写 PASS，并从 flash 提示符以 e2631rescue 作为第一条网络命令完成页面与 validate（§12）。截至本文件，task-79 仅剩真冷启动（用户断电/上电）验收。
+结论：旧 E4 镜像的 STEP-1 净零写入、STEP-2 真实写入、独立回读、reset 与 flash 启动均 PASS；从 flash 提示符直接运行 e2631rescue 暴露 PHY/refclk 缺口（§8），patch 0034 修复后，最终把 0034 镜像写入 mtd0 的第三写 PASS，并从 flash 提示符以 e2631rescue 作为第一条网络命令完成页面与 validate（§12）。截至本文件，task-79 仅剩真冷启动（用户断电/上电）验收；该验收已于 2026-11-28 09:12-09:14 完成并 GREEN（§13）。
 
 ## 0. 摘要
 
@@ -23,6 +23,7 @@
 | flash 提示符救援 | e2631rescue 为第一条网络命令：PHY done、lan1 up；GET / 200、validate 200 sha_match=ok |
 | 0034 postcheck | mtd0 ac06d7bc…、region 23395533…、env/secondboot/tail 不变、PANICS=0、MT7916=1、WiFi=1、fwslot s12/s7 |
 | 0034 驱动 | 原始 verdict=FAIL（两个 harness 记账缺陷）；离线复核 corrected=GREEN，见 §12.7 |
+| 0034 真冷启动 | 09:12:41 物理断电/上电 -> BootROM -> banner g1673d5c89c7b -> e2631boot -> kernel -> Linux；health mtd0 ac06d7bc…、PANICS=0、MT7916=1（§13） |
 | 驱动 | 01:42:50 抛错退出码 2；session-results.json 仍由 finally 写出并记录 error；无伪造数据 |
 
 ## 1. 输入与基线
@@ -118,7 +119,7 @@
 ## 11. 后续
 
 1. 旧 E4 的 flash 提示符救援缺口已由 patch 0034 修复；0034 已在 2026-11-28 第三写中刷入 mtd0，并从 flash 提示符验证 resident rescue（§12）。
-2. task-79 最后一项 = 真冷启动（用户断电/上电）从 BootROM 走 flash 0034 -> Linux，记录启动与 health；该动作由 Lead 安排用户执行，本文件不包含。
+2. task-79 最后一项（真冷启动）已于 2026-11-28 09:12-09:14 完成：物理断电/上电 -> flash 0034 -> Linux，health 全绿（§13）。
 3. 证据附件见 evidence/e4-rescue-write/ 与各目录 SHA256SUMS.txt。
 
 ## 12. task-79 最终会话：patch-0034 第三写与 flash 提示符救援（2026-11-28）
@@ -183,7 +184,48 @@
 ### 12.8 结论
 
 - task-79 写入部分：旧 E4 的 STEP-1/STEP-2 PASS；0034 第三写 PASS；独立回读 PASS；reset 到 flash 0034 启动 PASS；flash 提示符救援（页面 + validate）PASS；live postcheck PASS。
-- task-79 仍剩：真冷启动（物理断电/上电）从 flash 0034 到 Linux 的验收。
+- task-79 真冷启动（物理断电/上电）验收：GREEN，见 §13。
+
+## 13. task-79 最后一项：真冷启动（物理断电/上电）—— GREEN
+
+### 13.1 触发与方式
+
+- 2026-11-28 09:05:48 启动被动冷启动 watcher，从 /home/qc233/zte/e2631-serial-boot-002.log 的当前 offset 721374 开始读取；不向控制台发送任何输入，不写 flash。
+- 用户在 09:12 前后物理断电并重新上电；watcher 记录到新的一段 BootROM 启动。
+
+### 13.2 串口标记（完整段复读）
+
+| 标记 | 出现 |
+|---|---|
+| Boot SPI NAND / start read secondboot（BootROM -> secondboot） | 是 |
+| banner U-Boot 2027.01-rc2-g1673d5c89c7b（来自 flash） | 是 |
+| Loading Environment from MTD... OK | 是 |
+| e2631boot: slot0 / slot1 / cspboot would boot slot1 | 是 |
+| Starting kernel ... | 是 |
+| Run /sbin/init as init process | 是 |
+| Please press Enter to activate this console | 是 |
+| e2631-wifi-boot: waiting 25s -> MT7916 ready -> automatic Wi-Fi initialization complete | 是 |
+
+- 无 panic/abort/reset 标记；没有任何控制台输入；完整串口段 21,101 B，见附件 serial-segment-full.txt。
+
+### 13.3 只读 SSH postcheck（uptime 64 s）
+
+- MTD0=ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f（与 §12 写入结果一致）
+- REGION=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1
+- ENV=6e2c01da…、SECONDBOOT=540db435…、TAIL=b5a41c37…（全部与写前一致，冷启动没有改动 flash）
+- PANICS=0、OOPS=0、MT7916=1、WiFi complete=1、VERSION=ImmortalWrt v1.10.0、KERNEL=6.18.60
+- fwslot：running slot1 serial 12，slot0 serial 7 原样
+
+### 13.4 watcher 的原始 FAIL 与 harness 修复
+
+- watcher 原始 verdict=FAIL。原因：循环退出条件写成 deadline - 1700，而 deadline 是启动后 1800 s，启动 100 s 后该条件已经恒真；kernel 标记后约 1 s watcher 就退出并去做 health，没读到后面的 console/Wi-Fi 行（health 反而证明 Linux 已起）。
+- 这是纯 harness 计时缺陷，不是启动失败。修复：linux 标记优先退出；kernel 标记后最多再等 90 s；同时增加 init/console 标记。修复后的 watcher 未再跑真冷启动（不重复要求用户断电），离线用完整串口段复核 corrected-classification.json -> GREEN。
+- 原始 watcher 输出保存在 watcher-original-results.json，未改动。
+
+### 13.5 结论
+
+- 真冷启动从 BootROM 经 secondboot、flash 0034 U-Boot、e2631boot 到 Linux 全链路通过；网络、Wi-Fi、mtd0 全部符合预期。
+- 至此 task-79 的写入、回读、复位启动、flash 提示符救援、真冷启动五项全部 GREEN。
 
 ## 附件
 
@@ -192,6 +234,7 @@
 - session-results.json：驱动真实输出（含 error、postcheck、checks、verdict=ERROR）
 - step1/step2 的 page/post/status done 响应；postcheck.txt
 - tool-e4_rescue_write.py：本次驱动
+- final-coldboot/：§13 真冷启动证据包（watcher-original-results.json、corrected-classification.json、serial-segment-full.txt、health.txt、capture 日志、修复后的 watcher、SHA256SUMS.txt）
 - final-0034/：§12 的完整证据包（session-results-original.json、corrected-classification.json、serial/console、POST/status、resident page/status/validate、live-postcheck.txt、tool-e4_final_0034.py、SHA256SUMS.txt）
 - artifact-SHA256SUMS.txt / artifact-UBOOT-INFO.txt
 

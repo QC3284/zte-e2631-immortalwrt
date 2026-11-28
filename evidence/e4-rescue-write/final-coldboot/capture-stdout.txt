@@ -1,0 +1,9 @@
+09:05:48 watching /home/qc233/zte/e2631-serial-boot-002.log from offset 721374; cut power when ready
+09:12:41 MARKER bootrom
+09:12:41 MARKER secondboot
+09:12:42 MARKER banner
+09:12:42 MARKER env_ok
+09:12:47 MARKER e2631boot
+09:12:51 MARKER kernel
+09:13:17 ROUTE TRAP: reconnecting the USB NIC
+09:14:03 VERDICT FAIL

@@ -1,0 +1,77 @@
+{
+ "log": "/home/qc233/zte/e2631-serial-boot-002.log",
+ "start_offset": 721374,
+ "started": "2026-11-28T09:05:48+0800",
+ "markers": {
+  "bootrom": "2026-11-28T09:12:41+0800",
+  "secondboot": "2026-11-28T09:12:41+0800",
+  "banner": "2026-11-28T09:12:42+0800",
+  "env_ok": "2026-11-28T09:12:42+0800",
+  "e2631boot": "2026-11-28T09:12:47+0800",
+  "kernel": "2026-11-28T09:12:51+0800"
+ },
+ "panics": [],
+ "health": {
+  "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+  "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+  "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "TAIL": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+  "UPTIME": "64.37",
+  "PANICS": "0",
+  "MT7916": "1",
+  "WIFI": "1",
+  "VERSION": "ImmortalWrt v1.10.0",
+  "KERNEL": "6.18.60",
+  "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}"
+ },
+ "verdict": "FAIL",
+ "segment_bytes": 2009,
+ "health_attempts": [
+  {},
+  {},
+  {
+   "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+   "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "TAIL": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+   "UPTIME": "31.40",
+   "PANICS": "0",
+   "MT7916": "0",
+   "WIFI": "0",
+   "VERSION": "ImmortalWrt v1.10.0",
+   "KERNEL": "6.18.60",
+   "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}"
+  },
+  {
+   "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+   "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "TAIL": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+   "UPTIME": "48.34",
+   "PANICS": "0",
+   "MT7916": "0",
+   "WIFI": "0",
+   "VERSION": "ImmortalWrt v1.10.0",
+   "KERNEL": "6.18.60",
+   "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}"
+  },
+  {
+   "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+   "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "TAIL": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+   "UPTIME": "64.37",
+   "PANICS": "0",
+   "MT7916": "1",
+   "WIFI": "1",
+   "VERSION": "ImmortalWrt v1.10.0",
+   "KERNEL": "6.18.60",
+   "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}"
+  }
+ ],
+ "finished": "2026-11-28T09:14:03+0800"
+}
