@@ -59,8 +59,29 @@
 
 ## 5. CI 构建与身份
 
-（构建完成后填：run id、banner、u-boot.bin 大小/sha256/crc32、mtd0 镜像 sha256/crc32、env 块、
-size gate 行、key rescue gate 行、归档路径。）
+首个构建 run `46095628957`（run 41，head `191bdca`）在验收门禁里失败，原因与 patch 无关：新增的
+`E2631_UBOOT_KEY_BASELINE_SIZE` / `E2631_UBOOT_KEY_GROWTH_MAX` 两个 pin 只写在 `commits.env` 里，
+workflow 的 pin 加载步骤没有导出它们，尺寸门禁在 `set -u` 下报
+`E2631_UBOOT_KEY_BASELINE_SIZE: unbound variable`（当时 `u-boot.bin: 366600 bytes` 已测出，增量在 1 KiB 内）。
+修复提交 `a3426f8` 把两个 pin 加入导出白名单并按正整数校验；重派 **run `46095932548`（run 42，head `a3426f8`）GREEN**，
+14 步全绿、checkpatch 0 errors / 0 warnings、0 个 `##[error]`。
+
+| 项 | 值 |
+| --- | --- |
+| CI run | `46095932548`（run 42；`uboot-port/commits.env` 35 patches，post-am tree `a3e940a897ec9d86503c01a2b1c2e70d9f1e0ba6`） |
+| banner | `U-Boot 2027.01-rc2-gd381355b53b1 (Nov 19 2026 - 15:44:39 +0000)` |
+| u-boot.bin | 366,600 B（0x59808），sha256 `795ddf59868cfc0626b92c5819929c99739332df13c346003e13d589296b7fe3`，crc32 `02121525` |
+| 尺寸增量 | 0034 基线 365,872 B → 366,600 B = **+728 B**（门禁 366,600 <= 366,896，即基线 +1 KiB）；距硬上限 653,312 B 余 286,712 B |
+| mtd0 镜像 | 655,360 B，sha256 `f1489840c62f6a66a2c9c7b78cab1071e4e0e462331023e8c684ccb2d6eee2d4`，crc32 `dcbfd83a` |
+| 装配后首 0x800 | sha256 `cf1f0ba595c2071c71c2463b1540b0df27d6c14caea17469130c625b30a1cf34`（模板输入仍是 `19a9d546…`，+0x14 长度字段被改写） |
+| env 块 | `6eee153b82b80664e3ce767b05e967ca977ddc8e9d379f3fffff259a39214426`（只读，未变） |
+| .config | `d3a8450a810064adce1152741cf563237a587e1c2875ad598eaa6c5f969a7a5a`（与 0034 相同；0035 不新增符号） |
+| 入口点 | `0x47f00000` |
+| MTD 写点 | `mtd writer sites: 4 (e2631flash and the e2631env writer; -O2 inlines the static helpers)`；`e2631flash`/`e2631env` 安全断言均 present |
+| 关键门禁行 | `key rescue gate: board_late_init polls reset/mesh, bootcmd is e2631rescue, no MTD writes`；`recovery-key size gate: 366600 bytes <= 366896 bytes (baseline 365872 + 1024)` |
+| 归档 | `/home/qc233/zte/e2631-t5-artifacts/uboot-key-46095932548/e2631-uboot-46095932548/`（SHA256SUMS 11/11 校验通过） |
+
+构建只做了这一次重派；除本条构建外没有其他 CI、没有设备动作。
 
 ## 6. 真机验证计划（零写入，需 Lead/用户批准会话）
 

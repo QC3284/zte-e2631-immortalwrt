@@ -1130,3 +1130,9 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   诊断命令。用户操作指引：上电后按住 reset 或 mesh 约 6 s。内核层“按住 reset 过启动 = 恢复出厂”的手势
   由救援取代，恢复出厂将挪进救援页（后续模块）。CI 新增 key rescue 门禁与 +1 KiB 尺寸门禁。
   真机验证（零写入 RAM 链）待排期。
+  CI run `46095932548`（run 42，head `a3426f8`）绿：35 patches / post-am tree `a3e940a8…`、checkpatch 0 errors
+  / 0 warnings、`u-boot.bin` 366,600 B（基线 365,872 B，+728 B，1 KiB 门禁内）、sha256 `795ddf59…`、
+  crc32 `02121525`；mtd0 镜像 sha256 `f1489840…`、crc32 `dcbfd83a`；env 块 `6eee153b…` 未变；
+  MTD 写点仍 4 个；key rescue 与 recovery-key size 门禁均现于日志。首个 run `46095628957` 因新 pin
+  未导出到门禁步骤而失败（尺寸本身合格），修复见 `a3426f8`。证据
+  [evidence/uboot-key-rescue-20261128.md](../evidence/uboot-key-rescue-20261128.md) §5。
