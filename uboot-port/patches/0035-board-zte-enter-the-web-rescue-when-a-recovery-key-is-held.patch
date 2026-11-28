@@ -1,0 +1,156 @@
+From 53e74af14dd2cab7e94721ae867c8605f9518d10 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 09:50:20 +0800
+Subject: [PATCH] board: zte: enter the web rescue when a recovery key is held
+ (task-82)
+
+Holding the reset key (flat GPIO 18, bank 1 bit 2) or the mesh key
+(flat GPIO 20, bank 1 bit 4) through the boot window now overrides
+bootcmd to e2631rescue in RAM only.  Both keys are active low with
+external pull-ups and their direction bits stay 0 out of reset, so the
+poll reads the GPIO DATA register directly instead of pulling in DM_GPIO
+or a button framework.  The window is 2 s of continuous press; releasing
+a key before it ends cancels the trigger, and only keys already down at
+entry are tracked.  e2631key prints both pin states for diagnostics.
+
+The kernel's old "hold reset while booting" factory-reset gesture is
+replaced by this rescue entry; factory reset moves into the rescue page
+in a later module.  Nothing writes flash or the environment: the
+override is a plain env_set() in RAM.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631boot.c | 92 ++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index 4dfd39e2..fcda84ac 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -27,11 +27,14 @@
+ 
+ #include <config.h>
+ #include <asm/global_data.h>
++#include <asm/io.h>
+ #include <command.h>
+ #include <env.h>
+ #include <image.h>
+ #include <init.h>
++#include <linux/bitops.h>
+ #include <linux/build_bug.h>
++#include <linux/delay.h>
+ #include <linux/errno.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/string.h>
+@@ -82,6 +85,21 @@ DECLARE_GLOBAL_DATA_PTR;
+ #define E2631_ATAGS_ADDR		(CFG_SYS_SDRAM_BASE + 0x100)
+ #define E2631_ATAGS_MAX			0x100
+ 
++/*
++ * Board recovery keys. Flat GPIO 18 is the reset key and flat GPIO 20 the
++ * mesh/WPS key; both live on GPIO bank 1 (0x94407040) as bits 2 and 4 and
++ * are active low with external pull-ups. The vendor bootloader reads the
++ * same pins the same way, and the direction bits stay 0 (input) out of
++ * reset, so a raw DATA read is enough: no DM_GPIO, no pinmux change.
++ */
++#define E2631_GPIO_BASE			0x94407000UL
++#define E2631_GPIO_BANK_SIZE		0x40UL
++#define E2631_GPIO_DATA			0x14UL
++#define E2631_KEY_RESET			18
++#define E2631_KEY_MESH			20
++#define E2631_KEY_WINDOW_MS		2000
++#define E2631_KEY_POLL_MS		50
++
+ static_assert(E2631_ATAGS_ADDR > CFG_SYS_SDRAM_BASE,
+ 	      "ATAGS buffer must start above the DRAM base");
+ static_assert(E2631_ATAGS_ADDR + E2631_ATAGS_MAX <= E2631_KERNEL_LOAD_ADDR,
+@@ -468,6 +486,63 @@ static int do_e2631slot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	return active < 0 ? CMD_RET_FAILURE : CMD_RET_SUCCESS;
+ }
+ 
++static bool e2631_key_down(unsigned int pin)
++{
++	ulong bank = E2631_GPIO_BASE + (pin >> 4) * E2631_GPIO_BANK_SIZE;
++	u32 data;
++
++	data = readl((void __iomem *)(uintptr_t)(bank + E2631_GPIO_DATA));
++	return !(data & BIT(pin & 0xf));
++}
++
++/*
++ * 0: neither key was down at entry; 1: a key that was down stayed down for
++ * the whole window; -1: a key was down but released before the window
++ * ended, which cancels the trigger. Only the keys already down at entry
++ * are tracked, so pressing the other key after a release does not count.
++ */
++static int e2631_rescue_key_state(void)
++{
++	unsigned int waited;
++	u32 started = 0;
++
++	if (e2631_key_down(E2631_KEY_RESET))
++		started |= BIT(0);
++	if (e2631_key_down(E2631_KEY_MESH))
++		started |= BIT(1);
++	if (!started)
++		return 0;
++
++	for (waited = 0; waited < E2631_KEY_WINDOW_MS;
++	     waited += E2631_KEY_POLL_MS) {
++		mdelay(E2631_KEY_POLL_MS);
++		if ((started & BIT(0)) && e2631_key_down(E2631_KEY_RESET))
++			continue;
++		if ((started & BIT(1)) && e2631_key_down(E2631_KEY_MESH))
++			continue;
++		return -1;
++	}
++
++	return 1;
++}
++
++static int do_e2631key(struct cmd_tbl *cmdtp, int flag, int argc,
++		       char *const argv[])
++{
++	if (argc > 1)
++		return CMD_RET_USAGE;
++
++	printf("e2631key: reset (gpio18) %s, mesh (gpio20) %s\n",
++	       e2631_key_down(E2631_KEY_RESET) ? "pressed" : "released",
++	       e2631_key_down(E2631_KEY_MESH) ? "pressed" : "released");
++
++	return CMD_RET_SUCCESS;
++}
++
++U_BOOT_CMD(e2631key, 1, 1, do_e2631key,
++	   "print the state of the two board recovery keys",
++	   "  - read the reset (gpio18) and mesh (gpio20) pins; read-only\n");
++
+ U_BOOT_CMD(e2631slot, 1, 1, do_e2631slot,
+ 	   "print the firmware slot table",
+ 	   "  - scan both slots like e2631boot and print base, span, serial,\n"
+@@ -510,5 +585,22 @@ int board_late_init(void)
+ 	if (env_set("bootcmd", "e2631boot"))
+ 		printf("e2631boot: cannot override bootcmd\n");
+ 
++	/*
++	 * A recovery key held through the boot window replaces the kernel's
++	 * old "hold reset while booting" factory-reset gesture: override
++	 * bootcmd in RAM only (no saveenv, no flash write) so autoboot enters
++	 * the web rescue. Releasing a key before the window ends cancels it.
++	 */
++	switch (e2631_rescue_key_state()) {
++	case 1:
++		printf("e2631rescue: recovery key held, booting the web rescue\n");
++		if (env_set("bootcmd", "e2631rescue"))
++			printf("e2631rescue: cannot override bootcmd\n");
++		break;
++	case -1:
++		printf("e2631rescue: key released, booting normally\n");
++		break;
++	}
++
+ 	return 0;
+ }
+-- 
+2.56.1
+

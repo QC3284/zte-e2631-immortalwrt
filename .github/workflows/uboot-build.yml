@@ -242,7 +242,7 @@ jobs:
           done
           # A3: the slot boot command and the env device name must be linked
           # into the image, and saveenv must be compiled out (read-only stage).
-          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot e2631env e2631net e2631rescue spi-nand0; do
+          for binary_string in e2631boot e2631soc e2631refclk e2631flash e2631verify e2631slot e2631env e2631net e2631rescue e2631key spi-nand0; do
             if ! grep -aq "$binary_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing $binary_string"
               exit 1
@@ -358,6 +358,34 @@ jobs:
             exit 1
           fi
           echo "cold rescue gate: do_e2631rescue brings up the network reference clocks"
+          # task-82: holding reset (gpio18) or mesh (gpio20) through
+          # board_late_init() must override bootcmd to e2631rescue in RAM only.
+          boot_c=board/zte/zxhn-e2631/e2631boot.c
+          if ! awk '/^int board_late_init\(/,/^}/' "$boot_c" | grep -q 'e2631_rescue_key_state'; then
+            echo "::error::board_late_init() does not poll the recovery keys"
+            exit 1
+          fi
+          if ! grep -qF 'env_set("bootcmd", "e2631rescue")' "$boot_c"; then
+            echo "::error::e2631boot.c does not override bootcmd to e2631rescue"
+            exit 1
+          fi
+          if ! grep -qE '#define E2631_KEY_RESET[[:space:]]+18' "$boot_c"; then
+            echo "::error::e2631boot.c does not define the reset key pin 18"
+            exit 1
+          fi
+          if ! grep -qE '#define E2631_KEY_MESH[[:space:]]+20' "$boot_c"; then
+            echo "::error::e2631boot.c does not define the mesh key pin 20"
+            exit 1
+          fi
+          if grep -qE 'mtd_(write|erase|special_write_oob)' "$boot_c"; then
+            echo "::error::the boot and recovery-key path must never write MTD"
+            exit 1
+          fi
+          if ! grep -aq 'e2631key: reset (gpio18)' build/u-boot.bin; then
+            echo "::error::u-boot.bin is missing the e2631key diagnostic text"
+            exit 1
+          fi
+          echo "key rescue gate: board_late_init polls reset/mesh, bootcmd is e2631rescue, no MTD writes"
           if ! grep -qx '# CONFIG_CMD_SAVEENV is not set' build/.config; then
             echo "::error::CONFIG_CMD_SAVEENV must stay disabled (A3 is read-only)"
             exit 1
@@ -549,6 +577,14 @@ jobs:
           gate=$((max - margin))
           headroom=$((max - size))
           echo "u-boot.bin: $size bytes, hard cap $max bytes, CI gate $gate bytes ($margin byte safety margin), headroom $headroom bytes"
+          # task-82: the recovery-key trigger must add less than 1 KiB to the
+          # patch-0034 payload (365872 bytes), asserted against the pins.
+          key_limit=$((E2631_UBOOT_KEY_BASELINE_SIZE + E2631_UBOOT_KEY_GROWTH_MAX))
+          if [ "$size" -gt "$key_limit" ]; then
+            echo "::error::u-boot.bin is $size bytes, above the recovery-key limit $key_limit bytes (patch-0034 baseline $E2631_UBOOT_KEY_BASELINE_SIZE + $E2631_UBOOT_KEY_GROWTH_MAX)"
+            exit 1
+          fi
+          echo "recovery-key size gate: $size bytes <= $key_limit bytes (baseline $E2631_UBOOT_KEY_BASELINE_SIZE + $E2631_UBOOT_KEY_GROWTH_MAX)"
           if [ "$size" -gt "$gate" ]; then
             echo "::error::u-boot.bin is $size bytes, above the CI gate $gate bytes (hard cap $max bytes, $margin byte safety margin); observed $size, limit $gate"
             exit 1

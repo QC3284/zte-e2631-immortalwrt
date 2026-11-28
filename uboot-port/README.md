@@ -5,7 +5,7 @@
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
 的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）
-、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、0034 为冷启动救援修复（`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用幂等的 `e2631_net_refclk_init()`：flash 冷启动直接进救援时 `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 的 MDIO 不应答、`phy_startup()` 约 5 s 后超时（-110，`no usable Ethernet device`）；RAM 验收当时能过只是因为先跑过 `e2631net`/`e2631boot`）、
+、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、0034 为冷启动救援修复（`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用幂等的 `e2631_net_refclk_init()`：flash 冷启动直接进救援时 `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 的 MDIO 不应答、`phy_startup()` 约 5 s 后超时（-110，`no usable Ethernet device`）；RAM 验收当时能过只是因为先跑过 `e2631net`/`e2631boot`）、0035 为恢复键进救援（board_late_init 里裸 MMIO 轮询 reset/GPIO18 与 mesh/GPIO20，任一键连续按住 2 s 就把 `bootcmd` 在 RAM 内改成 `e2631rescue`；松手取消，不写 env/flash，另加只读 `e2631key` 诊断命令）、
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -125,7 +125,9 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0033 sha256 | `5657f596688825f2111fd3fea3108fbe93e2973231f28947d0c2faa56d2e21ca` |
 | patch 0034 | `uboot-port/patches/0034-board-zte-bring-up-the-network-clocks-for-a-cold-rescue.patch`（task-78/E4 cold boot：`do_e2631rescue()` 在 `net_init()`/`eth_init()` 前调用幂等的 `e2631_net_refclk_init()`，让救援能从 flash 冷启动提示符独立工作；CI 断言该调用留在 `do_e2631rescue()` 内） |
 | patch 0034 sha256 | `eef4625c0e3689acf7055de3636b2edc5a7a4d0f4e89cc0c3ee0161fc0c1e986` |
-| am 之后 tree | `0480ef834d718b827e32c1ae9b787f671ca3f5a1`（与机器无关，34 个 patch） |
+| patch 0035 | `uboot-port/patches/0035-board-zte-enter-the-web-rescue-when-a-recovery-key-is-held.patch`（task-82：`board_late_init()` 里裸 MMIO 轮询 reset/GPIO18 与 mesh/GPIO20（bank1 bit2/bit4，低=按下），任一键连续按住 2 s → `env_set("bootcmd", "e2631rescue")`（仅 RAM）并打印提示；松手取消；新增只读 `e2631key` 命令） |
+| patch 0035 sha256 | `9bb04c566e4319debba7a32509a2d07e37e45fe5166ca8229eef75c92d0734e4` |
+| am 之后 tree | `a3e940a897ec9d86503c01a2b1c2e70d9f1e0ba6`（与机器无关，35 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -143,7 +145,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = 0480ef834d718b827e32c1ae9b787f671ca3f5a1
+test "$(git rev-parse HEAD^{tree})" = a3e940a897ec9d86503c01a2b1c2e70d9f1e0ba6
 ```
 
 ## 2. 新增/修改的文件
@@ -157,7 +159,7 @@ test "$(git rev-parse HEAD^{tree})" = 0480ef834d718b827e32c1ae9b787f671ca3f5a1
 | `board/zte/zxhn-e2631/Kconfig` | `SYS_BOARD`/`SYS_VENDOR`/`SYS_CONFIG_NAME` |
 
 | `board/zte/zxhn-e2631/Makefile` | 编译 `zxhn-e2631.o`、`e2631boot.o`（A3）、`e2631soc.o`（C1b）、`e2631net.o`（A5）、`e2631flash.o`（D-U1）、`e2631env.o`（U-0017）与 `e2631rescue.o`（E4） |
-| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()`；U-0016：选中槽 uImage 失败时经 `e2631_try_boot_slot()` 改试另一槽一次（class-1 回退，无 flash/env 写）；U-0017：`board_late_init()` 在覆盖 `bootcmd` 之前调用 `e2631_env_snapshot()` 保存四个厂商键 |
+| `board/zte/zxhn-e2631/e2631boot.c` | A3：`e2631boot` 命令（槽位扫描/选择/uImage 校验/`bootm`）+ `board_late_init()` 覆盖 `bootcmd`；C1b：`bootm` 前调用 `e2631_soc_prepare_linux()`；A5：`bootm` 前调用 `e2631_net_refclk_init()`；U-0016：选中槽 uImage 失败时经 `e2631_try_boot_slot()` 改试另一槽一次（class-1 回退，无 flash/env 写）；U-0017：`board_late_init()` 在覆盖 `bootcmd` 之前调用 `e2631_env_snapshot()` 保存四个厂商键；task-82：`board_late_init()` 末尾裸 MMIO 轮询 reset(GPIO18)/mesh(GPIO20)，任一键连续按 2 s 就把 `bootcmd` 在 RAM 内改成 `e2631rescue`（另有只读 `e2631key` 命令） |
 | `board/zte/zxhn-e2631/e2631soc.c` | C1b：厂商顺序的 CP15 清理 + `e2631soc` 只读报告命令（SCTLR/CLIDR/TTBR0/VBAR/ACTLR 前后值；不启动、不写 flash/env） |
 | `board/zte/zxhn-e2631/e2631soc.h` | `e2631_soc_prepare_linux()` 原型（`e2631boot.c` 与 `e2631soc.c` 共用一条代码路径） |
 | `board/zte/zxhn-e2631/e2631net.c` | A5：厂商 `board_eth_init()` 的参考时钟/SerDes/CRM2/管脚序列（pinmux 六个整字、只驱动八个输出、`0x9400000C` 的 `bits[21:20]` 时钟选择）+ `e2631refclk` 前后 dump 命令（不启动、不写 flash/env）；E2 起 `e2631_net_refclk_init()` 幂等（`refclk_done`），`e2631boot` 与以太网驱动的 `start()` 可以各调一次 |
@@ -362,6 +364,7 @@ defconfig 打开 `CMD_DHCP/CMD_MII/CMD_PING/NET_RANDOM_ETHADDR/ETH_ZX279128S/MDI
 | 自更新命令 | `e2631flash` / `e2631verify` / `e2631slot`（0014） | `e2631flash` 块对齐擦除 → 全 0xFF 校验 → 写入 → 读回逐字节比较，打印 PASS/FAIL、首个不一致偏移与 staged payload/readback CRC32；`<src>` ≥0x40000000 为 RAM 地址、<0x10000000 为 NAND 字节偏移（先读入 `0x44000000` 的 1 MiB bounce buffer，flash→flash 更新不边擦边读目标）；拒绝未对齐/越界、secondboot 0x00000..0x20000、env 0xC0000..0xE0000 与长度 >1 MiB；擦除前打印 DO NOT POWER OFF。`e2631verify` 只读 CRC32；`e2631slot` 复用 `e2631boot` 的扫描函数 |
 
 | 原始 mtd 写入口 | `CONFIG_CMD_MTD_WRITE`（0015） | 上游 `CONFIG_CMD_MTD` 自带 `mtd write/erase` 子命令；新增 `CONFIG_CMD_MTD_WRITE`（bool，默认 y）把它们编到开关后，本 defconfig 关闭，使 `e2631flash` 成为镜像中唯一调用 `mtd_write()`/`mtd_erase()` 的代码（CI 用调用点白名单证明） |
+| 恢复键进救援（0035） | 无（纯软件） | 上电后按住 reset 或 mesh 键约 6 s（覆盖 secondboot→`board_late_init` 的 2 s 轮询窗口）即把 `bootcmd` 在 RAM 内改成 `e2631rescue`；松手取消、不写 env/flash；`e2631key` 只读打印两键电平 |
 | 救援模式（E4 v1） | `e2631rescue` + 0x46000000 上传区（0026-0028；0034 冷启动补参考时钟） | 串口进入；lan1 上跑 DHCP（192.168.1.1/24，池从 .100）与极简 HTTP；页面只刷 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B 整镜像，源指针=镜像首地址，SHA-256 + 结构校验后再经 `e2631_flash_*` 五步写）；secondboot `0x0..0x20000`、env `0xC0000..0xE0000` 与保留区 `0xE0000..0xFFFFF` 一律不碰；成功不自动重启，Ctrl-C 退出 |
 | 软复位 | 厂商 TOPCRM `0x94000044`（0029） | `reset_cpu()` 先 `mdelay(50)`，再向 `TOPCRM+0x44` 写 1；BootROM 随后重跑 secondboot 并重新加载 U-Boot。没有 L2/SCU/时钟副作用，也不新增 MTD 写路径 |
 
@@ -414,8 +417,8 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `0480ef834d718b827e32c1ae9b787f671ca3f5a1`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 34）。
+1. `git rev-parse HEAD^{tree}` == `a3e940a897ec9d86503c01a2b1c2e70d9f1e0ba6`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 35）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -551,6 +554,12 @@ make O=build -j"$(nproc)"
 22. E4 冷启动救援（0034，task-78/E4 cold boot）：`e2631rescue.c` 含 `#include "e2631net.h"`，且 `do_e2631rescue()`
     函数体内含 `e2631_net_refclk_init();`（CI 用 awk 截取该函数再 grep，缺一即失败）；打印
     `cold rescue gate: do_e2631rescue brings up the network reference clocks`。
+23. 恢复键进救援（0035，task-82）：awk 截取 `int board_late_init(void)` 后必须 grep 到 `e2631_rescue_key_state`；
+    源码必须含 `env_set("bootcmd", "e2631rescue")`、`#define E2631_KEY_RESET … 18`、`#define E2631_KEY_MESH … 20`；
+    `e2631boot.c` 不得出现任何 `mtd_write`/`mtd_erase`/`mtd_special_write_oob`；二进制必须含
+    `e2631key: reset (gpio18)` 帮助文本。另有尺寸门禁：u-boot.bin ≤ `E2631_UBOOT_KEY_BASELINE_SIZE`（0034 基线
+    365,872 B）+ `E2631_UBOOT_KEY_GROWTH_MAX`（1 KiB），防止恢复键功能把载荷预算吃掉。打印
+    `key rescue gate: ...` 与 `recovery-key size gate: ...`。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -714,6 +723,22 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
 7. 中途 Ctrl-C 若正在擦/写，串口打印 `e2631rescue: WARNING: the flash update was interrupted...`；这是最危险的
    窗口，只能靠串口 + 厂商/第二级链路恢复，所以实际写之前必须先通过“仅校验”。
 
+### 恢复键进救援（0035，task-82；零写入）
+
+操作：断电 → 按住 reset 键或 mesh 键不放 → 上电 → 保持约 6 s（secondboot 到 `board_late_init()` 约 3–4 s，
+再加 2 s 轮询窗口；串口出现 `e2631rescue: recovery key held...` 或救援启动行即可松手）。触发后 autoboot 的
+bootdelay 结束即进入救援页（DHCP/HTTP 同上面的 E4 流程）；若在窗口内松手，会打印
+`e2631rescue: key released, booting normally` 并照常启动固件。
+
+实现与边界：`board_late_init()` 末尾用裸 MMIO 读 GPIO bank1 的 DATA（`0x94407040 + 0x14`，bit2 = reset、
+bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键；窗口内任一已按键保持按下即触发，全部松开即取消。
+`bootcmd` 只在 RAM 里改成 `e2631rescue`，不 saveenv、不写 flash，4 个 MTD 写点 allowlist 不变；
+`e2631key` 可只读打印两键状态，用于标定与诊断。
+
+语义替换：内核层“按住 reset 过启动 = 恢复出厂”（rc.button hold ≥ 5 s）被这个手势取代；恢复出厂将挪进救援页
+（后续模块）。首次真机验证必须零写入（RAM 链）：确认 GPIO 读在本 U-Boot 的 board_late_init 阶段安全、窗口和
+6 s 操作指引可复现之后，才进入刷写讨论。
+
 ## 6. 已知限制与风险
 
 - **F2 的诊断开关是临时的**：0031 的 TX 模式默认等于内核描述符，`e2631net tx/mode/sbrg` 只在控制台显式调用时
@@ -772,6 +797,7 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
   人为破坏选中槽的 uImage（写 slot 区，需单独批准）或等真实坏槽事件。健康路径不受影响：选槽规则、版本头校验与
   uImage 校验顺序都与 0006 相同，回退只在选中槽失败时才发生，且不改任何持久状态。
 
+- **恢复键触发尚未真机验证（0035）**：`board_late_init()` 直接读 GPIO DATA，而本 U-Boot 的冷启动链此前只在 `e2631net`/救援入口之后碰过这批寄存器（厂商 Linux 里 devmem2 读 GPIO 曾把板子读挂，是厂商 OS 环境的历史现象）。首次验证走零写入 RAM 链：从 flash 提示符加载新镜像，按住键看提示与救援页；若 board_late_init 阶段读 GPIO 卡住，串口会停住、断电即可恢复（未写 flash）。2 s 窗口与“上电后约 6 s”的操作指引需要用真机矩阵标定。
 - **E4 救援是“每次开机只用一次”**：0034 已让救援从 flash 冷启动第一条命令就可用（自带参考时钟初始化），但同一次开机内 Ctrl-C 退出后再进第二次，DHCP/ARP 可能不再应答（v1 已知限制，见 §5 E4 验收的命令台输入与重复进入两段）。重进前先 `reset`/断电；救援期间别往 U-Boot 控制台打字，Ctrl-C 是唯一被识别的输入。
 - **E4 救援页直接写 mtd0，变砖风险最高**：`e2631rescue` 的写窗口是 U-Boot 区 `0x20000..0xC0000`（655360 B，到 env 前为止）；
   写前必须通过 SHA-256 + 结构校验，且页面要求 `X-E2631-Confirm: write` 才进入五步写。成功不自动重启；
@@ -1096,3 +1122,11 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
   作为第一条网络命令完成 autoneg/lan1 1 Gbps/页面/validate，mtd0 `d87db54a…` 与 region `8a38896e…` 未变；
   证据 [evidence/e4-coldrescue-0034-20261128.md](../evidence/e4-coldrescue-0034-20261128.md)（kit `636b0ae`）。
   真冷启动（刷入 0034 后）仍待用户批准。
+
+- 2026-11-28（task-82，恢复键进救援）：新增 patch 0035——`board_late_init()` 末尾用裸 MMIO 轮询 reset（GPIO18，
+  bank1 bit2）与 mesh（GPIO20，bank1 bit4），任一键连续按住 2 s 就把 `bootcmd` 在 RAM 内改成 `e2631rescue`
+  并打印 `e2631rescue: recovery key held, booting the web rescue`；松手取消（`key released, booting normally`）。
+  只采用进入时已按下的键，不 saveenv、不写 flash，MTD 写点 allowlist 仍 4 个；新增只读 `e2631key`
+  诊断命令。用户操作指引：上电后按住 reset 或 mesh 约 6 s。内核层“按住 reset 过启动 = 恢复出厂”的手势
+  由救援取代，恢复出厂将挪进救援页（后续模块）。CI 新增 key rescue 门禁与 +1 KiB 尺寸门禁。
+  真机验证（零写入 RAM 链）待排期。
