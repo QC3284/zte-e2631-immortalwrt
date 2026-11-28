@@ -57,7 +57,7 @@
 | patch 0041 sha256 | `cf03f0e239e286551cb24f619c8d45fc4fd27d4b74a8d7df7164b6e953c64e1b` |
 | patch 总数 | 41 |
 | post-am tree | `58c996fe8151ca81f45829d8fb5c41f7aea3b38b` |
-| 尺寸预算 | 仍为 `E2631_UBOOT_V2_BASELINE_SIZE=366600` + `40960`；防御逻辑预计 < 1 KiB |
+| 尺寸预算 | task-90 起改为 v3 门禁：`size <= E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN` = `653312 - 245760` = 407,552 B；防御逻辑本身 < 1 KiB |
 
 构建统一走 `uboot-build.yml`（task-92），由 CI 重放 41 个 patch 并断言 tree；本文不记录本地构建值。
 
@@ -72,3 +72,13 @@
 - 防御**不修复**野写根因；它把静默损坏变成响亮停止。定位仍建议重放 run-1 顺序（先 `/console`、`/env`，再 6 次 22 MB 上传，backup 与 status 交错），并记录是否并发连接。
 - 若 `rescue_fmt` 因正常的大响应触界（不应发生：所有渲染缓冲 1 KiB/4 KiB，单行最长 < 100 B），返回 500 而非崩溃；页面侧需展示该错误。
 - 本文是 task-90（E4 v3）的 known-risk 记录：v3 证据文档应引用本节，说明 v2.1 三个异常可复现性状态与防御。
+## 9. 交付后注记（task-90 同批，Lead m10265）
+
+- **上传窗口比契约宽 2 MiB（有意）**：0040 的 `rescue_sha256()` 对固件上传登记的是基址 `0x46100000` + `E2631_FW_STAGE_MAX`
+  （`0x1C00000`），窗口上界 `0x47D00000`；task-89 契约 §6 写的是 `0x46100000 + 0x1BE0214`（上界 `0x47CE0214`）。
+  实现比文档宽 2 MiB，仍严格低于 U-Boot 链接基址 `0x47F00000`，属安全余量；本文与 v3 证据同时记录该脚注，
+  契约文档下一版按代码值收口。
+- **`e2631verify` 确认没有 SHA-256 路径**：`e2631flash.c` 只用 `crc32()`（行 323/388/461/470/592），
+  `e2631verify` 是只读的 RAM↔flash CRC32 比较；0030 的 env 失败转储也是 CRC32。task-90 把 CI 的 `sha256_csum_wd`
+  禁令从 `e2631rescue.c` 扩到整个 `board/zte/zxhn-e2631/`（见 `uboot-build.yml` 的 rescue self-check 段），
+  task-92 构建会再次断言；`make check` 侧的 e2631verify 语义验证仍在 kit 静态检查范围内。
