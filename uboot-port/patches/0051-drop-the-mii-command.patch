@@ -1,0 +1,37 @@
+From a7427db72baa6e67afbae435ddf18e2443df663e Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:31:52 +0800
+Subject: [PATCH 10/10] zx279128s: drop the mii command to stay inside the v3 size
+ gate (task-92)
+
+The unified E4 v3 build came out at 410040 bytes, 2488 bytes over the
+407552-byte budget (653312-byte hard cap minus 245760 bytes of headroom).
+Per the 2026-11-28 budget ruling, reclaim the pre-approved P2 before
+touching the rescue page: the console mii command is a debugging
+convenience (cmd/mii.o measured 5696 text + 28 data in the v2.1 build) and
+no boot or rescue path uses it; the board-local e2631net diagnostics and
+the PHY startup logs cover the same ground.
+
+The page I18N stays intact: I18N is preserved ahead of mii.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 5fd993bb..38c98bc2 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -28,7 +28,7 @@ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+ # CONFIG_CMD_MTD_WRITE is not set
+ CONFIG_CMD_DHCP=y
+-CONFIG_CMD_MII=y
++# CONFIG_CMD_MII is not set
+ CONFIG_CMD_PING=y
+ # CONFIG_CMD_TFTPBOOT is not set
+ CONFIG_OF_CONTROL=y
+-- 
+2.56.1
+
