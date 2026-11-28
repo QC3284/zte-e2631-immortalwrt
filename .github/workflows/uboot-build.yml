@@ -37,7 +37,9 @@ jobs:
             E2631_UBOOT_TREE_SHA \
             E2631_UBOOT_PAYLOAD_MAX \
             E2631_UBOOT_TEXT_BASE \
-            E2631_UBOOT_SOURCE_DATE_EPOCH; do
+            E2631_UBOOT_SOURCE_DATE_EPOCH \
+            E2631_UBOOT_KEY_BASELINE_SIZE \
+            E2631_UBOOT_KEY_GROWTH_MAX; do
             value=${!name:-}
             if [ -z "$value" ]; then
               echo "::error::uboot-port/commits.env does not define $name"
@@ -75,6 +77,16 @@ jobs:
           # so export the frozen pin here instead of letting the CI clock leak in.
           printf 'SOURCE_DATE_EPOCH=%s\n' "$E2631_UBOOT_SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
+          # task-82: both recovery-key size pins are plain decimal byte counts.
+          for name in E2631_UBOOT_KEY_BASELINE_SIZE E2631_UBOOT_KEY_GROWTH_MAX; do
+            case "${!name}" in
+              *[!0-9]*|"") echo "::error::$name must be a byte count, got ${!name}"; exit 1;;
+            esac
+          done
+          if [ "$E2631_UBOOT_KEY_BASELINE_SIZE" -le 0 ] || [ "$E2631_UBOOT_KEY_GROWTH_MAX" -le 0 ]; then
+            echo "::error::the recovery-key size pins must be positive"
+            exit 1
+          fi
       - name: Install the ARM cross toolchain and U-Boot build dependencies
         run: |
           sudo apt-get update
