@@ -1,0 +1,77 @@
+{
+ "session": "task-79 final write of patch-0034 through e2631rescue, 2026-11-28 08:57:44-08:59:25 CST",
+ "original_driver_verdict": "FAIL",
+ "original_false_checks": {
+  "env_sanity": false,
+  "mt7916": false
+ },
+ "harness_fixes": [
+  "env_sanity was called with an empty boot_text: pass the real console history so boot_env_ok can see 'Loading Environment from MTD... OK'.",
+  "postcheck read dmesg once, before MT7916/Wi-Fi was ready: poll device_facts until MTD0==ac06d7bc, PANICS=0 and MT7916=1 (300 s timeout), recording each attempt."
+ ],
+ "corrected_env_sanity": {
+  "boot_env_ok": true,
+  "bad_crc": false,
+  "default_environment": false,
+  "warning_ethernet": false,
+  "entries": 27,
+  "unexpected": [],
+  "missing": [],
+  "mismatched": [],
+  "values_ok": true,
+  "ethaddr": "00:41:71:00:00:50",
+  "ethaddr_ok": true,
+  "bootdelay_ok": true,
+  "bootcmd_ok": true,
+  "stdio_ok": true
+ },
+ "corrected_mt7916": {
+  "live_mt7916": "1",
+  "live_wifi_complete": "1",
+  "live_panics": "0",
+  "live_uptime_s": "254.85"
+ },
+ "corrected_checks": {
+  "artifact_pins": true,
+  "image_pins": true,
+  "staging": true,
+  "flash_banner": true,
+  "staging_crc": true,
+  "ram_banner": true,
+  "env_sanity": true,
+  "write_done": true,
+  "readback": true,
+  "reset_banner": true,
+  "flash_0034_version": true,
+  "resident_phy": true,
+  "resident_page": true,
+  "resident_validate": true,
+  "resident_readonly": true,
+  "linux_back": true,
+  "mtd0_final": true,
+  "region_final": true,
+  "env_after": true,
+  "secondboot_after": true,
+  "panics_zero": true,
+  "mt7916": true,
+  "capture_after": true,
+  "no_error": true,
+  "no_forbidden": true
+ },
+ "live_postcheck": {
+  "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+  "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+  "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+  "SECONDBOOT": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+  "TAIL": "b5a41c3758763bbec72769fab4a2533bf2db0b6312d93d25a695f9e4b9e02260",
+  "UPTIME": "254.85",
+  "PANICS": "0",
+  "MT7916": "1",
+  "WIFI": "1",
+  "VERSION": "ImmortalWrt v1.10.0",
+  "KERNEL": "6.18.60",
+  "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}"
+ },
+ "note": "Original session-results-original.json is the untouched driver output (verdict FAIL). This file records the offline reclassification after the two harness fixes; no device action was repeated and no evidence was invented. Product verdict is PASS because all 23 product checks already passed in the original run and the two remaining checks are explained by the harness defects above.",
+ "corrected_verdict": "GREEN"
+}

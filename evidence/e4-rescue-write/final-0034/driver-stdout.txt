@@ -1,0 +1,49 @@
+08:57:52 stage copy 0.23s rc=0
+08:57:53 stage erase 0.85s rc=0
+08:57:54 stage write 0.38s rc=0
+08:57:54 stage readback 0.26s rc=0
+08:57:54 stage sync 0.18s rc=0
+08:57:54 STAGING GREEN
+08:57:55 capture paused: {"supervisor_pids": [544985], "bootwatch_pids": [545032, 1512748], "tty_holders": [544991], "tty_holders_after": [], "free": true}
+08:57:55 serial hu08:59:19 VERDICT FAIL
+log=/home/qc233/zte/e2631-p3/e2/e4-rescue/final-0034/run-1/serial.log
+08:57:57 banner seen; stopping autoboot
+08:58:00 stop_autoboot: {"banner": true, "prompt": true}
+08:58:01 ub cmd: version ok=True
+08:58:01 ub cmd: mtd read spi-nand0 0x47f00000 0x3f00000 0x80000 ok=True
+08:58:01 ub cmd: crc32 0x47f00000 0x59530 ok=True
+08:58:01 banner seen; stopping autoboot
+08:58:04 stop_autoboot: {"banner": true, "prompt": true}
+08:58:04 ub cmd: version ok=True
+08:58:04 ub cmd: mtd read spi-nand0 0x44000000 0xc0000 0x20000 ok=True
+08:58:04 ub cmd: md 0x44000000 4 ok=True
+08:58:05 ub cmd: crc32 0x44000000 0x20000 ok=True
+08:58:05 env block state=OK stored=0xf95a816e region=0xe826c394
+08:58:05 ub cmd: printenv ok=True
+08:58:05 env sanity ok=False entries=27
+08:58:05 ub cmd: help e2631rescue ok=True
+08:58:05 rescue command present=True
+08:58:05 RAM prompt ready
+08:58:11 WRITE POST status=200 body='result=accepted\nsha256=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\nsha_match=ok\n'
+08:58:11 status stage=staged progress=0
+08:58:12 status stage=blank progress=30
+08:58:13 status stage=write progress=45
+08:58:14 status stage=readback progress=80
+08:58:15 status stage=compare progress=90
+08:58:16 status stage=done progress=100
+08:58:16 WRITE DONE: crc32=0x1e5ff289 result=ok
+08:58:17 ub cmd: mtd read spi-nand0 0x46000000 0x20000 0xa0000 ok=True
+08:58:17 ub cmd: crc32 0x46000000 0xa0000 ok=True
+08:58:17 ub cmd: mtd read spi-nand0 0x47000000 0xc0000 0x20000 ok=True
+08:58:17 ub cmd: md 0x47000000 1 ok=True
+08:58:17 ub cmd: crc32 0x47000000 0x20000 ok=True
+08:58:17 ub cmd: mtd read spi-nand0 0x48000000 0x0 0x20000 ok=True
+08:58:17 ub cmd: crc32 0x48000000 0x20000 ok=True
+08:58:17 READBACK GREEN: region=0x1e5ff289 env=0xf95a816e/0xe826c394 secondboot=0x9848a667
+08:58:18 banner seen; stopping autoboot
+08:58:21 stop_autoboot: {"banner": true, "prompt": true}
+08:58:21 ub cmd: version ok=True
+08:58:21 RESET GREEN: flash 0034 prompt
+08:58:28 RESIDENT RESCUE: page=True validate=True readonly=True
+08:58:39 capture restore: {"restore_rc": 0, "supervisor_pids": [1521780], "bootwatch_pids": [1521827], "tty_holders": [1521790], "events_tail": "2026-11-28T08:55:12+08:00 supervisor-002-already-running pid=1512682\n2026-11-28T08:58:35+08:00 reader-start pid=1521780", "ok": true}
+08:59:25 VERDICT FAIL

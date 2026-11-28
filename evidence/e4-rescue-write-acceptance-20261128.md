@@ -1,9 +1,9 @@
-# E4 救援写模式验收（task-79）—— 写入 PASS、复位 PASS、冷启动救援 FAIL
+# E4 救援写模式验收（task-79）—— 写入 PASS、复位 PASS、patch-0034 最终写入与 flash 提示符救援 GREEN
 
 日期：2026-11-28（CST）
 设备：ZTE ZXHN E2631 / ZX279128S，ImmortalWrt v1.10.0，kernel 6.18.60
-产物：uboot-build run 46036894542，34 个 patch 之前的 E4 镜像（patch 0026-0033，tree cd67a041…）
-结论：STEP-1 净零写入 PASS、STEP-2 真实 E4 写入 PASS、独立回读 PASS、reset 回 flash 启动 PASS；从 flash 冷提示符直接运行 e2631rescue FAIL（PHY autoneg timeout，见 §8）。写入验收本身通过，失败点是救援模式在 flash 冷启动路径上的 refclk 初始化缺口，归入 patch 0034 修复队列。
+产物：旧 E4 镜像（run 46036894542，patch 0026-0033，tree cd67a041…）；最终 0034 镜像（run 46046018929，patch 0026-0034，tree 0480ef83…）
+结论：旧 E4 镜像的 STEP-1 净零写入、STEP-2 真实写入、独立回读、reset 与 flash 启动均 PASS；从 flash 提示符直接运行 e2631rescue 暴露 PHY/refclk 缺口（§8），patch 0034 修复后，最终把 0034 镜像写入 mtd0 的第三写 PASS，并从 flash 提示符以 e2631rescue 作为第一条网络命令完成页面与 validate（§12）。截至本文件，task-79 仅剩真冷启动（用户断电/上电）验收。
 
 ## 0. 摘要
 
@@ -17,6 +17,12 @@
 | reset | 01:41:17 reset -> flash E4 banner g30dca5f54503 prompt 01:41:20（RESET GREEN） |
 | postcheck | mtd0 d87db54a…、区域 8a38896e…、env 6e2c01da…、secondboot 540db435…、tail b5a41c37…、PANICS=0、MT7916=1、WiFi=1 |
 | 冷启动救援 | FAIL：PHY startup failed (-110)，e2631rescue: no usable Ethernet device（§8） |
+| 0034 最终写 | 08:58:11 POST accepted -> /status done 08:58:16；crc32 0x1e5ff289 = want；串口显示 PASS: mtd0 updated |
+| 0034 独立回读 | region 0x1e5ff289；env 0xF95A816E/0xe826c394；secondboot 0x9848a667 |
+| 0034 flash 启动 | reset -> Boot SPI NAND -> secondboot -> banner g1673d5c89c7b |
+| flash 提示符救援 | e2631rescue 为第一条网络命令：PHY done、lan1 up；GET / 200、validate 200 sha_match=ok |
+| 0034 postcheck | mtd0 ac06d7bc…、region 23395533…、env/secondboot/tail 不变、PANICS=0、MT7916=1、WiFi=1、fwslot s12/s7 |
+| 0034 驱动 | 原始 verdict=FAIL（两个 harness 记账缺陷）；离线复核 corrected=GREEN，见 §12.7 |
 | 驱动 | 01:42:50 抛错退出码 2；session-results.json 仍由 finally 写出并记录 error；无伪造数据 |
 
 ## 1. 输入与基线
@@ -111,9 +117,73 @@
 
 ## 11. 后续
 
-1. patch 0034 冷启动救援验收：冷启动（用户断电或至少 flash E4 冷复位）-> 中断 autoboot -> e2631rescue 作为第一条命令 -> PHY autoneg 正常、GET /、/status、validate PASS；零写入。
-2. 第三写（把 patch 0034 镜像刷入 flash）需要 Lead 再次向用户申请批准；本文件不包含该动作。
-3. 证据附件见 evidence/e4-rescue-write/ 与 SHA256SUMS.txt。
+1. 旧 E4 的 flash 提示符救援缺口已由 patch 0034 修复；0034 已在 2026-11-28 第三写中刷入 mtd0，并从 flash 提示符验证 resident rescue（§12）。
+2. task-79 最后一项 = 真冷启动（用户断电/上电）从 BootROM 走 flash 0034 -> Linux，记录启动与 health；该动作由 Lead 安排用户执行，本文件不包含。
+3. 证据附件见 evidence/e4-rescue-write/ 与各目录 SHA256SUMS.txt。
+
+## 12. task-79 最终会话：patch-0034 第三写与 flash 提示符救援（2026-11-28）
+
+### 12.1 产物与基线
+
+- 产物目录：/home/qc233/zte/e2631-t5-artifacts/uboot-coldrescue-46046018929/e2631-uboot-46046018929/
+- u-boot.bin：365,872 B，sha256 b7ea6bbc138e1b3cbea6389fbaae89419d1d7e46e0668ef88637dd2cd14ac33d，crc32 0x9f2b707d，banner U-Boot 2027.01-rc2-g1673d5c89c7b
+- e2631-uboot-mtd0.bin：655,360 B，sha256 23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1，crc32 0x1e5ff289
+- 会话前 flash（旧 E4 第三写后的状态）：mtd0 d87db54a…、region 8a38896e…、env 6e2c01da…、secondboot 540db435…
+- 预期写后 mtd0：ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f（基线 mtd0 的 0x20000..0xC0000 替换为 0034 镜像；构造脚本见驱动 expected_final）
+- 驱动：/home/qc233/zte/e2631-p3/e2/e4_final_0034.py（附件 tool-e4_final_0034.py）
+
+### 12.2 run-1 驱动 bug（无设备写）
+
+08:55:10 run-1 在 staging 前报 RuntimeError: reconstruction current sha mismatch。原因是驱动 expected_final() 用 0034 镜像（23395533）拼“当前”mtd0，而实际当前镜像区是旧 E4（8a38896e）。device_before 门禁已先行通过：live mtd0 就是 d87db54a…、region 8a38896e…、env 6e2c01da…、secondboot 540db435…；没有 byte 级设备差异，也没有 staging/写入/POST。修复 = OLD_IMAGE 指向旧 E4 mtd0 镜像；重算得到 cur=d87db54a、final=ac06d7bc、final_ok=true。
+
+### 12.3 run-2 时间线
+
+- 08:57:44 会话开始；08:57:54 STAGING GREEN：copy 0.23 s、erase 0.85 s、write 0.38 s、readback 0.26 s、sync 0.18 s
+- SSH 侧 reboot -> flash 旧 E4 提示符 g30dca5f54503；mtd read userdata 0x3F00000 -> 0x47F00000；crc32 0x9f2b707d 通过；go 0x47F00000
+- 08:58:05 RAM 0034 提示符 banner g1673d5c89c7b；env block state=OK（stored 0xF95A816E / region 0xe826c394）；env sanity 27 项（26 flash key + fdtcontroladdr），ethaddr 00:41:71:00:00:50；help e2631rescue 存在
+- 08:58:11 POST /flash?mode=write（0034 镜像，X-E2631-SHA256=23395533…，X-E2631-Confirm: write）-> 200 result=accepted sha_match=ok
+- /status：staged 0 -> blank 30 -> write 45 -> readback 80 -> compare 90 -> done 100（08:58:11-08:58:16）；done 时 crc32=0x1e5ff289、result=ok、sha_match=ok
+- 串口原文：e2631rescue: erasing mtd0 0x20000..0xc0000 / e2631flash: erasing block 0x20000..0xa0000 / writing 655360 bytes to mtd0 / PASS: mtd0 updated, CRC32 0x1e5ff289 / nothing was rebooted
+- 08:58:17 仅一次 Ctrl-C（e2631rescue: left the rescue mode）；控制台回读：region crc32 0x1e5ff289；env md 首字 0xF95A816E、crc32 0xe826c394；secondboot crc32 0x9848a667
+- 08:58:18 reset -> 串口 Boot SPI NAND / start read bootheader / start read secondboot / banner U-Boot 2027.01-rc2-g1673d5c89c7b（来自 flash）
+- 08:58:21 停 autoboot -> 0034 flash 提示符；08:58:22 e2631rescue 作为从 flash 提示符发出的第一条网络命令（其前只有 version，无 e2631net/e2631boot）：PHY auto negotiation done、zx279128s: lan1 up, 1000 Mbit/s full duplex
+- 08:58:28 resident rescue HTTP：GET / 200（gzip 4456 B，解压 9216 B，sha256 30a8f03e…）；/status 初始 stage=idle；POST /flash?mode=validate（0034 镜像）-> 200 result=ok sha_match=ok；/status 后 stage=idle crc32=0x1e5ff289 sha_match=ok；Ctrl-C 退出
+- 08:58:39 e2631boot -> Starting kernel -> Linux 恢复；会话后只读 SSH 复核见 12.4
+
+### 12.4 写后 live postcheck（只读 SSH）
+
+- MTD0=ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f（与重建一致）
+- REGION=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1
+- ENV=6e2c01da…、SECONDBOOT=540db435…、TAIL=b5a41c37…（均与写前一致）
+- PANICS=0、OOPS=0、MT7916=1、WiFi complete=1、VERSION=ImmortalWrt v1.10.0、KERNEL=6.18.60
+- fwslot：running slot1 serial 12，slot0 serial 7 原样
+
+### 12.5 写入审计
+
+- Linux 侧唯一写入：userdata 暂存（erase + write padded 524,288 B + readback + sync，全部 rc 0）
+- U-Boot 侧写入：恰好一次 POST；e2631rescue 内部一次 erase（5 个 eraseblock，0x20000..0xC0000）+ 一次 write（655,360 B / 320 pages）
+- 未触碰：env 块 0xC0000..0xE0000、secondboot 0x0..0x20000、tail 0xE0000..0x100000；未使用 saveenv/mtd write/erase/nand write/erase/e2631flash/loadx/xmodem
+- U-Boot 命令清单无 forbidden 项；POST 只有 write-post 一条
+
+### 12.6 flash 提示符救援的验收意义
+
+旧 E4 在 §8 的失败是“flash 冷启动路径直接进 e2631rescue，refclk 未初始化 -> PHY -110”。patch 0034 在 do_e2631rescue 里先调用 e2631_net_refclk_init() 再 net init。本次从 flash 提示符（BootROM -> secondboot -> 0034 U-Boot）以 e2631rescue 第一条网络命令复测：PHY autoneg done、lan1 up 1 Gbps、GET / 200、validate 200 sha_match=ok。因此 §8 的缺口在 0034 上已关闭。
+
+注意：本段是 reset（温复位）后的 flash 提示符，不是物理断电冷启动；真冷启动仍是 task-79 的最后一个 gate，由 Lead 安排用户断电/上电后记录。
+
+### 12.7 驱动原始 verdict=FAIL 的两个 harness 记账缺陷
+
+原始 session-results-original.json 的 25 项检查中 23 项 true，只有：
+
+1. env_sanity=false：驱动把空字符串作为 boot_text 传给 env_sanity，导致 boot_env_ok 恒 false。实际 boot text 含 Loading Environment from MTD... OK，串口中 bad CRC / default environment / Warning: ethernet 计数均为 0；printenv 26 个 flash key + fdtcontroladdr，missing=[]、mismatched=[]、values_ok=true、ethaddr/bootdelay/bootcmd/stdio 全部 ok。修复：env_sanity 接收真实 console history。
+2. mt7916=false：postcheck 只读一次 dmesg，当时 Wi-Fi 还没起来。修复：postcheck 轮询 device_facts 直到 MTD0==ac06d7bc、PANICS=0、MT7916=1（300 s 超时），记录每次尝试。live postcheck 已确认 MT7916=1。
+
+两处都是 harness 记账，不是产品失败；离线复核文件 corrected-classification.json 把这两项按实测修正后 verdict=GREEN，原始文件保持 FAIL 原样以保留真实输出。修复后的驱动未再跑设备（不重复写入），仅 py_compile 通过；真冷启动会话可使用同一轮询逻辑。
+
+### 12.8 结论
+
+- task-79 写入部分：旧 E4 的 STEP-1/STEP-2 PASS；0034 第三写 PASS；独立回读 PASS；reset 到 flash 0034 启动 PASS；flash 提示符救援（页面 + validate）PASS；live postcheck PASS。
+- task-79 仍剩：真冷启动（物理断电/上电）从 flash 0034 到 Linux 的验收。
 
 ## 附件
 
@@ -122,5 +192,6 @@
 - session-results.json：驱动真实输出（含 error、postcheck、checks、verdict=ERROR）
 - step1/step2 的 page/post/status done 响应；postcheck.txt
 - tool-e4_rescue_write.py：本次驱动
+- final-0034/：§12 的完整证据包（session-results-original.json、corrected-classification.json、serial/console、POST/status、resident page/status/validate、live-postcheck.txt、tool-e4_final_0034.py、SHA256SUMS.txt）
 - artifact-SHA256SUMS.txt / artifact-UBOOT-INFO.txt
 
