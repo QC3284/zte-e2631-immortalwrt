@@ -116,6 +116,8 @@ memcpy(telnetd.exec_line, telnetd.line, telnetd.line_len + 1);
   `dnsd fixture: PASS (35 checks)`、`task-99 contract fixture: PASS (15 checks)`。
 - checkpatch（`--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF`）对 0062/0063/0064 三个 commit：
   0 errors / 0 warnings（“no obvious style problems”）。
+- kit 提交 `5f2c1b6`（12 files, +1128/−9）已 push 到 `origin/iwrt-adaptation`；kit「Upgrade safety checks」
+  run `46145244404` SUCCESS。
 - 本机未跑交叉编译；uboot-build 由 task-92 统一派发。
 
 ## 7. 真机验收要点（t92f，零写）
