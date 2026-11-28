@@ -182,6 +182,20 @@ jobs:
             -o "$RUNNER_TEMP/slotcore-test"
           "$RUNNER_TEMP/slotcore-test" | tee "$RUNNER_TEMP/slotcore-test.out"
           grep -q '(52 checks' "$RUNNER_TEMP/slotcore-test.out"
+      - name: Compile and run the rescue DHCP pool fixture
+        # task-93: the rescue page must not fall back to its built-in DHCP
+        # values on a clean environment. The fixture pins the host-octet
+        # extraction (ntohl, not the raw network-order low byte) and the
+        # server-in-pool rejection that the device Phase A probe caught.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            -I "$GITHUB_WORKSPACE/uboot-port/tests/shim" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/dhcp_pool_test.c" \
+            -o "$RUNNER_TEMP/dhcp-pool-test"
+          "$RUNNER_TEMP/dhcp-pool-test" | tee "$RUNNER_TEMP/dhcp-pool-test.out"
+          grep -q '(14 checks' "$RUNNER_TEMP/dhcp-pool-test.out"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before
@@ -504,6 +518,16 @@ jobs:
             fi
           done
           echo "E4 v3 rescue gate: sysinfo/log/integrity/reboot/LED/DHCP wired"
+          # task-93: the pool check must read the host octet through ntohl(),
+          # not from the raw network-order word.
+          grep -q 'e2631_dhcp_pool_ok(' "$rescue_c"
+          grep -q 'e2631_dhcp_host_octet' board/zte/zxhn-e2631/e2631dhcp.h
+          grep -q 'e2631_dhcp_pool_ok' board/zte/zxhn-e2631/e2631dhcp.h
+          if grep -q 'ip\.s_addr & 0xff' "$rescue_c"; then
+            echo "::error::e2631rescue.c masks the network-order word instead of using ntohl()"
+            exit 1
+          fi
+          echo "DHCP pool gate: host octet through ntohl() and the shared pool check"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c

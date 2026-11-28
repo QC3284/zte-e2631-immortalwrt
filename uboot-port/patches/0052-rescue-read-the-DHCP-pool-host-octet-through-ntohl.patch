@@ -1,0 +1,135 @@
+From 74b0e5538a59092123d18cee34a7226e24eb2f2b Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:57:47 +0800
+Subject: [PATCH] rescue: read the DHCP pool host octet through ntohl (task-93)
+
+rescue_dhcp_load() compared the server address with the pool through
+
+	host = rescue_dhcp.ip.s_addr & 0xff;
+
+but struct in_addr keeps the address in network byte order, so on a
+little-endian machine & 0xff returns the FIRST octet: 192.168.1.1 is
+0x0101a8c0 in memory and yielded 192 instead of 1.  192 falls inside
+the default pool 100..200, so a CLEAN environment was flagged as
+fallback and /status reported
+
+	dhcp_source=fallback
+	dhcp_warning=e2631_dhcp_pool_start
+
+while DHCP itself kept working.  The task-93 Phase A device probe
+found the defect on the v3 build.
+
+Read the host octet through ntohl() and move the pool validation into
+a small header so a host fixture can pin it: e2631_dhcp_host_octet()
+returns the last dotted component, and e2631_dhcp_pool_ok() keeps the
+1..254 range check and the server-in-pool rejection.  The fixture
+covers clean defaults, both collision edges, a server just outside the
+pool and the range boundaries, and guards against the first-octet
+regression that caused this defect.
+
+Audit: the three other e2631_dhcp_* parsers do no octet arithmetic
+(ipval() goes through string_to_ip(), the pool numbers are plain
+integers), and net/mtk_dhcpd.c already converts with ntohl() before
+building the pool range, so rescue_dhcp_load() was the only site with
+the endianness slip.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631dhcp.h   | 50 ++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631rescue.c | 12 +++----
+ 2 files changed, 54 insertions(+), 8 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631dhcp.h
+
+diff --git a/board/zte/zxhn-e2631/e2631dhcp.h b/board/zte/zxhn-e2631/e2631dhcp.h
+new file mode 100644
+index 00000000..bb903442
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631dhcp.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * E2631 rescue DHCP configuration helpers
++ *
++ * The rescue DHCP server advertises 192.168.1.1/24 with an in-tree pool
++ * (default 192.168.1.100-200), and the four e2631_dhcp_* environment keys
++ * can move both the server address and the pool.  The pool must stay
++ * inside the 1..254 host range and must never contain the server's own
++ * host octet.
++ *
++ * struct in_addr keeps the address in network byte order, so the host
++ * octet is the low byte of the ntohl() value.  Masking s_addr directly
++ * reads the FIRST octet on little-endian machines: the task-93 Phase A
++ * defect saw 192.168.1.1 as 192 and falsely collided with the default
++ * pool 100..200, which then reported dhcp_source=fallback on a clean
++ * environment.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631DHCP_H
++#define __E2631DHCP_H
++
++#include <asm/byteorder.h>
++#include <linux/types.h>
++
++/* Host octet (the last dotted component) of a network-order IPv4 address. */
++static inline u32 e2631_dhcp_host_octet(u32 s_addr)
++{
++	return ntohl(s_addr) & 0xff;
++}
++
++/*
++ * A pool is usable when it fits in 1..254 and does not contain the
++ * server's own host octet.  Returns true when the pool can be used.
++ */
++static inline bool e2631_dhcp_pool_ok(u32 s_addr, u32 start, u32 size)
++{
++	u32 host = e2631_dhcp_host_octet(s_addr);
++	u32 end;
++
++	if (size < 1)
++		return false;
++	end = start + size - 1;
++	if (start < 1 || end > 254)
++		return false;
++	return host < start || host > end;
++}
++
++#endif /* __E2631DHCP_H */
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index afc39ed2..a782a0f0 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -77,6 +77,7 @@
+ #include "e2631factory.h"
+ #include "e2631flash.h"
+ #include "e2631fwslot.h"
++#include "e2631dhcp.h"
+ #include "e2631http.h"
+ #include "e2631net.h"
+ #include "e2631soc.h"
+@@ -922,7 +923,6 @@ static void rescue_dhcp_load(void)
+ 	int ip_ret, mask_ret, start_ret, size_ret;
+ 	bool from_env = false;
+ 	bool bad = false;
+-	u32 host;
+ 
+ 	ip_ret = rescue_dhcp_ipval("e2631_dhcp_ipaddr", "192.168.1.1",
+ 				   &rescue_dhcp.ip, rescue_dhcp.ip_str,
+@@ -955,13 +955,9 @@ static void rescue_dhcp_load(void)
+ 	from_env = !ip_ret || !mask_ret || !start_ret || !size_ret;
+ 
+ 	if (!bad) {
+-		host = rescue_dhcp.ip.s_addr & 0xff;
+-		if (rescue_dhcp.pool_start + rescue_dhcp.pool_size - 1 > 254) {
+-			bad = true;
+-			rescue_dhcp_warn("e2631_dhcp_pool_start");
+-		} else if (host >= rescue_dhcp.pool_start &&
+-			   host <= rescue_dhcp.pool_start +
+-				   rescue_dhcp.pool_size - 1) {
++		if (!e2631_dhcp_pool_ok(rescue_dhcp.ip.s_addr,
++					rescue_dhcp.pool_start,
++					rescue_dhcp.pool_size)) {
+ 			bad = true;
+ 			rescue_dhcp_warn("e2631_dhcp_pool_start");
+ 		}
