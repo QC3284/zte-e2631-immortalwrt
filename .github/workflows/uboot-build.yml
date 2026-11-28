@@ -380,7 +380,11 @@ jobs:
           fi
           echo "F2 forward-control gate: value 17, the bmu dump and the new SBRG text are present"
           # E4 v2.1 (task-84): the multi-function rescue keeps every writer
-          # behind its owner.  The rescue only starts the slot (e2631fwslot),
+          # behind its owner.  boot_c is assigned here because this block runs
+          # before the recovery-key gate that first defines it; the rescue is
+          # the owner-starter and must not touch MTD itself.
+          boot_c=board/zte/zxhn-e2631/e2631boot.c
+          # The rescue only starts the slot (e2631fwslot),
           # rootfs_data (e2631factory) and environment (e2631env) state
           # machines; the console path captures the console record; the backup
           # path streams read-only partitions with its own headers.
