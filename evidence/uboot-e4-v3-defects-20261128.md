@@ -3,7 +3,7 @@
 日期：2026-11-28
 范围：`GET /`（救援页）与 `POST /console`（单命令）在 v3 统一构建（task-92 的 t92 镜像）上的两个 100% 复现缺陷。
 结论：两者都是 U-Boot 侧实现缺陷（不是页面/网络/环境问题），已分别用 patch 0053、0054 修复，并用主机 fixture 与 CI 门禁钉住。
-本任务不派发构建（task-92 第三次重建统一执行），无设备 / 无 flash 写。
+本任务不直接派发构建（由 task-92 第三次重建执行，结果见 §9），无设备 / 无 flash 写。
 
 ## 1. 现场证据（verify-docs t92 Phase A，零写）
 
@@ -127,3 +127,27 @@
 - 代码：`board/zte/zxhn-e2631/e2631rescue.c`、`e2631page.h`、`e2631query.h`、`net/mtk_tcp.c`、`net/mtk_tcp_priv.h`。
 - patch：`uboot-port/patches/0053-rescue-stream-the-rescue-page.patch`、
   `uboot-port/patches/0054-rescue-keep-the-URI-untruncated-and-release-dead-connections.patch`。
+
+## 9. 第三次统一构建（task-92 重开 t92c，run 46126880665）
+
+- 在 54-patch pin 上重跑 `uboot-build.yml`（head `1e430a2`）：run `46126880665`，`2026-11-28T08:40:05Z→08:42:04Z`
+  （约 2 分钟），**24/24 步全部成功**；artifact `e2631-uboot-46126880665`（id `15256310660`，zip 553,704 B，
+  `sha256sum -c` 全部通过），本地归档 `/home/qc233/zte/e2631-t5-artifacts/t92c-46126880665/`（`files/`、`logs/run.log`）。
+- 产物身份：banner `U-Boot 2027.01-rc2-gb52cb68dc9b9 (Nov 19 2026 - 15:44:39 +0000)`；post-am tree
+  `0b48c04ad18e8df251a1ec93a2614b3a6337e06b`（54 patches）；`u-boot.bin` **398,480 B**（比 52-patch 构建 398,552 B
+  小 72 B——0053 的流式发送与 0054 的连接释放净减代码），crc32 `d77a87d4`，sha256
+  `926b1b480230c0d45b7a978c412eb2595d9abb0f28286eafcedcad023abb4c84`；`mtd0.bin` 655,360 B，crc32 `155f3041`，
+  sha256 `0562a4c8cfd1134830a9e29282f15c1cf2af5c81792457cabdc11e0a6074c6b6`；装配后首 0x800 sha256
+  `e373501de671693fe91c4e1b8f51229dbf38c6840e032f0a9a173ca519bd8c16`；env 块 `6eee153b…` 与 `.config` `1e925cf2…`
+  均未变；入口点 `0x47f00000`。
+- 门禁实测：`E4 v3 size gate: 398480 <= 407552`（余量 9,072 B）；结构门禁 398,480 ≤ 645,120（余量 254,832 B / 39.01%）；
+  `slot core fixture: PASS (52 checks)`；`rescue dhcp pool fixture: PASS (14 checks)`；`console query fixture: PASS (14 checks)`；
+  `page stream fixture: PASS (16 checks, 7 chunks, 24904 bytes)`；`rescue header fixture: PASS`；
+  `rescue self-check gate: ... wired`；`E4 v3 rescue gate: sysinfo/log/integrity/reboot/LED/DHCP wired`；
+  `page stream gate: GET / streams the gzip page in chunks`；
+  `console query gate: untruncated URI, raw length guard, released connections`；
+  `command set: mii reclaimed (P2 applied)`（未再回收任何东西）；`mtd writer sites: 9`；`checkpatch: errors=0 warnings=0`；
+  页面 raw 78,957 / gzip 24,904 B（≤ 32,768，sha256 `8172e720…` 未变）。
+- 后续：verify-docs 的 t92c 设备复测（零 flash 写）按 §6 三项判据执行：`GET /` 200 + gzip body 长度/sha 与资产一致；
+  `/console` 257 B → 400 精确 body 后 `/status` 与 `/` 仍 200；三次大 `/backup` 流后页面与 `/status` 仍 200、`backup=idle`。
+- 边界：无 `firmware.yml`、无 Release/tag、main 未动、无设备动作。

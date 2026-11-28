@@ -857,9 +857,9 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
   `POST /env` 对这四个键做语义校验（池不越过 .254、不含服务器地址）。干净环境必须保持 `dhcp_source=default` 且无 warning
   （0052：主机八位组经 `ntohl()` 取，192.168.1.1 的主机八位组是 1，默认池 100..200 不包含它）。
 
-尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B；第二次统一 v3 构建（run 46124073666）最终
-`u-boot.bin` 398,552 B（≤ 407,552，余量 9,000 B，比 v3 基线 405,368 B 低 6,816 B；硬上限 653,312 − 240 KiB headroom
-的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B、0053/0054 净减 72 B；第三次统一 v3 构建
+（run 46126880665）最终 `u-boot.bin` 398,480 B（≤ 407,552，余量 9,072 B，比 v3 基线 405,368 B 低 6,888 B；
+硬上限 653,312 − 240 KiB headroom 的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### 恢复键进救援（0035，task-82；零写入）
 
@@ -1353,5 +1353,15 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   `close_all_conn` 释放存活连接，故看起来“能恢复”）。新增 patch 0053（页面按 4 KiB 分块流式发送，`e2631page.h` +
   主机 fixture 16 项）与 0054（URI 指向原始头行、`e2631query.h` 提供原始 query 长度/256 B 门、`REMOTE_CLOSED`
   释放 pdata、备份缓冲先释放再关连接；主机 fixture 14 项）；54 patches / tree
-  `0b48c04ad18e8df251a1ec93a2614b3a6337e06b`；构建由 task-92 第三次重建统一执行。证据
+  `0b48c04ad18e8df251a1ec93a2614b3a6337e06b`；构建由 task-92 第三次重建执行（身份见下一条）。证据
   [evidence/uboot-e4-v3-defects-20261128.md](../evidence/uboot-e4-v3-defects-20261128.md)。
+- 2026-11-28（task-92 重开 t92c，第三次统一构建）：run `46126880665`（head `1e430a2`，54 patches）24/24 步绿、约 2 分钟。
+  `u-boot.bin` **398,480 B**（比 52-patch 构建小 72 B），crc32 `d77a87d4`，sha256
+  `926b1b480230c0d45b7a978c412eb2595d9abb0f28286eafcedcad023abb4c84`；`mtd0.bin` 655,360 B crc32 `155f3041`
+  sha256 `0562a4c8cfd1134830a9e29282f15c1cf2af5c81792457cabdc11e0a6074c6b6`；装配后首 0x800 sha256
+  `e373501de671693fe91c4e1b8f51229dbf38c6840e032f0a9a173ca519bd8c16`；banner `U-Boot 2027.01-rc2-gb52cb68dc9b9`；
+  env 块 `6eee153b…`、`.config` `1e925cf2…` 未变；artifact `e2631-uboot-46126880665`（id 15256310660，553,704 B）。
+  门禁：`E4 v3 size gate: 398480 <= 407552`（余量 9,072 B）、结构余量 254,832 B (39.01%)、slot core 52、DHCP pool 14、
+  console query 14、page stream 16（7 chunks / 24,904 B）、page stream + console query gate 绿、mii reclaimed (P2)、
+  writer sites 9、checkpatch 0E/0W、页面 gzip 24,904 B 未变。无 Release/tag、无 firmware.yml、无设备动作。
+  证据 [evidence/uboot-e4-v3-defects-20261128.md](../evidence/uboot-e4-v3-defects-20261128.md) §9。
