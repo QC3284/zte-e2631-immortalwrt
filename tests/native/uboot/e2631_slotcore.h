@@ -60,7 +60,8 @@
 #define E2631_H_CRC2		0x1fcU
 
 #define E2631_PRODUCT_STRING	"ZXHN E2631 V1.0.0"
-#define E2631_PRODUCT_LEN	16U
+/* Linux e2631-fwslot compares 17 bytes of the 32-byte product field. */
+#define E2631_PRODUCT_LEN	17U
 
 enum e2631_slot_identity {
 	E2631_SLOT_ID_EMPTY = 0,

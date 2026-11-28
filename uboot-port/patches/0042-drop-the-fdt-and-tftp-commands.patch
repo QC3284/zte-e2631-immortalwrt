@@ -1,0 +1,43 @@
+From ef10f33a108ef39667e0afa353fa701676d7b332 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 14:58:52 +0800
+Subject: [PATCH 1/8] zx279128s: drop the fdt and tftp commands (task-90)
+
+The E4 v3 budget needs the P1 reclaim: cmd/fdt.o is 8,166 text + 63
+data and net/tftp.o is 4,137 text + 14 data.  Neither command is used by
+the rescue page or the normal boot path - host-to-U-Boot transfers go
+through the web rescue, and the serial loadx / e2631flash ladder is the
+recovery channel - so both are compiled out here.
+
+Measured from the UBOOT-SIZES of the task-84 build; the real number comes
+from the task-92 rebuild.  CONFIG_NET_TFTP_VARS goes away with the tftp
+command, which is expected.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ configs/zx279128s_zte_zxhn-e2631_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 95886d66..5fd993bb 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -22,6 +22,7 @@ CONFIG_CONSOLE_RECORD_OUT_SIZE=0x4000
+ # CONFIG_DISPLAY_CPUINFO is not set
+ # CONFIG_BOARD_INIT is not set
+ CONFIG_BOARD_LATE_INIT=y
++# CONFIG_CMD_FDT is not set
+ # CONFIG_CMD_SAVEENV is not set
+ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+@@ -29,6 +30,7 @@ CONFIG_CMD_MTD=y
+ CONFIG_CMD_DHCP=y
+ CONFIG_CMD_MII=y
+ CONFIG_CMD_PING=y
++# CONFIG_CMD_TFTPBOOT is not set
+ CONFIG_OF_CONTROL=y
+ CONFIG_OF_EMBED=y
+ CONFIG_ENV_IS_IN_MTD=y
+-- 
+2.56.1
+

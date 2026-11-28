@@ -5,7 +5,7 @@
 SPI-NAND 只读路径，0006/0007 为 A3 的槽位感知启动 + 只读 env，0008/0009 为 C1a 的 bootm ATAGS 修复 +
 env 日志名称诊断，0010 为产品入口 0x47F00000，0011 为跳转前的 CP15 归一化，0012 为厂商 board_eth_init
 的网络参考时钟/SerDes/管脚补齐，0013 为厂商在板级表回放后补驱动的两根 GPIO（PCIe 端点复位/供电线），0014 为自更新命令 `e2631flash`/`e2631verify`/`e2631slot`（flash 源先经 1 MiB bounce buffer 暂存，payload 与 readback 各打印 CRC32），0015 为 `CONFIG_CMD_MTD_WRITE` 开关（我们的 defconfig 关掉它，`e2631flash` 成为镜像里唯一的 MTD 写入口），0016 为 class-1 跨槽回退（选中槽 uImage 校验失败时自动改启另一槽一次，只回退本次启动、不写 flash/env），0017 为 `e2631env` 环境写回（白名单 + 厂商键快照 + 坏块预检/擦除/全 FF/写入/回读五步），0018/0019/0020 为 E2 U-Boot 以太网（MDIO 总线 + 交换机/流量管理器/DMA 初始化 + datapath 驱动与 `e2631net` 调试命令；固定 16 MiB DMA arena，单口 lan1），0021/0022 为 checkpatch 收口（新增一段 MAINTAINERS 条目覆盖板级/SoC/驱动/DTS/defconfig/命令文档，新增 `doc/usage/cmd/e2631net.rst` 用法页；两个 patch 都不含代码改动）
-、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、0034 为冷启动救援修复（`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用幂等的 `e2631_net_refclk_init()`：flash 冷启动直接进救援时 `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 的 MDIO 不应答、`phy_startup()` 约 5 s 后超时（-110，`no usable Ethernet device`）；RAM 验收当时能过只是因为先跑过 `e2631net`/`e2631boot`）、0035 为恢复键进救援（board_late_init 里裸 MMIO 轮询 reset/GPIO18 与 mesh/GPIO20，任一键连续按住 2 s 就把 `bootcmd` 在 RAM 内改成 `e2631rescue`；松手取消，不写 env/flash，另加只读 `e2631key` 诊断命令）、0036 为 E4 v2 的共享槽核心与槽写入器（Linux 侧 `e2631-fwslot` 逻辑编译进 U-Boot，`e2631_slotcore.c` 与 kit `tests/native/uboot/` 副本逐字节一致并有主机 fixture；`e2631fwslot.c` 是镜像里唯一写固件槽的 MTD shim）、0037 为 `rootfs_data` 擦除/全 FF 校验与一次性启动槽覆盖（只认名为 `rootfs_data` 且偏移/长度精确匹配的分区；`e2631_next_slot` 只改本次启动，不写 env）、0038 为救援页的分阶段环境写（begin/poll/end，同一五步写、同一白名单/厂商快照）、0039 为 E4 v2.1 多功能救援（`/slots`、`/env`、`/backup` 只读接口与 `/firmware`、`/boot`、`/factory`、`/env`、`/console` 写/控制接口；固件包只写目标槽，bootloader/slot/rootfs_data/env 各有唯一 owner），0040/0041 为 task-94 防御性自检（所有 SHA-256 使用显式清零的 `sha256_context`，哈希前校验上传窗口基址/长度；`rescue_fmt` 在输出游标离开已登记缓冲区时打印 FATAL 并拒绝渲染，`/status`、`/slots` 返回 500 `output cursor corrupted`）、
+、0025 为 defconfig-only 瘦身（`# CONFIG_MMC is not set` 一行；MMC=n → BLK=n 级联丢掉 EFI loader / 标准启动 / FAT / 块缓存，控制台少 `bootefi`/`eficonfig`/`bootflow`/`bcb`，`bootm` 与全部 `e2631*` 命令不变）、0026/0027/0028 为 E4 v1 救援模式（bl-mt798x-dhcpd 的最小 TCP/DHCP 栈 + `e2631flash` 五步写 job API + `e2631rescue` 的 DHCP/HTTP 救援页；只写 mtd0 的 U-Boot 区 `0x20000..0xC0000`（655360 B，写长度 0xA0000，源指针=镜像首地址）并复用 `e2631flash` 五步写，带 SHA-256 契约与结构校验，不自动重启）、0029 为厂商 TOPCRM 软复位（`0x94000044`）替换占位 `reset_cpu()`、0030 为环境区读取重试与失败现场打印（3 次重试仍失败才回落默认环境，打印偏移、CRC32 与前 64 字节）、0031 为 F2 的 TX 诊断（描述符变体运行时可切换，默认仍是内核的 directed-egress 描述符；`e2631net tx` 发广播探测帧并打印全量 TX/桥块状态，`e2631net sbrg allow` 回放 egress mask 复位值；只加诊断，不改默认发送路径）、0032 为 F2 根因修复（交换转发控制 `0x1cc000` 写 `17` 而不是误植的 `BIT(17)`：内核驱动与厂商 U-Boot 都写 `17`，写错时 TM 收下描述符并报完成、交换机却不转发、帧不上线；另新增 `e2631net bmu` 寄存器转储、`0x1fc` 改称 `dma err`、SBRG 状态常显）、0034 为冷启动救援修复（`do_e2631rescue()` 在 `net_init()`/`eth_init()` 之前显式调用幂等的 `e2631_net_refclk_init()`：flash 冷启动直接进救援时 `e2631boot` 还没跑过，网络参考时钟/SerDes 未建立，内部 PHY 的 MDIO 不应答、`phy_startup()` 约 5 s 后超时（-110，`no usable Ethernet device`）；RAM 验收当时能过只是因为先跑过 `e2631net`/`e2631boot`）、0035 为恢复键进救援（board_late_init 里裸 MMIO 轮询 reset/GPIO18 与 mesh/GPIO20，任一键连续按住 2 s 就把 `bootcmd` 在 RAM 内改成 `e2631rescue`；松手取消，不写 env/flash，另加只读 `e2631key` 诊断命令）、0036 为 E4 v2 的共享槽核心与槽写入器（Linux 侧 `e2631-fwslot` 逻辑编译进 U-Boot，`e2631_slotcore.c` 与 kit `tests/native/uboot/` 副本逐字节一致并有主机 fixture；`e2631fwslot.c` 是镜像里唯一写固件槽的 MTD shim）、0037 为 `rootfs_data` 擦除/全 FF 校验与一次性启动槽覆盖（只认名为 `rootfs_data` 且偏移/长度精确匹配的分区；`e2631_next_slot` 只改本次启动，不写 env）、0038 为救援页的分阶段环境写（begin/poll/end，同一五步写、同一白名单/厂商快照）、0039 为 E4 v2.1 多功能救援（`/slots`、`/env`、`/backup` 只读接口与 `/firmware`、`/boot`、`/factory`、`/env`、`/console` 写/控制接口；固件包只写目标槽，bootloader/slot/rootfs_data/env 各有唯一 owner），0040/0041 为 task-94 防御性自检（所有 SHA-256 使用显式清零的 `sha256_context`，哈希前校验上传窗口基址/长度；`rescue_fmt` 在输出游标离开已登记缓冲区时打印 FATAL 并拒绝渲染，`/status`、`/slots` 返回 500 `output cursor corrupted`）、0042 为 E4 v3 的尺寸回收（defconfig 关掉 `CONFIG_CMD_FDT` 与 `CONFIG_CMD_TFTPBOOT`，实测省 12,380 B；代价是控制台没有 `fdt`/`tftp`，主机到 U-Boot 的网络传输改由救援页承担，串口恢复仍可用 `loadx` + `e2631flash`）、0043 为产品串比较对齐 Linux（`E2631_PRODUCT_LEN` 16→17，主机 fixture 增第 17 字节向量、涨到 52 项）、0044 为 `POST /console` 原始长度检查（257 B 以上返回 400 `only a single command is allowed`，不再静默截断并执行前缀）、0045 为 E4 v3 系统信息与启动日志（GET `/sysinfo` 固定键序含 CP15/SPI-NAND id/时钟寄存器，GET `/log` 返回进入救援时抓取的 console 记录快照、`?download=1` 加附件头；`/status` 增 `log_bytes`/`log_overflow`）、0046 为只读完整性校验（POST `/integrity` 对 mtd0 `0x20000..0xC0000` 算 CRC32+SHA-256，可带 `expect` 或 `X-E2631-Expected-Sha256` 比对，返回 `match=ok|mismatch|absent`）、0047 为槽与 rootfs 备份流（`/backup?part=slot0|slot1|rootfs|header`，整槽用 1 MiB cache-aligned bounce、先两遍读算 CRC32/SHA-256 再流）、0048 为确认重启与蓝灯心跳（POST `/reboot` 需 `X-E2631-Confirm: reboot`，先回 `result=accepted` 再等 `DATA_SENT` 约 300 ms 调 `reset_cpu()`；救援期间 GPIO0 bit8 按 1 Hz 闪、退出时恢复原 DIR/DATA）、0049 为 DHCP 配置进 env（`e2631_dhcp_ipaddr`/`netmask`/`pool_start`/`pool_size` 优先于旧 `dhcpd_pool_*`，非法值回落默认并在 `/status` 报 `dhcp_source=fallback` 与 `dhcp_warning`）。
 pin 文件、设计说明
 （[a2-spi-nand-design.md](a2-spi-nand-design.md)、[a3-slot-boot-design.md](a3-slot-boot-design.md)、
 [a4-soc-state-design.md](a4-soc-state-design.md)、[a5-net-refclk-design.md](a5-net-refclk-design.md)、
@@ -139,7 +139,23 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0040 sha256 | `d274ff0f586caefa0a7fb77caa59e0e515af02829062639129a89a537077112e` |
 | patch 0041 | `uboot-port/patches/0041-rescue-stop-rendering-when-the-output-cursor-is-corrupted.patch`（task-94 防御：`rescue_fmt()` 在已登记缓冲区内校验 `*p`/`*left`，失配即 FATAL 并拒绝渲染；`/status`、`/slots` 返回 500 `output cursor corrupted`；状态渲染末尾校验 `p == buf + (bufsz - left)`） |
 | patch 0041 sha256 | `cf03f0e239e286551cb24f619c8d45fc4fd27d4b74a8d7df7164b6e953c64e1b` |
-| am 之后 tree | `58c996fe8151ca81f45829d8fb5c41f7aea3b38b`（与机器无关，41 个 patch） |
+| patch 0042 | `uboot-port/patches/0042-drop-the-fdt-and-tftp-commands.patch`（E4 v3 尺寸回收：defconfig 关 `CONFIG_CMD_FDT` 与 `CONFIG_CMD_TFTPBOOT`，实测 8,229 + 4,151 = 12,380 B；网络传输由救援页承担） |
+| patch 0042 sha256 | `6f322294061909aa36c74de87c8f618d6fb019da47775e74b84ec422947516c8` |
+| patch 0043 | `uboot-port/patches/0043-board-zte-compare-the-17-byte-product-string-like-Li.patch`（E4 v3：`E2631_PRODUCT_LEN` 16→17，与 Linux `e2631-fwslot` 的 `sizeof(PRODUCT)-1` 一致；fixture 增加第 17 字节向量） |
+| patch 0043 sha256 | `5bbe5d2b6b91384de357c49b94c9f5610713512a860385cdbc679e24a0e9068b` |
+| patch 0044 | `uboot-port/patches/0044-board-zte-reject-an-over-long-console-command-instead.patch`（E4 v3：`rescue_query_raw_len()` 在解码前检查原始长度，>256 B 返回 400 `only a single command is allowed`） |
+| patch 0044 sha256 | `aa0e9b0a69e33bfbf077e0023dde0bdba686ca5bec428de4c1be513bf03e63ac` |
+| patch 0045 | `uboot-port/patches/0045-board-zte-report-the-system-state-and-the-boot-log.patch`（E4 v3：GET `/sysinfo`、`/log` 与 `/status` 的 `log_bytes`/`log_overflow`；CP15 读取经 `e2631soc.c` 导出） |
+| patch 0045 sha256 | `65a8751b1d6daa42d54d3ffe5271f0a138754aeb79bfd851126852b66ad85166` |
+| patch 0046 | `uboot-port/patches/0046-board-zte-add-the-read-only-flash-integrity-check.patch`（E4 v3：POST `/integrity`，mtd0 `0x20000..0xC0000` 的 CRC32+SHA-256 与可选 expect 比对；GET 405、busy 409、读失败 500） |
+| patch 0046 sha256 | `746fead6b0a265de3b7684cff16cc7d1c90bf15fc91c3dd49ce36b4ad634bc0b` |
+| patch 0047 | `uboot-port/patches/0047-board-zte-stream-the-slot-and-rootfs-backups.patch`（E4 v3：`/backup` 增加 slot0/slot1/rootfs/header，整槽 1 MiB cache-aligned bounce、先两遍读再流；`/status` 报 `backup`/`backup_part`） |
+| patch 0047 sha256 | `1960f78df83062ec95d93115162ad93a2d139813a97961d461de21393badc4e3` |
+| patch 0048 | `uboot-port/patches/0048-board-zte-add-the-confirmed-reboot-and-the-blue-LED-.patch`（E4 v3：POST `/reboot` 需 confirm 头、先 accepted 后约 300 ms 复位；蓝灯 GPIO0 bit8 1 Hz 心跳并在退出时恢复 DIR/DATA） |
+| patch 0048 sha256 | `5f5dba995c699f03189e7fd1e0eb6906790d8afdb97e679eb9b2bc0820d5e0b0` |
+| patch 0049 | `uboot-port/patches/0049-board-zte-let-the-environment-move-the-DHCP-server.patch`（E4 v3：`e2631_dhcp_*` 优先于旧 `dhcpd_pool_*`/内置默认；非法值回落并在 `/status` 报 fallback+warning；`/env` 对四键做语义校验） |
+| patch 0049 sha256 | `ba15e88c0095e65e934e1fb8829e988e8f1e7c3fb9d9f5b6a5d74367af67d904` |
+| am 之后 tree | `8b32cd3c0f050c02e640efe36d30cb50446ec09d`（与机器无关，49 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -157,7 +173,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = 58c996fe8151ca81f45829d8fb5c41f7aea3b38b
+test "$(git rev-parse HEAD^{tree})" = 8b32cd3c0f050c02e640efe36d30cb50446ec09d
 ```
 
 ## 2. 新增/修改的文件
@@ -437,8 +453,8 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `58c996fe8151ca81f45829d8fb5c41f7aea3b38b`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 41）。
+1. `git rev-parse HEAD^{tree}` == `8b32cd3c0f050c02e640efe36d30cb50446ec09d`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 49）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -450,12 +466,14 @@ make O=build -j"$(nproc)"
    E2 起还要求 `CONFIG_DM_ETH=y`、`CONFIG_DM_MDIO=y`、`CONFIG_PHYLIB=y`、`CONFIG_PHY_GIGE=y`、
    `CONFIG_ETH_ZX279128S=y`、`CONFIG_MDIO_ZX279128S=y`、`CONFIG_NET_RANDOM_ETHADDR=y`、
 
-   `CONFIG_CMD_DHCP=y`、`CONFIG_CMD_MII=y`、`CONFIG_CMD_PING=y`、`CONFIG_CMD_TFTPBOOT=y`；
+   `CONFIG_CMD_DHCP=y`、`CONFIG_CMD_MII=y`、`CONFIG_CMD_PING=y`（E4 v3 起还要求
+   `# CONFIG_CMD_TFTPBOOT is not set` 与 `# CONFIG_CMD_FDT is not set`）；
    E4 起还要求 `CONFIG_MTK_TCP=y`、`CONFIG_MTK_DHCPD=y`、`CONFIG_SHA256=y` 且
    `# CONFIG_MTK_TCP_VERBOSE is not set`；E4 v2.1 起还要求 `CONFIG_CONSOLE_RECORD=y` 与
    `CONFIG_CONSOLE_RECORD_OUT_SIZE=0x4000`（`/console` 的 4 KiB 尾部捕获）。
 3. 镜像尺寸：`size=$(stat -c%s build/u-boot.bin); test "$size" -le 653312`
-   （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。
+   （超限就裁命令/驱动；这条对应 mtd0 载荷上限 0x9F800，是刷写阶段的硬前置）。E4 v3 起还要求
+   `size <= 653312 - 245760 = 407552`（至少保留 240 KiB headroom），打印 `E4 v3 size gate: ...`。
 4. 入口点：`readelf -h build/u-boot` 的 Entry point 应为 `0x47F00000`（readelf 打印小写 `0x47f00000`，CI 统一转小写比较）。
 5. 上传 CI artifact：`u-boot.bin`、`u-boot.map`、`.config`、构建日志；记录 run URL。
 6. checkpatch（CI 门禁，见 §6）：CI 以 `--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF` 跑
@@ -463,7 +481,7 @@ make O=build -j"$(nproc)"
    逐类注释，并由运行期断言钉成“恰好这四类”；这四类之外的任何 warning 或任何 error 都会让 uboot-build 失败。
    不加 ignore 时的原始统计是 0 errors / 26 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0/2；0013 0/0；
    0014 0/4；0015 0/5；0016 0/0；0017 0/2；0018 修正后 0/1；0019 0/1；0020 0/1；0021 0/0；0022 0/1；
-   0036-0039 各 0/0；0040/0041 各 0/0，无新增豁免），分项与原因见 §6；
+   0036-0039 各 0/0；0040/0041 各 0/0；0042-0049 各 0/0，无新增豁免），分项与原因见 §6；
    四类豁免的必要性与 checkpatch.pl 源码依据（2805、3560-3568、2670-2674 行）见
    [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
@@ -484,6 +502,7 @@ make O=build -j"$(nproc)"
     E4 v2.1 起二进制还须含 `serve the web failsafe (v1+v2) on lan1`、`X-E2631-Part`、
     `only a single command is allowed`、`rootfs_data` + `layout mismatch`（工厂模块用 `%s` 拼接）、`slot is not bootable`、
     `package size out of range`、`refusing to overwrite a working vendor system`。
+    E4 v3 起还须含 `X-E2631-Log-Bytes`、`X-E2631-Expected-Sha256`、`e2631-bootlog.txt`、`method not allowed`。
 11. A3/C1a/C1b/A5 修复（0008/0009/0011/0012）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h`、
     `grep -q 'e2631_soc_prepare_linux' board/zte/zxhn-e2631/e2631boot.c`、
@@ -588,11 +607,11 @@ make O=build -j"$(nproc)"
     `e2631boot.c` 不得出现任何 `mtd_write`/`mtd_erase`/`mtd_special_write_oob`；二进制必须含
     `e2631key: reset (gpio18)` 帮助文本。打印
     `key rescue gate: ...`。该任务的 +1 KiB 尺寸门禁只适用于 0035 单独增量；0036-0039 加入后它已被
-    E4 v2.1 预算门禁取代（见 item 26）。
+    E4 v2.1/v3 尺寸门禁取代（见 item 26）。
 
 24. E4 v2 模块 C（0036/0037，task-84）：`tests/native/uboot/e2631_slotcore.{c,h}` 必须在 `git am` 之后与
     `board/zte/zxhn-e2631/` 同名文件逐字节一致（CI `cmp`），主机 fixture 编译运行并打印
-    `slot core fixture: PASS (51 checks, package/identity/guard/stamp vectors)`；源码含
+    `slot core fixture: PASS (52 checks, package/identity/guard/stamp vectors)`；源码含
     `e2631_fwslot_validate`/`e2631_fwslot_begin`/`e2631_fwslot_poll`/`e2631_factory_begin`/`e2631_factory_poll`；
     U-Boot DTS 含 `fixed-partitions`、`"rootfs_data"`、`0x03360000 0x004a0000`；`e2631boot.c` 含
     `e2631_next_slot_override` 与 `env_get("e2631_next_slot")`，救援侧含 `env_set("e2631_next_slot"`。
@@ -600,12 +619,15 @@ make O=build -j"$(nproc)"
     `console_record_reset_enable`、`rescue_console_run`、`hexport_r`、`rescue_backup_part`、`sha256_starts`、
     `X-E2631-Part`；`.config` 含 `CONFIG_CONSOLE_RECORD=y` 与 `CONFIG_CONSOLE_RECORD_OUT_SIZE=0x4000`；
     二进制文本见 item 10 的 v2.1 列表；`e2631env.c` 的 `static_assert(` 仍为 4 条、坏块预检仍在 erase 之前。
-26. 四 owner 写者与尺寸预算（0036-0039）：见 item 14 的白名单描述；尺寸门禁为 u-boot.bin ≤
-    `E2631_UBOOT_V2_BASELINE_SIZE`（366,600 B，run 46095932548）+ `E2631_UBOOT_V2_GROWTH_MAX`（40 KiB），
-    即 E4 v2.1 增量不超过 40 KiB；打印 `E4 v2.1 size gate: ...`。旧 `E2631_UBOOT_KEY_*` pin 与
-    `recovery-key size gate` 已随序列增长退役（见 commits.env 注释）。
+26. 四 owner 写者与尺寸预算（0036-0039 起，0042 起改为 v3 预算）：见 item 14 的白名单描述；E4 v3 的
+    尺寸门禁是 u-boot.bin ≤ `E2631_UBOOT_HARD_LIMIT`（653,312 B）− `E2631_UBOOT_HEADROOM_MIN`（245,760 B）
+    = 407,552 B，即至少保留 240 KiB headroom；打印 `E4 v3 size gate: ...`。`E2631_UBOOT_SIZE_BASELINE`
+    （405,368 B，run 46109519805）只用于说明起点。旧的 `E2631_UBOOT_V2_*`、`E2631_UBOOT_KEY_*` pin 与
+    对应门禁均已退役（见 commits.env 注释）。
 
-27. task-94 救援自检（0040/0041）：`e2631rescue.c` 必须含 `rescue_fmt_range`、`output cursor corrupted`、`memset(&ctx, 0, sizeof(ctx))`，且不得再出现 `sha256_csum_wd`；`u-boot.bin` 必须含 `output cursor corrupted` 与 `refusing to hash` 两条文本；打印 `rescue self-check gate: ...`。
+27. task-94 救援自检（0040/0041）：`e2631rescue.c` 必须含 `rescue_fmt_range`、`output cursor corrupted`、`memset(&ctx, 0, sizeof(ctx))`；**整个 `board/zte/zxhn-e2631/` 都不得再出现 `sha256_csum_wd`**；`u-boot.bin` 必须含 `output cursor corrupted` 与 `refusing to hash` 两条文本；打印 `rescue self-check gate: ...`。
+28. E4 v3 端点（0042-0049，task-90）：`e2631rescue.c` 必须含 `rescue_query_raw_len`、`rescue_sysinfo_text`、`rescue_log_snapshot`、`rescue_integrity`、`rescue_handle_reboot`、`rescue_led_start`、`rescue_dhcp_load`；`e2631_slotcore.h` 的 `E2631_PRODUCT_LEN` 必须是 17U；`net/mtk_dhcpd.c` 必须含 `e2631_dhcp_pool_start`；二进制文本见 item 10 的 v3 列表；打印 `E4 v3 rescue gate: ...`。
+29. slot core 主机 fixture 的检查数（task-90）：fixture 输出必须命中 `(52 checks`（0043 增加第 17 字节产品向量），否则 53 个环境里的老副本会被当成通过。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -793,6 +815,35 @@ autoneg 等待）与 `zx_hw_reset()` 之后的硬件状态；根因未定前，�
 `result=error` + `error=<短 ASCII>`；成功不自动重启，页面只提示断电重启或手动 `reset`。
 验收顺序：先在 RAM 链做零写入 validate/负例/页面交互（含一次 `/console`、`/env` 与 `/backup`），
 固件 write 与 `/factory` 必须单独批准；写后回读 slot/`rootfs_data` 校验并记录 mtd0 与目标槽 sha256。
+
+### E4 v3 状态/日志/完整性/重启/DHCP（0042-0049，task-90；构建由 task-92 统一）
+
+契约以 [evidence/e4-v3-contract-delta-20261128.md](../evidence/e4-v3-contract-delta-20261128.md) 为准（页面已在 task-91 实现，
+C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化的端点：
+
+- **控制台命令回收（0042）**：defconfig 关掉 `CONFIG_CMD_FDT` 与 `CONFIG_CMD_TFTPBOOT`（12,380 B）。控制台不再有 `fdt`/`tftp`/
+  `tftpboot`；主机到 U-Boot 的网络传输改走救援页（`POST /flash` 与 `POST /firmware`），串口恢复仍可用 `loadx` + `e2631flash`。
+  `CONFIG_CMD_MTD`/`bootm`/`e2631*` 命令不受影响，D-U1 的写 owner 规则不变。
+- **GET `/sysinfo`**：固定键序的只读系统表（版本/banner/构建时间/板卡/SoC/DRAM/mtd0/SPI-NAND 参数与 id/CP15 寄存器/
+  9 个时钟寄存器/cpu_mhz=`1000`+`source=known`）。全部只读，不写 flash/env，幂等无缓存。
+- **GET `/log`**：进入 `e2631rescue` 时（打印 banner 前）把 console record ring 读成快照；body 是原始文本行，
+  头带 `X-E2631-Log-Bytes`/`X-E2631-Log-Overflow`/`Content-Length`；`?download=1` 加 `Content-Disposition`。
+- **POST `/integrity`**：只读计算 mtd0 `0x20000..0xC0000` 的 CRC32+SHA-256；`expect` 可来自 query 或
+  `X-E2631-Expected-Sha256`（query 优先，必须 64 hex），返回 `match=ok|mismatch|absent`。GET 为 405，写任务/备份期间 409。
+- **GET `/backup` 扩展（0047）**：除 v2.1 的五个小分区外，新增 `slot0`/`slot1`（各 `0x1C00000`）、`rootfs`（按 `next_slot` 选
+  `0x00B00000`/`0x02700000`，`0x1100000`）与 `header`（`0x1C00000`/`0x3800000`，`0x20000`）。整槽用 1 MiB cache-aligned bounce、
+  先两遍读（CRC32+SHA-256）再流式发送；单个备份可能持续数分钟，期间 `/status` 报 `backup=active`/`backup_part`，其它写任务 409。
+- **POST `/reboot`（0048）**：空 body + `X-E2631-Confirm: reboot`；任一写任务或备份进行中 409；应答 `result=accepted`/`reboot=1`
+  并等 ACK，约 300 ms 后调 0029 的 TOPCRM 软复位。页面只提示“设备正在重启，约 20-30 秒后回到系统”。
+- **蓝灯心跳（0048）**：救援期间 GPIO0 bit8（active-low）1 Hz 闪；进入时保存 bank0 DIR/DATA，退出/Ctrl-C/错误/复位前恢复原值，
+  不驱动绿/红灯，`/status` 不加 LED 字段。
+- **DHCP 配置（0049）**：`e2631_dhcp_ipaddr`/`e2631_dhcp_netmask`/`e2631_dhcp_pool_start`（1..254）/`e2631_dhcp_pool_size`（1..200）
+  优先于旧的 `dhcpd_pool_start/size` 与内置默认；非法值回落默认并在 `/status` 报 `dhcp_source=fallback` 与 `dhcp_warning`，
+  `POST /env` 对这四个键做语义校验（池不越过 .254、不含服务器地址）。
+
+尺寸：0042 回收 12,380 B，v3 端点净增后必须仍满足 `size <= 407,552`（硬上限 653,312 − 240 KiB headroom，
+见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+`/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### 恢复键进救援（0035，task-82；零写入）
 
 操作：断电 → 按住 reset 键或 mesh 键不放 → 上电 → 保持约 6 s（secondboot 到 `board_late_init()` 约 3–4 s，
@@ -877,6 +928,16 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   任何能接上 lan1 并拿到 DHCP 地址的人都能执行单条 U-Boot 命令（含 `mtd erase` 之外的受限命令）、写白名单 env、
   擦 `rootfs_data`、或按契约写目标固件槽；安全边界是**物理 LAN 信任**，不要把救援链暴露到 WAN，不要在不可信网络上
   保持救援模式运行。`/console` 还允许阻塞式命令（没有超时保护），可能把救援会话卡住；阻塞类操作只接物理串口。
+- **E4 v3 删掉了控制台的 `fdt`/`tftp` 命令（0042）**：这是尺寸回收的代价，不是回归。恢复/更新通道改为救援页（`POST /flash`、
+  `POST /firmware`）与串口 `loadx` + `e2631flash`；若需要在控制台做设备树/变量调试，请临时打开 defconfig 里的对应符号
+  （默认关闭），并预期镜像会超过 407,552 B 门禁。
+- **E4 v3 的 `/reboot` 会真复位（0048）**：只在确认头 + 空 body 下触发，写任务/备份期间 409；复位前救援 LED 恢复原值。
+  RAM 链上 `/reboot` 会重跑 BootROM→secondboot→已写入的 U-Boot，若镜像只在 RAM 里，复位后就回到 flash 镜像——
+  这是预期行为，页面文案不能写成“已升级”。
+- **整槽备份很慢（0047）**：`/backup?part=slot0|slot1` 各 `0x1C00000`（28 MiB），要两遍读（先哈希再流），
+  在 100 Mbit 链路上按分钟计；期间 `/status` 的 `backup=active` 会阻止其它写任务。不要在救援页同时开多个大备份。
+- **E4 v3 的尺寸门禁会把页面算进来（task-92）**：v3 页面 gzip 约 24,904 B（v1 基线 13,773 B），加上 v3 C 代码后
+  u-boot.bin 可能逼近 407,552 B；若 task-92 构建被门禁拒绝，按用户授权先砍页面 I18N（不改 C），再评估 P2 的 `CMD_MII` 回收。
 - **E4 v2.1 的写路径只能在受控会话里验收**：`/firmware` 写目标槽（整槽擦/写/回读）、`/factory` 擦 `rootfs_data` 都是
   破坏性操作；首次验收必须在 RAM 链、已记录目标槽/整盘 sha256 的前提下，由用户单独批准，先跑 net-zero validate 与负例矩阵，
   再跑一次真实的空槽/净零写入，写后回读 slot 校验并核对 mtd0 未变。固件包上限 `0x1BE0214`、暂存 `0x46100000`，
@@ -1231,3 +1292,8 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   只读探针 + 首次真实写）交 task-86，需 Lead/用户批准。证据
   [evidence/uboot-e4-v2-20261128.md](../evidence/uboot-e4-v2-20261128.md)。
 - 2026-11-28（task-94，救援自检防御）：新增 patch 0040/0041——所有 SHA-256 改为显式清零的 `sha256_context` 并在哈希前校验上传窗口基址/长度（`rescue_sha256()` 越界即 FATAL），`rescue_fmt()` 在输出游标离开已登记缓冲区时 FATAL 并拒绝渲染，`/status`、`/slots` 返回 500 `output cursor corrupted`；41 patches / tree `58c996fe8151ca81f45829d8fb5c41f7aea3b38b`；构建由 task-92 统一重跑（CI 身份待填）。证据 [evidence/uboot-rescue-defenses-20261128.md](../evidence/uboot-rescue-defenses-20261128.md)。
+- 2026-11-28（task-90，E4 v3 C 实现）：新增 patch 0042-0049——defconfig 回收 `CONFIG_CMD_FDT`/`CONFIG_CMD_TFTPBOOT`（12,380 B）、
+  产品串按 Linux 比较 17 B、`/console` 原始长度检查、GET `/sysinfo` 与 `/log`、POST `/integrity`、`/backup` 的槽/rootfs/header 流、
+  POST `/reboot` 与蓝灯心跳、DHCP 配置进 env（`e2631_dhcp_*`）；49 patches / tree `8b32cd3c0f050c02e640efe36d30cb50446ec09d`；
+  slot core fixture 52 项；尺寸门禁改为 `<= 653,312 − 245,760 = 407,552 B`。构建由 task-92 统一重跑（CI 身份待填）。证据
+  [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md)。

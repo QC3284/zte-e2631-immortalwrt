@@ -1,0 +1,307 @@
+From a64774f3a8a348ca22c8f848f583d64b9e0fdeef Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:08:31 +0800
+Subject: [PATCH 8/8] rescue: let the environment move the DHCP server
+ (task-90)
+
+Four whitelisted keys now configure the rescue DHCP server:
+e2631_dhcp_ipaddr (192.168.1.1), e2631_dhcp_netmask (255.255.255.0),
+e2631_dhcp_pool_start (100, 1..254) and e2631_dhcp_pool_size (101,
+1..200).  The e2631_dhcp_* keys win, the legacy dhcpd_pool_start/size
+keys stay readable for compatibility and the built-ins are the last
+resort.  The values are read once, before net_init(), and the HTTP
+address is printed from the same config.
+
+A key that exists but is invalid falls back to its default, the pool is
+reset to 100..200 when it runs past .254 or contains the server address,
+and /status reports dhcp_source=env|default|fallback plus the key list in
+dhcp_warning.  POST /env now applies the same checks to those four keys
+and rejects an invalid value with 400 bad value.
+
+net/mtk_dhcpd.c keeps its own defaults but prefers the e2631_dhcp_*
+values, so the pool it hands out matches what /status reports.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 185 ++++++++++++++++++++++++++++-
+ net/mtk_dhcpd.c                    |   8 +-
+ 2 files changed, 185 insertions(+), 8 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 0bc064eb..0bc47b6a 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -16,6 +16,10 @@
+  *             POST /firmware?mode=...      upgrade package to a slot
+  *             POST /boot?slot=0|1          one-shot boot override
+  *             POST /factory?confirm=reset  erase the overlay
++ *             GET  /sysinfo                board, SoC and clock report
++ *             GET  /log                    boot-log snapshot
++ *             POST /integrity              CRC32/SHA-256 of the U-Boot area
++ *             POST /reboot                 confirmed SoC reset
+  *             POST /env?key=&value=        whitelisted env write
+  *             POST /console?cmd=           capture one console command
+  *
+@@ -835,6 +839,157 @@ static void rescue_slot_fields(char **p, size_t *left, int idx,
+ 		   si->hpos >= 0 ? base + (unsigned long)si->hpos : 0UL);
+ }
+ 
++/*
++ * Rescue DHCP configuration (v3 contract): e2631_dhcp_* wins over the
++ * legacy dhcpd_pool_* keys, which stay readable for compatibility, and
++ * over the built-in defaults.  Values are read once, before net_init(),
++ * because the DHCP server and the HTTP address must agree from the first
++ * reply.  A key that exists but is invalid falls back to its default and
++ * is listed in dhcp_warning so /status can show why.
++ */
++struct rescue_dhcp_cfg {
++	struct in_addr ip;
++	struct in_addr netmask;
++	char ip_str[16];
++	char netmask_str[16];
++	u32 pool_start;
++	u32 pool_size;
++	const char *source;
++	char warning[128];
++};
++
++static struct rescue_dhcp_cfg rescue_dhcp;
++
++static void rescue_dhcp_warn(const char *key)
++{
++	size_t n = strlen(rescue_dhcp.warning);
++
++	if (n && n + 1 < sizeof(rescue_dhcp.warning))
++		rescue_dhcp.warning[n++] = ',';
++	if (n + strlen(key) < sizeof(rescue_dhcp.warning))
++		strcpy(rescue_dhcp.warning + n, key);
++}
++
++/* 0 = from the environment, 1 = built-in default, -1 = invalid value. */
++static int rescue_dhcp_ipval(const char *key, const char *def,
++			     struct in_addr *out,
++			     char *out_str, size_t outsz)
++{
++	const char *val = env_get(key);
++	struct in_addr ip;
++
++	if (!val || !val[0]) {
++		*out = string_to_ip(def);
++		ip_to_string(*out, out_str);
++		return 1;
++	}
++	ip = string_to_ip(val);
++	if (!ip.s_addr) {
++		*out = string_to_ip(def);
++		ip_to_string(*out, out_str);
++		return -1;
++	}
++	*out = ip;
++	ip_to_string(*out, out_str);
++	return 0;
++}
++
++static int rescue_dhcp_num(const char *key, const char *legacy, u32 def,
++			   u32 lo, u32 hi, u32 *out)
++{
++	const char *val = env_get(key);
++	char *end;
++	u32 v;
++
++	if (!val || !val[0])
++		val = legacy ? env_get(legacy) : NULL;
++	if (!val || !val[0]) {
++		*out = def;
++		return 1;
++	}
++	v = simple_strtoul(val, &end, 0);
++	if (!end || *end || v < lo || v > hi) {
++		*out = def;
++		return -1;
++	}
++	*out = v;
++	return 0;
++}
++
++static void rescue_dhcp_load(void)
++{
++	int ip_ret, mask_ret, start_ret, size_ret;
++	bool from_env = false;
++	bool bad = false;
++	u32 host;
++
++	ip_ret = rescue_dhcp_ipval("e2631_dhcp_ipaddr", "192.168.1.1",
++				   &rescue_dhcp.ip, rescue_dhcp.ip_str,
++				   sizeof(rescue_dhcp.ip_str));
++	mask_ret = rescue_dhcp_ipval("e2631_dhcp_netmask", "255.255.255.0",
++				     &rescue_dhcp.netmask,
++				     rescue_dhcp.netmask_str,
++				     sizeof(rescue_dhcp.netmask_str));
++	start_ret = rescue_dhcp_num("e2631_dhcp_pool_start", "dhcpd_pool_start",
++				    100, 1, 254, &rescue_dhcp.pool_start);
++	size_ret = rescue_dhcp_num("e2631_dhcp_pool_size", "dhcpd_pool_size",
++				   101, 1, 200, &rescue_dhcp.pool_size);
++
++	if (ip_ret < 0) {
++		bad = true;
++		rescue_dhcp_warn("e2631_dhcp_ipaddr");
++	}
++	if (mask_ret < 0) {
++		bad = true;
++		rescue_dhcp_warn("e2631_dhcp_netmask");
++	}
++	if (start_ret < 0) {
++		bad = true;
++		rescue_dhcp_warn("e2631_dhcp_pool_start");
++	}
++	if (size_ret < 0) {
++		bad = true;
++		rescue_dhcp_warn("e2631_dhcp_pool_size");
++	}
++	from_env = !ip_ret || !mask_ret || !start_ret || !size_ret;
++
++	if (!bad) {
++		host = rescue_dhcp.ip.s_addr & 0xff;
++		if (rescue_dhcp.pool_start + rescue_dhcp.pool_size - 1 > 254) {
++			bad = true;
++			rescue_dhcp_warn("e2631_dhcp_pool_start");
++		} else if (host >= rescue_dhcp.pool_start &&
++			   host <= rescue_dhcp.pool_start +
++				   rescue_dhcp.pool_size - 1) {
++			bad = true;
++			rescue_dhcp_warn("e2631_dhcp_pool_start");
++		}
++		if (bad) {
++			rescue_dhcp.pool_start = 100;
++			rescue_dhcp.pool_size = 101;
++		}
++	}
++	rescue_dhcp.source = bad ? "fallback" : from_env ? "env" : "default";
++}
++
++static bool rescue_env_semantic_ok(const char *key, const char *value)
++{
++	char *end;
++	u32 v;
++
++	if (!strcmp(key, "e2631_dhcp_ipaddr") ||
++	    !strcmp(key, "e2631_dhcp_netmask"))
++		return string_to_ip(value).s_addr != 0;
++	if (strcmp(key, "e2631_dhcp_pool_start") &&
++	    strcmp(key, "e2631_dhcp_pool_size"))
++		return true;
++	v = simple_strtoul(value, &end, 0);
++	if (!end || *end)
++		return false;
++	if (!strcmp(key, "e2631_dhcp_pool_start"))
++		return v >= 1 && v <= 254;
++	return v >= 1 && v <= 200;
++}
+ static void rescue_status_text(char *buf, size_t bufsz)
+ {
+ 	const struct e2631_slots *slots = rescue_slots();
+@@ -971,6 +1126,12 @@ static void rescue_status_text(char *buf, size_t bufsz)
+ 	rescue_fmt(&p, &left, "backup_part=%s\n", rescue_backup_part_name);
+ 	rescue_fmt(&p, &left, "reboot_pending=%d\n",
+ 		   reboot_pending ? 1 : 0);
++	rescue_fmt(&p, &left, "dhcp_ip=%s\n", rescue_dhcp.ip_str);
++	rescue_fmt(&p, &left, "dhcp_netmask=%s\n", rescue_dhcp.netmask_str);
++	rescue_fmt(&p, &left, "dhcp_pool_start=%u\n", rescue_dhcp.pool_start);
++	rescue_fmt(&p, &left, "dhcp_pool_size=%u\n", rescue_dhcp.pool_size);
++	rescue_fmt(&p, &left, "dhcp_source=%s\n", rescue_dhcp.source);
++	rescue_fmt(&p, &left, "dhcp_warning=%s\n", rescue_dhcp.warning);
+ 
+ 	if (!rescue_fmt_fault && p != buf + (bufsz - left))
+ 		rescue_fmt_range_fail("p and left no longer agree");
+@@ -2216,7 +2377,8 @@ static void rescue_handle_env(struct e2631_rescue_conn *c, const char *query,
+ 			     strlen("result=error\nerror=key is not writable\n"));
+ 		return;
+ 	}
+-	if (!rescue_env_value_ok(value)) {
++	if (!rescue_env_value_ok(value) ||
++	    !rescue_env_semantic_ok(key, value)) {
+ 		rescue_reply(c, 400, "Bad Request", "text/plain", NULL,
+ 			     "result=error\nerror=bad value\n",
+ 			     strlen("result=error\nerror=bad value\n"));
+@@ -2717,6 +2879,7 @@ static int rescue_loop(void)
+ 	int ch;
+ 
+ 	printf("e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\n");
++	rescue_dhcp_load();
+ 	net_init();
+ 
+ 	if (eth_init()) {
+@@ -2724,11 +2887,19 @@ static int rescue_loop(void)
+ 		return CMD_RET_FAILURE;
+ 	}
+ 
+-	server_ip = string_to_ip("192.168.1.1");
++	server_ip = rescue_dhcp.ip;
+ 	net_ip = server_ip;
+-	net_netmask = string_to_ip("255.255.255.0");
++	net_netmask = rescue_dhcp.netmask;
+ 	net_gateway = server_ip;
+ 	net_dns_server = server_ip;
++	printf("e2631rescue: DHCP %s/%s pool %u..%u (%s)\n",
++	       rescue_dhcp.ip_str, rescue_dhcp.netmask_str,
++	       rescue_dhcp.pool_start,
++	       rescue_dhcp.pool_start + rescue_dhcp.pool_size - 1,
++	       rescue_dhcp.source);
++	if (rescue_dhcp.warning[0])
++		printf("e2631rescue: DHCP warning: %s\n",
++		       rescue_dhcp.warning);
+ 
+ 	mtk_tcp_start();
+ 	if (mtk_tcp_listen(htons(E2631_RESCUE_TCP_PORT), rescue_tcp_cb)) {
+@@ -2745,7 +2916,8 @@ static int rescue_loop(void)
+ 		return CMD_RET_FAILURE;
+ 	}
+ 
+-	printf("e2631rescue: open http://192.168.1.1/ from a lan1 host\n");
++	printf("e2631rescue: open http://%s/ from a lan1 host\n",
++	       rescue_dhcp.ip_str);
+ 	printf("e2631rescue: press Ctrl-C to leave the rescue mode\n");
+ 
+ 	rescue_led_start();
+@@ -2843,7 +3015,8 @@ static int do_e2631rescue(struct cmd_tbl *cmdtp, int flag, int argc,
+ U_BOOT_CMD(e2631rescue, 1, 1, do_e2631rescue,
+ 	   "serve the web failsafe (v1+v2) on lan1",
+ 	   "e2631rescue - start DHCP and the HTTP failsafe page. GET /, /status,\n"
+-	   "              /slots, /env, /backup; POST /flash, /firmware, /boot,\n"
+-	   "              /factory, /env, /console.  No flash is written until a\n"
++	   "              /slots, /env, /backup, /sysinfo, /log; POST /flash,\n"
++	   "              /firmware, /boot, /factory, /env, /console, /integrity,\n"
++	   "              /reboot.  No flash is written until a\n"
+ 	   "              validated image is uploaded with the X-E2631-Confirm\n"
+ 	   "              header.  Ctrl-C leaves the rescue mode.\n");
+diff --git a/net/mtk_dhcpd.c b/net/mtk_dhcpd.c
+index f606b869..ba65e47d 100644
+--- a/net/mtk_dhcpd.c
++++ b/net/mtk_dhcpd.c
+@@ -167,8 +167,10 @@ static struct in_addr dhcpd_get_dns(void)
+ 
+ static u32 dhcpd_get_pool_start_host(void)
+ {
+-	const char *val = env_get("dhcpd_pool_start");
++	const char *val = env_get("e2631_dhcp_pool_start");
+ 
++	if (!val || !val[0])
++		val = env_get("dhcpd_pool_start");
+ 	if (val && val[0])
+ 		return (u32)simple_strtoul(val, NULL, 0);
+ 
+@@ -181,8 +183,10 @@ static u32 dhcpd_get_pool_start_host(void)
+ 
+ static u32 dhcpd_get_pool_size(void)
+ {
+-	const char *val = env_get("dhcpd_pool_size");
++	const char *val = env_get("e2631_dhcp_pool_size");
+ 
++	if (!val || !val[0])
++		val = env_get("dhcpd_pool_size");
+ 	if (val && val[0])
+ 		return (u32)simple_strtoul(val, NULL, 0);
+ 
+-- 
+2.56.1
+

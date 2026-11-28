@@ -1,0 +1,82 @@
+From 5c2e49183d0bffcfb0eff9a7f0770d066bc93f44 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 14:58:52 +0800
+Subject: [PATCH 3/8] rescue: reject an over-long console command instead of
+ running a prefix
+
+rescue_query_value() copies at most outsz - 1 characters and cannot tell
+the caller that the value was longer, so a 257+ byte cmd= was silently
+truncated and the prefix executed with a 200 answer.  The contract says
+an over-long command is a 400 with the fixed bad-body text.  Measure the
+undecoded value length first and refuse before allocating or decoding.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 38 +++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 3 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 160b4d1c..3de2f4c9 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -267,6 +267,37 @@ static bool rescue_query_value(const char *query, const char *key, char *out,
+ 	return false;
+ }
+ 
++/*
++ * Return the length of the undecoded value for @key, or -1 when the key is
++ * absent.  rescue_query_value() cannot stop at the end of the value, so the
++ * console endpoint uses this to reject an over-long command instead of
++ * running the part it managed to copy.
++ */
++static int rescue_query_raw_len(const char *query, const char *key)
++{
++	const char *p = query;
++	size_t klen = strlen(key);
++	const char *v;
++	size_t n;
++
++	if (!query)
++		return -1;
++	while (*p) {
++		if (!strncmp(p, key, klen)) {
++			v = p + klen;
++			n = 0;
++			while (v[n] && v[n] != '&')
++				n++;
++			return (int)n;
++		}
++		p = strchr(p, '&');
++		if (!p)
++			break;
++		p++;
++	}
++
++	return -1;
++}
+ static const unsigned char *rescue_image(void)
+ {
+ 	return (const unsigned char *)(uintptr_t)E2631_RESCUE_IMG_ADDR;
+@@ -1267,15 +1298,16 @@ static void rescue_handle_console(struct e2631_rescue_conn *c, const char *query
+ 	char cmd[257];
+ 	char *raw = NULL, *esc = NULL;
+ 	bool truncated = false, overflowed = false;
+-	int code;
++	int code, raw_len;
+ 
+ 	if (!query) {
+ 		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
+ 			     strlen(bad_body));
+ 		return;
+ 	}
+-	rescue_query_value(query, "cmd=", raw_cmd, sizeof(raw_cmd));
+-	if (!raw_cmd[0] || strlen(raw_cmd) > 256 ||
++	raw_len = rescue_query_raw_len(query, "cmd=");
++	if (raw_len <= 0 || raw_len > 256 ||
++	    !rescue_query_value(query, "cmd=", raw_cmd, sizeof(raw_cmd)) ||
+ 	    rescue_has_nul_escape(raw_cmd)) {
+ 		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
+ 			     strlen(bad_body));
+-- 
+2.56.1
+

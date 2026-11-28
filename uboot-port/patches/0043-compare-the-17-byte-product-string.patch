@@ -1,0 +1,35 @@
+From a26bc75db3ef8a05a6b4b5e4976fa27192881bda Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 14:58:52 +0800
+Subject: [PATCH 2/8] e2631: compare the 17-byte product string like Linux does
+ (task-90)
+
+The shared slot core compared E2631_PRODUCT_LEN (16) bytes of the product
+field while Linux e2631-fwslot compares strncmp(PRODUCT, 17).  Real
+packages carry the full 17-byte string plus NUL padding, so both accept
+them, but U-Boot was the looser side for a hand-built package that only
+differs in the 17th byte.  Raise the length to 17 and add the fixture
+vector that flips exactly that byte.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631_slotcore.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631_slotcore.h b/board/zte/zxhn-e2631/e2631_slotcore.h
+index 07c8b1d6..dde0f48e 100644
+--- a/board/zte/zxhn-e2631/e2631_slotcore.h
++++ b/board/zte/zxhn-e2631/e2631_slotcore.h
+@@ -60,7 +60,8 @@
+ #define E2631_H_CRC2		0x1fcU
+ 
+ #define E2631_PRODUCT_STRING	"ZXHN E2631 V1.0.0"
+-#define E2631_PRODUCT_LEN	16U
++/* Linux e2631-fwslot compares 17 bytes of the 32-byte product field. */
++#define E2631_PRODUCT_LEN	17U
+ 
+ enum e2631_slot_identity {
+ 	E2631_SLOT_ID_EMPTY = 0,
+-- 
+2.56.1
+

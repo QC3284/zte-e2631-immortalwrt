@@ -1,0 +1,212 @@
+From ae31e30ef5cb213893042cbf6fc8355ef4cf7f36 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:06:52 +0800
+Subject: [PATCH 7/8] rescue: add the confirmed reboot and the blue LED
+ heartbeat (task-90)
+
+POST /reboot requires an empty body and X-E2631-Confirm: reboot, and
+refuses while a write task or a backup stream is running (409 busy).  It
+answers result=accepted / reboot=1 first, then the rescue loop resets the
+SoC through the vendor TOPCRM register as soon as the DATA_SENT callback
+confirms the answer left the stack (3 s upper bound).  GET /reboot is 405
+and /status gains reboot_pending.
+
+The blue status LED (bank 0, bit 8, active low) blinks at 1 Hz while the
+rescue runs: the first use saves the bank-0 direction and data registers,
+only bit 8 is driven, and the saved values are restored on Ctrl-C, on any
+exit path and immediately before a requested reset.  The green and red
+LEDs are not touched.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 113 ++++++++++++++++++++++++++++-
+ 1 file changed, 112 insertions(+), 1 deletion(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index a6143617..0bc064eb 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -41,6 +41,7 @@
+ #include <config.h>
+ #include <command.h>
+ #include <console.h>
++#include <cpu_func.h>
+ #include <env_internal.h>
+ #include <errno.h>
+ #include <malloc.h>
+@@ -203,6 +204,9 @@ static char rescue_backup_part_name[16];
+ static bool slots_ready;
+ static bool bl_crc_valid;
+ static u32 bl_crc;
++static bool reboot_pending;
++static bool reboot_ack;
++static unsigned long reboot_at;
+ static char *rescue_log;
+ static u32 rescue_log_bytes;
+ static bool rescue_log_overflow;
+@@ -965,6 +969,8 @@ static void rescue_status_text(char *buf, size_t bufsz)
+ 	rescue_fmt(&p, &left, "backup=%s\n",
+ 		   backup_active ? "active" : "idle");
+ 	rescue_fmt(&p, &left, "backup_part=%s\n", rescue_backup_part_name);
++	rescue_fmt(&p, &left, "reboot_pending=%d\n",
++		   reboot_pending ? 1 : 0);
+ 
+ 	if (!rescue_fmt_fault && p != buf + (bufsz - left))
+ 		rescue_fmt_range_fail("p and left no longer agree");
+@@ -1273,6 +1279,93 @@ static void rescue_integrity(struct e2631_rescue_conn *c, const char *query,
+ 	rescue_reply(c, 200, "OK", "text/plain; charset=utf-8", NULL, body,
+ 		     (u32)n);
+ }
++/*
++ * Blue LED (bank 0, bit 8, active low).  The rescue mode saves the two
++ * bank-0 registers, drives only that bit as a 1 Hz blink and restores the
++ * saved values on exit or before a reboot request takes effect.  Green and
++ * red are never touched.
++ */
++#define E2631_GPIO0_DIR		0x94407000UL
++#define E2631_GPIO0_DATA	0x94407014UL
++#define E2631_LED_BIT		BIT(8)
++
++static u32 rescue_led_dir_saved;
++static u32 rescue_led_data_saved;
++static unsigned long rescue_led_next;
++static bool rescue_led_active;
++static bool rescue_led_on;
++
++static void rescue_led_start(void)
++{
++	rescue_led_dir_saved =
++		readl((const void __iomem *)(uintptr_t)E2631_GPIO0_DIR);
++	rescue_led_data_saved =
++		readl((const void __iomem *)(uintptr_t)E2631_GPIO0_DATA);
++	writel(rescue_led_dir_saved | E2631_LED_BIT,
++	       (void __iomem *)(uintptr_t)E2631_GPIO0_DIR);
++	writel(rescue_led_data_saved & ~E2631_LED_BIT,
++	       (void __iomem *)(uintptr_t)E2631_GPIO0_DATA);
++	rescue_led_on = true;
++	rescue_led_next = get_timer(0) + 500;
++	rescue_led_active = true;
++}
++
++static void rescue_led_stop(void)
++{
++	if (!rescue_led_active)
++		return;
++	writel(rescue_led_dir_saved,
++	       (void __iomem *)(uintptr_t)E2631_GPIO0_DIR);
++	writel(rescue_led_data_saved,
++	       (void __iomem *)(uintptr_t)E2631_GPIO0_DATA);
++	rescue_led_active = false;
++}
++
++static void rescue_led_tick(void)
++{
++	u32 data;
++
++	if (!rescue_led_active || get_timer(0) < rescue_led_next)
++		return;
++	rescue_led_on = !rescue_led_on;
++	data = readl((const void __iomem *)(uintptr_t)E2631_GPIO0_DATA);
++	if (rescue_led_on)
++		data &= ~E2631_LED_BIT;
++	else
++		data |= E2631_LED_BIT;
++	writel(data, (void __iomem *)(uintptr_t)E2631_GPIO0_DATA);
++	rescue_led_next = get_timer(0) + 500;
++}
++
++/* POST /reboot: answer accepted, wait for the DATA_SENT callback, then reset. */
++static void rescue_handle_reboot(struct e2631_rescue_conn *c,
++				 const char *hdr_start)
++{
++	const char *accepted = "result=accepted\nreboot=1\n";
++	char value[32];
++
++	if (rescue_header_value(hdr_start, "Content-Length", value,
++				  sizeof(value)) &&
++	    simple_strtoul(value, NULL, 10) != 0) {
++		rescue_fail_reply(c, 400, "bad body");
++		return;
++	}
++	if (!rescue_header_value(hdr_start, "X-E2631-Confirm", value,
++				  sizeof(value)) || strcmp(value, "reboot")) {
++		rescue_fail_reply(c, 400, "missing confirm");
++		return;
++	}
++	if (rescue_task_busy() || backup_active || reboot_pending) {
++		rescue_busy_reply(c);
++		return;
++	}
++	reboot_pending = true;
++	reboot_ack = false;
++	reboot_at = get_timer(0);
++	printf("e2631rescue: reboot requested by the browser\n");
++	rescue_reply(c, 200, "OK", "text/plain", NULL, accepted,
++		     strlen(accepted));
++}
+ static int rescue_backup_part(const char *name, u32 *off, u32 *len)
+ {
+ 	static const struct {
+@@ -1517,7 +1610,8 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 
+-	if (!strcmp(c->path, "/integrity")) {
++	if (!strcmp(c->path, "/integrity") ||
++	    !strcmp(c->path, "/reboot")) {
+ 		rescue_method_reply(c);
+ 		return;
+ 	}
+@@ -2229,6 +2323,11 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/reboot")) {
++		rescue_handle_reboot(c, hdr_start);
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/sysinfo") || !strcmp(c->path, "/log") ||
+ 	    !strcmp(c->path, "/status") || !strcmp(c->path, "/slots") ||
+ 	    !strcmp(c->path, "/backup")) {
+@@ -2406,6 +2505,8 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 		rescue_conn_data(c, cbd->data, cbd->datalen);
+ 		return;
+ 	case MTK_TCP_CB_DATA_SENT:
++		if (reboot_pending)
++			reboot_ack = true;
+ 		if (!c)
+ 			return;
+ 		if (c->backup_stream) {
+@@ -2647,11 +2748,20 @@ static int rescue_loop(void)
+ 	printf("e2631rescue: open http://192.168.1.1/ from a lan1 host\n");
+ 	printf("e2631rescue: press Ctrl-C to leave the rescue mode\n");
+ 
++	rescue_led_start();
+ 	rescue_active = true;
+ 	while (!ctrlc()) {
+ 		eth_rx();
+ 		mtk_tcp_periodic_check();
+ 		rescue_task_poll();
++		rescue_led_tick();
++		if (reboot_pending &&
++		    (reboot_ack || get_timer(reboot_at) > 3000)) {
++			printf("e2631rescue: resetting ...\n");
++			rescue_led_stop();
++			udelay(10000);
++			reset_cpu();
++		}
+ 		udelay(200);
+ 		if (tstc()) {
+ 			ch = getchar();
+@@ -2660,6 +2770,7 @@ static int rescue_loop(void)
+ 		}
+ 	}
+ 	rescue_active = false;
++	rescue_led_stop();
+ 
+ 	/*
+ 	 * A Ctrl-C can land between two flash stages. Finish the bookkeeping
+-- 
+2.56.1
+

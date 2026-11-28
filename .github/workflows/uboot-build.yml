@@ -38,8 +38,9 @@ jobs:
             E2631_UBOOT_PAYLOAD_MAX \
             E2631_UBOOT_TEXT_BASE \
             E2631_UBOOT_SOURCE_DATE_EPOCH \
-            E2631_UBOOT_V2_BASELINE_SIZE \
-            E2631_UBOOT_V2_GROWTH_MAX; do
+            E2631_UBOOT_SIZE_BASELINE \
+            E2631_UBOOT_HEADROOM_MIN \
+            E2631_UBOOT_HARD_LIMIT; do
             value=${!name:-}
             if [ -z "$value" ]; then
               echo "::error::uboot-port/commits.env does not define $name"
@@ -77,14 +78,17 @@ jobs:
           # so export the frozen pin here instead of letting the CI clock leak in.
           printf 'SOURCE_DATE_EPOCH=%s\n' "$E2631_UBOOT_SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
-          # task-84: both E4 v2.1 size pins are plain decimal byte counts.
-          for name in E2631_UBOOT_V2_BASELINE_SIZE E2631_UBOOT_V2_GROWTH_MAX; do
+          # task-90: the E4 v3 size pins are plain decimal byte counts.
+          for name in E2631_UBOOT_SIZE_BASELINE E2631_UBOOT_HEADROOM_MIN \
+                      E2631_UBOOT_HARD_LIMIT; do
             case "${!name}" in
               *[!0-9]*|"") echo "::error::$name must be a byte count, got ${!name}"; exit 1;;
             esac
           done
-          if [ "$E2631_UBOOT_V2_BASELINE_SIZE" -le 0 ] || [ "$E2631_UBOOT_V2_GROWTH_MAX" -le 0 ]; then
-            echo "::error::the E4 v2.1 size pins must be positive"
+          if [ "$E2631_UBOOT_SIZE_BASELINE" -le 0 ] ||
+             [ "$E2631_UBOOT_HEADROOM_MIN" -le 0 ] ||
+             [ "$E2631_UBOOT_HARD_LIMIT" -le 0 ]; then
+            echo "::error::the E4 v3 size pins must be positive"
             exit 1
           fi
       - name: Install the ARM cross toolchain and U-Boot build dependencies
@@ -176,7 +180,8 @@ jobs:
             "$GITHUB_WORKSPACE/tests/native/uboot/e2631_slotcore.c" \
             "$GITHUB_WORKSPACE/uboot-port/tests/slotcore_test.c" \
             -o "$RUNNER_TEMP/slotcore-test"
-          "$RUNNER_TEMP/slotcore-test"
+          "$RUNNER_TEMP/slotcore-test" | tee "$RUNNER_TEMP/slotcore-test.out"
+          grep -q '(52 checks' "$RUNNER_TEMP/slotcore-test.out"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before
@@ -247,7 +252,8 @@ jobs:
             CONFIG_CMD_DHCP=y \
             CONFIG_CMD_MII=y \
             CONFIG_CMD_PING=y \
-            CONFIG_CMD_TFTPBOOT=y \
+            '# CONFIG_CMD_FDT is not set' \
+            '# CONFIG_CMD_TFTPBOOT is not set' \
             CONFIG_MTK_TCP=y \
             CONFIG_MTK_DHCPD=y \
             CONFIG_SHA256=y \
@@ -300,7 +306,7 @@ jobs:
               exit 1
             fi
           done
-          for rescue_marker in e2631_flash_begin sha256_csum_wd e2631_failsafe_html_gz; do
+          for rescue_marker in e2631_flash_begin rescue_sha256 e2631_failsafe_html_gz; do
             if ! grep -q "$rescue_marker" board/zte/zxhn-e2631/e2631rescue.c; then
               echo "::error::e2631rescue.c is missing $rescue_marker"
               exit 1
@@ -466,10 +472,12 @@ jobs:
           grep -q 'rescue_fmt_range' "$rescue_c"
           grep -q 'output cursor corrupted' "$rescue_c"
           grep -q 'memset(&ctx, 0, sizeof(ctx))' "$rescue_c"
-          if grep -q 'sha256_csum_wd' "$rescue_c"; then
-            echo "::error::e2631rescue.c hashes through sha256_csum_wd() without the zeroed-context wrapper"
-            exit 1
-          fi
+          for src in board/zte/zxhn-e2631/*.c; do
+            if grep -q 'sha256_csum_wd' "$src"; then
+              echo "::error::$src hashes through sha256_csum_wd() without the zeroed-context wrapper"
+              exit 1
+            fi
+          done
           for self_text in 'output cursor corrupted' 'refusing to hash'; do
             if ! grep -aq "$self_text" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing the task-94 self-check text: $self_text"
@@ -477,6 +485,26 @@ jobs:
             fi
           done
           echo "rescue self-check gate: zeroed digest contexts and the output-cursor guard are wired"
+          # task-90/E4 v3: the six new endpoints and their invariants.
+          for v3_marker in rescue_query_raw_len rescue_sysinfo_text \
+                           rescue_log_snapshot rescue_integrity \
+                           rescue_handle_reboot rescue_led_start \
+                           rescue_dhcp_load; do
+            if ! grep -q "$v3_marker" "$rescue_c"; then
+              echo "::error::e2631rescue.c is missing the v3 marker: $v3_marker"
+              exit 1
+            fi
+          done
+          grep -qE '^#define E2631_PRODUCT_LEN[[:space:]]+17U' board/zte/zxhn-e2631/e2631_slotcore.h
+          grep -q 'e2631_dhcp_pool_start' net/mtk_dhcpd.c
+          for v3_text in 'X-E2631-Log-Bytes' 'X-E2631-Expected-Sha256' \
+                         'e2631-bootlog.txt' 'method not allowed'; do
+            if ! grep -aq "$v3_text" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the v3 text: $v3_text"
+              exit 1
+            fi
+          done
+          echo "E4 v3 rescue gate: sysinfo/log/integrity/reboot/LED/DHCP wired"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c
@@ -696,16 +724,14 @@ jobs:
           gate=$((max - margin))
           headroom=$((max - size))
           echo "u-boot.bin: $size bytes, hard cap $max bytes, CI gate $gate bytes ($margin byte safety margin), headroom $headroom bytes"
-          # task-84: the E4 v2.1 modules (patches 0036-0039) are bounded by a
-          # per-series budget against the last E4 v1 + recovery-key build
-          # (366600 bytes, run 46095932548), independent of the hard payload
-          # cap above.  Patch 0025 (the defconfig diet) is part of the series.
-          v2_limit=$((E2631_UBOOT_V2_BASELINE_SIZE + E2631_UBOOT_V2_GROWTH_MAX))
-          if [ "$size" -gt "$v2_limit" ]; then
-            echo "::error::u-boot.bin is $size bytes, above the E4 v2.1 budget $v2_limit bytes (baseline $E2631_UBOOT_V2_BASELINE_SIZE + $E2631_UBOOT_V2_GROWTH_MAX)"
+          # task-90: E4 v3 starts from the task-84 v2.1 build and must keep
+          # at least 240 KiB of headroom below the hard payload ceiling.
+          v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))
+          if [ "$size" -gt "$v3_limit" ]; then
+            echo "::error::u-boot.bin is $size bytes, above the E4 v3 budget $v3_limit bytes (hard cap $E2631_UBOOT_HARD_LIMIT minus $E2631_UBOOT_HEADROOM_MIN bytes of headroom)"
             exit 1
           fi
-          echo "E4 v2.1 size gate: $size bytes <= $v2_limit bytes (baseline $E2631_UBOOT_V2_BASELINE_SIZE + $E2631_UBOOT_V2_GROWTH_MAX)"
+          echo "E4 v3 size gate: $size bytes <= $v3_limit bytes (hard cap $E2631_UBOOT_HARD_LIMIT minus $E2631_UBOOT_HEADROOM_MIN headroom)"
           if [ "$size" -gt "$gate" ]; then
             echo "::error::u-boot.bin is $size bytes, above the CI gate $gate bytes (hard cap $max bytes, $margin byte safety margin); observed $size, limit $gate"
             exit 1

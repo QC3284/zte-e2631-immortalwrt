@@ -1,0 +1,392 @@
+From bb3b75f669db6f4dc04e79e2b1cf74de78496a8a Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:02:44 +0800
+Subject: [PATCH 4/8] rescue: report the system state and the boot log
+ (task-90)
+
+Two read-only v3 endpoints plus the matching /status keys:
+
+- GET /sysinfo returns the frozen key list from the v3 contract:
+  version and build strings, board/SoC/CPU, DRAM size, the SPI-NAND
+  geometry and ID, the CP15 registers and the clock registers the rescue
+  can see. The CP15 reads reuse the e2631soc helpers, now exported through
+  e2631soc.h, so e2631soc and /sysinfo cannot disagree about the core.
+- GET /log returns the boot-log snapshot taken once at the e2631rescue
+  entry from the console record ring, with X-E2631-Log-Bytes/Overflow
+  headers and the download disposition for ?download=1. Rescue traffic
+  after the snapshot does not change it.
+- /status gains log_bytes and log_overflow.
+
+Neither endpoint writes flash or the environment.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 229 +++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631soc.c    |  26 ++++
+ board/zte/zxhn-e2631/e2631soc.h    |  14 ++
+ 3 files changed, 269 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 3de2f4c9..ef7a77ed 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -54,11 +54,14 @@
+ #include <u-boot/crc.h>
+ #include <u-boot/sha256.h>
+ #include <version_string.h>
++#include <version.h>
+ #include <vsprintf.h>
+ #include <asm/global_data.h>
++#include <asm/io.h>
+ #include <linux/build_bug.h>
+ #include <linux/delay.h>
+ #include <linux/mtd/mtd.h>
++#include <linux/mtd/spinand.h>
+ #include <linux/types.h>
+ #include <net/mtk_dhcpd.h>
+ #include <net/mtk_tcp.h>
+@@ -69,6 +72,7 @@
+ #include "e2631fwslot.h"
+ #include "e2631http.h"
+ #include "e2631net.h"
++#include "e2631soc.h"
+ 
+ /*
+  * env_internal.h hides env_htab under DO_DEPS_ONLY, which only the host
+@@ -197,6 +201,10 @@ static bool backup_active;
+ static bool slots_ready;
+ static bool bl_crc_valid;
+ static u32 bl_crc;
++static char *rescue_log;
++static u32 rescue_log_bytes;
++static bool rescue_log_overflow;
++static bool rescue_log_ready;
+ 
+ /*
+  * Output-cursor guard.  Every renderer registers the buffer it is about
+@@ -948,11 +956,199 @@ static void rescue_status_text(char *buf, size_t bufsz)
+ 	rescue_slot_fields(&p, &left, 0, &slots->slot[0]);
+ 	rescue_slot_fields(&p, &left, 1, &slots->slot[1]);
+ 	rescue_fmt(&p, &left, "slot1_header_partition=mtd8\n");
++	rescue_fmt(&p, &left, "log_bytes=%u\n", rescue_log_bytes);
++	rescue_fmt(&p, &left, "log_overflow=%d\n",
++		   rescue_log_overflow ? 1 : 0);
+ 
+ 	if (!rescue_fmt_fault && p != buf + (bufsz - left))
+ 		rescue_fmt_range_fail("p and left no longer agree");
+ }
+ 
++/*
++ * GET /sysinfo: the read-only hardware report from the v3 contract.  Keys
++ * and their order are frozen; the page renders them as a table and tolerates
++ * no missing field.  Nothing here writes flash or the environment.
++ */
++static int rescue_sysinfo_text(char *buf, size_t bufsz)
++{
++	struct e2631_cp15_state cp15;
++	struct mtd_info *mtd;
++	struct spinand_device *spinand;
++	char *p = buf;
++	size_t left = bufsz;
++	char version[96];
++	char build[64];
++	char spi_id[2 * SPINAND_MAX_ID_LEN + 1];
++	int i;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_RESCUE_MTD_DEV);
++	if (!mtd) {
++		printf("e2631rescue: /sysinfo cannot open %s\n",
++		       E2631_RESCUE_MTD_DEV);
++		return -ENODEV;
++	}
++	spinand = mtd_to_spinand(mtd);
++	for (i = 0; i < SPINAND_MAX_ID_LEN; i++)
++		sprintf(spi_id + 2 * i, "%02x", spinand->id.data[i]);
++	put_mtd_device(mtd);
++
++	e2631_soc_read_cp15(&cp15);
++	snprintf(version, sizeof(version), "%s", version_string);
++	rescue_value(version, sizeof(version), version);
++	snprintf(build, sizeof(build), "%s %s", U_BOOT_DATE, U_BOOT_TIME);
++	rescue_value(build, sizeof(build), build);
++
++	rescue_fmt_range(buf, bufsz);
++	rescue_fmt(&p, &left, "result=ok\n");
++	rescue_fmt(&p, &left, "version=%s\n", version);
++	rescue_fmt(&p, &left, "banner=%s\n", version);
++	rescue_fmt(&p, &left, "build=%s\n", build);
++	rescue_fmt(&p, &left, "board=ZTE ZXHN E2631\n");
++	rescue_fmt(&p, &left, "soc=ZX279128S\n");
++	rescue_fmt(&p, &left, "cpu=ARM Cortex-A9\n");
++	rescue_fmt(&p, &left, "dram=0x%llx\n",
++		   (unsigned long long)gd->ram_size);
++	rescue_fmt(&p, &left, "dram_mb=%llu\n",
++		   (unsigned long long)(gd->ram_size >> 20));
++	rescue_fmt(&p, &left, "mtd0_size=0x100000\n");
++	rescue_fmt(&p, &left, "spi_nand=%s\n", E2631_RESCUE_MTD_DEV);
++	rescue_fmt(&p, &left, "spi_size=0x%08llx\n",
++		   (unsigned long long)mtd->size);
++	rescue_fmt(&p, &left, "spi_erasesize=0x%08x\n",
++		   (unsigned int)mtd->erasesize);
++	rescue_fmt(&p, &left, "spi_writesize=0x%08x\n",
++		   (unsigned int)mtd->writesize);
++	rescue_fmt(&p, &left, "spi_oobsize=0x%08x\n",
++		   (unsigned int)mtd->oobsize);
++	rescue_fmt(&p, &left, "spi_id=%s\n", spi_id);
++	rescue_fmt(&p, &left, "sctlr=0x%08x\n", cp15.sctlr);
++	rescue_fmt(&p, &left, "midr=0x%08x\n", cp15.midr);
++	rescue_fmt(&p, &left, "clidr=0x%08x\n", cp15.clidr);
++	rescue_fmt(&p, &left, "ttbr0=0x%08x\n", cp15.ttbr0);
++	rescue_fmt(&p, &left, "vbar=0x%08x\n", cp15.vbar);
++	rescue_fmt(&p, &left, "actlr=0x%08x\n", cp15.actlr);
++	rescue_fmt(&p, &left, "dacr=0x%08x\n", cp15.dacr);
++	rescue_fmt(&p, &left, "pll_a9_cfg0=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x94000018));
++	rescue_fmt(&p, &left, "pll_a9_cfg1=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x9400001c));
++	rescue_fmt(&p, &left, "top_ctrl8=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x94000008));
++	rescue_fmt(&p, &left, "top_clk_sel=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x9400000c));
++	rescue_fmt(&p, &left, "crm2_10=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x94100010));
++	rescue_fmt(&p, &left, "crm_4c=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x9400004c));
++	rescue_fmt(&p, &left, "lsp1_04=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x9a100004));
++	rescue_fmt(&p, &left, "net_pll_cfg0=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x94000050));
++	rescue_fmt(&p, &left, "net_pll_cfg1=0x%08x\n",
++		   readl((const void __iomem *)(uintptr_t)0x94000054));
++	rescue_fmt(&p, &left, "cpu_mhz=1000\n");
++	rescue_fmt(&p, &left, "cpu_mhz_source=known\n");
++
++	return rescue_fmt_fault ? -EFAULT : 0;
++}
++
++/*
++ * Boot-log snapshot: taken once, at the e2631rescue entry, before the rescue
++ * talks to the network.  The console record ring keeps lines already printed;
++ * capture them once so later rescue traffic cannot change what GET /log says.
++ */
++#define E2631_RESCUE_LOG_LIMIT	(E2631_RESCUE_OUT_MAX - 512)
++
++static void rescue_log_snapshot(void)
++{
++	char line[256];
++	size_t used = 0;
++	int ret;
++
++	if (rescue_log_ready)
++		return;
++	rescue_log = malloc(E2631_RESCUE_OUT_MAX);
++	if (!rescue_log)
++		return;
++	if (gd->flags & GD_FLG_RECORD_OVF)
++		rescue_log_overflow = true;
++	for (;;) {
++		size_t l;
++
++		ret = console_record_readline(line, sizeof(line));
++		if (ret == -ENOENT)
++			break;
++		if (ret < 0) {
++			rescue_log_overflow = true;
++			break;
++		}
++		l = strlen(line);
++		if (used + l + 1 > E2631_RESCUE_LOG_LIMIT) {
++			rescue_log_overflow = true;
++			break;
++		}
++		memcpy(rescue_log + used, line, l);
++		used += l;
++		rescue_log[used++] = '\n';
++	}
++	rescue_log[used] = 0;
++	rescue_log_bytes = used;
++	rescue_log_ready = true;
++	printf("e2631rescue: boot log snapshot: %u bytes%s\n",
++	       rescue_log_bytes,
++	       rescue_log_overflow ? " (the record ring overflowed)" : "");
++}
++
++static void rescue_log_reply(struct e2631_rescue_conn *c, bool download)
++{
++	int n;
++
++	if (!rescue_log_ready || !rescue_log) {
++		const char *body = "result=error\nerror=log unavailable\n";
++
++		rescue_reply(c, 500, "Internal Server Error", "text/plain", NULL,
++			     body, strlen(body));
++		return;
++	}
++	n = snprintf((char *)c->out, sizeof(c->out),
++		     "HTTP/1.1 200 OK\r\n"
++		     "Server: e2631rescue\r\n"
++		     "Content-Type: text/plain; charset=utf-8\r\n"
++		     "Content-Length: %u\r\n"
++		     "X-E2631-Log-Bytes: %u\r\n"
++		     "X-E2631-Log-Overflow: %d\r\n"
++		     "Cache-Control: no-store\r\n"
++		     "Connection: close\r\n",
++		     rescue_log_bytes, rescue_log_bytes,
++		     rescue_log_overflow ? 1 : 0);
++	if (n <= 0 || (size_t)n >= sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++	if (download) {
++		int d = snprintf((char *)c->out + n, sizeof(c->out) - n,
++				 "Content-Disposition: attachment; filename=\"e2631-bootlog.txt\"\r\n");
++
++		if (d <= 0 || (size_t)(n + d) >= sizeof(c->out)) {
++			mtk_tcp_close_conn(c->conn, 1);
++			return;
++		}
++		n += d;
++	}
++	if ((size_t)n + 2 >= sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++	c->out[n++] = '\r';
++	c->out[n++] = '\n';
++	if ((size_t)n + rescue_log_bytes > sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++	memcpy(c->out + n, rescue_log, rescue_log_bytes);
++	rescue_tcp_send(c, c->out, (u32)n + rescue_log_bytes);
++}
+ static int rescue_backup_part(const char *name, u32 *off, u32 *len)
+ {
+ 	static const struct {
+@@ -1175,6 +1371,37 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/sysinfo")) {
++		char *text = malloc(2048);
++
++		if (!text) {
++			rescue_error_reply(c, "out of memory");
++			return;
++		}
++		if (rescue_sysinfo_text(text, 2048)) {
++			free(text);
++			rescue_reply(c, 500, "Internal Server Error",
++				     "text/plain", NULL,
++				     "result=error\nerror=sysinfo unavailable\n",
++				     strlen("result=error\nerror=sysinfo unavailable\n"));
++			return;
++		}
++		rescue_reply(c, 200, "OK", "text/plain; charset=utf-8",
++			     NULL, text, strlen(text));
++		free(text);
++		return;
++	}
++
++	if (!strcmp(c->path, "/log")) {
++		char dl[8];
++		bool download = false;
++
++		if (query && rescue_query_value(query, "download=", dl, sizeof(dl)))
++			download = !strcmp(dl, "1");
++		rescue_log_reply(c, download);
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/backup")) {
+ 		rescue_backup_start(c, query);
+ 		return;
+@@ -2325,6 +2552,8 @@ static int do_e2631rescue(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	 */
+ 	e2631_net_refclk_init();
+ 
++	rescue_log_snapshot();
++
+ 	memset(&rescue_status, 0, sizeof(rescue_status));
+ 	rescue_status.stage = RESCUE_IDLE;
+ 	snprintf(rescue_status.sha_state, sizeof(rescue_status.sha_state),
+diff --git a/board/zte/zxhn-e2631/e2631soc.c b/board/zte/zxhn-e2631/e2631soc.c
+index 72a1862b..69da981d 100644
+--- a/board/zte/zxhn-e2631/e2631soc.c
++++ b/board/zte/zxhn-e2631/e2631soc.c
+@@ -48,6 +48,8 @@
+ #include <asm/barriers.h>
+ #include <asm/io.h>
+ 
++#include "e2631soc.h"
++
+ /*
+  * Read-only PL310 / SCU registers for the e2631soc report. Same addresses as
+  * the kernel SoC description (target/linux/zx279128/patches-6.18/026):
+@@ -118,6 +120,15 @@ static u32 e2631_read_dacr(void)
+ 	return val;
+ }
+ 
++static u32 e2631_read_midr(void)
++{
++	u32 val;
++
++	asm volatile ("mrc p15, 0, %0, c0, c0, 0" : "=r" (val));
++
++	return val;
++}
++
+ /*
+  * CCSIDR depends on the CSSELR selection. Point CSSELR at the L1 data cache
+  * (level 0, data/unified) so both dumps describe the same cache.
+@@ -236,6 +247,21 @@ void e2631_soc_prepare_linux(void)
+ 	e2631_dump_l2_scu();
+ }
+ 
++/*
++ * Read-only CP15 snapshot for the /sysinfo report.  The same helpers feed
++ * the e2631soc dump, so the two reports can never disagree about the state
++ * of the core.
++ */
++void e2631_soc_read_cp15(struct e2631_cp15_state *state)
++{
++	state->sctlr = e2631_read_sctlr();
++	state->midr = e2631_read_midr();
++	state->clidr = e2631_read_clidr();
++	state->ttbr0 = e2631_read_ttbr0();
++	state->vbar = e2631_read_vbar();
++	state->actlr = e2631_read_actlr();
++	state->dacr = e2631_read_dacr();
++}
+ static int do_e2631soc(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		       char *const argv[])
+ {
+diff --git a/board/zte/zxhn-e2631/e2631soc.h b/board/zte/zxhn-e2631/e2631soc.h
+index e161f897..86e01be6 100644
+--- a/board/zte/zxhn-e2631/e2631soc.h
++++ b/board/zte/zxhn-e2631/e2631soc.h
+@@ -8,6 +8,20 @@
+ #ifndef __ZXHN_E2631_SOC_H__
+ #define __ZXHN_E2631_SOC_H__
+ 
++#include <linux/types.h>
++
++/* Read-only CP15 snapshot used by the /sysinfo report. */
++struct e2631_cp15_state {
++	u32 sctlr;
++	u32 midr;
++	u32 clidr;
++	u32 ttbr0;
++	u32 vbar;
++	u32 actlr;
++	u32 dacr;
++};
++
++void e2631_soc_read_cp15(struct e2631_cp15_state *state);
+ void e2631_soc_prepare_linux(void);
+ 
+ #endif /* __ZXHN_E2631_SOC_H__ */
+-- 
+2.56.1
+

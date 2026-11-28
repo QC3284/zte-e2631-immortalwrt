@@ -1,0 +1,199 @@
+From 6b6db6ec009c95a54f252a78b2e04e744a1db81c Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 15:04:25 +0800
+Subject: [PATCH 5/8] rescue: add the read-only flash integrity check (task-90)
+
+POST /integrity reads mtd0 0x20000..0xC0000 in 16 KiB blocks and reports
+the CRC32 and SHA-256 of the U-Boot area.  The expected digest comes from
+?expect= or X-E2631-Expected-Sha256 (the query wins), is validated as 64
+hex characters and compared after normalising to lower case; a bad digest
+is a 400 bad sha256, a non-empty body is a 400 bad body, and the request
+refuses to run next to a write task or a backup stream (409 busy).  A read
+failure is a 500 flash read failed.  Nothing is written.
+
+The dispatch now follows the v3 contract for method and path errors: a
+GET on /integrity is 405 method not allowed, a POST on a GET-only path is
+405, and an unknown POST path is 404 not found (it used to be a generic
+400 unsupported request).
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 141 ++++++++++++++++++++++++++++-
+ 1 file changed, 139 insertions(+), 2 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index ef7a77ed..15241d1e 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -1149,6 +1149,124 @@ static void rescue_log_reply(struct e2631_rescue_conn *c, bool download)
+ 	memcpy(c->out + n, rescue_log, rescue_log_bytes);
+ 	rescue_tcp_send(c, c->out, (u32)n + rescue_log_bytes);
+ }
++static void rescue_method_reply(struct e2631_rescue_conn *c)
++{
++	const char *body = "result=error\nerror=method not allowed\n";
++
++	rescue_reply(c, 405, "Method Not Allowed", "text/plain", NULL,
++		     body, strlen(body));
++}
++
++static void rescue_not_found_reply(struct e2631_rescue_conn *c)
++{
++	const char *body = "result=error\nerror=not found\n";
++
++	rescue_reply(c, 404, "Not Found", "text/plain", NULL, body,
++		     strlen(body));
++}
++
++static void rescue_fail_reply(struct e2631_rescue_conn *c, int http,
++			      const char *error)
++{
++	char body[128];
++	int n;
++
++	n = snprintf(body, sizeof(body), "result=error\nerror=%s\n", error);
++	if (n <= 0 || (size_t)n >= sizeof(body))
++		return;
++	rescue_reply(c, http,
++		     http == 500 ? "Internal Server Error" : "Bad Request",
++		     "text/plain", NULL, body, (u32)n);
++}
++
++/*
++ * POST /integrity: read the whole U-Boot area of mtd0 and report its CRC32
++ * and SHA-256.  The expected digest can come from ?expect= or
++ * X-E2631-Expected-Sha256; the query wins when both are present.  This is
++ * read-only and refuses to run next to a write task or a backup stream.
++ */
++static void rescue_integrity(struct e2631_rescue_conn *c, const char *query,
++			     const char *hdr_start)
++{
++	sha256_context ctx;
++	u8 digest[SHA256_SUM_LEN];
++	char sha[2 * SHA256_SUM_LEN + 1];
++	char expected[2 * SHA256_SUM_LEN + 1] = "";
++	char value[32];
++	char body[512];
++	const char *match = "absent";
++	u32 done = 0, crc = 0;
++	bool have_expect = false;
++	u8 *buf;
++	int n;
++
++	if (rescue_header_value(hdr_start, "Content-Length", value,
++				  sizeof(value)) &&
++	    simple_strtoul(value, NULL, 10) != 0) {
++		rescue_fail_reply(c, 400, "bad body");
++		return;
++	}
++	if (query && rescue_query_value(query, "expect=", expected,
++					sizeof(expected)))
++		have_expect = true;
++	if (!have_expect &&
++	    rescue_header_value(hdr_start, "X-E2631-Expected-Sha256",
++				expected, sizeof(expected)))
++		have_expect = true;
++	if (have_expect) {
++		rescue_url_decode(expected);
++		if (!rescue_hex_digest_valid(expected)) {
++			rescue_fail_reply(c, 400, "bad sha256");
++			return;
++		}
++		rescue_hex_lower(expected, expected);
++	}
++	if (rescue_task_busy() || backup_active) {
++		rescue_busy_reply(c);
++		return;
++	}
++	buf = malloc(E2631_BACKUP_BLOCK);
++	if (!buf) {
++		rescue_fail_reply(c, 500, "out of memory");
++		return;
++	}
++	memset(&ctx, 0, sizeof(ctx));
++	sha256_starts(&ctx);
++	while (done < E2631_RESCUE_FLASH_LEN) {
++		u32 n2 = E2631_RESCUE_FLASH_LEN - done;
++
++		if (n2 > E2631_BACKUP_BLOCK)
++			n2 = E2631_BACKUP_BLOCK;
++		if (rescue_mtd_read(E2631_RESCUE_FLASH_OFF + done, buf, n2)) {
++			free(buf);
++			memset(&ctx, 0, sizeof(ctx));
++			rescue_fail_reply(c, 500, "flash read failed");
++			return;
++		}
++		crc = crc32(crc, buf, n2);
++		sha256_update(&ctx, buf, n2);
++		done += n2;
++	}
++	free(buf);
++	sha256_finish(&ctx, digest);
++	memset(&ctx, 0, sizeof(ctx));
++	rescue_hex(digest, sha);
++	if (have_expect)
++		match = strcmp(sha, expected) ? "mismatch" : "ok";
++	n = snprintf(body, sizeof(body),
++		     "result=ok\noffset=0x%08lx\nlength=0x%08lx\ncrc32=0x%08x\nsha256=%s\nmatch=%s\n",
++		     (unsigned long)E2631_RESCUE_FLASH_OFF,
++		     (unsigned long)E2631_RESCUE_FLASH_LEN, crc, sha, match);
++	if (have_expect && n > 0 && (size_t)n < sizeof(body))
++		n += snprintf(body + n, sizeof(body) - n, "expected=%s\n",
++			      expected);
++	if (n <= 0 || (size_t)n >= sizeof(body)) {
++		rescue_fail_reply(c, 500, "internal error");
++		return;
++	}
++	rescue_reply(c, 200, "OK", "text/plain; charset=utf-8", NULL, body,
++		     (u32)n);
++}
+ static int rescue_backup_part(const char *name, u32 *off, u32 *len)
+ {
+ 	static const struct {
+@@ -1371,6 +1489,11 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/integrity")) {
++		rescue_method_reply(c);
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/sysinfo")) {
+ 		char *text = malloc(2048);
+ 
+@@ -2073,6 +2196,18 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/integrity")) {
++		rescue_integrity(c, query, hdr_start);
++		return;
++	}
++
++	if (!strcmp(c->path, "/sysinfo") || !strcmp(c->path, "/log") ||
++	    !strcmp(c->path, "/status") || !strcmp(c->path, "/slots") ||
++	    !strcmp(c->path, "/backup")) {
++		rescue_method_reply(c);
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/env")) {
+ 		rescue_handle_env(c, query, hdr_start);
+ 		return;
+@@ -2131,8 +2266,10 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 		return;
+ 	}
+ 
+-	if (strcmp(c->path, "/flash"))
+-		goto bad;
++	if (strcmp(c->path, "/flash")) {
++		rescue_not_found_reply(c);
++		return;
++	}
+ 
+ 	if (rescue_task_busy()) {
+ 		rescue_busy_reply(c);
+-- 
+2.56.1
+

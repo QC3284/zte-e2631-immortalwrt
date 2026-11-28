@@ -145,6 +145,13 @@ static int test_parse(void)
 	CHECK(parse(img, PKG_LEN) == E2631_PKG_WRONG_PRODUCT, "product");
 	make_package(img);
 
+	/* Linux compares the 17th product byte; U-Boot must not be looser. */
+	img[PKG_HDR_OFF + E2631_H_PRODUCT + 16] = 'X';
+	fix_header_crcs(img);
+	CHECK(parse(img, PKG_LEN) == E2631_PKG_WRONG_PRODUCT,
+	      "product 17th byte");
+	make_package(img);
+
 	e2631_slotcore_wr32(img + PKG_HDR_OFF, E2631_H_BOOT_INCLUDED, 1);
 	fix_header_crcs(img);
 	CHECK(parse(img, PKG_LEN) == E2631_PKG_BOOTLOADER, "bootloader flag");
