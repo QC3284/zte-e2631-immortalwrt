@@ -1,0 +1,107 @@
+From c807276ff4de865110c4659ecf21488ed72b2679 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 14:49:05 +0800
+Subject: [PATCH] rescue: harden the digests against uninitialised state
+
+Every SHA-256 this rescue computes now runs through an explicitly zeroed
+sha256_context, the two upload windows are checked (base address and
+maximum length) before the bytes are hashed, and the /backup stream zeroes
+its context once the digest has been copied out.
+
+The v2.1 Phase A run returned digests that are not a function of the
+delivered bytes (CRC32 of the same buffer was correct, the package CRCs
+verified) while a later run of the same image was correct, so the failure
+is state, not the SHA-256 math.  A corrupted pointer or length must stop
+the request with a loud line instead of silently producing a bad digest
+that a user could then compare against the browser hash.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 39 +++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 4 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 2f30495a..2c885418 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -306,12 +306,33 @@ static void rescue_hex(const u8 *digest, char *out)
+ 	out[SHA256_SUM_LEN * 2] = 0;
+ }
+ 
+-static void rescue_sha256(const void *buf, u32 len, char *out)
++/*
++ * Hash one of the two known upload windows with an explicitly zeroed
++ * context, and refuse anything whose address or length is outside that
++ * window: a corrupted buffer pointer must stop us, never feed a digest or
++ * a flash writer.
++ */
++static int rescue_sha256(const void *buf, u32 len, uintptr_t base, u32 maxlen, char *out)
+ {
++	sha256_context ctx;
+ 	u8 digest[SHA256_SUM_LEN];
+ 
+-	sha256_csum_wd(buf, len, digest, CHUNKSZ_SHA256);
++	if (!buf || !len || len > maxlen || (uintptr_t)buf != base) {
++		printf("e2631rescue: FATAL: refusing to hash %u bytes at 0x%lx\n",
++		       len, (unsigned long)(uintptr_t)buf);
++		printf("e2631rescue: FATAL: the window is 0x%lx+0x%x\n",
++		       (unsigned long)base, maxlen);
++		return -EINVAL;
++	}
++
++	memset(&ctx, 0, sizeof(ctx));
++	sha256_starts(&ctx);
++	sha256_update(&ctx, (const u8 *)buf, len);
++	sha256_finish(&ctx, digest);
++	memset(&ctx, 0, sizeof(ctx));
+ 	rescue_hex(digest, out);
++
++	return 0;
+ }
+ 
+ static bool rescue_hex_digest_valid(const char *hex)
+@@ -934,6 +955,7 @@ static void rescue_backup_start(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 
++	memset(&ctx, 0, sizeof(ctx));
+ 	sha256_starts(&ctx);
+ 	while (done < len) {
+ 		u32 n2 = len - done;
+@@ -952,6 +974,7 @@ static void rescue_backup_start(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 	sha256_finish(&ctx, digest);
++	memset(&ctx, 0, sizeof(ctx));
+ 	rescue_hex(digest, sha);
+ 
+ 	n = snprintf((char *)c->out, sizeof(c->out),
+@@ -1250,7 +1273,11 @@ static void rescue_flash_body_complete(struct e2631_rescue_conn *c)
+ 		return;
+ 	}
+ 
+-	rescue_sha256(img, E2631_RESCUE_IMG_LEN, computed);
++	if (rescue_sha256(img, E2631_RESCUE_IMG_LEN, E2631_RESCUE_IMG_ADDR,
++			  E2631_RESCUE_IMG_LEN, computed)) {
++		rescue_error_reply(c, "cannot hash the image buffer");
++		return;
++	}
+ 	snprintf(rescue_status.mode, sizeof(rescue_status.mode), "%s",
+ 		 c->mode);
+ 	printf("e2631rescue: received %u bytes, sha256 %s\n", c->content_len,
+@@ -1352,7 +1379,11 @@ static void rescue_firmware_body_complete(struct e2631_rescue_conn *c)
+ 	u32 len = c->content_len;
+ 	int ret, n;
+ 
+-	rescue_sha256(img, len, computed);
++	if (rescue_sha256(img, len, E2631_FW_STAGE_ADDR, E2631_FW_STAGE_MAX,
++			  computed)) {
++		rescue_error_reply(c, "cannot hash the firmware buffer");
++		return;
++	}
+ 	printf("e2631rescue: received %u firmware bytes, sha256 %s\n", len,
+ 	       computed);
+ 
+-- 
+2.56.1
+

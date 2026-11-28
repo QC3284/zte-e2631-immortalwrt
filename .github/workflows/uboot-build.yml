@@ -459,6 +459,24 @@ jobs:
             exit 1
           fi
           echo "cold rescue gate: do_e2631rescue brings up the network reference clocks"
+          # task-94: the rescue must not format or hash through corrupted state.
+          # Every digest uses an explicitly zeroed sha256_context, and
+          # rescue_fmt() refuses to write once the output cursor leaves the
+          # buffer the handler registered.
+          grep -q 'rescue_fmt_range' "$rescue_c"
+          grep -q 'output cursor corrupted' "$rescue_c"
+          grep -q 'memset(&ctx, 0, sizeof(ctx))' "$rescue_c"
+          if grep -q 'sha256_csum_wd' "$rescue_c"; then
+            echo "::error::e2631rescue.c hashes through sha256_csum_wd() without the zeroed-context wrapper"
+            exit 1
+          fi
+          for self_text in 'output cursor corrupted' 'refusing to hash'; do
+            if ! grep -aq "$self_text" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the task-94 self-check text: $self_text"
+              exit 1
+            fi
+          done
+          echo "rescue self-check gate: zeroed digest contexts and the output-cursor guard are wired"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c

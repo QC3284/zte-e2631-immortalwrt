@@ -1,0 +1,138 @@
+From 1fb9e1071e38b5e938571cd7712904201e272397 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 14:49:06 +0800
+Subject: [PATCH] rescue: stop rendering when the output cursor is corrupted
+
+rescue_fmt() now works inside a registered buffer range: the renderer
+calls rescue_fmt_range() with the buffer it is about to fill, and every
+format call verifies that *p and *left still describe a window inside that
+buffer.  If they do not, or if the p/left pair stops agreeing with the
+buffer walk at the end of rescue_status_text(), the handler prints a FATAL
+line, refuses to render and answers 500 result=error with
+error=output cursor corrupted.
+
+The v2.1 Phase A abort had exactly this signature: the output cursor held
+0xe28d005c, the opcode word of the add r0, sp, #92 instruction that
+computes its own address at the call sites, and vsnprintf() then wrote
+through it.  A wild write into the handler frame is not reproducible today,
+but it must turn into a loud stop rather than a data abort inside the
+image that also owns the flash writer.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 57 ++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 2c885418..160b4d1c 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -198,6 +198,16 @@ static bool slots_ready;
+ static bool bl_crc_valid;
+ static u32 bl_crc;
+ 
++/*
++ * Output-cursor guard.  Every renderer registers the buffer it is about
++ * to walk through rescue_fmt(); a (p, left) pair that stops matching that
++ * range is a wild write, and formatting on top of it is how the v2.1
++ * data abort turned into a silent corruption.  Fail loudly instead.
++ */
++static char *rescue_fmt_lo;
++static char *rescue_fmt_hi;
++static bool rescue_fmt_fault;
++
+ enum e2631_rescue_upload {
+ 	UPLOAD_NONE = 0,
+ 	UPLOAD_FLASH,
+@@ -432,12 +442,39 @@ static bool rescue_task_busy(void)
+ 	       e2631_env_write_busy();
+ }
+ 
++static void rescue_fmt_range(char *buf, size_t size)
++{
++	rescue_fmt_lo = buf;
++	rescue_fmt_hi = buf + size;
++	rescue_fmt_fault = false;
++}
++
++static void rescue_fmt_range_fail(const char *why)
++{
++	if (!rescue_fmt_fault)
++		printf("e2631rescue: FATAL: output cursor corrupted (%s); refusing to render\n",
++		       why);
++	rescue_fmt_fault = true;
++}
++
++static bool rescue_fmt_range_ok(char *p, size_t left)
++{
++	return p >= rescue_fmt_lo && p <= rescue_fmt_hi && left >= 1 &&
++	       left <= (size_t)(rescue_fmt_hi - p) + 1;
++}
++
+ /* Append with the buffer bookkeeping every status line needs. */
+ static void rescue_fmt(char **p, size_t *left, const char *fmt, ...)
+ {
+ 	va_list ap;
+ 	int n;
+ 
++	if (rescue_fmt_fault)
++		return;
++	if (!rescue_fmt_range_ok(*p, *left)) {
++		rescue_fmt_range_fail("cursor outside the registered buffer");
++		return;
++	}
+ 	if (*left < 2)
+ 		return;
+ 	va_start(ap, fmt);
+@@ -880,6 +917,9 @@ static void rescue_status_text(char *buf, size_t bufsz)
+ 	rescue_slot_fields(&p, &left, 0, &slots->slot[0]);
+ 	rescue_slot_fields(&p, &left, 1, &slots->slot[1]);
+ 	rescue_fmt(&p, &left, "slot1_header_partition=mtd8\n");
++
++	if (!rescue_fmt_fault && p != buf + (bufsz - left))
++		rescue_fmt_range_fail("p and left no longer agree");
+ }
+ 
+ static int rescue_backup_part(const char *name, u32 *off, u32 *len)
+@@ -1033,7 +1073,16 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 			rescue_error_reply(c, "out of memory");
+ 			return;
+ 		}
++		rescue_fmt_range(text, 4096);
+ 		rescue_status_text(text, 4096);
++		if (rescue_fmt_fault) {
++			free(text);
++			rescue_reply(c, 500, "Internal Server Error",
++				     "text/plain", NULL,
++				     "result=error\nerror=output cursor corrupted\n",
++				     strlen("result=error\nerror=output cursor corrupted\n"));
++			return;
++		}
+ 		rescue_reply(c, 200, "OK", "text/plain", NULL, text,
+ 			     strlen(text));
+ 		free(text);
+@@ -1046,6 +1095,7 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		size_t left = sizeof(body);
+ 		const struct e2631_slot_info *si;
+ 
++		rescue_fmt_range(body, sizeof(body));
+ 		rescue_fmt(&p, &left, "next_slot=%d\n", slots->next_slot);
+ 		rescue_fmt(&p, &left, "next_reason=%s\n",
+ 			   slots->next_reason ? slots->next_reason : "none");
+@@ -1059,6 +1109,13 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		rescue_slot_fields(&p, &left, 0, si);
+ 		si = &slots->slot[1];
+ 		rescue_slot_fields(&p, &left, 1, si);
++		if (rescue_fmt_fault) {
++			rescue_reply(c, 500, "Internal Server Error",
++				     "text/plain", NULL,
++				     "result=error\nerror=output cursor corrupted\n",
++				     strlen("result=error\nerror=output cursor corrupted\n"));
++			return;
++		}
+ 		rescue_reply(c, 200, "OK", "text/plain", NULL, body,
+ 			     strlen(body));
+ 		return;
+-- 
+2.56.1
+
