@@ -562,7 +562,9 @@ const failsafeCheck = (() => {
 ok('the E4 rescue page is a single self-contained gzip asset within the 32768-byte v3 budget',
   failsafeCheck.ok && failsafeCheck.limit === 32768 && failsafeCheck.gzip <= failsafeCheck.limit &&
   failsafeCheck.raw > failsafeCheck.gzip &&
-  FAILSAFE_PAGE.includes('xhr.send(file)') && !/FormData|multipart/.test(FAILSAFE_PAGE) &&
+  FAILSAFE_PAGE.includes('xhr.send(file)') && FAILSAFE_PAGE.includes('new FormData()') &&
+  FAILSAFE_PAGE.includes('/console/exec') && FAILSAFE_PAGE.includes('/console/poll') &&
+  FAILSAFE_PAGE.includes('Content-Type","application/octet-stream') &&
   FAILSAFE_PAGE.includes('upload.onprogress') && FAILSAFE_PAGE.includes('function sha256(') &&
   FAILSAFE_PAGE.includes('id="validate"') && FAILSAFE_PAGE.includes('id="write"') &&
   FAILSAFE_PAGE.includes('/flash?mode=') && FAILSAFE_PAGE.includes('/status') &&

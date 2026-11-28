@@ -327,6 +327,22 @@ function header(req, name) {
 let backupActive = false;
 let backupPart = '';
 let rebootPending = false;
+let consoleBuf = '';
+let consoleBusy = false;
+
+function multipartField(req, body, name) {
+  const ct = header(req, 'content-type') || '';
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(ct);
+  if (!m) return '';
+  const boundary = '--' + (m[1] || m[2]).trim();
+  for (const part of body.toString('utf8').split(boundary)) {
+    if (!part.includes('name="' + name + '"')) continue;
+    const idx = part.indexOf('\r\n\r\n');
+    let v = idx >= 0 ? part.slice(idx + 4) : '';
+    return v.replace(/\r\n$/, '');
+  }
+  return '';
+}
 function jobActive() {
   return task.stage !== 'idle' && task.stage !== 'done' && task.stage !== 'error';
 }
@@ -445,6 +461,33 @@ const server = http.createServer(async (req, res) => {
       const crc = hex32(crc32(Buffer.from(envText(), 'utf8')));
       task = { op: 'envwrite', mode: 'write', stage: 'diff', progress: 5, bytesDone: 1, bytesTotal: 1, crc32: crc, sha256: '', browser: '', match: '', result: '', error: '', slotTarget: '', writtenSerial: '', version: task.version };
       return send(res, 200, 'result=accepted\nnew_crc32=' + crc + '\nkeys=1\n');
+    }
+    if (req.method === 'POST' && u.pathname === '/console/exec') {
+      const body = await readBody(req);
+      const cmd = multipartField(req, body, 'cmd').trim();
+      if (!cmd || cmd.length > 256 || /[;\r\n]/.test(cmd)) {
+        return send(res, 400, JSON.stringify({ error: 'only a single command is allowed' }) + '\n', 'application/json');
+      }
+      if (consoleBusy) return send(res, 503, JSON.stringify({ error: 'busy' }) + '\n', 'application/json');
+      consoleBusy = true;
+      const out = mockConsole(cmd);
+      consoleBuf += out.text;
+      if (consoleBuf && !consoleBuf.endsWith('\n')) consoleBuf += '\n';
+      consoleBusy = false;
+      return send(res, 200, JSON.stringify({ ret: out.code }) + '\n', 'application/json');
+    }
+    if (req.method === 'POST' && u.pathname === '/console/poll') {
+      const data = consoleBuf;
+      consoleBuf = '';
+      return send(res, 200, JSON.stringify({ data, avail: data.length, overflow: false, busy: consoleBusy }) + '\n', 'application/json');
+    }
+    if (req.method === 'POST' && u.pathname === '/console/abort') {
+      consoleBuf += '^C\n';
+      return send(res, 200, JSON.stringify({ ok: true }) + '\n', 'application/json');
+    }
+    if (req.method === 'POST' && u.pathname === '/console/clear') {
+      consoleBuf = '';
+      return send(res, 200, JSON.stringify({ ok: true }) + '\n', 'application/json');
     }
     if (req.method === 'POST' && u.pathname === '/console') {
       const cmd = (parseQuery(u).cmd || '').trim();

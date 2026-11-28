@@ -294,3 +294,103 @@ task-91 按 `evidence/e4-v3-contract-delta-20261128.md`（task-89 v3 契约）�
 P1 回收（CMD_FDT/CMD_TFTPBOOT）后约 249 KB 余量，task-90 的 C 模块仍可能逼近
 240 KB 门；必要时按契约在页面 gzip > 26,000 B 或余量门被破时裁 I18N。
 页面端点已按 v3 契约实现，base-builder 的补丁 0040+ 落地后即可做 task-93 真机验收。
+
+## 12. v3.1 外观对齐上游与实时终端（task-96，2026-11-28）
+
+### 12.1 范围与依据
+
+用户 2026-11-28 要求（Lead m05327/m06207）：救援页必须看起来像上游
+Yuzhii0718/bl-mt798x-dhcpd 的 failsafe Web UI，而不是风格接近；同时把串口台
+升级成上游形态的实时网页终端。上游源码为 /tmp/bl-mt798x-dhcpd（master
+e4cf4dc7，2026-10-08），页面资源在
+uboot-mtk-20250711/failsafe/embedded/fsdata-bootstrap/（style.css 63,488 B、
+index.html 3,375 B、console.html 3,023 B、console_js.js 37,713 B）。
+base-builder 的 task-97 传输契约（m06239）规定浏览器用 HTTP 轮询而不是裸 TCP：
+POST /console/exec（multipart cmd，不超过 256 B）、POST /console/poll（JSON
+data/avail/overflow/busy）、POST /console/abort、POST /console/clear，
+旧 POST /console?cmd= 保留兼容；telnet 是独立的 TCP 23 前端，浏览器不使用它。
+
+本任务只改页面/页面资产/mock/静态门禁，不改 U-Boot C 代码、不派发 uboot-build、不接设备。
+
+### 12.2 页面实现
+
+- 上游 shell：.app 两栏（左侧栏 272 px + 主区）、.sidebar-brand（内联 SVG 标志 +
+  恢复模式 WEBUI/EN Failsafe Web UI + U-Boot 版本）、.sidebar-controls（语言
+  中文/English、主题 自动/亮色/暗色、8 个上游强调色）、分组导航（救援：系统状态/
+  固件更新/引导区；系统：环境变量/串口台/恢复出厂）、.card-head（上传 hero + h1 +
+  提示 + 状态徽标）/.card-main/.card-foot（.i.w 注意事项）、#version 页脚；
+  六个 .panel 复用同一 shell。
+- CSS：从上游 style.css 裁剪出与本页相关的选择器子集后内联（保留主题变量、
+  sidebar/nav、card、form、button、bar、table、console/ANSI、响应式；删除 AMOLED、
+  动画、404、flash/hex、settings、reboot 页、help modal 等不用段落），再压缩空白；
+  另加本页少量自定义 CSS（.panel/.section-title/.pill/.logbox 等）。页面内 GPL-2.0
+  版权注释保留 MediaTek 2022 / Yuzhii0718 2026 归属；不复制上游 HTML/JS/图片/字体/
+  i18n 资产。
+- 交互/主题：#lang_select 写 localStorage.e2631_lang 后重载；#theme_select 写
+  localStorage.theme 并设置 html[data-theme]；8 个 .color-swatch + 自定义 hex 写
+  --primary/--primary-rgb/--primary-2；head 内联脚本在首屏前恢复缓存，避免 FOUC；
+  保留 prefers-reduced-motion、:focus-visible、不超过 860 px 单列。
+- 实时终端：term 为 24x100 字符网格；termFeed 处理 CSI H/f/A/B/C/D/G/J/K、
+  忽略 SGR 颜色、跨 poll 拆分的 ESC 序列、回车/换行/退格/制表；termRender 输出
+  .ans-row；termProbe 探测 POST /console/poll，404/405 时显示单命令模式（当前固件
+  未提供实时终端）并走旧 POST /console?cmd=；termExec 用 FormData 发 cmd、确认
+  ret 字段，termPoll 空闲 300 ms/忙碌 150 ms，conabort 发 Ctrl-C，conclear 清设备
+  缓冲与本地网格。保留原 v2.1 的 conRunLegacy 回退，不转发 stdin，不建立 TCP 连接。
+- 其余 v3 功能（状态/固件/引导区/env/恢复出厂、9 项备份、DHCP、I18N、摘要门控、
+  power-cycle 文案）逻辑保留；只把 DOM 重排成上游 class/表格/卡片，ID 不变，JS 适配
+  pct() 的 --percent、renderSlots()/loadEnv()/loadSysinfo() 的表格输出和语言/主题控件。
+
+### 12.3 尺寸与确定性
+
+| 项 | v3（task-91） | v3.1（task-96） |
+|---|---|---|
+| 原始 | 78,957 B | 113,057 B |
+| gzip | 24,904 B | 31,518 B |
+| 页面 sha256 | b70ce1c9... | 82a44f59384144cf037d5d74d4ccdffab50dc5462f000ee3647765a48ed684f3 |
+| gzip sha256 | 8172e720... | e452fb022e5d451eefbefaa5a4368941ce77d7fb353ef88ba43f691dedfe635f |
+| 预算 | 32,768 B | 32,768 B（余量 1,250 B） |
+
+tools/embed-failsafe.sh --check：raw 113057 B, gzip 31518 B (limit 32768 B)。
+第一版拼装为 raw 116,730 B / gzip 33,064 B（超 296 B），通过裁掉未用 CSS 段（AMOLED/
+动画/404/flash/settings/reboot/help 等）、精简未用 I18N 键、压缩 body 与自定义 CSS
+压到 31,518 B；双语未砍。生成物：.c sha256
+161f7d3599344feb2447730fc73129ec5633b3a1fee1c744ac87fcd75d33c694，.h 仍为
+e4ea1fe10374b7263caf1f61be2e595180629d6e52b40eae6e3184fbe3ef8ad4；两次生成
+逐字节相同，冻结符号未变。
+
+### 12.4 测试与门禁
+
+- mock 实时终端自测（tools/mock-failsafe.mjs，127.0.0.1:18095）：GET / 200；
+  POST /console/poll 空缓冲返回 data 空、avail 0、overflow false、busy false；
+  POST /console/exec（multipart cmd=version）返回 ret 0，随后 poll 收到
+  U-Boot 2027.01-rc2 (mock)；printenv bootdelay 收到 bootdelay=0；
+  /console/clear、/console/abort 返回 ok true。mock 新增 multipartField() 解析与
+  内存 console record，旧 /console?cmd= 路由未动。
+- jsdom 31 功能测试（NODE_PATH=/tmp/jsd/node_modules，非仓库依赖）：加载真实页面
+  无 JS 错误、无外部 script/link；六个 nav/panel 存在；品牌标题 恢复模式 WEBUI、
+  U-Boot 版本显示；状态页 /status 填充（stage=空闲）；六个标签切换正常；实时终端
+  探测成功、version 输出进入 #conout、状态徽标 空闲、清屏后仅空行；主题切 dark
+  生效；强调色 #10b981 写入 --primary/--primary-rgb；env 表渲染。共 19 项断言
+  PASS 19 / FAIL 0，无 jsdomError/console.error。
+- 静态门禁：node tools/check-workflows.mjs 全 PASS；tools/embed-failsafe.sh
+  --check 尺寸通过；make check 通过（仅树 fork 缺省 SKIP 有说明）。
+  门禁变更说明：live terminal 需要 multipart/form-data，因此
+  tools/check-workflows.mjs 原来禁止 FormData|multipart 的单条页面断言改为：
+  仍要求 xhr.send(file)、Content-Type application/octet-stream（bootloader/固件原始
+  上传），并要求 new FormData()、/console/exec、/console/poll（实时终端）；其余
+  断言（32,768 B、六标签字符串、摘要/确认头、无外链、无 /reboot 自动调用）不变。
+  该门禁由 pkg-release 的 task-85 维护，需在其后续门禁整理时知悉。
+- 未覆盖：task-97 的 C 端点尚未进真实构建（本任务只有 mock 契约）；真机验收
+  （task-86/task-93 系列）仍需在 task-92 统一构建后跑。实时终端在真机上的 ANSI 行为
+  与 poll 速率以 C 实现为准，本页按契约对齐。
+
+### 12.5 文件与复现
+
+- 页面：uboot-port/failsafe/e2631-failsafe.html（raw 113,057 B，gzip 31,518 B）。
+- mock：tools/mock-failsafe.mjs（新增 v3.1 console 路由；PORT=8790 node
+  tools/mock-failsafe.mjs 预览）。
+- 门禁：tools/check-workflows.mjs（页面断言更新）。
+- README：uboot-port/failsafe/README.md（v3.1 协议/结构/尺寸/许可）。
+- 复现：bash tools/embed-failsafe.sh --check；NODE_PATH=/tmp/jsd/node_modules
+  node /tmp/jsd-test.js（本机测试脚本，不入库）；node tools/mock-failsafe.mjs +
+  浏览器 http://127.0.0.1:8787/。
