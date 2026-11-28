@@ -67,6 +67,12 @@ th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertic
 th{color:var(--muted);font-weight:500}
 @media (max-width:760px){.app{display:block}.sidebar{width:auto;flex:none;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}.grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+.out{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;min-height:120px;max-height:320px;overflow:auto;margin:8px 0}
+.kvrow{display:flex;gap:8px;align-items:center;margin:6px 0}
+.kvrow span{color:var(--muted);font-size:12px;flex:0 0 200px}
+.kvrow input{flex:1}
+@media (max-width:760px){.kvrow{display:block}.kvrow span{flex:none;display:block;margin-bottom:4px}}
 </style>
 </head>
 <body>
@@ -80,15 +86,16 @@ th{color:var(--muted);font-weight:500}
 <button class="navlink" data-tab="boot">引导区</button>
 <div class="navsec">系统</div>
 <button class="navlink" data-tab="env">环境变量</button>
+<button class="navlink" data-tab="console">串口台</button>
 <button class="navlink" data-tab="factory">恢复出厂</button>
 </nav>
-<div class="sidebar-note">本页只在救援模式生效；不自动重启，不写入 env。所有写操作结束后都需要<b>断电重启</b>。</div>
+<div class="sidebar-note">本页只在救援模式生效；不自动重启。bootloader/槽位/env 写入后都需要<b>断电重启</b>。</div>
 </aside>
 <main>
 
 <section id="tab-status" class="panel active">
 <h1>系统状态</h1>
-<p class="hint">启动路径、槽位与引导区备份。数据来自设备只读接口。</p>
+<p class="hint">启动路径与槽位。数据来自设备只读接口。</p>
 <div class="rail" aria-label="启动路径">
 <span class="step">BootROM</span><span class="step">secondboot</span><span class="step">U-Boot</span><span class="step on">救援模式</span>
 </div>
@@ -112,17 +119,6 @@ th{color:var(--muted);font-weight:500}
 <div class="chead"><h2>槽位</h2><span class="pill" id="nextpill">—</span></div>
 <div class="cmain" id="slotcards"><p class="hint">读取中…</p></div>
 </div>
-</div>
-<div class="card">
-<div class="chead"><h2>引导区备份（mtd0 0x20000..0xC0000）</h2></div>
-<div class="cmain">
-<div class="kv"><span>区间长度</span><b class="mono">655360 B</b></div>
-<div class="kv"><span>区域 CRC32</span><b class="mono" id="bk-crc">—</b></div>
-<div class="kv"><span>区域 SHA-256</span><b class="mono" id="bk-sha">—</b></div>
-<button id="bk-probe" class="btn alt" type="button">读取校验值</button>
-<a id="bk-dl" class="btn" href="/backup" download="e2631-uboot-region.bin">下载镜像区</a>
-</div>
-<div class="cfoot">下载与读取校验值均为只读，不写入 flash。</div>
 </div>
 </section>
 
@@ -177,6 +173,24 @@ th{color:var(--muted);font-weight:500}
 <div class="cfoot"><h3>注意事项</h3><ul><li>镜像必须<b>恰为 655360 字节</b>；只写 0x20000..0xC0000。</li><li>写入成功后<b>断电重启后生效</b>；不得断电。</li><li>串口可用时同步打印五步进度；Ctrl-C 可中止。</li></ul></div>
 </div>
 <div class="card">
+<div class="chead"><h2>分区备份（只读）</h2><span class="pill" id="bkpill">—</span></div>
+<div class="cmain">
+<label class="field" for="partsel"><span>分区</span><select id="partsel">
+<option value="bootloader">bootloader — U-Boot 镜像区 0x20000，655360 B</option>
+<option value="tag">tag — 0x100000，1048576 B</option>
+<option value="wifi">wifi — 0x200000，1048576 B</option>
+<option value="usercfg">usercfg — 0x300000，2097152 B</option>
+<option value="defcfg">defcfg — 0x500000，2097152 B</option>
+</select></label>
+<div class="kv"><span>偏移 / 长度</span><b class="mono" id="bk-range">0x20000 / 655360 B</b></div>
+<div class="kv"><span>分区 CRC32</span><b class="mono" id="bk-crc">—</b></div>
+<div class="kv"><span>分区 SHA-256</span><b class="mono" id="bk-sha">—</b></div>
+<button id="bk-probe" class="btn alt" type="button">读取校验值</button>
+<a id="bk-dl" class="btn" href="/backup?part=bootloader" download="e2631-bootloader.bin">下载分区</a>
+</div>
+<div class="cfoot">只读：读取校验值与下载都不写 flash。写分区仍归各所有者（bootloader=e2631flash、启动槽=fwslot、overlay=e2631factory）。</div>
+</div>
+<div class="card">
 <div class="chead"><h2>任务日志</h2><span class="pill" id="logpill">空闲</span></div>
 <div class="cmain"><div id="log" class="log" aria-live="polite"></div></div>
 </div>
@@ -185,14 +199,45 @@ th{color:var(--muted);font-weight:500}
 
 <section id="tab-env" class="panel">
 <h1>环境变量</h1>
-<p class="hint">当前 U-Boot env 的只读快照。写入请用串口 <b>e2631env</b>（白名单），本页不提供写入。</p>
+<p class="hint">只读快照 + 白名单编辑。仅 bootdelay 与 e2631_* 可写；vendor 键（bootcmd/bootargs/memsize/versioninfo）永远只读。写入走 e2631env 五步，成功后断电重启生效。</p>
+<div class="grid">
 <div class="card">
-<div class="chead"><h2>env 快照</h2><span class="pill" id="envpill">—</span></div>
+<div class="chead"><h2>可写键（白名单）</h2><span class="pill" id="envpill">—</span></div>
 <div class="cmain">
 <button id="envrefresh" class="btn alt" type="button">刷新</button>
-<div id="envtable"></div>
+<div id="envedit"><p class="hint">读取中…</p></div>
+<div class="kvrow"><span>新增变量</span><input id="envnewkey" type="text" placeholder="e2631_xxx" aria-label="新变量名"><input id="envnewval" type="text" placeholder="值" aria-label="新变量值"></div>
+<p><label><input id="envack" type="checkbox"> 我已了解：只写白名单键；写入走 e2631env 五步；<b>断电重启后生效</b>。</label></p>
+<div class="bar" aria-hidden="true"><div id="envbar"></div></div>
+<button id="envwrite" class="btn alt" type="button" disabled>写入 env</button>
 </div>
-<div class="cfoot">只读；任何情况下不回写 flash env。环境变量由 U-Boot 启动时按厂商格式加载。</div>
+<div class="cfoot"><h3>注意事项</h3><ul><li>同一时刻只允许一个 env 写任务；页面按顺序逐键提交。</li><li>vendor 键与未知键一律拒绝（403），页面不提供编辑入口。</li><li>掉电最坏回到默认 env，两条启动链都能启动。</li></ul></div>
+</div>
+<div class="card">
+<div class="chead"><h2>env 快照（只读）</h2><span class="pill" id="envsnappill">—</span></div>
+<div class="cmain"><div id="envtable"></div><div id="envlog" class="log" aria-live="polite"></div></div>
+</div>
+</div>
+</section>
+
+<section id="tab-console" class="panel">
+<h1>串口台</h1>
+<p class="hint">执行一条 U-Boot 命令并捕获输出（stdout）。只适合快速命令；不与救援循环 stdin 共享，交互式命令请用物理串口。</p>
+<div class="grid">
+<div class="card">
+<div class="chead"><h2>执行命令</h2><span class="pill" id="conpill">空闲</span></div>
+<div class="cmain">
+<label class="field" for="concmd"><span>命令（单条；不支持分号与多行）</span><input id="concmd" type="text" placeholder="例如 version / printenv bootdelay / md 0x40000000 4"></label>
+<button id="conrun" class="btn" type="button">执行</button>
+<button id="conclear" class="btn alt" type="button">清空输出</button>
+<div class="note">命令立即执行，可能改变设备状态（如 reset、mtd 擦写）；执行前会二次确认。输出最多 4 KiB，超出会截断。</div>
+</div>
+<div class="cfoot"><h3>限制</h3><ul><li>无 stdin：需要按键/确认的命令不支持，也不会挂住救援循环。</li><li>执行期间页面等待响应；长命令请改用物理串口。</li></ul></div>
+</div>
+<div class="card">
+<div class="chead"><h2>输出</h2><span class="pill" id="conexit">—</span></div>
+<div class="cmain"><pre id="conout" class="out" aria-live="polite">（尚未执行）</pre><div id="conlog" class="log" aria-live="polite"></div></div>
+</div>
 </div>
 </section>
 
@@ -223,10 +268,11 @@ th{color:var(--muted);font-weight:500}
 (function(){
 "use strict";
 var $=function(id){return document.getElementById(id)};
-var STAGE={idle:"空闲",staged:"已上传待命",validating:"校验中",erase:"擦除中",blank:"擦除校验中",write:"写入中",readback:"回读中",compare:"比对中",done:"完成",error:"错误"};
-var OP={idle:"空闲",flash:"引导区写入",firmware:"固件更新",factory:"恢复出厂"};
+var STAGE={idle:"空闲",staged:"已上传待命",validating:"校验中",diff:"差异比对",check:"坏块预检",erase:"擦除中",blank:"擦除校验中",write:"写入中",readback:"回读中",verify:"回读校验",compare:"比对中",done:"完成",error:"错误"};
+var OP={idle:"空闲",flash:"引导区写入",firmware:"固件更新",factory:"恢复出厂",envwrite:"环境变量写入"};
 var IDENT={empty:"空槽",vendor:"原厂",ours:"本固件",unknown:"无法识别"};
 var GUARD={ok:"允许",weak:"允许（回退为非原厂）",refuse:"拒绝"};
+var PARTS={bootloader:{off:"0x20000",len:655360},tag:{off:"0x100000",len:1048576},wifi:{off:"0x200000",len:1048576},usercfg:{off:"0x300000",len:2097152},defcfg:{off:"0x500000",len:2097152}};
 var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
 function rotr(x,n){return (x>>>n)|(x<<(32-n))}
 function sha256(buf){var l=buf.byteLength,H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19],bl=((l+8)>>6)+1,p=new Uint8Array(bl*64);p.set(new Uint8Array(buf));p[l]=0x80;var dv=new DataView(p.buffer),bit=l*8;dv.setUint32(bl*64-8,Math.floor(bit/0x100000000));dv.setUint32(bl*64-4,bit>>>0);var w=new Uint32Array(64);for(var i=0;i<bl;i++){var off=i*64;for(var t=0;t<16;t++)w[t]=dv.getUint32(off+t*4);for(t=16;t<64;t++){var s0=rotr(w[t-15],7)^rotr(w[t-15],18)^(w[t-15]>>>3),s1=rotr(w[t-2],17)^rotr(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)>>>0}var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];for(t=0;t<64;t++){var S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[t]+w[t])>>>0,S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0}var out="";for(i=0;i<8;i++)out+=("00000000"+H[i].toString(16)).slice(-8);return out}
@@ -241,7 +287,7 @@ function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 var slotsState={};var statusTimer=null;
 function startStatusPoll(){if(statusTimer)return;statusTimer=setInterval(refreshStatus,1000)}
 function stopStatusPoll(){if(statusTimer){clearInterval(statusTimer);statusTimer=null}}
-function tabs(){var list=document.querySelectorAll(".navlink");Array.prototype.forEach.call(list,function(b){b.addEventListener("click",function(){Array.prototype.forEach.call(list,function(x){x.classList.remove("active")});b.classList.add("active");Array.prototype.forEach.call(document.querySelectorAll(".panel"),function(p){p.classList.remove("active")});var el=$("tab-"+b.getAttribute("data-tab"));if(el)el.classList.add("active");var tab=b.getAttribute("data-tab");if(tab==="status"){refreshStatus();loadSlots();startStatusPoll()}else{stopStatusPoll()}if(tab==="env")loadEnv()})})}
+function tabs(){var list=document.querySelectorAll(".navlink");Array.prototype.forEach.call(list,function(b){b.addEventListener("click",function(){Array.prototype.forEach.call(list,function(x){x.classList.remove("active")});b.classList.add("active");Array.prototype.forEach.call(document.querySelectorAll(".panel"),function(p){p.classList.remove("active")});var el=$("tab-"+b.getAttribute("data-tab"));if(el)el.classList.add("active");var tab=b.getAttribute("data-tab");if(tab==="status"){refreshStatus();loadSlots();startStatusPoll()}else{stopStatusPoll()}if(tab==="env")loadEnv();if(tab==="console")$("concmd").focus()})})}
 function loadSlots(){return getText("/slots").then(function(t){var s=lines(t);slotsState=s;renderSlots(s);fwRefreshInfo();return s}).catch(function(e){setHtml("slotcards",'<p class="err">槽位读取失败：'+esc(e.message)+"</p>")})}
 function badge(ok,onText,offText){return '<span class="badge '+(ok?"ok":"err")+'">'+esc(ok?onText:offText)+"</span>"}
 function renderSlots(s){var next=s.next_slot;setTxt("nextpill",next==="0"?"本次启动 slot0":next==="1"?"本次启动 slot1":"无可启动槽");
@@ -250,14 +296,27 @@ h+='<div class="slot'+(String(n)===String(next)?" next":"")+'"><div><div class="
 setHtml("slotcards",h);Array.prototype.forEach.call(document.querySelectorAll("[data-boot]"),function(b){b.addEventListener("click",function(){bootSlot(b.getAttribute("data-boot"))})})}
 function bootSlot(n){if(!confirm("设置本次启动槽 slot"+n+"（仅 RAM，不写 flash）。按 Ctrl-C 退出救援后运行 e2631boot 生效。继续？"))return;fetch("/boot?slot="+n,{method:"POST"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||"HTTP 失败");alert("已设置：按 Ctrl-C 退出救援后运行 e2631boot 生效（仅本次）。")}).catch(function(e){alert("设置失败："+e.message)})}
 function stStage(s){return STAGE[s]||s||"—"}
-function refreshStatus(){return getText("/status").then(function(t){var s=lines(t);if(s.version)setTxt("ubver",s.version);setTxt("st-op",OP[s.op]||s.op||"—");setTxt("st-stage",stStage(s.stage));var prog=(s.progress||"0")+"%";if(s.bytes_total&&s.bytes_total!=="0")prog+="（"+(s.bytes_done||"0")+"/"+s.bytes_total+"）";setTxt("st-progress",prog);setTxt("st-crc",s.crc32||"—");setTxt("st-sha",s.sha256||"—");setTxt("st-mat",s.sha_match||"—");setTxt("st-result",s.result||"—");setTxt("st-error",s.error||"—");setTxt("stpill",stStage(s.stage));pct("st-bar",Number(s.progress||0));if(s.bootloader_region_crc32){setTxt("bl-crc",s.bootloader_region_crc32);setTxt("bk-crc",s.bootloader_region_crc32)}return s}).catch(function(){return null})}
-function probeBackup(){var btn=$("bk-probe");btn.disabled=true;fetch("/backup",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);var crc=r.headers.get("X-E2631-CRC32")||"—",sha=r.headers.get("X-E2631-SHA256")||"";return r.arrayBuffer().then(function(b){var local=sha256(b);setTxt("bk-crc",crc);setTxt("bk-sha",sha||local);if(sha&&local!==sha.toLowerCase())addLog("log","警告：区域 SHA-256 本地复算与响应头不一致","warn")})}).catch(function(e){setTxt("bk-crc","读取失败："+e.message)}).then(function(){btn.disabled=false})}
-function loadEnv(){setTxt("envpill","读取中…");getText("/env").then(function(t){var rows=String(t||"").split(/\r?\n/).filter(function(x){return x&&x.indexOf("=")>0});var size="",h='<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>';rows.forEach(function(r){if(r.indexOf("env_size=")===0){size=r.slice(9);return}var i=r.indexOf("=");h+='<tr><td class="mono">'+esc(r.slice(0,i))+'</td><td class="mono">'+esc(r.slice(i+1))+"</td></tr>"});h+="</tbody></table>";setHtml("envtable",h);setTxt("envpill",size?("容量 "+size):(rows.length+" 项"))}).catch(function(e){setTxt("envpill","读取失败");setHtml("envtable",'<p class="err">'+esc(e.message)+"</p>")})}
+function refreshStatus(){return getText("/status").then(function(t){var s=lines(t);if(s.version)setTxt("ubver",s.version);setTxt("st-op",OP[s.op]||s.op||"—");setTxt("st-stage",stStage(s.stage));var prog=(s.progress||"0")+"%";if(s.bytes_total&&s.bytes_total!=="0")prog+="（"+(s.bytes_done||"0")+"/"+s.bytes_total+"）";setTxt("st-progress",prog);setTxt("st-crc",s.crc32||"—");setTxt("st-sha",s.sha256||"—");setTxt("st-mat",s.sha_match||"—");setTxt("st-result",s.result||"—");setTxt("st-error",s.error||"—");setTxt("stpill",stStage(s.stage));pct("st-bar",Number(s.progress||0));if(s.bootloader_region_crc32){setTxt("bl-crc",s.bootloader_region_crc32);if($("partsel")&&$("partsel").value==="bootloader")setTxt("bk-crc",s.bootloader_region_crc32)}return s}).catch(function(){return null})}
+function probeBackup(){var btn=$("bk-probe");btn.disabled=true;var p=$("partsel").value;fetch("/backup?part="+p,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);var crc=r.headers.get("X-E2631-CRC32")||"—",sha=r.headers.get("X-E2631-SHA256")||"";return r.arrayBuffer().then(function(b){var local=sha256(b);setTxt("bk-crc",crc);setTxt("bk-sha",sha||local);setTxt("bkpill",p+" · "+b.byteLength+" B");if(sha&&local!==sha.toLowerCase())addLog("envlog","警告："+p+" SHA-256 本地复算与响应头不一致","warn")})}).catch(function(e){setTxt("bk-crc","读取失败："+e.message);setTxt("bkpill","失败")}).then(function(){btn.disabled=false})}
+function loadEnv(){setTxt("envpill","读取中…");setTxt("envsnappill","读取中…");getText("/env").then(function(t){var rows=String(t||"").split(/\r?\n/).filter(function(x){return x&&x.indexOf("=")>0});var size="",h="",rh="",n=0;envVals={};rows.forEach(function(r){if(r.indexOf("env_size=")===0){size=r.slice(9);return}var i=r.indexOf("=");var k=r.slice(0,i),v=r.slice(i+1);rh+="<tr><td class=\"mono\">"+esc(k)+"</td><td class=\"mono\">"+esc(v)+"</td></tr>";if(envWritable(k)){envVals[k]=v;n++;h+="<div class=\"kvrow\"><span class=\"mono\">"+esc(k)+"</span><input class=\"envval\" data-key=\""+esc(k)+"\" type=\"text\" value=\""+esc(v)+"\" aria-label=\""+esc(k)+"\"></div>"}});setHtml("envedit",h||"<p class=\"hint\">没有白名单键。</p>");setHtml("envtable","<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>"+rh+"</tbody></table>");setTxt("envpill","可写 "+n+" 项"+(size?(" · 容量 "+size):""));setTxt("envsnappill",rows.length+" 项");Array.prototype.forEach.call(document.querySelectorAll(".envval"),function(el){el.addEventListener("input",syncEnvBtn)});syncEnvBtn()}).catch(function(e){setTxt("envpill","读取失败");setTxt("envsnappill","读取失败");setHtml("envedit","<p class=\"err\">"+esc(e.message)+"</p>")})}
+var envVals={};
+function envWritable(k){return k==="bootdelay"||k.indexOf("e2631_")===0}
+function envKeyOk(k){return /^[a-z0-9_]+$/.test(k)&&k.length<=32&&envWritable(k)}
+function envValOk(v){return v.length<=128&&/^[\x20-\x7e]*$/.test(v)}
+function envChanges(){var out=[];Array.prototype.forEach.call(document.querySelectorAll(".envval"),function(el){var k=el.getAttribute("data-key");if(envVals[k]!==el.value)out.push([k,el.value])});var nk=($("envnewkey").value||"").trim();var nv=$("envnewval").value;if(nk||nv)out.push([nk,nv]);return out}
+function envValidate(list){for(var i=0;i<list.length;i++){var k=list[i][0],v=list[i][1];if(!envKeyOk(k))return "不允许的键："+(k||"（空）")+"（仅 bootdelay 与 e2631_*，小写字母/数字/下划线，≤32 B）";if(!envValOk(v))return "不允许的值："+k+"（可打印 ASCII，≤128 B）"}return ""}
+function syncEnvBtn(){var el=$("envwrite");if(!el)return;var list=envChanges();var err=envValidate(list);var ack=$("envack")&&$("envack").checked;el.disabled=busy||!ack||!list.length||!!err;setTxt("envpill",err?"参数不符":(list.length?("待写入 "+list.length+" 项"):"无修改"))}
+function envWriteOne(k,v){return new Promise(function(res,rej){fetch("/env?key="+encodeURIComponent(k)+"&value="+encodeURIComponent(v)+"&confirm=write",{method:"POST",headers:{"X-E2631-Confirm":"write"},cache:"no-store"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||(d.error&&d.result!=="accepted"))throw new Error(d.error||("HTTP "+x.status));addLog("envlog","["+k+"] 已接收"+(d.new_crc32?(" CRC32 "+d.new_crc32):""));waitStatus({op:"envwrite",pctId:"envbar",onstatus:function(s){setTxt("envpill",stStage(s.stage)+" "+(s.progress||"0")+"%")},ondone:function(s){addLog("envlog","["+k+"] 写入完成"+(s.crc32?(" CRC32 "+s.crc32):""),"ok");res()},onfail:function(m){rej(new Error(m))}})}).catch(rej)})}
+function writeEnv(){if(busy)return;var list=envChanges();var err=envValidate(list);if(err){alert(err);return}if(!list.length){alert("没有修改。");return}if(!$("envack").checked){alert("请先勾选确认。");return}var names=list.map(function(x){return x[0]}).join("、");if(!confirm("将写入 "+list.length+" 个 env 键：\n"+names+"\n\n写入走 e2631env 五步；断电重启后生效。继续？"))return;setBusy(true);setHtml("envlog","");addLog("envlog","开始写入 "+list.length+" 个键…");var chain=Promise.resolve();list.forEach(function(kv){chain=chain.then(function(){return envWriteOne(kv[0],kv[1])})});chain.then(function(){setBusy(false);addLog("envlog","全部完成；断电重启后生效。","ok");$("envnewkey").value="";$("envnewval").value="";$("envack").checked=false;loadEnv()}).catch(function(e){setBusy(false);failLog("envlog","写入失败："+e.message);loadEnv()})}
+function conUnescape(s){return String(s||"").replace(/\\n/g,"\n").replace(/\\\\/g,"\\")}
+function conRun(){if(busy)return;var cmd=(($("concmd").value)||"").trim();if(!cmd){alert("请输入一条命令。");return}if(cmd.length>256){alert("命令过长（≤256 B）。");return}if(/[;\r\n]/.test(cmd)){alert("只允许单条命令：不能包含分号或换行。");return}if(!confirm("将立即执行：\n"+cmd+"\n\n命令可能改变设备状态（如 reset、mtd 擦写）。继续？"))return;setBusy(true);setTxt("conpill","执行中…");setTxt("conexit","—");setHtml("conout","执行中…");fetch("/console?cmd="+encodeURIComponent(cmd),{method:"POST",cache:"no-store"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);var out=conUnescape(d.stdout||"");var ex=d.exit!==undefined?d.exit:"?";if(!x.ok||d.result==="error"){setTxt("conpill","失败");setTxt("conexit","exit "+ex);setHtml("conout",esc(out||d.error||("HTTP "+x.status)));failLog("conlog",cmd+" → "+(d.error||("HTTP "+x.status)))}else{setTxt("conpill",d.truncated==="1"?"完成（输出截断）":"完成");setTxt("conexit","exit "+ex);setHtml("conout",esc(out||"（无输出）"));addLog("conlog",cmd+" → exit "+ex)}setBusy(false)}).catch(function(e){setTxt("conpill","失败");setHtml("conout",esc("请求失败："+e.message));failLog("conlog",cmd+" → "+e.message);setBusy(false)})}
+function partInfo(){return PARTS[$("partsel").value]||PARTS.bootloader}
+function updatePart(){var p=$("partsel").value,info=partInfo();setTxt("bk-range",info.off+" / "+info.len+" B");setTxt("bkpill","—");setTxt("bk-crc","—");setTxt("bk-sha","—");var a=$("bk-dl");a.setAttribute("href","/backup?part="+p);a.setAttribute("download","e2631-"+p+".bin")}
 var busy=false;
-function refreshButtons(){["refresh","bk-probe","envrefresh"].forEach(function(id){var el=$(id);if(el)el.disabled=busy});var fv=$("fwvalidate");if(fv)fv.disabled=busy||!fwFile;var fww=$("fwwrite");if(fww)fww.disabled=busy||!fwOk||fwGuard==="refuse";var v=$("validate");if(v)v.disabled=busy||!blFile;var w=$("write");if(w)w.disabled=busy||!blOk;syncFactoryBtn()}
+function refreshButtons(){["refresh","bk-probe","envrefresh","conrun"].forEach(function(id){var el=$(id);if(el)el.disabled=busy});syncEnvBtn();var fv=$("fwvalidate");if(fv)fv.disabled=busy||!fwFile;var fww=$("fwwrite");if(fww)fww.disabled=busy||!fwOk||fwGuard==="refuse";var v=$("validate");if(v)v.disabled=busy||!blFile;var w=$("write");if(w)w.disabled=busy||!blOk;syncFactoryBtn()}
 function setBusy(b){busy=b;refreshButtons()}
 function syncFactoryBtn(){var el=$("factorygo");if(el)el.disabled=busy||!$("faccheck").checked}
-function waitStatus(opts){var fails=0,tries=0;var timer=setInterval(function(){tries++;if(tries>1800){clearInterval(timer);if(opts.onfail)opts.onfail("等待超时：设备未在 15 分钟内完成");return}getText("/status").then(function(t){var s=lines(t);fails=0;if(opts.pctId)pct(opts.pctId,Number(s.progress||0));if(opts.onstatus)opts.onstatus(s);if(s.stage==="done"||s.result==="ok"){clearInterval(timer);if(opts.ondone)opts.ondone(s)}else if(s.stage==="error"||s.result==="error"||s.error){clearInterval(timer);if(opts.onfail)opts.onfail(s.error||"设备返回错误")}}).catch(function(e){if(++fails>=20){clearInterval(timer);if(opts.onfail)opts.onfail("状态查询连续失败："+e.message)}})},500)}
+function waitStatus(opts){var fails=0,tries=0;var timer=setInterval(function(){tries++;if(tries>1800){clearInterval(timer);if(opts.onfail)opts.onfail("等待超时：设备未在 15 分钟内完成");return}getText("/status").then(function(t){var s=lines(t);fails=0;if(opts.pctId)pct(opts.pctId,Number(s.progress||0));if(opts.onstatus)opts.onstatus(s);var wrongOp=opts.op&&s.op&&s.op!==opts.op;if(wrongOp)return;if(s.stage==="done"||s.result==="ok"){clearInterval(timer);if(opts.ondone)opts.ondone(s)}else if(s.stage==="error"||s.result==="error"||s.error){clearInterval(timer);if(opts.onfail)opts.onfail(s.error||"设备返回错误")}}).catch(function(e){if(++fails>=20){clearInterval(timer);if(opts.onfail)opts.onfail("状态查询连续失败："+e.message)}})},500)}
 var fwFile=null,fwSha="",fwOk=false,fwDevSha="",fwGuard="ok";
 function fwIdentityText(ident,valid,intact){var t=IDENT[ident]||ident||"未知";if(valid&&intact)return t+"（完好）";if(ident==="unknown"||ident==="")return "无法识别/已损坏";return t+"（不完整）"}
 function fwRefreshInfo(){var s=slotsState||{};var pick=$("fwslot").value;var target=pick==="auto"?s.next_slot:pick;setTxt("fwtarget",target===undefined||target===""?"未知":(target==="-1"?"无可启动槽":"slot"+target));
@@ -308,9 +367,16 @@ if(!confirm("擦除 rootfs_data：overlay 与配置将丢失，成功后需断�
 facBusy=true;setBusy(true);$("factorygo").disabled=true;pct("facbar",0);setHtml("faclog","");addLog("faclog","请求擦除 overlay…");setTxt("facpill","擦除中");
 fetch("/factory?confirm=reset",{method:"POST",headers:{"X-E2631-Confirm":"reset"}}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||"HTTP 失败");addLog("faclog","设备已接收，擦除中…");waitStatus({pctId:"facbar",onstatus:function(s){setTxt("facpill",stStage(s.stage)+" "+(s.progress||"0")+"%")},ondone:function(s){facBusy=false;setBusy(false);setTxt("facpill","完成");addLog("faclog","擦除完成并回读校验为全 0xFF。断电重启后生效。","ok")},onfail:function(m){facBusy=false;setBusy(false);setTxt("facpill","失败");failLog("faclog","擦除失败："+m)}})}).catch(function(e){facBusy=false;setBusy(false);setTxt("facpill","失败");failLog("faclog","擦除失败："+e.message)})});
 $("envrefresh").addEventListener("click",loadEnv);
+$("envack").addEventListener("change",syncEnvBtn);
+$("envwrite").addEventListener("click",writeEnv);
+$("envnewkey").addEventListener("input",syncEnvBtn);
+$("envnewval").addEventListener("input",syncEnvBtn);
+$("conrun").addEventListener("click",conRun);
+$("conclear").addEventListener("click",function(){setHtml("conout","（尚未执行）");setTxt("conexit","—");setTxt("conpill","空闲")});
+$("partsel").addEventListener("change",updatePart);
 $("refresh").addEventListener("click",function(){refreshStatus();loadSlots()});
 $("bk-probe").addEventListener("click",probeBackup);
-tabs();refreshStatus();loadSlots();startStatusPoll();
+tabs();updatePart();refreshStatus();loadSlots();startStatusPoll();
 })();
 </script>
 </body>

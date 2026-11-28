@@ -44,8 +44,32 @@ const magic = Buffer.from('128s', 'ascii');
 magic.copy(backup, 0x10);
 backup.writeUInt32LE(494208, 0x14);
 Buffer.from('U-Boot 2027.01-rc2 (mock)', 'ascii').copy(backup, 0x800);
-const BACKUP_CRC = crc32(backup);
-const BACKUP_SHA = sha256(backup);
+const BOOTLOADER_CRC = crc32(backup);
+const BOOTLOADER_SHA = sha256(backup);
+
+const PART_DEFS = {
+  bootloader: { off: '0x20000', len: 655360, file: 'e2631-bootloader.bin' },
+  tag: { off: '0x100000', len: 1048576, file: 'e2631-tag.bin' },
+  wifi: { off: '0x200000', len: 1048576, file: 'e2631-wifi.bin' },
+  usercfg: { off: '0x300000', len: 2097152, file: 'e2631-usercfg.bin' },
+  defcfg: { off: '0x500000', len: 2097152, file: 'e2631-defcfg.bin' }
+};
+const partCache = {};
+function partMeta(p) {
+  if (partCache[p]) return partCache[p];
+  const d = PART_DEFS[p];
+  let buf;
+  if (p === 'bootloader') buf = backup;
+  else {
+    buf = Buffer.alloc(d.len, 0);
+    Buffer.from('E2631 ' + p + ' mock partition', 'ascii').copy(buf, 0);
+  }
+  partCache[p] = { buf, crc: hex32(crc32(buf)), sha: sha256(buf) };
+  return partCache[p];
+}
+
+const BACKUP_CRC = BOOTLOADER_CRC;
+const BACKUP_SHA = BOOTLOADER_SHA;
 
 const SLOTS = {
   next_slot: '1',
@@ -70,27 +94,36 @@ const SLOTS = {
   bootloader_region_crc32: hex32(BACKUP_CRC)
 };
 
-const ENV_TEXT = [
-  'baudrate=115200',
-  'bootcmd=e2631boot',
-  'bootdelay=0',
-  'bootfile=uboot.bin',
-  'console=ttyAMA0,115200n8',
-  'ethaddr=00:41:71:00:00:50',
-  'gatewayip=192.168.1.1',
-  'ipaddr=192.168.1.1',
-  'netmask=255.255.255.0',
-  'serverip=192.168.1.100',
-  'e2631_pocload=tftp 0x43000000 u-boot.bin',
-  'e2631_flashboot=reset',
-  'env_size=642/131068'
-].join('\n') + '\n';
+const ENV_ORDER = [
+  'baudrate', 'bootcmd', 'bootdelay', 'bootfile', 'console', 'ethaddr',
+  'gatewayip', 'ipaddr', 'netmask', 'serverip', 'e2631_pocload', 'e2631_flashboot'
+];
+const ENV_MAP = {
+  baudrate: '115200',
+  bootcmd: 'e2631boot',
+  bootdelay: '0',
+  bootfile: 'uboot.bin',
+  console: 'ttyAMA0,115200n8',
+  ethaddr: '00:41:71:00:00:50',
+  gatewayip: '192.168.1.1',
+  ipaddr: '192.168.1.1',
+  netmask: '255.255.255.0',
+  serverip: '192.168.1.100',
+  e2631_pocload: 'tftp 0x43000000 u-boot.bin',
+  e2631_flashboot: 'reset'
+};
+function envText() {
+  const lines = ENV_ORDER.map((k) => k + '=' + ENV_MAP[k]);
+  lines.push('env_size=' + ENV_ORDER.length + '/131068');
+  return lines.join('\n') + '\n';
+}
 
 let task = { op: 'idle', mode: '', stage: 'idle', progress: 0, bytesDone: 0, bytesTotal: 0, crc32: '', sha256: '', browser: '', match: '', result: '', error: '', slotTarget: '', writtenSerial: '', version: 'U-Boot 2027.01-rc2 (mock)' };
 const STEPS = {
   flash: [['erase', 10], ['blank', 30], ['write', 60], ['readback', 80], ['compare', 95], ['done', 100]],
   firmware: [['erase', 10], ['write', 60], ['readback', 80], ['compare', 95], ['done', 100]],
-  factory: [['erase', 40], ['blank', 80], ['done', 100]]
+  factory: [['erase', 40], ['blank', 80], ['done', 100]],
+  envwrite: [['diff', 10], ['check', 30], ['erase', 50], ['write', 70], ['readback', 85], ['verify', 95], ['done', 100]]
 };
 function advance() {
   if (task.stage === 'done' || task.stage === 'error' || task.stage === 'idle') return;
@@ -102,6 +135,20 @@ function advance() {
   task.progress = next[1];
   if (task.stage === 'done') task.result = 'ok';
 }
+function mockConsole(cmd) {
+  const parts = cmd.split(/\s+/);
+  const c = parts[0];
+  if (c === 'version') return { code: 0, text: '\nU-Boot 2027.01-rc2 (mock)\n\narm-linux-gnueabi-gcc\n' };
+  if (c === 'printenv') {
+    const k = parts[1];
+    if (k) return { code: 0, text: Object.prototype.hasOwnProperty.call(ENV_MAP, k) ? k + '=' + ENV_MAP[k] : '\n## Error: "' + k + '" not defined\n' };
+    return { code: 0, text: ENV_ORDER.map((x) => x + '=' + ENV_MAP[x]).join('\n') + '\n' };
+  }
+  if (c === 'md') return { code: 0, text: '42000000: 00000000 00000000 00000000 00000000    ................\n42000010: 00000000 00000000 00000000 00000000    ................\n' };
+  if (c === 'help') return { code: 0, text: '?         - alias for \'help\'\nbootm     - boot application image from memory\nprintenv  - print environment variables\nsetenv    - set environment variables\nversion   - print monitor, compiler and linker version\n' };
+  return { code: 1, text: 'Unknown command \'' + cmd + '\' - try \'help\'\n' };
+}
+
 function statusText() {
   const s = task;
   const out = [
@@ -176,14 +223,40 @@ const server = http.createServer(async (req, res) => {
       for (const k of ['slot0', 'slot1']) for (const f of ['valid', 'intact', 'identity', 'serial', 'version', 'header_at']) lines.push(k + '_' + f + '=' + SLOTS[k + '_' + f]);
       return send(res, 200, lines.join('\n') + '\n');
     }
-    if (req.method === 'GET' && u.pathname === '/env') return send(res, 200, ENV_TEXT);
+    if (req.method === 'GET' && u.pathname === '/env') return send(res, 200, envText());
+    if (req.method === 'POST' && u.pathname === '/env') {
+      const q = parseQuery(u);
+      if (q.confirm !== 'write' || header(req, 'x-e2631-confirm') !== 'write') return send(res, 400, 'result=error\nerror=missing confirm\n');
+      const key = q.key || '';
+      const value = q.value === undefined ? '' : q.value;
+      const writable = key === 'bootdelay' || key.indexOf('e2631_') === 0;
+      if (!/^[a-z0-9_]{1,32}$/.test(key) || !writable) return send(res, 403, 'result=error\nerror=key is not writable\n');
+      if (value.length > 128 || !/^[\x20-\x7e]*$/.test(value)) return send(res, 400, 'result=error\nerror=bad value\n');
+      if (!Object.prototype.hasOwnProperty.call(ENV_MAP, key)) ENV_ORDER.push(key);
+      ENV_MAP[key] = value;
+      const crc = hex32(crc32(Buffer.from(envText(), 'utf8')));
+      task = { op: 'envwrite', mode: 'write', stage: 'diff', progress: 5, bytesDone: 1, bytesTotal: 1, crc32: crc, sha256: '', browser: '', match: '', result: '', error: '', slotTarget: '', writtenSerial: '', version: task.version };
+      return send(res, 200, 'result=accepted\nnew_crc32=' + crc + '\nkeys=1\n');
+    }
+    if (req.method === 'POST' && u.pathname === '/console') {
+      const cmd = (parseQuery(u).cmd || '').trim();
+      if (!cmd || cmd.length > 256 || /[;\r\n]/.test(cmd)) return send(res, 400, 'result=error\nexit=1\nstdout=\ntruncated=0\nerror=only a single command is allowed\n');
+      const out = mockConsole(cmd);
+      const esc = out.text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n');
+      return send(res, 200, 'result=ok\nexit=' + out.code + '\nstdout=' + esc + '\ntruncated=0\nerror=\n');
+    }
     if (req.method === 'GET' && u.pathname === '/backup') {
-      return send(res, 200, backup, 'application/octet-stream', {
-        'Content-Disposition': 'attachment; filename="e2631-uboot-region.bin"',
-        'X-E2631-CRC32': hex32(BACKUP_CRC),
-        'X-E2631-SHA256': BACKUP_SHA,
-        'X-E2631-Offset': '0x20000',
-        'X-E2631-Length': '0xA0000'
+      const part = parseQuery(u).part || 'bootloader';
+      const def = PART_DEFS[part];
+      if (!def) return send(res, 400, 'result=error\nerror=bad part\n');
+      const m = partMeta(part);
+      return send(res, 200, m.buf, 'application/octet-stream', {
+        'Content-Disposition': 'attachment; filename="' + def.file + '"',
+        'X-E2631-CRC32': m.crc,
+        'X-E2631-SHA256': m.sha,
+        'X-E2631-Offset': def.off,
+        'X-E2631-Length': '0x' + def.len.toString(16).toUpperCase(),
+        'X-E2631-Part': part
       });
     }
     if (req.method === 'POST' && u.pathname === '/boot') {

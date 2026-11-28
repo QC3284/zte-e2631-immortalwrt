@@ -148,3 +148,74 @@ next_slot；坏摘要返回 400。
 - 契约：evidence/e4-v2-contract-design-20261128.md（task-83，Lead 2026-11-28 复核）。
 - 设计：docs/E4-多功能U-Boot设计-2026-11-27.md（§10 v2 契约摘要）。
 - 门禁：tools/embed-failsafe.sh、tools/check-workflows.mjs、.github/workflows/uboot-build.yml。
+
+## 10. v2.1 扩展（task-88，2026-11-28）
+
+用户裁定（m12022）：“把功能都加上，不要再说安不安全了”。据此在 v2 五标签页面上扩展为
+六标签，并补三个端点；**不设口令/鉴权门**，安全边界只写在契约 §15.5 与本节。
+
+### 10.1 新增端点（契约 §15）
+
+| 端点 | 语义 | 写所有者 |
+|---|---|---|
+| `POST /console?cmd=` | 单条 U-Boot 命令 + stdout 捕获（≤4 KiB，转义 `\n`/`\\`）；含 `;`/换行 400；无 stdin | 无（只转发） |
+| `POST /env?key=&value=&confirm=write` | 仅 bootdelay/e2631_* 白名单；复用 e2631env 五步；vendor 键 403 | e2631env（不变） |
+| `GET /backup?part=bootloader|tag|wifi|usercfg|defcfg` | 分区只读 + CRC32/SHA-256/Offset/Length/Part 头 | 无（只读） |
+
+明确不做：UBI/SIMG（MT798x 存储布局专属）、I18N（中文单语）、网页终端 stdin 会话。
+
+### 10.2 页面变更
+
+- 六个标签：系统状态 / 固件更新 / 引导区 / 环境变量 / **串口台** / 恢复出厂；
+  串口台在“系统”分组、环境变量之后。
+- **环境变量**：只读总表 + 白名单编辑行（`bootdelay`、`e2631_*`）+ 新增变量行；
+  “我已了解”勾选 + `confirm()` 双确认；按键逐个 `POST /env` 并轮询 `op=envwrite` 五步
+  （diff→check→erase→write→readback→verify→done）；每键写前检查 op 避免误判上一任务完成。
+- **串口台**：单命令输入、执行、输出区（`pre`）、历史 ≤20 条；客户端校验非空/≤256 B/无分号换行；
+  执行前 `confirm()`；显示 stdout、exit、截断标记；无 stdin 提示。
+- **引导区**：新增分区备份下拉（5 个分区）+ `读取校验值` + `下载分区`；备份卡从系统状态页移入；
+  `GET /backup?part=`，显示偏移/长度/分区 CRC32/SHA-256。
+- 侧边栏说明改为“bootloader/槽位/env 写入后都需要断电重启”（原先写“不写入 env”已失效）。
+
+### 10.3 尺寸与门禁
+
+| 项 | v2（task-81） | v2.1（task-88） |
+|---|---|---|
+| 原始 | 34,069 B | 44,003 B |
+| gzip | 10,962 B（sha256 36d9a176…） | 13,773 B（sha256 496c5651…） |
+| 页面 sha256 | adc68a10… | d6bff9225bee6b85f453f2e7b64f15b72eaa7106f8aebfbd6c79aca94b4d2ba2 |
+| 预算 | 32,768 B | 32,768 B（未抬闸） |
+
+`tools/embed-failsafe.sh --check` 输出：`raw 44003 B, gzip 13773 B (limit 32768 B)`；
+确定性未变（`gzip -9 -n`，冻结符号未动）。
+
+### 10.4 本地 mock 覆盖
+
+`tools/mock-failsafe.mjs` 新增：
+
+- `POST /env`：confirm 查询参数 + `X-E2631-Confirm` 头双查、白名单（bootdelay/e2631_*）、
+  可打印 ASCII ≤128 B、vendor 键 403、缺失 confirm 400；写后 `/env` 可见，`/status` 走
+  `envwrite` 五步（diff/check/erase/write/readback/verify/done）。
+- `POST /console`：单命令校验（空/超 256/含 `;` 或换行 → 400），`version`/`printenv`/`md`/`help`
+  返回假 stdout 与 exit，未知命令 exit=1；stdout 按契约转义。
+- `GET /backup?part=`：5 个分区各自长度（655360/1M/1M/2M/2M）+ CRC32/SHA-256/Offset/Length/Part 头；
+  未知 part 400；缺省 bootloader。
+
+curl 实测：page 200/44003；`version` stdout+exit=0；`a;b` 400；`e2631_test=hello` accepted，
+轮询到 readback；vendor 键 403；`/backup?part=tag` 200/1048576；未知 part 400。
+
+### 10.5 复现与门禁
+
+    bash tools/embed-failsafe.sh --check        # 44003 / 13773 / 32768
+    node tools/check-workflows.mjs              # 107 PASS
+    make check                                  # 通过（树 fork 缺省 SKIP 有说明）
+    node tools/mock-failsafe.mjs                # 127.0.0.1 预览六标签
+
+页面 JS 通过 `node --check`（抽出 `<script>`）；检查器必需的 v1 字符串全部保留，
+禁项（外部 URL/`<script src=`/`<link href=`/`/reboot`）均未出现。
+
+### 10.6 边界与后续
+
+- 页面不提供 env vendor 键编辑；`/console` 不新增 MTD 写路径（命令仍由 e2631flash/fwslot 等所有者执行）。
+- base-builder task-84 按契约 §15 实现 `/console`、`/env`、`/backup?part=`；本任务只改页面/契约/mock/文档。
+- task-86 真机验收按 README §8 的 v2.1 补充项执行。

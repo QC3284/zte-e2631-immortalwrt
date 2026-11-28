@@ -521,3 +521,140 @@ v2 新增/复用的缓冲：
 ---
 
 契约变更记录：任何端点/字段/错误文本/地址变更必须同时更新本文件、`docs/E4-多功能U-Boot设计-2026-11-27.md` §10、`uboot-port/failsafe/README.md` 与 `tools/check-workflows.mjs` 的断言，并在 task-86 重新验收。
+## 15. v2.1 增补（task-88，用户裁定 2026-11-28：功能全加，不设口令门）
+
+本节是 v2 契约的增补，覆盖三组新能力与两类明确不做项；与 §1–§14 冲突时以本节为准。
+用户裁定（m12022）：“把功能都加上，不要再说安不安全了”。因此本页**不设口令/鉴权门**，
+安全边界只写进文档（§15.5），不作为裁剪功能的理由。
+
+### 15.0 范围
+
+新增端点：
+
+- POST /console?cmd=<单条命令>：执行一条 U-Boot 命令并捕获 stdout；只适合快速命令，
+  不与救援循环 stdin 共享，交互式命令（需要按键/确认的）不支持。
+- POST /env?key=<名>&value=<值>&confirm=write：仅 e2631env 白名单键，复用 e2631env 五步写；
+  env 写所有者不变（仍是 e2631env）。
+- GET /backup?part=bootloader|tag|wifi|usercfg|defcfg：分区只读备份 + CRC32/SHA-256 响应头。
+
+明确不做：UBI/SIMG（MT798x 专属，本机不适用）、I18N（页面中文单语）；页面不提供网页终端
+的 stdin 会话，只提供单命令执行。
+
+### 15.1 POST /console?cmd=<单条命令>
+
+请求：
+
+- 无 body（Content-Length: 0）；cmd 由页面 URL-encode；解码后长度 1..256 B。
+- 只允许**单条命令**：含分号 ;、换行 CR/LF、NUL 一律 400 error=only a single command is allowed。
+- 无需确认头（用户裁定不设口令门）；页面侧有二次确认与风险提示。
+
+执行：
+
+- 服务端调用 U-Boot run_command(cmd, 0)；执行期间把控制台输出重定向到 4 KiB 环形捕获缓冲
+  （覆盖式，保留尾部），执行结束后恢复。
+- 不与救援循环的 stdin 共享；不等待按键；命令自行阻塞超过约 2 s 时由命令自身语义决定
+  （服务端不强制超时，页面提示交互式命令请用物理串口）。
+- 捕获输出中的换行编码为两字符 \n，反斜杠编码为 \\；页面反转义后显示。
+
+响应（200，text/plain，逐行 key=value）：
+
+    result=ok|error
+    exit=<run_command 返回值，十进制>
+    stdout=<转义后的捕获文本，单行>
+    truncated=<0|1>
+    error=<短原因，无错误时为空>
+
+失败：400（参数非法）、500（执行异常）；错误响应也带 exit= 与 stdout=（可能为空）。
+
+### 15.2 POST /env?key=<名>&value=<值>&confirm=write
+
+请求：
+
+- 无 body；key/value 均为 URL-encode；必须 confirm=write 且请求头 X-E2631-Confirm: write，
+  缺一即 400 error=missing confirm。
+- 白名单：key 必须等于 bootdelay 或以 e2631_ 开头，且匹配 [a-z0-9_]+，长度 ≤32 B；
+  value 只允许可打印 ASCII（0x20..0x7E），长度 ≤128 B。其余一律 403 error=key is not writable
+  （vendor 键如 bootcmd/bootargs/memsize/versioninfo 永远只读；e2631env 白名单不变）。
+- 同一时刻只允许一个 env 写任务。
+
+五步写（复用 e2631env，写所有者不变）：
+
+1. diff：把当前 env + 本次修改生成目标快照，打印差异；无变化直接 result=ok。
+2. check：长度校验与坏块预检（env 块 0xC0000，0x20000 B；不允许越界；坏块则失败）。
+3. erase：擦除 env 块（0xC0000..0xDFFFF）。
+4. write：写标准 vendor env 格式（4 B CRC32 + 0x1FFFC 数据），全 0x00 填充。
+5. readback/verify：回读比较并重算 CRC32；失败则保持 error，不自动重试。
+
+响应：
+
+- 立即 200 accepted：result=accepted、new_crc32=0x…、keys=<本次写入键数>；
+  随后 /status：op=envwrite，stage=diff→check→erase→write→readback→verify→done，
+  progress 0..100；成功 result=ok、crc32=0x…；失败 result=error、error=<原因>。
+- 掉电：最坏回到默认 env（两条启动链都能启动，不是砖路径，D-U2 结论不变）。
+- 成功文案只提示“断电重启后生效”；不自动重启。
+
+### 15.3 GET /backup?part=<分区>
+
+part 与区间（设备实测/槽位契约）：
+
+| part | 偏移 | 长度（B） | 说明 |
+|---|---|---|---|
+| bootloader | 0x20000 | 655,360 | mtd0 的 U-Boot 镜像区（默认，兼容 v1） |
+| tag | 0x100000 | 1,048,576 | mtd1（含 MAC 等只读信息） |
+| wifi | 0x200000 | 1,048,576 | mtd2 |
+| usercfg | 0x300000 | 2,097,152 | mtd3 |
+| defcfg | 0x500000 | 2,097,152 | mtd4 |
+
+- 请求：GET，无 body；part 缺省 = bootloader；未知 part → 400 result=error error=bad part。
+- 响应：application/octet-stream 原始数据 + Content-Length + Content-Disposition
+  （filename=e2631-<part>.bin）+ X-E2631-CRC32 + X-E2631-SHA256 + X-E2631-Offset +
+  X-E2631-Length + X-E2631-Part。只读，不占飞行锁（同一时刻只允许一个备份传输）。
+- 页面只做读取/下载，不提供写回（写分区仍归各自所有者，见 §4 写所有者矩阵）。
+
+### 15.4 明确不做
+
+- UBI/SIMG/BL2/GPT：MT798x 的存储布局专属，本机 SPI-NAND + 双槽 + mtd0 结构不适用，
+  已由其它任务所有者（e2631flash / e2631-fwslot / e2631factory）负责，本页不重复实现。
+- I18N：页面中文单语；不引入 i18n 资源（省 gzip 预算，单用户自用）。
+- 网页终端 stdin 会话：只做单命令 + stdout 捕获；交互式命令请用物理串口。
+- env 写入不扩展到 vendor 键；页面不提供 vendor 键编辑入口。
+
+### 15.5 安全说明（只在文档，不设口令门）
+
+- 救援页无鉴权，任何能访问 192.168.1.1 的主机都可执行 /console 命令或写 env/槽位。
+  这是用户明确接受的取舍；救援模式只在按键触发后运行，正常启动不监听网络。
+- /console 可执行任意单条 U-Boot 命令（包括 reset、mtd 擦写），页面仅做二次确认与提示；
+  不提供 stdin，因此依赖交互的命令不会挂住整个救援循环。
+- /env 只允许 e2631env 白名单键；/backup 只读；固件写仍有原厂槽守卫与摘要门控。
+- 若未来要收紧，优先加口令或限制 /console 命令白名单；当前版本不做。
+
+### 15.6 写所有者与不变式
+
+| 对象 | 所有者 | 本页动作 |
+|---|---|---|
+| bootloader mtd0 镜像区 | e2631flash | /flash（v1） |
+| 启动槽 | e2631-fwslot | /firmware |
+| overlay（rootfs_data） | e2631factory | /factory |
+| env 块 | e2631env | /env（v2.1） |
+| 备份/只读 | 无 | /backup、/slots、/status、/console |
+
+不变式：三者互不越界；/console 只是转发用户命令，不新增写路径；/env 不写 vendor 键；
+/backup 永不写 flash。
+
+### 15.7 页面映射与预算
+
+- 六个标签：系统状态、固件更新、引导区、环境变量、串口台、恢复出厂；串口台放在“系统”
+  分组、环境变量之后。引导区新增分区备份下拉（bootloader/tag/wifi/usercfg/defcfg）。
+- 环境变量：只读总表 + 白名单键编辑（bootdelay 与 e2631_*），勾选确认 + confirm() 双确认，
+  逐个键写入并轮询 /status（op=envwrite）；写入完成提示断电重启。
+- 串口台：单命令输入 + 执行 + 输出区 + 历史（≤20 条）；执行前 confirm；提示无 stdin、
+  命令立即生效；输出截断标记。
+- gzip 预算仍是 32,768 B；新页面实测见 evidence/failsafe-redesign-20261128.md §10。
+
+### 15.8 验收补充（task-86）
+
+- /console：version、printenv bootdelay、md 0x40000000 4 等快速命令返回 stdout；
+  含分号/换行请求返回 400；执行 reset 会重启（在验收中只做一次，且仅当用户批准）。
+- /env：写 e2631_ 测试键 → /status 五步 → 回读 printenv 一致；写 vendor 键 403；
+  掉电模拟（可选）后仍能启动。
+- /backup：五个分区下载长度/offset/CRC32/SHA-256 与设备一致；未知 part 400。
