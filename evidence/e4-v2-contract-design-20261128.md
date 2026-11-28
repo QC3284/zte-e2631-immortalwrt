@@ -2,6 +2,7 @@
 
 > 状态：设计稿，供 Lead 拍板后由 base-builder（task-84）、页面（task-81）、闸门/构建（task-85）、真机验收（task-86）接力。
 > 本文件只定义契约与边界，不含代码；所有地址/字段/错误文本以实现和真机测量为准，变更必须回写本文。
+> **2026-11-28 Lead 复核：接受本契约并修订 4 项**（D1 页面闸门改由 task-87 先落地、D3 只拒绝完整 vendor 目标槽、D7 成功文案只用断电重启、D8 真机验收改为首次真实升级）；修订已并入正文与 §13。
 > 前序文档：[docs/E4-多功能U-Boot设计-2026-11-27.md](../docs/E4-多功能U-Boot设计-2026-11-27.md)（v1 设计，`/flash` 契约仍然有效）、[evidence/e4-rescue-acceptance-plan-20261127.md](e4-rescue-acceptance-plan-20261127.md)（v1 验收方案）。
 
 ## 0. 一页结论
@@ -11,8 +12,8 @@
 3. **新增一个固件写入口 `/firmware`，与 `/flash` 分离**：`/flash` 继续是 bootloader 区（mtd0 `0x20000..0xC0000`）唯一入口、五步写、净零验收可复现；`/firmware` 只写 slot0/slot1，语义逐条对齐 Linux 侧 `e2631-fwslot`（校验、守卫、擦整槽、写 body、写版本头、回读校验、失败擦头回退）。**页面不得做第三个写入实现**。
 4. **写路径所有者固定**：bootloader = `e2631flash`（现有五步）；firmware slot = 新增 `e2631fwslot`（语义端口，golden 向量对拍）；overlay = 新增 `e2631factory`（只擦 `rootfs_data` + 全 FF 回读，无文件系统逻辑）；env = `e2631env` 白名单写（patch 0017，v2 页面不暴露写）；其余一律拒绝。
 5. **单线程、单飞行任务**：同一时刻只允许一个上传/擦写/回读任务；`/status` 的每次 GET 推进一步有界工作（≤16 个擦除块或 ≤2 MiB 编程/回读），页面 500 ms 轮询。
-6. **页面 gzip 预算 32 KiB**（v1 为 6,144 B 的闸门）；v2 必然超过 v1 闸门，闸门提升必须由 task-85 一次性完成并留下构建证据，页面才能提交。**在此之前的页面工作不落库**。
-7. **安全**：仅 lan1、无 TLS、无登录；写端点强制自定义头（`X-E2631-SHA256`、`X-E2631-Confirm`），浏览器跨站请求会因非简单头触发预检而被拒（CSRF 缓解）；`/firmware` 拒绝覆盖 vendor/未知系统槽；`/factory` 双确认。
+6. **页面 gzip 预算 32 KiB**（v1 为 6,144 B 的闸门）；闸门提升由 **task-87**（pkg-release，2026-11-28 起进行中）一次性完成并留下构建证据，页面在 task-87 落地后即可提交，**不再等 task-85**。
+7. **安全**：仅 lan1、无 TLS、无登录；写端点强制自定义头（`X-E2631-SHA256`、`X-E2631-Confirm`），浏览器跨站请求会因非简单头触发预检而被拒（CSRF 缓解）；`/firmware` 拒绝覆盖**识别为 vendor 且完整的**目标槽，UNKNOWN/CORRUPT 槽可写（救援核心用途）；`/factory` 双确认。
 
 端点总表（新= v2 新增，旧= v1 保留）：
 
@@ -41,7 +42,7 @@
 ### 1.2 v1 已交付且 v2 必须保持
 
 - `/flash` 的请求/响应/校验/写入/摘要契约与 v1 完全一致（见 E4 设计 §4.2、本仓 `uboot-port/failsafe/README.md`）；task-75 的零净验收脚本与 task-79 的写验收证据继续有效。
-- 页面永不自动重启；成功文案要求人手动断电/或串口 `reset`。
+- 页面永不自动重启；成功文案**只用「断电重启后生效」**，不得提示按 reset（Linux 运行时按住 reset ≥5 s = factory reset；启动时按住 reset = 救援触发，提示会有危险）。
 - 上传摘要：页面发送 `X-E2631-SHA256`（整个文件 64 位小写十六进制），设备回显 `sha256=`、`browser_sha256=`、`sha_match=`；摘要一致前不启用写入。
 
 ### 1.3 设备事实（本契约的硬输入，2026-11-28 真机只读核对）
@@ -236,10 +237,11 @@ written_serial=<将要盖章的 serial>
 
 失败/掉电语义：目标槽在擦除后即失去旧版本头，因此任何中途失败都回退到另一槽（守卫保证它 `known && intact`）；这是设计上的安全网，页面必须显示“失败后启动仍在另一槽”。**不自动重启、不自动重试**。
 
-#### 3.7.4 拒绝覆盖其它系统
+#### 3.7.4 只拒绝覆盖「完整可用的 vendor 系统」
 
-- 目标槽身份为 `vendor` 或 `unknown` → `guard=refuse`，`400 error=refusing to overwrite another system`。救援 UI 不提供“覆盖厂商系统”的入口（该操作只在 Linux 侧 `e2631-fwslot install --replace-other-system` 做，并先备份 1 MiB）。
+- 目标槽 **identity=vendor 且 intact（版本头/内核/rootfs CRC 全部回读一致）** → `guard=refuse`，`400 error=refusing to overwrite a working vendor system`。这是唯一一种“覆盖会把最后一次原厂回退毁掉”的情况；该操作只在 Linux 侧 `e2631-fwslot install --replace-other-system` 做，并先备份 1 MiB。
 - 目标槽为 `empty`/`ours` → 允许。
+- 目标槽为 `unknown`、`vendor 但损坏`、无有效版本头、或内容不可识别 → **允许写**：救援模式的核心用途就是重写砖掉的槽。页面必须显示“目标槽内容无法识别/已损坏，将被覆盖”。
 
 ### 3.8 `POST /factory?confirm=reset`
 
@@ -295,8 +297,9 @@ written_serial=<将要盖章的 serial>
 
 - 目标槽（`auto` → `next_slot`；显式 0/1）：
   - `empty` / `ours` → 允许；
-  - `vendor` / `unknown` → `guard=refuse`（见 §3.7.4）；
-  - 目标槽不可读/无版本头 → `refuse`。
+  - `vendor` 且 `intact` → `guard=refuse`（唯一拒绝；见 §3.7.4）；
+  - `unknown` / `vendor` 但损坏 / 无有效版本头 / 内容不可识别 → 允许（砖槽救援），页面警示内容将被覆盖；
+  - 目标槽 MTD 设备本身不存在 → `refuse`。
 - 另一槽（fallback）：
   - `known && intact && identity==vendor` → `guard=ok`（与 Linux `upgrade_guard` 一致）；
   - `known && intact && identity in {ours, unknown}` → `guard=weak`：允许写，但页面必须显示“回退槽不是原厂镜像”警告；写完成后若目标槽坏，回退目标是这个镜像而非原厂；
@@ -394,7 +397,7 @@ v2 新增/复用的缓冲：
 ### 8.2 标签页
 
 1. **系统状态**：启动路径 rail（BootROM → secondboot → U-Boot → 救援）；槽卡片（slot0/slot1：serial、版本、身份、valid/intact、next 标记）；当前 U-Boot `version`；`/status` 500 ms 轮询显示活动任务与进度；`GET /backup` 下载按钮 + CRC32/SHA-256 显示。
-2. **固件更新**：文件选择（`accept=.bin`）、大小、浏览器 SHA-256；槽选择 `auto`/`slot0`/`slot1`（渲染身份/版本/完好/guard 徽标）；按钮“仅校验”和“写入待命”（后者在 `mode=validate` 返回 `result=ok` 且 `sha_match=ok` 且 `guard!=refuse` 后才可用）；写确认弹窗必须写明目标槽与“写入后下次启动该槽 / 断电重启生效”；进度卡 + 阶段中文映射 + 日志；失败显示 `error` 与“启动仍留在另一槽”。
+2. **固件更新**：文件选择（`accept=.bin`）、大小、浏览器 SHA-256；槽选择 `auto`/`slot0`/`slot1`（渲染身份/版本/完好/guard 徽标）；按钮“仅校验”和“写入待命”（后者在 `mode=validate` 返回 `result=ok` 且 `sha_match=ok` 且 `guard!=refuse` 后才可用）；写确认弹窗必须写明目标槽与“写入后下次启动该槽 / 断电重启后生效”；进度卡 + 阶段中文映射 + 日志；失败显示 `error` 与“启动仍留在另一槽”。
 3. **引导区**：v1 `/flash` 页签（文件、SHA-256、仅校验/写入待命、五步进度）；显示当前 mtd0 镜像区 CRC32（`/status` 的 `bootloader_region_crc32`）；注意事项强调只写 `0x20000..0xC0000`。
 4. **环境变量**：`/env` 只读表格（键/值），刷新按钮；页面标注“只读；写入请用串口 `e2631env`（白名单）”。
 5. **恢复出厂**：说明（擦除 `rootfs_data`，overlay/配置丢失；squashfs 与槽位不动）；双确认（勾选“我已了解” + `confirm()`）；按钮“擦除 overlay”；进度；成功后“断电重启后生效”。
@@ -403,7 +406,7 @@ v2 新增/复用的缓冲：
 
 - 写按钮 gating：bootloader 写 = v1 摘要门控；firmware 写 = validate 摘要一致 + guard 非 refuse；factory = 双确认。
 - 忙时：所有写/擦按钮禁用；`/status` 轮询照旧；Ctrl-C/断开不依赖页面。
-- 不做自动重启、不调用 `/reboot`（不存在该端点）；成功文案给“断电重启”；若实现后 `reset` 命令可验证，可加一句“串口可 `reset`”，但不得把页面按钮做成“自动重启”。
+- 不做自动重启、不调用 `/reboot`（不存在该端点）；成功文案**只用“断电重启后生效”**，不得出现 reset 提示（Linux 运行时按住 reset ≥5 s = factory reset；启动时按住 = 救援触发）。
 - 无外部资源；键盘可达（`label for`、`:focus-visible`）；尊重 `prefers-reduced-motion`。
 
 ## 9. 尺寸预算
@@ -418,13 +421,13 @@ v2 新增/复用的缓冲：
 | 载荷硬上限 | 653,312 B | mtd0 镜像区 |
 | 余量（闸门） | ≥ 221 KiB | 实际以 task-85 构建测量为准 |
 
-规则：**task-85 必须实测 v2 构建的 u-boot.bin 大小并留下证据**；只有确需时才调整 `uboot-port` 的尺寸闸门，且必须同时更新 `tools/check-workflows.mjs` 的页面/资产断言；本契约不预先改闸门。页面若超 32 KiB，回到 task-81 裁功能，不得偷抬闸门。
+规则：**task-87 先落地页面闸门 6,144 → 32,768 B**（`tools/embed-failsafe.sh` 默认 MAX、`tools/check-workflows.mjs` 断言、README 数字）并留下证据；页面的尺寸门以 task-87 的闸门为准。**task-85 实测 v2 构建的 u-boot.bin 大小并留下证据**，只有确需时才调整 `uboot-port` 的尺寸闸门。页面若超 32 KiB，回到 task-81 裁功能，不得偷抬闸门。
 
 ## 10. 安全边界
 
 - 仅 lan1；开放 Wi-Fi/wan 无法访问（救援时无无线）。无 TLS、无认证——这是“物理/串口在场”场景的救援页；页面必须在启动文本里提示“仅连接可信 LAN”。
 - 写端点必须自定义头（§2.4）；服务端不实现 CORS；同源检查可选加固。
-- 不允许覆盖 vendor/unknown 系统槽；不允许写 env/bootloader 以外的裸区间；factory 只能擦按名核对的 `rootfs_data`。
+- 不允许覆盖**完整可用的 vendor 系统槽**（唯一拒绝）；UNKNOWN/CORRUPT 槽允许写以救砖；不允许写 env/bootloader 以外的裸区间；factory 只能擦按名核对的 `rootfs_data`。
 - 页面不使用 `innerHTML` 注入设备返回文本（错误文本限短 ASCII，仍以 `textContent` 渲染）；文件名只读展示。
 - 页面不提供“网页终端/命令执行”；`/env` 只读。
 
@@ -447,7 +450,9 @@ v2 新增/复用的缓冲：
 | 11 | 负例/并发 | 缺确认头、错 `slot`、旧格式 URL、busy 时段第二个写 → 400/409；不擦写 |
 | 12 | 断电窗口 | 写固件中途断电（人工）→ 重启进另一槽（不砖）；记录来回复位证据 |
 
-零净原则：验证阶段（validate/backup/env/slots/status）必须零 flash 写入，用任务前后 mtd0/槽 digest 对比；写阶段（firmware write/factory）是真实变更，单独会话、单独批准。
+零净原则：验证阶段（validate/backup/env/slots/status）必须零 flash 写入，用任务前后 mtd0/槽 digest 对比；bootloader 写继续用 task-79 的净零写验收。
+
+**firmware write / factory 不做“同一镜像牺牲写”**（Lead 2026-11-28 定）：验收 = (a) 现在完成 on-device validate + 负例 + 净零 bootloader 流程；(b) **首次真实固件升级**（确实是新镜像）走救援 UI `/firmware`，作为该端点的真机验收，需用户单独批准。
 
 ## 12. 实施拆分与移交
 
@@ -473,31 +478,36 @@ v2 新增/复用的缓冲：
 - 按 §8 重写 `uboot-port/failsafe/e2631-failsafe.html`；单文件、无外部资源；复用 v1 的 SHA-256/上传/进度实现；新增五标签页与 §3 端点；
 - 生成/自检：`bash tools/embed-failsafe.sh --check --max 32768`；`evidence/failsafe-redesign-20261128.md` 记录上游形态摘要、尺寸、sha；
 - 提供 `python3 -m http.server` 之外的 mock 预览脚本（绑定 127.0.0.1）与契约 mock，供浏览器不连设备查看；
-- 不提交，直到 task-85 抬闸（或 Lead 指定提交窗口）。
+- task-87 抬闸后直接提交（Lead 2026-11-28 定）。
 
-### 12.3 task-85（pkg-release：闸门/构建）
-- 把页面预算闸门 6144 → 32768，同时更新 `tools/embed-failsafe.sh` 默认 `MAX`、`tools/check-workflows.mjs` 断言与 README 中的数字；
-- 实测 v2 构建大小并记录；`uboot-build.yml` 产物表加入新模块/资产统计；
-- 不动 `0001..0035` 的既有校验；新增断言覆盖 `/firmware`、`/factory`、`/backup` 的 README/契约字符串。
+### 12.3 task-87 / task-85（pkg-release：闸门/构建）
+- **task-87（先做，2026-11-28 已启动）**：页面预算闸门 6144 → 32768，同时更新 `tools/embed-failsafe.sh` 默认 `MAX`、`tools/check-workflows.mjs` 断言与 README 中的数字；
+- **task-85（随后）**：实测 v2 构建大小并记录；`uboot-build.yml` 产物表加入新模块/资产统计；不动 `0001..0035` 的既有校验；新增断言覆盖 `/firmware`、`/factory`、`/backup` 的 README/契约字符串；
+- 页面提交不再等 task-85（D1）。
 
 ### 12.4 task-86（verify-docs：真机验收）
 - 按 §11 执行；validate/backup/env/slots 为只读阶段（零 flash 写，mtd 前后 sha 对比）；
-- firmware write / factory 需要 Lead/用户单独批准，记录断电窗口与回退验证；
+- firmware write / factory **不做牺牲写**：firmware 验收 = 首次真实升级（新镜像）走 `/firmware`，需用户单独批准；factory 验收单独安排并说明 overlay 丢失；
 - 证据：串口全日志、`/status` 序列、mtd 前后 sha、页面 gzip/解压 sha、curl 请求响应原文。
 
-## 13. 未决问题（请 Lead 拍板）
+## 13. 决策记录（Lead 2026-11-28 复核）
 
-1. **页面闸门**：task-81 的 v2 页面必然超过 6,144 B；task-85 抬到 32,768 B 的顺序能否先于页面提交？若不能，页面保持 WIP（不落库）。
-2. **/firmware 默认目标**：`auto = next_slot`（serial 最大者）是否符合“默认写本次会启动的槽”的原意？写入后 serial+1 使目标槽成为下次启动槽，是否接受？
-3. **拒绝覆盖 vendor 槽**：救援 UI 一律拒绝写 vendor/unknown 槽（只在 Linux 侧带备份覆盖），是否符合救援场景预期？
-4. **weak fallback**：另一槽是 ours 且 intact 时允许写（页面警示“回退不是原厂”），是否接受？
-5. **/factory 语义**：只擦 `rootfs_data` + 全 FF 回读、依赖下次 Linux 启动 jffs2 重新格式化，是否接受（U-Boot 不做格式化）？
-6. **/boot 覆盖变量名**：`e2631_next_slot`（RAM，仅本次）；task-84 实现，是否同意？
-7. **成功文案的 reset**：patch 0029 的 `reset_cpu()` 已实现但真机验收未做；页面成功文案目前写“断电重启”，是否允许在验收后追加“串口 reset”（仍不做页面自动重启）？
-8. **写验收需要真机写**：firmware write / factory 是真实 flash 变更，不在零净会话里做；验收会话需单独批准并接受“写入后 serial 变化”。安排哪个会话？
-9. **备份文件名/头**：`e2631-uboot-region.bin` + `X-E2631-CRC32/SHA256/Offset/Length`，是否够用？
-10. **未来页面语言**：v2 中文单语；上游 i18n 是否需要在 v3 再评估（当前为省体积不做）？
+本契约在 2026-11-28 经 Lead 复核，**全部接受**，其中四项按修订执行（修订已并入正文）：
 
+| # | 决策 | 落点 |
+|---|---|---|
+| 1 | **D1 页面闸门**：task-87 先做 6,144 → 32,768 B；页面在 task-87 落地后直接提交，不等 task-85。 | §0.6 / §3.1 / §9 / §12.2 |
+| 2 | **D3 目标槽守卫**：只拒绝 `identity=vendor` 且 `intact` 的槽；UNKNOWN / vendor-但损坏 / 无头 / 不可识别槽**可写**（救砖是救援的核心用途）。 | §0.7 / §3.7.4 / §5.2 / §10 |
+| 3 | **D7 成功文案**：只用「断电重启后生效」；**不得提示 reset**（Linux 运行时按住 reset ≥5 s = factory reset；启动时按住 = 救援触发）。 | §1.2 / §8.2 / §8.3 |
+| 4 | **D8 固件写验收**：不做同一镜像牺牲写；(a) 现在做 on-device validate + 负例 + 净零 bootloader 流程；(b) **首次真实固件升级**（确实是新镜像）走 `/firmware` 作为该端点验收，需用户单独批准。 | §11 / §12.4 |
+| 5 | 默认目标 `auto = next_slot`（serial 最大）；写后 `serial=max_serial()+1`、`H_NEW=1`、CRC2 重算盖章。 | §3.7 / §5.3 |
+| 6 | weak fallback：另一槽 `ours` 且 intact 时允许写（页面警示“回退不是原厂”）；不完整/不可读仍 `refuse`。 | §5.2 |
+| 7 | `/factory` 只擦按名核对的 `rootfs_data` + 全 FF 回读，不格式化（下次 Linux 启动 jffs2 格式化）。 | §3.8 |
+| 8 | `/boot` 覆盖变量 `e2631_next_slot`，RAM-only、不持久化。 | §3.6 |
+| 9 | 备份文件名/响应头按 §3.4；中文单语；不搬上游资产。 | §3.4 / §8 |
+| 10 | 页面形态照上游 failsafe（五标签）；boot-path rail 只有在 fits 上游形态时才保留。 | §8 |
+
+后续实现按 §12 的 task-87 / task-84 / task-81 / task-85 / task-86 拆分推进。
 ## 14. 参考与复现
 
 - v1 设计/契约：[docs/E4-多功能U-Boot设计-2026-11-27.md](../docs/E4-多功能U-Boot设计-2026-11-27.md) §4.2–§6。
