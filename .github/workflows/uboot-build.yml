@@ -220,6 +220,34 @@ jobs:
             -o "$RUNNER_TEMP/env-align-test"
           "$RUNNER_TEMP/env-align-test" | tee "$RUNNER_TEMP/env-align-test.out"
           grep -q 'env align fixture: PASS' "$RUNNER_TEMP/env-align-test.out"
+      - name: Compile and run the env write candidate fixture
+        # task-98/patch 0060: a /env write must build the candidate block from
+        # the flash baseline plus the single requested key, so the RAM
+        # environment (runtime keys, wild values) can never leak into what is
+        # persisted. The fixture pins two byte-identical no-change writes, the
+        # runtime-key exclusion and the malformed/oversize rejections.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/env_candidate_test.c" \
+            -o "$RUNNER_TEMP/env-candidate-test"
+          "$RUNNER_TEMP/env-candidate-test" | tee "$RUNNER_TEMP/env-candidate-test.out"
+          grep -q 'env candidate fixture: PASS (65 checks)' "$RUNNER_TEMP/env-candidate-test.out"
+      - name: Compile and run the env tweak fixture
+        # task-98/patch 0061: the alignment tweaks must keep key-name copies.
+        # The old code stored pointers into the first export buffer that the
+        # second export overwrote (t92d: wild env_set calls and a corrupted
+        # block). The fixture replays that overwrite and the full gate
+        # alignment/restore sequence.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/env_tweak_test.c" \
+            -o "$RUNNER_TEMP/env-tweak-test"
+          "$RUNNER_TEMP/env-tweak-test" | tee "$RUNNER_TEMP/env-tweak-test.out"
+          grep -q 'env tweak fixture: PASS (27 checks)' "$RUNNER_TEMP/env-tweak-test.out"
       - name: Compile and run the web console fixture
         # task-97/patch 0057: the rescue page drives the console through
         # multipart /console/exec and reads JSON /console/poll. The fixture
@@ -668,6 +696,31 @@ jobs:
             fi
           done
           echo "task-97 gate: DNS + telnet + web console wired, shared console slot, env candidate aligned"
+          # task-98: the t92d env-write incident.  The /env candidate must be
+          # built from the flash baseline block plus the single requested key
+          # (no env_set before the write, no pointers into the export buffer);
+          # the alignment tweaks keep key-name copies, and the CLI save joins
+          # key=value again before the block is written.
+          env_c=board/zte/zxhn-e2631/e2631env.c
+          for task98_file in board/zte/zxhn-e2631/e2631env_build.h board/zte/zxhn-e2631/e2631env_tweak.h; do
+            if [ ! -s "$task98_file" ]; then
+              echo "::error::the task-98 file $task98_file is missing"
+              exit 1
+            fi
+          done
+          grep -q 'e2631_env_build_single(' "$env_c"
+          grep -q 'e2631_env_join_block(new_ents, new_n);' "$env_c"
+          grep -qE 'char key\[E2631_ENV_TWEAK_KEY_MAX\]' board/zte/zxhn-e2631/e2631env_tweak.h
+          grep -q 'strcpy(tweak->key, key)' board/zte/zxhn-e2631/e2631env_tweak.h
+          if awk '/^int e2631_env_write_begin\(/,/^}/' "$env_c" | grep -qE 'env_set\(|e2631_env_align_with_baseline'; then
+            echo "::error::e2631_env_write_begin mutates the RAM environment or realigns the candidate"
+            exit 1
+          fi
+          if grep -q 'tweaks\[\*ntweak\]\.key = key;' "$env_c"; then
+            echo "::error::the alignment tweaks point their key names into the export buffer again"
+            exit 1
+          fi
+          echo "task-98 env write gate: candidate is the baseline block plus the one requested key"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c

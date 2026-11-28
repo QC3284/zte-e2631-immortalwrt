@@ -1,0 +1,386 @@
+From f01c06f44fbf72c4ee29135f0a00b219c1e7524b Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 18:25:09 +0800
+Subject: [PATCH 1/2] env: build the web write candidate from the baseline
+ block alone
+
+The /env request staged its candidate from the RAM environment and then
+aligned it against flash. That path persisted a key the request never
+named (t92d): a second export overwrote the buffer that held the tweak
+keys, the restore called env_set() with garbage names and corrupted the
+RAM environment, and the next no-change write persisted the difference.
+
+Build the candidate from the flash baseline block alone instead: copy
+every baseline entry with its original bytes and order, and only replace
+or append the one key named in the request. The RAM environment no
+longer takes part, so a request naming only bootdelay cannot persist any
+other key, whatever the RAM environment contains. The block is
+serialized directly (never parsed before the write), and the requested
+key is applied to the RAM environment only after the write verified.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631env.c       |  69 +++++----
+ board/zte/zxhn-e2631/e2631env_build.h | 192 ++++++++++++++++++++++++++
+ 2 files changed, 237 insertions(+), 24 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631env_build.h
+
+diff --git a/board/zte/zxhn-e2631/e2631env.c b/board/zte/zxhn-e2631/e2631env.c
+index 84dbd69d..97b87eac 100644
+--- a/board/zte/zxhn-e2631/e2631env.c
++++ b/board/zte/zxhn-e2631/e2631env.c
+@@ -49,6 +49,7 @@
+ 
+ #include "e2631env.h"
+ #include "e2631env_align.h"
++#include "e2631env_build.h"
+ 
+ #define E2631_ENV_MTD_DEV		"spi-nand0"
+ #define E2631_ENV_MAX_ENTRIES		64
+@@ -856,6 +857,8 @@ struct e2631_env_job {
+ 	u8 *readback;
+ 	u8 *reserved;
+ 	enum e2631_env_stage stage;
++	char key[E2631_ENV_BUILD_KEY_MAX];
++	char value[E2631_ENV_VALUE_MAX + 1];
+ };
+ 
+ static struct e2631_env_job env_job;
+@@ -893,12 +896,12 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 			  unsigned int errsz)
+ {
+ 	struct e2631_env_entry old_ents[E2631_ENV_MAX_ENTRIES];
+-	struct e2631_env_entry new_ents[E2631_ENV_MAX_ENTRIES];
+ 	struct e2631_env_change changes[E2631_ENV_MAX_CHANGES];
+ 	struct mtd_info *mtd = NULL;
+ 	u8 *old = NULL, *cand = NULL, *reserved = NULL, *readback = NULL;
+ 	size_t retlen = 0;
+ 	bool old_valid = false;
++	const char *old_value = NULL;
+ 	u32 old_crc = 0, old_calc = 0, new_crc = 0;
+ 	int ret, old_n = 0, new_n = 0, nchanges;
+ 
+@@ -924,12 +927,6 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 		return -EPERM;
+ 	}
+ 
+-	ret = env_set(key, value);
+-	if (ret) {
+-		snprintf(err, errsz, "cannot set the variable");
+-		return ret;
+-	}
+-
+ 	ret = e2631_env_get_mtd(&mtd);
+ 	if (ret) {
+ 		snprintf(err, errsz, "environment storage is not available");
+@@ -956,19 +953,17 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 	if (e2631_env_all_ff(old, CONFIG_ENV_SIZE)) {
+ 		printf("e2631env: current env block is blank (all 0xFF); this is a first write\n");
+ 	} else {
+-		ret = e2631_env_parse(old, CONFIG_ENV_SIZE, old_ents,
+-				      E2631_ENV_MAX_ENTRIES, &old_n, &old_crc,
+-				      &old_calc);
+-		old_valid = !ret && old_crc == old_calc;
+-		if (!old_valid) {
++		old_crc = e2631_env_le32(old);
++		old_calc = crc32(0, old + ENV_HEADER_SIZE,
++				 CONFIG_ENV_SIZE - ENV_HEADER_SIZE);
++		if (old_crc != old_calc) {
+ 			printf("e2631env: current env block is INVALID (stored CRC 0x%08x, calculated 0x%08x); refusing to rebuild it from the fallback environment\n",
+ 			       old_crc, old_calc);
+ 			snprintf(err, errsz, "the current env block is invalid");
+ 			ret = -EIO;
+ 			goto fail;
+ 		}
+-		printf("e2631env: current env block: %d entries, CRC 0x%08x\n",
+-		       old_n, old_crc);
++		old_valid = true;
+ 	}
+ 
+ 	ret = e2631_env_reserved_check(mtd, reserved, "before");
+@@ -977,27 +972,48 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 		goto fail;
+ 	}
+ 
+-	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc,
+-					old_ents, old_n, old_valid);
++	/*
++	 * The candidate is built from the flash baseline block alone, never
++	 * from the RAM environment: a request naming only bootdelay must not
++	 * persist any other key, whatever the RAM environment contains.
++	 */
++	ret = e2631_env_build_single(cand, CONFIG_ENV_SIZE, old, old_valid,
++				     key, value, crc32, &new_n);
+ 	if (ret) {
+ 		snprintf(err, errsz, "cannot build the candidate block");
+ 		goto fail;
+ 	}
+ 
++	if (old_valid) {
++		ret = e2631_env_parse(old, CONFIG_ENV_SIZE, old_ents,
++				      E2631_ENV_MAX_ENTRIES, &old_n, &old_crc,
++				      &old_calc);
++		if (ret) {
++			snprintf(err, errsz, "cannot parse the current env block");
++			ret = -EIO;
++			goto fail;
++		}
++		old_value = e2631_env_find(old_ents, old_n, key);
++		printf("e2631env: current env block: %d entries, CRC 0x%08x\n",
++		       old_n, old_crc);
++	}
++
++	new_crc = e2631_env_le32(cand);
+ 	printf("e2631env: candidate: %d entries, block %u bytes, CRC 0x%08x\n",
+ 	       new_n, (unsigned int)CONFIG_ENV_SIZE, new_crc);
+ 
+-	nchanges = e2631_env_collect_changes(old_ents, old_n, old_valid,
+-					     new_ents, new_n, changes,
+-					     E2631_ENV_MAX_CHANGES);
+-	if (nchanges < 0) {
+-		snprintf(err, errsz, "cannot collect the changes");
+-		ret = nchanges;
+-		goto fail;
++	nchanges = 0;
++	if (old_value && !strcmp(old_value, value)) {
++		nchanges = 0;
++	} else {
++		changes[0].key = key;
++		changes[0].old_value = old_value;
++		changes[0].new_value = value;
++		nchanges = 1;
+ 	}
++
+ 	if (!nchanges) {
+ 		printf("e2631env: nothing to write, env block left untouched\n");
+-		env_set("bootcmd", "e2631boot");
+ 		free(old);
+ 		free(cand);
+ 		free(reserved);
+@@ -1007,6 +1023,7 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 		env_status.progress = 100;
+ 		env_status.old_crc = old_crc;
+ 		env_status.new_crc = new_crc;
++		env_status.keys = 0;
+ 		return 1;
+ 	}
+ 
+@@ -1028,6 +1045,8 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 	env_job.cand = cand;
+ 	env_job.reserved = reserved;
+ 	env_job.readback = readback;
++	strlcpy(env_job.key, key, sizeof(env_job.key));
++	strlcpy(env_job.value, value, sizeof(env_job.value));
+ 	env_job.stage = E2631_ENV_STAGE_DIFF;
+ 	env_status.stage = E2631_ENV_STAGE_DIFF;
+ 	env_status.progress = 10;
+@@ -1132,6 +1151,8 @@ int e2631_env_write_poll(void)
+ 		printf("e2631env: Saving Environment to MTD... OK\n");
+ 		printf("e2631env: old CRC 0x%08x, new CRC 0x%08x, %d key(s) changed\n",
+ 		       env_status.old_crc, env_status.new_crc, env_status.keys);
++		if (env_job.key[0])
++			env_set(env_job.key, env_job.value);
+ 		env_set("bootcmd", "e2631boot");
+ 		env_job.stage = E2631_ENV_STAGE_DONE;
+ 		env_status.stage = E2631_ENV_STAGE_DONE;
+diff --git a/board/zte/zxhn-e2631/e2631env_build.h b/board/zte/zxhn-e2631/e2631env_build.h
+new file mode 100644
+index 00000000..9c0cb432
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631env_build.h
+@@ -0,0 +1,192 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Single-key environment block builder for the web write-back (task-98).
++ *
++ * The rescue page may only persist the one variable named in the request,
++ * so the candidate block is derived from the flash baseline block alone:
++ * every baseline entry is copied with its original bytes and order, and
++ * only the requested key is replaced or appended. The RAM environment and
++ * the runtime keys it carries (fdtcontroladdr, stdin/stdout pointing at the
++ * live serial device, dnsd_domain, ...) never take part in the candidate.
++ *
++ * The header is standalone (no U-Boot includes) so the host fixture can pin
++ * the rule, and e2631env.c writes the candidate with this very function.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __BOARD_ZTE_E2631_ENV_BUILD_H__
++#define __BOARD_ZTE_E2631_ENV_BUILD_H__
++
++#include <string.h>
++
++#define E2631_ENV_BUILD_HEADER		4
++#define E2631_ENV_BUILD_MAX_ENTRIES	64
++#define E2631_ENV_BUILD_KEY_MAX		32
++#define E2631_ENV_BUILD_VALUE_MAX	160
++
++struct e2631_env_build_view {
++	const unsigned char *key;
++	unsigned int key_len;
++	const unsigned char *value;
++	unsigned int value_len;
++};
++
++typedef unsigned int (*e2631_env_build_crc_fn)(unsigned int crc,
++					       const unsigned char *buf,
++					       unsigned int len);
++
++static inline unsigned int e2631_env_build_le32(const unsigned char *p)
++{
++	return (unsigned int)p[0] | ((unsigned int)p[1] << 8) |
++	       ((unsigned int)p[2] << 16) | ((unsigned int)p[3] << 24);
++}
++
++static inline void e2631_env_build_put_le32(unsigned char *p,
++					    unsigned int value)
++{
++	p[0] = value & 0xff;
++	p[1] = (value >> 8) & 0xff;
++	p[2] = (value >> 16) & 0xff;
++	p[3] = (value >> 24) & 0xff;
++}
++
++/*
++ * Split a block into views without modifying it. Only the entries before
++ * the first 0x00 are returned, matching the U-Boot environment layout.
++ * Returns 0 and the entry count, or -1 for a malformed block.
++ */
++static inline int e2631_env_build_parse(const unsigned char *block,
++					unsigned int size,
++					struct e2631_env_build_view *views,
++					int max, int *count)
++{
++	unsigned int pos = E2631_ENV_BUILD_HEADER;
++	int n = 0;
++
++	*count = 0;
++	if (!block || size <= E2631_ENV_BUILD_HEADER)
++		return -1;
++
++	while (pos < size) {
++		unsigned int start = pos, end = 0, eq = 0, i;
++
++		if (!block[pos])
++			break;
++
++		while (pos < size && block[pos])
++			pos++;
++		if (pos == size)
++			return -1;
++		end = pos;
++
++		for (i = start; i < end; i++) {
++			if (block[i] == '=') {
++				eq = i;
++				break;
++			}
++		}
++		if (!eq || eq == start)
++			return -1;
++		if (n >= max)
++			return -1;
++
++		views[n].key = block + start;
++		views[n].key_len = eq - start;
++		views[n].value = block + eq + 1;
++		views[n].value_len = end - eq - 1;
++		n++;
++
++		pos = end + 1;
++	}
++
++	*count = n;
++	return 0;
++}
++
++/*
++ * Build the candidate block for one requested key:
++ *   dest        - output block, size bytes, filled on success
++ *   base        - flash baseline block, read when base_valid is true
++ *   base_valid  - false for a blank block (first write)
++ *   key, value  - the only variable the request may persist
++ *   crc_fn      - CRC32 function (U-Boot crc32 in the firmware, a local
++ *                 copy in the host fixture)
++ * Returns 0 and the entry count, or -1 if the baseline or the request is
++ * malformed or the entries do not fit.
++ */
++static inline int e2631_env_build_single(unsigned char *dest,
++					 unsigned int size,
++					 const unsigned char *base,
++					 int base_valid, const char *key,
++					 const char *value,
++					 e2631_env_build_crc_fn crc_fn,
++					 int *count)
++{
++	struct e2631_env_build_view views[E2631_ENV_BUILD_MAX_ENTRIES];
++	unsigned int key_len, value_len, used;
++	int n = 0, found = -1, i;
++	unsigned int crc;
++
++	if (!dest || !key || !value || !crc_fn)
++		return -1;
++	if (size <= E2631_ENV_BUILD_HEADER)
++		return -1;
++
++	memset(dest, 0, size);
++
++	if (base_valid) {
++		if (e2631_env_build_parse(base, size, views,
++					  E2631_ENV_BUILD_MAX_ENTRIES, &n))
++			return -1;
++		for (i = 0; i < n; i++) {
++			if (views[i].key_len == strlen(key) &&
++			    !memcmp(views[i].key, key, views[i].key_len)) {
++				found = i;
++				break;
++			}
++		}
++	}
++
++	key_len = strlen(key);
++	value_len = strlen(value);
++	if (!key_len || key_len > E2631_ENV_BUILD_KEY_MAX ||
++	    value_len > E2631_ENV_BUILD_VALUE_MAX)
++		return -1;
++
++	if (found >= 0) {
++		views[found].value = (const unsigned char *)value;
++		views[found].value_len = value_len;
++	} else {
++		if (n >= E2631_ENV_BUILD_MAX_ENTRIES)
++			return -1;
++		views[n].key = (const unsigned char *)key;
++		views[n].key_len = key_len;
++		views[n].value = (const unsigned char *)value;
++		views[n].value_len = value_len;
++		n++;
++	}
++
++	used = E2631_ENV_BUILD_HEADER;
++	for (i = 0; i < n; i++) {
++		unsigned int need = views[i].key_len + views[i].value_len + 2;
++
++		if (used + need > size)
++			return -1;
++		memcpy(dest + used, views[i].key, views[i].key_len);
++		dest[used + views[i].key_len] = '=';
++		memcpy(dest + used + views[i].key_len + 1, views[i].value,
++		       views[i].value_len);
++		/* the NUL separator is already there because dest is zeroed */
++		used += need;
++	}
++
++	crc = crc_fn(0, dest + E2631_ENV_BUILD_HEADER,
++		     size - E2631_ENV_BUILD_HEADER);
++	e2631_env_build_put_le32(dest, crc);
++
++	*count = n;
++	return 0;
++}
++
++#endif /* __BOARD_ZTE_E2631_ENV_BUILD_H__ */
+-- 
+2.56.1
+

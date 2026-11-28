@@ -1,0 +1,229 @@
+From c5bd1d006f4d36ca77d04a91300ac16f1e243a8b Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 18:25:19 +0800
+Subject: [PATCH 2/2] env: keep the aligned keys in stable copies
+
+e2631_env_align_with_baseline() saved values for the non-whitelisted keys
+so the exported candidate matches the flash baseline, but it referenced
+the key strings through pointers into the first export buffer. The
+second export overwrote that buffer, and the restore then called
+env_set() with garbage key names: the t92d serial shows "illegal
+character '=' in variable name", "Baudrate 0 bps not supported" and
+"Error inserting baudrate".
+
+Every tweak record now owns a copy of its key, so a restore can never
+depend on a buffer that has since been rewritten. The CLI save path also
+joins the parsed block again before writing it, so the exported
+candidate stays a valid key=value block instead of the split form used
+for the diff.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631env.c       | 57 +++++++++--------
+ board/zte/zxhn-e2631/e2631env_tweak.h | 89 +++++++++++++++++++++++++++
+ 2 files changed, 121 insertions(+), 25 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631env_tweak.h
+
+diff --git a/board/zte/zxhn-e2631/e2631env.c b/board/zte/zxhn-e2631/e2631env.c
+index 97b87eac..24a82bf0 100644
+--- a/board/zte/zxhn-e2631/e2631env.c
++++ b/board/zte/zxhn-e2631/e2631env.c
+@@ -50,6 +50,7 @@
+ #include "e2631env.h"
+ #include "e2631env_align.h"
+ #include "e2631env_build.h"
++#include "e2631env_tweak.h"
+ 
+ #define E2631_ENV_MTD_DEV		"spi-nand0"
+ #define E2631_ENV_MAX_ENTRIES		64
+@@ -227,11 +228,15 @@ static int e2631_env_restore_vendor_keys(void)
+ 	return 0;
+ }
+ 
+-struct e2631_env_tweak {
+-	const char *key;
+-	char *saved;
+-	bool existed;
+-};
++static const char *e2631_env_get_wrap(const char *key)
++{
++	return env_get(key);
++}
++
++static int e2631_env_set_wrap(const char *key, const char *value)
++{
++	return env_set(key, value);
++}
+ 
+ /*
+  * Align the non-whitelisted keys with the flash baseline before exporting
+@@ -263,7 +268,6 @@ static int e2631_env_align_with_baseline(const struct e2631_env_entry *base,
+ 		const char *base_value;
+ 		enum e2631_env_align_action action;
+ 		const char *want;
+-		const char *cur;
+ 
+ 		base_value = base_valid ? e2631_env_find(base, base_n, key) :
+ 					  NULL;
+@@ -274,22 +278,13 @@ static int e2631_env_align_with_baseline(const struct e2631_env_entry *base,
+ 			continue;
+ 		want = action == E2631_ENV_ALIGN_SET ? base_value : NULL;
+ 
+-		if (*ntweak >= E2631_ENV_MAX_CHANGES)
++		if (*ntweak >= E2631_ENV_MAX_CHANGES ||
++		    strlen(key) >= E2631_ENV_TWEAK_KEY_MAX)
+ 			return -ENOSPC;
+-
+-		cur = env_get(key);
+-		tweaks[*ntweak].key = key;
+-		tweaks[*ntweak].existed = cur != NULL;
+-		tweaks[*ntweak].saved = NULL;
+-		if (cur) {
+-			size_t len = strlen(cur) + 1;
+-
+-			tweaks[*ntweak].saved = malloc(len);
+-			if (!tweaks[*ntweak].saved)
+-				return -ENOMEM;
+-			strlcpy(tweaks[*ntweak].saved, cur, len);
+-		}
+-		(*ntweak)++;
++		if (!e2631_env_tweak_save(tweaks, ntweak,
++					  E2631_ENV_MAX_CHANGES, key,
++					  e2631_env_get_wrap))
++			return -ENOMEM;
+ 
+ 		ret = env_set(key, want);
+ 		if (ret)
+@@ -302,11 +297,22 @@ static int e2631_env_align_with_baseline(const struct e2631_env_entry *base,
+ static void e2631_env_restore_tweaks(struct e2631_env_tweak *tweaks,
+ 				     int ntweak)
+ {
+-	while (ntweak-- > 0) {
+-		struct e2631_env_tweak *t = &tweaks[ntweak];
++	e2631_env_tweak_restore(tweaks, ntweak, e2631_env_set_wrap);
++}
++
++/*
++ * Undo the in-place split done by e2631_env_parse(): put the '=' between
++ * every key and value back. The CLI save path exported the block first and
++ * parsed it for the diff, so the write needs the repaired copy; the web
++ * write path builds its candidate without parsing it (task-98).
++ */
++static void e2631_env_join_block(const struct e2631_env_entry *ents, int n)
++{
++	int i;
+ 
+-		env_set(t->key, t->existed ? t->saved : NULL);
+-		free(t->saved);
++	for (i = 0; i < n; i++) {
++		if (ents[i].value > ents[i].key)
++			((char *)ents[i].value)[-1] = '=';
+ 	}
+ }
+ 
+@@ -813,6 +819,7 @@ static int do_e2631env_save(struct mtd_info *mtd)
+ 	       CONFIG_ENV_OFFSET, CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE - 1,
+ 	       old_crc, new_crc);
+ 
++	e2631_env_join_block(new_ents, new_n);
+ 	ret = e2631_env_write_block(mtd, cand);
+ 	if (ret) {
+ 		printf("e2631env: env write FAILED (%d); the block is not trustworthy, cold boot and run e2631env check\n",
+diff --git a/board/zte/zxhn-e2631/e2631env_tweak.h b/board/zte/zxhn-e2631/e2631env_tweak.h
+new file mode 100644
+index 00000000..e1a2a643
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631env_tweak.h
+@@ -0,0 +1,89 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Stable save/restore records for the environment baseline alignment
++ * (task-98).
++ *
++ * e2631_env_align_with_baseline() temporarily replaces the non-whitelisted
++ * RAM variables with their flash baseline values so the exported candidate
++ * does not carry runtime keys. The values it saves used to be referenced
++ * through pointers into the first export buffer, which the second export
++ * overwrote: the restore then called env_set() with garbage key names
++ * ("illegal character '=' in variable name", "Error inserting baudrate").
++ * Every record now owns a copy of the key, so a restore can never depend on
++ * a buffer that has since been rewritten.
++ *
++ * The header is standalone (no U-Boot includes) so the host fixture can pin
++ * the lifetime rule.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __BOARD_ZTE_E2631_ENV_TWEAK_H__
++#define __BOARD_ZTE_E2631_ENV_TWEAK_H__
++
++#include <stdbool.h>
++#include <stdlib.h>
++#include <string.h>
++
++#define E2631_ENV_TWEAK_KEY_MAX		32
++
++struct e2631_env_tweak {
++	char key[E2631_ENV_TWEAK_KEY_MAX];
++	char *saved;
++	bool existed;
++};
++
++/*
++ * Record the current value of key (through get) and return a pointer to the
++ * record, which the caller fills before calling e2631_env_tweak_restore().
++ * Returns NULL when there is no room or no memory; the caller then aborts
++ * and restores the records it already has.
++ */
++static inline struct e2631_env_tweak *
++e2631_env_tweak_save(struct e2631_env_tweak *tweaks, int *count, int max,
++		     const char *key, const char *(*get)(const char *))
++{
++	struct e2631_env_tweak *tweak;
++	const char *cur;
++	size_t len;
++
++	if (!tweaks || !count || !key || !get)
++		return NULL;
++	if (*count >= max || strlen(key) >= E2631_ENV_TWEAK_KEY_MAX)
++		return NULL;
++
++	tweak = &tweaks[*count];
++	memset(tweak, 0, sizeof(*tweak));
++	strcpy(tweak->key, key);
++
++	cur = get(key);
++	tweak->existed = cur ? true : false;
++	if (cur) {
++		len = strlen(cur) + 1;
++		tweak->saved = malloc(len);
++		if (!tweak->saved)
++			return NULL;
++		memcpy(tweak->saved, cur, len);
++	}
++
++	(*count)++;
++	return tweak;
++}
++
++/* Restore every recorded variable and free the records and the key copies. */
++static inline void
++e2631_env_tweak_restore(struct e2631_env_tweak *tweaks, int count,
++			int (*set)(const char *key, const char *value))
++{
++	while (count-- > 0) {
++		struct e2631_env_tweak *tweak = &tweaks[count];
++
++		if (set)
++			set(tweak->key, tweak->existed ? tweak->saved : NULL);
++		free(tweak->saved);
++		tweak->saved = NULL;
++		tweak->key[0] = 0;
++	}
++}
++
++#endif /* __BOARD_ZTE_E2631_ENV_TWEAK_H__ */
+-- 
+2.56.1
+
