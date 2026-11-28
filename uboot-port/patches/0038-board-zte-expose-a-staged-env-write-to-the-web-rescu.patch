@@ -1,0 +1,396 @@
+From 2a143d18d3078533d61ec3f7c326bece7896bc85 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 11:56:22 +0800
+Subject: [PATCH 38/39] board: zte: expose a staged env write to the web rescue
+
+The E4 v2.1 page persists one whitelisted variable per request and polls
+/status for the stages diff -> check -> erase -> write -> readback ->
+verify -> done. Keep e2631env as the only writer: the begin call builds
+the candidate with the vendor snapshot restored and prints the diff, and
+the poll call walks the same bad-block precheck, erase, all-0xFF check,
+program, read-back and compare sequence as "e2631env save", one bounded
+step per poll. Keys outside the whitelist are refused before env_set().
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631env.c | 306 ++++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631env.h |  41 +++++
+ 2 files changed, 347 insertions(+)
+
+diff --git a/board/zte/zxhn-e2631/e2631env.c b/board/zte/zxhn-e2631/e2631env.c
+index 7b9d0e9c..4851995b 100644
+--- a/board/zte/zxhn-e2631/e2631env.c
++++ b/board/zte/zxhn-e2631/e2631env.c
+@@ -53,6 +53,7 @@
+ #define E2631_ENV_MAX_ENTRIES		64
+ #define E2631_ENV_MAX_CHANGES		96
+ #define E2631_ENV_VALUE_MAX		160
++#define E2631_ENV_VALUE_MAX		160
+ 
+ /*
+  * Layout constants are frozen: the vendor chain reads 0xC0000 and expects
+@@ -722,6 +723,311 @@ out:
+ 	return ret;
+ }
+ 
++/*
++ * Web-triggered env write (v2.1 contract section 15.2).
++ *
++ * The rescue page writes one whitelisted key per request and polls
++ * /status for the stage: diff -> check -> erase -> write -> readback ->
++ * verify -> done.  e2631env remains the only owner of the block: the
++ * candidate is built and diffed in e2631_env_write_begin(), and
++ * e2631_env_write_poll() advances one flash step per call, using the same
++ * bad-block precheck, erase, all-0xFF check, write, read back and compare
++ * sequence as "e2631env save".
++ */
++struct e2631_env_job {
++	bool open;
++	struct mtd_info *mtd;
++	u8 *cand;
++	u8 *readback;
++	u8 *reserved;
++	enum e2631_env_stage stage;
++};
++
++static struct e2631_env_job env_job;
++static struct e2631_env_status env_status;
++
++static void e2631_env_job_fail(const char *why)
++{
++	snprintf(env_status.error, sizeof(env_status.error), "%s", why);
++	env_status.stage = E2631_ENV_STAGE_ERROR;
++	env_job.open = false;
++	printf("e2631env: FAIL: %s\n", why);
++}
++
++void e2631_env_write_end(void)
++{
++	free(env_job.cand);
++	free(env_job.readback);
++	free(env_job.reserved);
++	if (env_job.mtd)
++		put_mtd_device(env_job.mtd);
++	memset(&env_job, 0, sizeof(env_job));
++}
++
++const struct e2631_env_status *e2631_env_write_state(void)
++{
++	return &env_status;
++}
++
++bool e2631_env_write_busy(void)
++{
++	return env_job.open;
++}
++
++int e2631_env_write_begin(const char *key, const char *value, char *err,
++			  unsigned int errsz)
++{
++	struct e2631_env_entry old_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_entry new_ents[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_change changes[E2631_ENV_MAX_CHANGES];
++	struct mtd_info *mtd = NULL;
++	u8 *old = NULL, *cand = NULL, *reserved = NULL, *readback = NULL;
++	size_t retlen = 0;
++	bool old_valid = false;
++	u32 old_crc = 0, old_calc = 0, new_crc = 0;
++	int ret, old_n = 0, new_n = 0, nchanges;
++
++	memset(&env_status, 0, sizeof(env_status));
++	env_status.stage = E2631_ENV_STAGE_IDLE;
++
++	if (env_job.open) {
++		snprintf(err, errsz, "an env write is already active");
++		return -EBUSY;
++	}
++	if (!key || !key[0] || strlen(key) > 31) {
++		snprintf(err, errsz, "bad key");
++		return -EINVAL;
++	}
++	if (!value)
++		value = "";
++	if (strlen(value) > E2631_ENV_VALUE_MAX) {
++		snprintf(err, errsz, "value too long");
++		return -EINVAL;
++	}
++	if (!e2631_env_key_allowed(key)) {
++		snprintf(err, errsz, "key not in the whitelist");
++		return -EPERM;
++	}
++
++	ret = env_set(key, value);
++	if (ret) {
++		snprintf(err, errsz, "cannot set the variable");
++		return ret;
++	}
++
++	ret = e2631_env_get_mtd(&mtd);
++	if (ret) {
++		snprintf(err, errsz, "environment storage is not available");
++		return ret;
++	}
++
++	old = malloc(CONFIG_ENV_SIZE);
++	cand = malloc(CONFIG_ENV_SIZE);
++	reserved = malloc(CONFIG_ENV_SIZE);
++	readback = malloc(CONFIG_ENV_SIZE);
++	if (!old || !cand || !reserved || !readback) {
++		snprintf(err, errsz, "out of memory");
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	ret = mtd_read(mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE, &retlen, old);
++	if (ret || retlen != CONFIG_ENV_SIZE) {
++		snprintf(err, errsz, "cannot read the env block");
++		ret = -EIO;
++		goto fail;
++	}
++
++	if (e2631_env_all_ff(old, CONFIG_ENV_SIZE)) {
++		printf("e2631env: current env block is blank (all 0xFF); this is a first write\n");
++	} else {
++		ret = e2631_env_parse(old, CONFIG_ENV_SIZE, old_ents,
++				      E2631_ENV_MAX_ENTRIES, &old_n, &old_crc,
++				      &old_calc);
++		old_valid = !ret && old_crc == old_calc;
++		if (!old_valid) {
++			printf("e2631env: current env block is INVALID (stored CRC 0x%08x, calculated 0x%08x); refusing to rebuild it from the fallback environment\n",
++			       old_crc, old_calc);
++			snprintf(err, errsz, "the current env block is invalid");
++			ret = -EIO;
++			goto fail;
++		}
++		printf("e2631env: current env block: %d entries, CRC 0x%08x\n",
++		       old_n, old_crc);
++	}
++
++	ret = e2631_env_reserved_check(mtd, reserved, "before");
++	if (ret) {
++		snprintf(err, errsz, "the reserved sector is not blank");
++		goto fail;
++	}
++
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	if (ret) {
++		snprintf(err, errsz, "cannot build the candidate block");
++		goto fail;
++	}
++
++	printf("e2631env: candidate: %d entries, block %u bytes, CRC 0x%08x\n",
++	       new_n, (unsigned int)CONFIG_ENV_SIZE, new_crc);
++
++	nchanges = e2631_env_collect_changes(old_ents, old_n, old_valid,
++					     new_ents, new_n, changes,
++					     E2631_ENV_MAX_CHANGES);
++	if (nchanges < 0) {
++		snprintf(err, errsz, "cannot collect the changes");
++		ret = nchanges;
++		goto fail;
++	}
++	if (!nchanges) {
++		printf("e2631env: nothing to write, env block left untouched\n");
++		env_set("bootcmd", "e2631boot");
++		free(old);
++		free(cand);
++		free(reserved);
++		free(readback);
++		put_mtd_device(mtd);
++		env_status.stage = E2631_ENV_STAGE_DONE;
++		env_status.progress = 100;
++		env_status.old_crc = old_crc;
++		env_status.new_crc = new_crc;
++		return 1;
++	}
++
++	printf("e2631env: %d key(s) to persist:\n", nchanges);
++	if (e2631_env_print_changes(changes, nchanges, true)) {
++		snprintf(err, errsz, "a vendor key is in the change set");
++		ret = -EPERM;
++		goto fail;
++	}
++
++	printf("e2631env: DO NOT POWER OFF DURING WRITE\n");
++	printf("e2631env: writing env block 0x%x..0x%x, CRC 0x%08x -> 0x%08x\n",
++	       CONFIG_ENV_OFFSET, CONFIG_ENV_OFFSET + CONFIG_ENV_SIZE - 1,
++	       old_crc, new_crc);
++
++	free(old);
++	env_job.open = true;
++	env_job.mtd = mtd;
++	env_job.cand = cand;
++	env_job.reserved = reserved;
++	env_job.readback = readback;
++	env_job.stage = E2631_ENV_STAGE_DIFF;
++	env_status.stage = E2631_ENV_STAGE_DIFF;
++	env_status.progress = 10;
++	env_status.old_crc = old_crc;
++	env_status.new_crc = new_crc;
++	env_status.keys = nchanges;
++
++	return 0;
++
++fail:
++	free(old);
++	free(cand);
++	free(reserved);
++	free(readback);
++	if (mtd)
++		put_mtd_device(mtd);
++	return ret;
++}
++
++int e2631_env_write_poll(void)
++{
++	struct erase_info ei = { };
++	size_t retlen = 0;
++	int ret;
++
++	if (!env_job.open)
++		return 1;
++
++	switch (env_job.stage) {
++	case E2631_ENV_STAGE_DIFF:
++		env_job.stage = E2631_ENV_STAGE_CHECK;
++		env_status.stage = env_job.stage;
++		env_status.progress = 30;
++		return 0;
++	case E2631_ENV_STAGE_CHECK:
++		if (mtd_block_isbad(env_job.mtd, CONFIG_ENV_OFFSET) > 0) {
++			e2631_env_job_fail("the env block is marked bad");
++			return -1;
++		}
++		env_job.stage = E2631_ENV_STAGE_ERASE;
++		env_status.stage = env_job.stage;
++		env_status.progress = 50;
++		return 0;
++	case E2631_ENV_STAGE_ERASE:
++		ei.mtd = env_job.mtd;
++		ei.addr = CONFIG_ENV_OFFSET;
++		ei.len = CONFIG_ENV_SIZE;
++		puts("e2631env: erasing the env block... ");
++		ret = mtd_erase(env_job.mtd, &ei);
++		if (ret) {
++			printf("FAILED (%d)\n", ret);
++			e2631_env_job_fail("erase failed");
++			return -1;
++		}
++		puts("OK\n");
++		ret = e2631_env_read_block(env_job.mtd, env_job.readback);
++		if (ret) {
++			e2631_env_job_fail("cannot read the erased block");
++			return -1;
++		}
++		if (!e2631_env_all_ff(env_job.readback, CONFIG_ENV_SIZE)) {
++			e2631_env_job_fail("erase left data behind");
++			return -1;
++		}
++		puts("e2631env: erase verified (all 0xFF)\n");
++		env_job.stage = E2631_ENV_STAGE_WRITE;
++		env_status.stage = env_job.stage;
++		env_status.progress = 70;
++		return 0;
++	case E2631_ENV_STAGE_WRITE:
++		ret = mtd_write(env_job.mtd, CONFIG_ENV_OFFSET, CONFIG_ENV_SIZE,
++				&retlen, (const u_char *)env_job.cand);
++		if (ret || retlen != CONFIG_ENV_SIZE) {
++			e2631_env_job_fail("write failed");
++			return -1;
++		}
++		env_job.stage = E2631_ENV_STAGE_READBACK;
++		env_status.stage = env_job.stage;
++		env_status.progress = 85;
++		return 0;
++	case E2631_ENV_STAGE_READBACK:
++		ret = e2631_env_read_block(env_job.mtd, env_job.readback);
++		if (ret) {
++			e2631_env_job_fail("read back failed");
++			return -1;
++		}
++		env_job.stage = E2631_ENV_STAGE_VERIFY;
++		env_status.stage = env_job.stage;
++		env_status.progress = 95;
++		return 0;
++	case E2631_ENV_STAGE_VERIFY:
++		if (memcmp(env_job.readback, env_job.cand, CONFIG_ENV_SIZE)) {
++			e2631_env_job_fail("read back does not match the candidate");
++			return -1;
++		}
++		ret = e2631_env_reserved_check(env_job.mtd, env_job.reserved,
++					       "after");
++		if (ret) {
++			e2631_env_job_fail("the reserved sector changed");
++			return -1;
++		}
++		printf("e2631env: Saving Environment to MTD... OK\n");
++		printf("e2631env: old CRC 0x%08x, new CRC 0x%08x, %d key(s) changed\n",
++		       env_status.old_crc, env_status.new_crc, env_status.keys);
++		env_set("bootcmd", "e2631boot");
++		env_job.stage = E2631_ENV_STAGE_DONE;
++		env_status.stage = E2631_ENV_STAGE_DONE;
++		env_status.progress = 100;
++		env_job.open = false;
++		return 1;
++	default:
++		e2631_env_job_fail("unexpected stage");
++		return -1;
++	}
++}
++
+ static int do_e2631env(struct cmd_tbl *cmdtp, int flag, int argc,
+ 		       char *const argv[])
+ {
+diff --git a/board/zte/zxhn-e2631/e2631env.h b/board/zte/zxhn-e2631/e2631env.h
+index 82364dff..ca3f1a00 100644
+--- a/board/zte/zxhn-e2631/e2631env.h
++++ b/board/zte/zxhn-e2631/e2631env.h
+@@ -10,4 +10,45 @@
+ 
+ void e2631_env_snapshot(void);
+ 
++/* Stages of the web-triggered block rewrite (v2.1 contract section 15.2). */
++enum e2631_env_stage {
++	E2631_ENV_STAGE_IDLE = 0,
++	E2631_ENV_STAGE_DIFF,
++	E2631_ENV_STAGE_CHECK,
++	E2631_ENV_STAGE_ERASE,
++	E2631_ENV_STAGE_WRITE,
++	E2631_ENV_STAGE_READBACK,
++	E2631_ENV_STAGE_VERIFY,
++	E2631_ENV_STAGE_DONE,
++	E2631_ENV_STAGE_ERROR,
++};
++
++struct e2631_env_status {
++	enum e2631_env_stage stage;
++	int progress;
++	u32 old_crc;
++	u32 new_crc;
++	int keys;
++	char error[96];
++};
++
++/*
++ * Set one whitelisted variable and stage the block rewrite: the candidate
++ * block, the diff and the safety checks are prepared here, the five flash
++ * steps run from e2631_env_write_poll().  Returns 0 when a job is staged,
++ * 1 when the candidate equals the current block (nothing to write) and a
++ * negative errno otherwise.  e2631env stays the only owner of the block.
++ */
++int e2631_env_write_begin(const char *key, const char *value, char *err,
++			  unsigned int errsz);
++
++/* One bounded step: 0 = running, 1 = done, -1 = failed. */
++int e2631_env_write_poll(void);
++
++void e2631_env_write_end(void);
++
++const struct e2631_env_status *e2631_env_write_state(void);
++
++bool e2631_env_write_busy(void);
++
+ #endif /* __E2631ENV_H */
+-- 
+2.56.1
+

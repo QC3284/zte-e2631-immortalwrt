@@ -1,0 +1,461 @@
+From e89838933d8352a308caef0f8c116e997c1b8f53 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 11:47:23 +0800
+Subject: [PATCH 37/39] board: zte: add the rootfs_data reset and the one-shot
+ slot request
+
+The E4 v2 rescue page needs a factory reset that only erases the
+overlay. Look rootfs_data up by name, check its offset and size against
+the layout the page promises, then erase every good block and verify
+that the result is blank. A missing or moved partition is refused
+before anything is erased, so a different device tree cannot wipe an
+unrelated region.
+
+The page can also ask for one boot from a chosen slot. e2631boot reads
+the RAM-only e2631_next_slot variable, accepts only 0 or 1, and only
+when that slot carries a valid version header. The serial rule, the
+class-1 fallback and the persistent environment stay untouched.
+
+The U-Boot device tree describes rootfs_data as a fixed partition. Only
+that one partition is declared: the bootloader addresses every other
+region through absolute chip offsets and does not need partitions for
+them.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ arch/arm/dts/zx279128s-zte-zxhn-e2631.dts |  17 ++
+ board/zte/zxhn-e2631/Makefile             |   1 +
+ board/zte/zxhn-e2631/e2631boot.c          |  39 ++++
+ board/zte/zxhn-e2631/e2631factory.c       | 269 ++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631factory.h       |  46 ++++
+ 5 files changed, 372 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631factory.c
+ create mode 100644 board/zte/zxhn-e2631/e2631factory.h
+
+diff --git a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+index 7ed1deb5..8fb6b8f5 100644
+--- a/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
++++ b/arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+@@ -103,6 +103,23 @@
+ 			spi-max-frequency = <50000000>;
+ 			spi-rx-bus-width = <2>;
+ 			spi-tx-bus-width = <1>;
++
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				/*
++				 * The kernel mounts this partition as the overlay
++				 * (rootfs_data). Only this one partition is described:
++				 * the bootloader addresses every other region through
++				 * absolute chip offsets and does not need partitions.
++				 */
++				partition@3360000 {
++					label = "rootfs_data";
++					reg = <0x03360000 0x004a0000>;
++				};
++			};
+ 		};
+ 	};
+ };
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index 7fb63e4e..88d2ed23 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -8,6 +8,7 @@ obj-y += e2631net.o
+ obj-y += e2631soc.o
+ obj-y += e2631_slotcore.o
+ obj-y += e2631fwslot.o
++obj-y += e2631factory.o
+ obj-y += zxhn-e2631.o
+ obj-y += e2631flash.o
+ obj-y += e2631rescue.o
+diff --git a/board/zte/zxhn-e2631/e2631boot.c b/board/zte/zxhn-e2631/e2631boot.c
+index fcda84ac..50e5b85c 100644
+--- a/board/zte/zxhn-e2631/e2631boot.c
++++ b/board/zte/zxhn-e2631/e2631boot.c
+@@ -211,6 +211,44 @@ static int e2631_pick_slot(const struct e2631_slot slots[E2631_SLOT_COUNT])
+ 	return slots[0].valid ? 0 : 1;
+ }
+ 
++/*
++ * The E4 v2 rescue page can ask for one boot from a specific slot
++ * (POST /boot). The request is a RAM-only environment variable, and a
++ * slot without a valid version header is never accepted: cspboot parses
++ * the header before it boots as well.
++ */
++static int e2631_next_slot_override(const struct e2631_slot slots[E2631_SLOT_COUNT],
++				    int active)
++{
++	const char *req = env_get("e2631_next_slot");
++	int want;
++
++	if (!req || !req[0])
++		return active;
++
++	if (!strcmp(req, "0")) {
++		want = 0;
++	} else if (!strcmp(req, "1")) {
++		want = 1;
++	} else {
++		printf("e2631boot: ignoring e2631_next_slot=\"%s\" (not 0 or 1)\n",
++		       req);
++		return active;
++	}
++
++	if (!slots[want].valid) {
++		printf("e2631boot: ignoring e2631_next_slot=%d, slot%d has no valid version header\n",
++		       want, want);
++		return active;
++	}
++
++	if (want != active)
++		printf("e2631boot: e2631_next_slot=%d requests slot%d for this boot\n",
++		       want, want);
++
++	return want;
++}
++
+ /*
+  * Load and verify one slot's kernel. On failure *whyp names the failed
+  * check so the caller can log the attempt and decide about the fallback.
+@@ -367,6 +405,7 @@ static int do_e2631boot(struct cmd_tbl *cmdtp, int flag, int argc,
+ 	}
+ 
+ 	printf("e2631boot: cspboot would boot slot%d\n", active);
++	active = e2631_next_slot_override(slots, active);
+ 
+ 	if (!load) {
+ 		put_mtd_device(mtd);
+diff --git a/board/zte/zxhn-e2631/e2631factory.c b/board/zte/zxhn-e2631/e2631factory.c
+new file mode 100644
+index 00000000..b30c45ab
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631factory.c
+@@ -0,0 +1,269 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 rootfs_data (overlay) reset for the web rescue (E4 v2).
++ *
++ * One complete erase of the rootfs_data partition, followed by a blank
++ * check.  This is the only module that writes rootfs_data: firmware slots
++ * belong to e2631fwslot, mtd0 to e2631flash and the environment block to
++ * e2631env.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <linux/errno.h>
++#include <linux/mtd/mtd.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <linux/build_bug.h>
++#include <malloc.h>
++#include <mtd.h>
++#include <stdio.h>
++#include <vsprintf.h>
++
++#include "e2631factory.h"
++
++#define E2631_FACTORY_PART	"rootfs_data"
++#define E2631_FACTORY_OFF	0x03360000U
++#define E2631_FACTORY_LEN	0x004A0000U
++
++/* One GET /status step: eight erase blocks, sixteen checked blocks. */
++#define E2631_FACTORY_ERASE_STEP	8U
++#define E2631_FACTORY_BLANK_STEP	16U
++
++static_assert(E2631_FACTORY_OFF % 0x20000U == 0,
++	      "rootfs_data must start on an erase block boundary");
++static_assert(E2631_FACTORY_LEN % 0x20000U == 0,
++	      "rootfs_data must be a whole number of erase blocks");
++
++static struct mtd_info *fa_mtd;
++static struct e2631_factory_status fa_status;
++static bool fa_active;
++
++struct e2631_factory_job {
++	u32 bs;
++	u32 blocks;
++	u32 next;
++	u8 *buf;
++};
++
++static struct e2631_factory_job fa_job;
++
++static int fa_get_mtd(char *err, unsigned int errsz)
++{
++	struct mtd_info *mtd;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_FACTORY_PART);
++	if (!mtd) {
++		snprintf(err, errsz, "%s partition not found",
++			 E2631_FACTORY_PART);
++		return -ENODEV;
++	}
++	if (mtd->offset != E2631_FACTORY_OFF ||
++	    mtd->size != E2631_FACTORY_LEN) {
++		snprintf(err, errsz, "%s layout mismatch",
++			 E2631_FACTORY_PART);
++		put_mtd_device(mtd);
++		return -EINVAL;
++	}
++	if (!mtd->erasesize ||
++	    E2631_FACTORY_LEN % mtd->erasesize) {
++		snprintf(err, errsz, "%s erase geometry is unusable",
++			 E2631_FACTORY_PART);
++		put_mtd_device(mtd);
++		return -EINVAL;
++	}
++	fa_mtd = mtd;
++	return 0;
++}
++
++static void fa_fail(const char *msg)
++{
++	snprintf(fa_status.error, sizeof(fa_status.error), "%s", msg);
++	fa_status.stage = E2631_FACTORY_ERROR;
++	printf("e2631factory: FAIL: %s\n", msg);
++}
++
++bool e2631_factory_busy(void)
++{
++	return fa_active;
++}
++
++const struct e2631_factory_status *e2631_factory_state(void)
++{
++	return &fa_status;
++}
++
++static int fa_erase_step(void)
++{
++	u32 done = 0;
++
++	while (fa_job.next < fa_job.blocks && done < E2631_FACTORY_ERASE_STEP) {
++		loff_t off = (loff_t)fa_job.next * fa_job.bs;
++		struct erase_info einfo;
++		int ret;
++
++		fa_job.next++;
++		done++;
++		ret = mtd_block_isbad(fa_mtd, off);
++		if (ret < 0) {
++			snprintf(fa_status.error, sizeof(fa_status.error),
++				 "cannot read the block state at 0x%08llx",
++				 (unsigned long long)off);
++			fa_status.stage = E2631_FACTORY_ERROR;
++			printf("e2631factory: FAIL: %s\n", fa_status.error);
++			return -1;
++		}
++		if (ret > 0) {
++			printf("e2631factory: block 0x%08llx is bad, skipping\n",
++			       (unsigned long long)off);
++			continue;
++		}
++
++		memset(&einfo, 0, sizeof(einfo));
++		einfo.mtd = fa_mtd;
++		einfo.addr = off;
++		einfo.len = fa_job.bs;
++		ret = mtd_erase(fa_mtd, &einfo);
++		if (ret) {
++			snprintf(fa_status.error, sizeof(fa_status.error),
++				 "erase failed at 0x%08llx (%d)",
++				 (unsigned long long)off, ret);
++			fa_status.stage = E2631_FACTORY_ERROR;
++			printf("e2631factory: FAIL: %s\n", fa_status.error);
++			return -1;
++		}
++	}
++
++	fa_status.bytes_done = (u64)fa_job.next * fa_job.bs;
++	fa_status.progress = 10 + (int)(50ULL * fa_job.next / fa_job.blocks);
++	if (fa_job.next < fa_job.blocks)
++		return 0;
++
++	fa_job.next = 0;
++	fa_status.stage = E2631_FACTORY_BLANK;
++	return 0;
++}
++
++static int fa_blank_step(void)
++{
++	u32 done = 0;
++
++	while (fa_job.next < fa_job.blocks && done < E2631_FACTORY_BLANK_STEP) {
++		loff_t off = (loff_t)fa_job.next * fa_job.bs;
++		size_t retlen = 0;
++		u32 i;
++		int ret;
++
++		fa_job.next++;
++		done++;
++		ret = mtd_block_isbad(fa_mtd, off);
++		if (ret > 0)
++			continue;
++		if (ret < 0) {
++			snprintf(fa_status.error, sizeof(fa_status.error),
++				 "cannot read the block state at 0x%08llx",
++				 (unsigned long long)off);
++			fa_status.stage = E2631_FACTORY_ERROR;
++			printf("e2631factory: FAIL: %s\n", fa_status.error);
++			return -1;
++		}
++
++		ret = mtd_read(fa_mtd, off, fa_job.bs, &retlen, fa_job.buf);
++		if ((ret && ret != -EUCLEAN) || retlen != fa_job.bs) {
++			snprintf(fa_status.error, sizeof(fa_status.error),
++				 "read failed at 0x%08llx (%d)",
++				 (unsigned long long)off, ret);
++			fa_status.stage = E2631_FACTORY_ERROR;
++			printf("e2631factory: FAIL: %s\n", fa_status.error);
++			return -1;
++		}
++		for (i = 0; i < fa_job.bs; i++) {
++			if (fa_job.buf[i] == 0xff)
++				continue;
++			snprintf(fa_status.error, sizeof(fa_status.error),
++				 "erase failed, 0x%08llx is not blank",
++				 (unsigned long long)(off + i));
++			fa_status.stage = E2631_FACTORY_ERROR;
++			printf("e2631factory: FAIL: %s\n", fa_status.error);
++			return -1;
++		}
++	}
++
++	fa_status.bytes_done = (u64)fa_job.next * fa_job.bs;
++	fa_status.progress = 60 + (int)(40ULL * fa_job.next / fa_job.blocks);
++	if (fa_job.next < fa_job.blocks)
++		return 0;
++
++	fa_status.stage = E2631_FACTORY_DONE;
++	fa_status.progress = 100;
++	fa_status.bytes_done = E2631_FACTORY_LEN;
++	printf("e2631factory: PASS: rootfs_data erased and blank\n");
++	fa_active = false;
++	return 1;
++}
++
++int e2631_factory_begin(char *err, unsigned int errsz)
++{
++	int ret;
++
++	if (fa_active) {
++		snprintf(err, errsz, "a factory reset is already running");
++		return -EBUSY;
++	}
++
++	memset(&fa_status, 0, sizeof(fa_status));
++	ret = fa_get_mtd(err, errsz);
++	if (ret)
++		return ret;
++
++	fa_job.bs = fa_mtd->erasesize;
++	fa_job.blocks = E2631_FACTORY_LEN / fa_job.bs;
++	fa_job.next = 0;
++	fa_job.buf = malloc(fa_job.bs);
++	if (!fa_job.buf) {
++		snprintf(err, errsz, "out of memory for the erase buffer");
++		put_mtd_device(fa_mtd);
++		fa_mtd = NULL;
++		return -ENOMEM;
++	}
++
++	fa_status.stage = E2631_FACTORY_ERASE;
++	fa_status.bytes_total = E2631_FACTORY_LEN;
++	fa_active = true;
++	printf("e2631factory: erasing %s, 0x%08x bytes at 0x%08x\n",
++	       E2631_FACTORY_PART, (u32)E2631_FACTORY_LEN,
++	       (u32)E2631_FACTORY_OFF);
++	return 0;
++}
++
++int e2631_factory_poll(void)
++{
++	if (!fa_active)
++		return 1;
++
++	switch (fa_status.stage) {
++	case E2631_FACTORY_ERASE:
++		return fa_erase_step();
++	case E2631_FACTORY_BLANK:
++		return fa_blank_step();
++	case E2631_FACTORY_ERROR:
++		return -1;
++	default:
++		return 1;
++	}
++}
++
++void e2631_factory_end(void)
++{
++	if (fa_job.buf) {
++		free(fa_job.buf);
++		fa_job.buf = NULL;
++	}
++	if (fa_mtd) {
++		put_mtd_device(fa_mtd);
++		fa_mtd = NULL;
++	}
++	fa_active = false;
++}
+diff --git a/board/zte/zxhn-e2631/e2631factory.h b/board/zte/zxhn-e2631/e2631factory.h
+new file mode 100644
+index 00000000..c220433b
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631factory.h
+@@ -0,0 +1,46 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 rootfs_data (overlay) reset for the web rescue (E4 v2).
++ *
++ * The factory reset is a single, complete erase of the rootfs_data
++ * partition the kernel uses for /overlay.  The partition is looked up by
++ * name and its geometry is checked before anything is erased, so a device
++ * tree that moved it cannot silently wipe another region.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __ZXHN_E2631_FACTORY_H
++#define __ZXHN_E2631_FACTORY_H
++
++#include <linux/types.h>
++
++enum e2631_factory_stage {
++	E2631_FACTORY_IDLE = 0,
++	E2631_FACTORY_ERASE,
++	E2631_FACTORY_BLANK,
++	E2631_FACTORY_DONE,
++	E2631_FACTORY_ERROR,
++};
++
++struct e2631_factory_status {
++	enum e2631_factory_stage stage;
++	int progress;
++	u64 bytes_done;
++	u64 bytes_total;
++	char error[96];
++};
++
++/* Start a factory reset; returns 0, or -errno with the reason in err. */
++int e2631_factory_begin(char *err, unsigned int errsz);
++
++/* One bounded step: 0 = running, 1 = done, -1 = failed. */
++int e2631_factory_poll(void);
++
++void e2631_factory_end(void);
++
++const struct e2631_factory_status *e2631_factory_state(void);
++
++bool e2631_factory_busy(void);
++
++#endif /* __ZXHN_E2631_FACTORY_H */
+-- 
+2.56.1
+

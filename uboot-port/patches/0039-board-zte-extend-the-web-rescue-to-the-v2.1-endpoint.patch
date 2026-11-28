@@ -1,0 +1,2015 @@
+From f556631cdc73dc6c1fad1d1850edb5216430dc99 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 12:14:17 +0800
+Subject: [PATCH 39/39] board: zte: extend the web rescue to the v2.1 endpoints
+
+Add the v2.1 endpoints to e2631rescue: GET /slots, /env and /backup
+(bootloader plus the four small partitions, streamed in 16 KiB blocks
+with CRC32/SHA-256 headers), POST /firmware (package validation and the
+guarded slot write through e2631fwslot), /boot (one-shot
+e2631_next_slot override), /factory (rootfs_data erase through
+e2631factory), /env (staged e2631env write) and /console (one command
+with a 4 KiB tail capture and no stdin sharing). /status grows the v2
+keys and keeps the v1 ones unchanged. The defconfig enables
+CONFIG_CONSOLE_RECORD with a 16 KiB ring for the capture.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c         | 1725 +++++++++++++++++---
+ configs/zx279128s_zte_zxhn-e2631_defconfig |    2 +
+ 2 files changed, 1500 insertions(+), 227 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 7cb6afc0..2f30495a 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -1,15 +1,23 @@
+ // SPDX-License-Identifier: GPL-2.0+
+ /*
+- * ZTE ZXHN E2631 web failsafe (E4 v1)
++ * ZTE ZXHN E2631 web failsafe (E4 v1 and v2)
+  *
+  * e2631rescue serves a minimal DHCP server and an HTTP server on lan1 so
+- * that a bootloader image can be validated and written into mtd0 from a
+- * browser, with no serial transfer and no md.b ladder:
++ * that firmware can be updated from a browser, with no serial transfer
++ * and no md.b ladder:
+  *
+  *   - DHCP  : 192.168.1.1/24, pool 192.168.1.100-200 (lan1 only)
+- *   - HTTP  : GET  /                 rescue page (gzip, built in-tree)
+- *             GET  /status           key=value progress snapshot
+- *             POST /flash?mode=...   raw 655360-byte mtd0 image
++ *   - HTTP  : GET  /                       rescue page (gzip, in-tree)
++ *             GET  /status                 key=value progress snapshot
++ *             GET  /slots                  slot headers and the decision
++ *             GET  /env                    read-only environment dump
++ *             GET  /backup                 mtd0 0x20000..0xC0000 or parts
++ *             POST /flash?mode=...         raw 655360-byte mtd0 image
++ *             POST /firmware?mode=...      upgrade package to a slot
++ *             POST /boot?slot=0|1          one-shot boot override
++ *             POST /factory?confirm=reset  erase the overlay
++ *             POST /env?key=&value=        whitelisted env write
++ *             POST /console?cmd=           capture one console command
+  *
+  * The POST body is staged in RAM at 0x46000000 (1 MiB, clear of the kernel
+  * load area, the uImage staging area and the 16 MiB network DMA arena), then
+@@ -33,26 +41,43 @@
+ #include <config.h>
+ #include <command.h>
+ #include <console.h>
++#include <env_internal.h>
+ #include <errno.h>
+ #include <malloc.h>
++#include <mtd.h>
+ #include <net.h>
++#include <search.h>
++#include <stdarg.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <time.h>
+ #include <u-boot/crc.h>
+ #include <u-boot/sha256.h>
++#include <version_string.h>
+ #include <vsprintf.h>
+ #include <asm/global_data.h>
+ #include <linux/build_bug.h>
+ #include <linux/delay.h>
++#include <linux/mtd/mtd.h>
+ #include <linux/types.h>
+ #include <net/mtk_dhcpd.h>
+ #include <net/mtk_tcp.h>
+ 
++#include "e2631env.h"
++#include "e2631factory.h"
+ #include "e2631flash.h"
++#include "e2631fwslot.h"
+ #include "e2631http.h"
+ #include "e2631net.h"
+ 
++/*
++ * env_internal.h hides env_htab under DO_DEPS_ONLY, which only the host
++ * syntax check defines (it skips the generated-offsets static asserts).
++ */
++#if defined(DO_DEPS_ONLY)
++extern struct hsearch_data env_htab;
++#endif
++
+ /* Upload staging: see the memory map in uboot-port/README.md. */
+ #define E2631_RESCUE_IMG_ADDR	0x46000000UL
+ #define E2631_RESCUE_IMG_MAX	0x100000UL
+@@ -75,7 +100,7 @@
+ #define E2631_IMG_BANNER	"U-Boot 20"
+ 
+ #define E2631_RESCUE_HDR_MAX	1024
+-#define E2631_RESCUE_OUT_MAX	8192
++#define E2631_RESCUE_OUT_MAX	16384
+ 
+ static_assert(E2631_RESCUE_IMG_ADDR >= 0x45000000UL + 0x1000000UL,
+ 	      "the rescue upload buffer must stay clear of the network DMA arena");
+@@ -92,6 +117,25 @@ static_assert(E2631_RESCUE_FLASH_LEN == E2631_RESCUE_IMG_LEN,
+ 	      "the whole uploaded mtd0 image must be written");
+ static_assert(E2631_RESCUE_IMG_LEN <= E2631_RESCUE_IMG_MAX,
+ 	      "the mtd0 image must fit in the rescue upload buffer");
++/* E4 v2: firmware package staging, see the memory map in the contract. */
++#define E2631_FW_STAGE_ADDR	0x46100000UL
++#define E2631_FW_STAGE_MAX	0x1C00000UL
++#define E2631_FW_PKG_MIN	0x214UL
++#define E2631_FW_PKG_MAX	(E2631_PKG_BODY_MAX + E2631_FW_PKG_MIN)
++
++static_assert(E2631_FW_STAGE_ADDR >= 0x46100000UL,
++	      "the firmware staging area must stay above the v1 upload buffer");
++static_assert(E2631_FW_STAGE_ADDR + E2631_FW_STAGE_MAX <= 0x47F00000UL,
++	      "the firmware staging area must stay clear of the U-Boot image");
++static_assert(E2631_FW_STAGE_MAX == 0x1C00000UL,
++	      "the firmware staging area size comes from the contract");
++static_assert(E2631_FW_STAGE_ADDR > CONFIG_SYS_LOAD_ADDR,
++	      "the firmware staging area must stay above the uImage buffer");
++static_assert(E2631_FW_PKG_MAX <= E2631_FW_STAGE_MAX,
++	      "the largest package must fit in the staging area");
++
++/* GET /backup streams one region in 16 KiB blocks. */
++#define E2631_BACKUP_BLOCK	0x4000UL
+ 
+ enum e2631_rescue_stage {
+ 	RESCUE_IDLE = 0,
+@@ -105,6 +149,14 @@ enum e2631_rescue_stage {
+ 	RESCUE_STAGED,
+ };
+ 
++enum e2631_rescue_op {
++	RESCUE_OP_IDLE = 0,
++	RESCUE_OP_FLASH,
++	RESCUE_OP_FIRMWARE,
++	RESCUE_OP_FACTORY,
++	RESCUE_OP_ENVWRITE,
++};
++
+ struct e2631_rescue_status {
+ 	enum e2631_rescue_stage stage;
+ 	int progress;
+@@ -114,6 +166,19 @@ struct e2631_rescue_status {
+ 	char browser_sha256[SHA256_SUM_LEN * 2 + 1];
+ 	char sha_state[16];
+ 	char error[128];
++
++	/* E4 v2 */
++	enum e2631_rescue_op op;
++	char mode[16];
++	char slot_sel[8];
++	int slot_target;
++	char target_identity[16];
++	char guard[8];
++	char guard_reason[72];
++	u64 bytes_total;
++	u64 bytes_done;
++	u32 written_serial;
++	bool have_written_serial;
+ };
+ 
+ static struct e2631_rescue_status rescue_status;
+@@ -121,6 +186,23 @@ static bool rescue_active;
+ static bool flash_pending;
+ static bool flash_job_open;
+ static unsigned long flash_next_ms;
++static bool fw_pending;
++static bool fw_finished;
++static unsigned long fw_next_ms;
++static bool factory_pending;
++static bool factory_finished;
++static unsigned long factory_next_ms;
++static unsigned long env_next_ms;
++static bool backup_active;
++static bool slots_ready;
++static bool bl_crc_valid;
++static u32 bl_crc;
++
++enum e2631_rescue_upload {
++	UPLOAD_NONE = 0,
++	UPLOAD_FLASH,
++	UPLOAD_FIRMWARE,
++};
+ 
+ struct e2631_rescue_conn {
+ 	void *conn;
+@@ -130,13 +212,22 @@ struct e2631_rescue_conn {
+ 	bool responded;
+ 	bool close_after_send;
+ 	bool upload;
++	enum e2631_rescue_upload upload_kind;
+ 	char method[8];
+ 	char path[96];
+ 	char mode[16];
++	char slot_sel[8];
+ 	char sha_header[SHA256_SUM_LEN * 2 + 1];
+ 	char confirm_header[16];
+ 	u32 content_len;
+ 	u32 body_len;
++	int fw_slot_sel;
++	/* GET /backup streams one region; the block stays put until ACK. */
++	bool backup_stream;
++	u8 *backup_buf;
++	u32 backup_off;
++	u32 backup_sent;
++	u32 backup_total;
+ 	u8 out[E2631_RESCUE_OUT_MAX];
+ };
+ 
+@@ -262,6 +353,192 @@ static bool rescue_header_value(const char *hdr, const char *name, char *out,
+ 				       (unsigned int)outsz) != 0;
+ }
+ 
++static const char *rescue_op_name(enum e2631_rescue_op op)
++{
++	switch (op) {
++	case RESCUE_OP_FLASH:
++		return "flash";
++	case RESCUE_OP_FIRMWARE:
++		return "firmware";
++	case RESCUE_OP_FACTORY:
++		return "factory";
++	case RESCUE_OP_ENVWRITE:
++		return "envwrite";
++	default:
++		return "idle";
++	}
++}
++
++static const char *rescue_fw_stage_name(enum e2631_fwslot_stage stage)
++{
++	switch (stage) {
++	case E2631_FWS_ERASE:
++		return "erase";
++	case E2631_FWS_WRITE:
++		return "write";
++	case E2631_FWS_READBACK:
++		return "readback";
++	case E2631_FWS_COMPARE:
++		return "compare";
++	case E2631_FWS_DONE:
++		return "done";
++	case E2631_FWS_ERROR:
++		return "error";
++	default:
++		return "idle";
++	}
++}
++
++static const char *rescue_factory_stage_name(enum e2631_factory_stage stage)
++{
++	switch (stage) {
++	case E2631_FACTORY_ERASE:
++		return "erase";
++	case E2631_FACTORY_BLANK:
++		return "blank";
++	case E2631_FACTORY_DONE:
++		return "done";
++	case E2631_FACTORY_ERROR:
++		return "error";
++	default:
++		return "idle";
++	}
++}
++
++static bool rescue_task_busy(void)
++{
++	return flash_pending || fw_pending || factory_pending ||
++	       e2631_env_write_busy();
++}
++
++/* Append with the buffer bookkeeping every status line needs. */
++static void rescue_fmt(char **p, size_t *left, const char *fmt, ...)
++{
++	va_list ap;
++	int n;
++
++	if (*left < 2)
++		return;
++	va_start(ap, fmt);
++	n = vsnprintf(*p, *left, fmt, ap);
++	va_end(ap);
++	if (n <= 0)
++		return;
++	if ((size_t)n >= *left) {
++		*p += *left - 1;
++		*left = 1;
++		return;
++	}
++	*p += n;
++	*left -= (size_t)n;
++}
++
++/* Contract: printable ASCII only, whitespace and '=' become '_'. */
++static void rescue_value(char *dst, size_t dstsz, const char *src)
++{
++	size_t i;
++
++	if (!dstsz)
++		return;
++	if (!src) {
++		dst[0] = 0;
++		return;
++	}
++	for (i = 0; i + 1 < dstsz && src[i]; i++) {
++		unsigned char c = src[i];
++
++		if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '=')
++			dst[i] = '_';
++		else if (c < 0x20 || c > 0x7e)
++			dst[i] = '?';
++		else
++			dst[i] = (char)c;
++	}
++	dst[i] = 0;
++}
++
++/* Percent-decode an HTTP query value in place ('+' becomes a space). */
++static void rescue_url_decode(char *s)
++{
++	char *out = s;
++
++	while (*s) {
++		if (*s == '+') {
++			*out++ = ' ';
++			s++;
++		} else if (*s == '%' && s[1] && s[2]) {
++			int hi = s[1] >= 'a' ? s[1] - 'a' + 10 :
++				 s[1] >= 'A' ? s[1] - 'A' + 10 : s[1] - '0';
++			int lo = s[2] >= 'a' ? s[2] - 'a' + 10 :
++				 s[2] >= 'A' ? s[2] - 'A' + 10 : s[2] - '0';
++
++			if ((hi < 0 || hi > 15) || (lo < 0 || lo > 15)) {
++				*out++ = *s++;
++				continue;
++			}
++			*out++ = (char)((hi << 4) | lo);
++			s += 3;
++		} else {
++			*out++ = *s++;
++		}
++	}
++	*out = 0;
++}
++
++#define E2631_RESCUE_MTD_DEV	"spi-nand0"
++
++static int rescue_mtd_read(u64 abs, void *buf, u32 len)
++{
++	struct mtd_info *mtd;
++	size_t retlen = 0;
++	int ret;
++
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_RESCUE_MTD_DEV);
++	if (!mtd)
++		return -ENODEV;
++	ret = mtd_read(mtd, abs, len, &retlen, buf);
++	put_mtd_device(mtd);
++	if ((ret && ret != -EUCLEAN) || retlen != len)
++		return ret ? ret : -EIO;
++	return 0;
++}
++
++/* CRC32 over the bootloader region for /status; cached until a write. */
++static void rescue_bootloader_crc(u32 *crc)
++{
++	u8 *buf;
++	u32 done = 0;
++	u32 value = 0;
++
++	if (bl_crc_valid) {
++		*crc = bl_crc;
++		return;
++	}
++	buf = malloc(E2631_BACKUP_BLOCK);
++	if (!buf) {
++		*crc = 0;
++		return;
++	}
++	while (done < E2631_RESCUE_FLASH_LEN) {
++		u32 n = E2631_RESCUE_FLASH_LEN - done;
++
++		if (n > E2631_BACKUP_BLOCK)
++			n = E2631_BACKUP_BLOCK;
++		if (rescue_mtd_read(E2631_RESCUE_FLASH_OFF + done, buf, n)) {
++			free(buf);
++			*crc = 0;
++			return;
++		}
++		value = crc32(value, buf, n);
++		done += n;
++	}
++	free(buf);
++	bl_crc = value;
++	bl_crc_valid = true;
++	*crc = value;
++}
++
+ static int rescue_tcp_send(struct e2631_rescue_conn *c, const void *data,
+ 			   u32 len)
+ {
+@@ -326,6 +603,14 @@ static int rescue_error_reply(struct e2631_rescue_conn *c, const char *error)
+ 			    (u32)n);
+ }
+ 
++static int rescue_busy_reply(struct e2631_rescue_conn *c)
++{
++	const char *body = "result=error\nerror=busy\n";
++
++	return rescue_reply(c, 409, "Conflict", "text/plain", NULL, body,
++			    strlen(body));
++}
++
+ static void rescue_set_error(const char *error)
+ {
+ 	rescue_status.stage = RESCUE_ERROR;
+@@ -390,57 +675,326 @@ static int rescue_check_image(const unsigned char *img, u32 len, char *err,
+ 	return 0;
+ }
+ 
++static const char *rescue_env_stage_name(enum e2631_env_stage stage)
++{
++	switch (stage) {
++	case E2631_ENV_STAGE_DIFF:
++		return "diff";
++	case E2631_ENV_STAGE_CHECK:
++		return "check";
++	case E2631_ENV_STAGE_ERASE:
++		return "erase";
++	case E2631_ENV_STAGE_WRITE:
++		return "write";
++	case E2631_ENV_STAGE_READBACK:
++		return "readback";
++	case E2631_ENV_STAGE_VERIFY:
++		return "verify";
++	case E2631_ENV_STAGE_DONE:
++		return "done";
++	case E2631_ENV_STAGE_ERROR:
++		return "error";
++	default:
++		return "idle";
++	}
++}
++
++/*
++ * Slot headers are cheap; the body CRCs behind "intact" are not (two 22 MiB
++ * spans).  Verify once while idle, then reuse the result until a writer
++ * invalidates it.
++ */
++static const struct e2631_slots *rescue_slots(void)
++{
++	if (!slots_ready && !e2631_fwslot_job_open()) {
++		e2631_fwslot_refresh(true);
++		slots_ready = true;
++	}
++
++	return e2631_fwslot_slots();
++}
++
++static void rescue_slot_fields(char **p, size_t *left, int idx,
++			       const struct e2631_slot_info *si)
++{
++	unsigned long base = idx ? E2631_SLOT1_BASE : E2631_SLOT0_BASE;
++	char ver[40];
++
++	rescue_value(ver, sizeof(ver), si->version);
++	rescue_fmt(p, left, "slot%d_valid=%d\n", idx, si->valid);
++	rescue_fmt(p, left, "slot%d_intact=%d\n", idx, si->intact);
++	rescue_fmt(p, left, "slot%d_identity=%s\n", idx,
++		   e2631_slotcore_identity_name(si->identity));
++	rescue_fmt(p, left, "slot%d_serial=%u\n", idx, si->serial);
++	rescue_fmt(p, left, "slot%d_version=%s\n", idx, ver);
++	rescue_fmt(p, left, "slot%d_header_at=0x%08lx\n", idx,
++		   si->hpos >= 0 ? base + (unsigned long)si->hpos : 0UL);
++}
++
+ static void rescue_status_text(char *buf, size_t bufsz)
+ {
+-	int n = 0;
+-	int ret;
++	const struct e2631_slots *slots = rescue_slots();
++	const struct e2631_fwslot_status *fws = e2631_fwslot_state();
++	const struct e2631_factory_status *fas = e2631_factory_state();
++	const struct e2631_env_status *es = e2631_env_write_state();
++	const char *stage = "idle";
++	const char *error = "";
++	const char *result = "";
++	u32 crc = 0, blcrc = 0;
++	bool have_crc = false;
++	u64 bytes_total = 0, bytes_done = 0;
++	u32 written_serial = 0;
++	int slot_target = -1;
++	int progress = 0;
++	char version[96];
++	char *p = buf;
++	size_t left = bufsz;
++
++	switch (rescue_status.op) {
++	case RESCUE_OP_FIRMWARE:
++		stage = rescue_fw_stage_name(fws->stage);
++		progress = fws->progress;
++		error = fws->error;
++		bytes_total = fws->bytes_total;
++		bytes_done = fws->bytes_done;
++		slot_target = fws->target_slot;
++		written_serial = fws->written_serial;
++		if (fws->stage == E2631_FWS_DONE) {
++			result = "ok";
++			crc = fws->body_crc;
++			have_crc = true;
++		} else if (fws->stage == E2631_FWS_ERROR) {
++			result = "error";
++		} else {
++			result = "accepted";
++		}
++		break;
++	case RESCUE_OP_FACTORY:
++		stage = rescue_factory_stage_name(fas->stage);
++		progress = fas->progress;
++		error = fas->error;
++		bytes_total = fas->bytes_total;
++		bytes_done = fas->bytes_done;
++		if (fas->stage == E2631_FACTORY_DONE)
++			result = "ok";
++		else if (fas->stage == E2631_FACTORY_ERROR)
++			result = "error";
++		else
++			result = "accepted";
++		break;
++	case RESCUE_OP_ENVWRITE:
++		stage = rescue_env_stage_name(es->stage);
++		progress = es->progress;
++		error = es->error;
++		bytes_total = 1;
++		bytes_done = es->stage == E2631_ENV_STAGE_DONE ? 1 : 0;
++		if (es->stage == E2631_ENV_STAGE_DONE) {
++			result = "ok";
++			crc = es->new_crc;
++			have_crc = true;
++		} else if (es->stage == E2631_ENV_STAGE_ERROR) {
++			result = "error";
++		} else {
++			result = "accepted";
++		}
++		break;
++	default:
++		stage = rescue_stage_name(rescue_status.stage);
++		progress = rescue_status.progress;
++		error = rescue_status.error;
++		if (rescue_status.stage == RESCUE_STAGED) {
++			result = "staged";
++		} else if (rescue_status.stage == RESCUE_DONE) {
++			result = "ok";
++			crc = rescue_status.crc;
++			have_crc = rescue_status.have_crc;
++		} else if (rescue_status.stage == RESCUE_ERROR) {
++			result = "error";
++		}
++		break;
++	}
+ 
+-	ret = snprintf(buf + n, bufsz - n, "stage=%s\n",
+-		       rescue_stage_name(rescue_status.stage));
+-	if (ret > 0)
+-		n += ret;
+-	ret = snprintf(buf + n, bufsz - n, "progress=%d\n",
+-		       rescue_status.progress);
+-	if (ret > 0)
+-		n += ret;
+-	if (rescue_status.have_crc) {
+-		ret = snprintf(buf + n, bufsz - n, "crc32=0x%08x\n",
+-			       rescue_status.crc);
+-		if (ret > 0)
+-			n += ret;
+-	}
+-	ret = snprintf(buf + n, bufsz - n, "sha256=%s\n",
+-		       rescue_status.sha256);
+-	if (ret > 0)
+-		n += ret;
+-	ret = snprintf(buf + n, bufsz - n, "browser_sha256=%s\n",
+-		       rescue_status.browser_sha256);
+-	if (ret > 0)
+-		n += ret;
+-	ret = snprintf(buf + n, bufsz - n, "sha_match=%s\n",
+-		       rescue_status.sha_state);
+-	if (ret > 0)
+-		n += ret;
+-
+-	if (rescue_status.stage == RESCUE_STAGED) {
+-		ret = snprintf(buf + n, bufsz - n, "result=staged\n");
+-		if (ret > 0)
+-			n += ret;
+-	} else if (rescue_status.stage == RESCUE_DONE) {
+-		ret = snprintf(buf + n, bufsz - n, "result=ok\n");
+-		if (ret > 0)
+-			n += ret;
+-	} else if (rescue_status.stage == RESCUE_ERROR) {
+-		ret = snprintf(buf + n, bufsz - n, "result=error\nerror=%s\n",
+-			       rescue_status.error);
+-		if (ret > 0)
+-			n += ret;
+-	}
+-}
+-
+-static void rescue_handle_get(struct e2631_rescue_conn *c)
++	if (rescue_status.op == RESCUE_OP_FIRMWARE) {
++		slot_target = fws->target_slot;
++		written_serial = fws->written_serial;
++	} else if (rescue_status.op != RESCUE_OP_IDLE) {
++		slot_target = rescue_status.slot_target;
++	}
++
++	snprintf(version, sizeof(version), "U-Boot %s", version_string);
++	rescue_value(version, sizeof(version), version);
++
++	rescue_bootloader_crc(&blcrc);
++
++	rescue_fmt(&p, &left, "stage=%s\n", stage);
++	rescue_fmt(&p, &left, "progress=%d\n", progress);
++	rescue_fmt(&p, &left, "op=%s\n", rescue_op_name(rescue_status.op));
++	rescue_fmt(&p, &left, "mode=%s\n", rescue_status.mode);
++	rescue_fmt(&p, &left, "result=%s\n", result);
++	rescue_fmt(&p, &left, "error=%s\n", error ? error : "");
++	if (have_crc)
++		rescue_fmt(&p, &left, "crc32=0x%08x\n", crc);
++	else
++		rescue_fmt(&p, &left, "crc32=\n");
++	rescue_fmt(&p, &left, "sha256=%s\n", rescue_status.sha256);
++	rescue_fmt(&p, &left, "browser_sha256=%s\n",
++		   rescue_status.browser_sha256);
++	rescue_fmt(&p, &left, "sha_match=%s\n", rescue_status.sha_state);
++	rescue_fmt(&p, &left, "bytes_total=%llu\n",
++		   (unsigned long long)bytes_total);
++	rescue_fmt(&p, &left, "bytes_done=%llu\n",
++		   (unsigned long long)bytes_done);
++	rescue_fmt(&p, &left, "slot=%s\n", rescue_status.slot_sel);
++	rescue_fmt(&p, &left, "slot_target=%d\n", slot_target);
++	rescue_fmt(&p, &left, "slot_target_identity=%s\n",
++		   rescue_status.target_identity);
++	rescue_fmt(&p, &left, "guard=%s\n", rescue_status.guard);
++	rescue_fmt(&p, &left, "guard_reason=%s\n", rescue_status.guard_reason);
++	rescue_fmt(&p, &left, "written_serial=%u\n", written_serial);
++	rescue_fmt(&p, &left, "version=%s\n", version);
++	rescue_fmt(&p, &left, "next_slot=%d\n", slots->next_slot);
++	rescue_fmt(&p, &left, "next_reason=%s\n",
++		   slots->next_reason ? slots->next_reason : "none");
++	rescue_fmt(&p, &left, "bootloader_region_crc32=0x%08x\n", blcrc);
++	rescue_slot_fields(&p, &left, 0, &slots->slot[0]);
++	rescue_slot_fields(&p, &left, 1, &slots->slot[1]);
++	rescue_fmt(&p, &left, "slot1_header_partition=mtd8\n");
++}
++
++static int rescue_backup_part(const char *name, u32 *off, u32 *len)
+ {
+-	char body[512];
++	static const struct {
++		const char *name;
++		u32 off;
++		u32 len;
++	} parts[] = {
++		{ "bootloader", E2631_RESCUE_FLASH_OFF, E2631_RESCUE_FLASH_LEN },
++		{ "tag", 0x00100000U, 0x00100000U },
++		{ "wifi", 0x00200000U, 0x00100000U },
++		{ "usercfg", 0x00300000U, 0x00200000U },
++		{ "defcfg", 0x00500000U, 0x00200000U },
++	};
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(parts); i++) {
++		if (!strcmp(parts[i].name, name)) {
++			*off = parts[i].off;
++			*len = parts[i].len;
++			return 0;
++		}
++	}
++
++	return -1;
++}
++
++/* Send the next 16 KiB block; DATA_SENT drives the whole stream. */
++static int rescue_backup_block(struct e2631_rescue_conn *c)
++{
++	u32 n = c->backup_total - c->backup_sent;
++
++	if (!n)
++		return 0;
++	if (n > E2631_BACKUP_BLOCK)
++		n = E2631_BACKUP_BLOCK;
++	if (rescue_mtd_read(c->backup_off + c->backup_sent, c->backup_buf, n))
++		return -EIO;
++	if (mtk_tcp_send_data(c->conn, c->backup_buf, n))
++		return -EIO;
++	c->backup_sent += n;
++
++	return 0;
++}
++
++static void rescue_backup_start(struct e2631_rescue_conn *c, const char *query)
++{
++	sha256_context ctx;
++	u8 digest[SHA256_SUM_LEN];
++	char sha[SHA256_SUM_LEN * 2 + 1];
++	char part[16] = "bootloader";
++	u32 off, len, crc = 0, done = 0;
++	u8 *buf;
++	int n;
++
++	if (query)
++		rescue_query_value(query, "part=", part, sizeof(part));
++	rescue_url_decode(part);
++
++	if (rescue_backup_part(part, &off, &len)) {
++		rescue_error_reply(c, "bad part");
++		return;
++	}
++	if (backup_active) {
++		rescue_busy_reply(c);
++		return;
++	}
++
++	buf = malloc(E2631_BACKUP_BLOCK);
++	if (!buf) {
++		rescue_error_reply(c, "out of memory");
++		return;
++	}
++
++	sha256_starts(&ctx);
++	while (done < len) {
++		u32 n2 = len - done;
++
++		if (n2 > E2631_BACKUP_BLOCK)
++			n2 = E2631_BACKUP_BLOCK;
++		if (rescue_mtd_read(off + done, buf, n2))
++			break;
++		crc = crc32(crc, buf, n2);
++		sha256_update(&ctx, buf, n2);
++		done += n2;
++	}
++	if (done != len) {
++		free(buf);
++		rescue_error_reply(c, "flash read failed");
++		return;
++	}
++	sha256_finish(&ctx, digest);
++	rescue_hex(digest, sha);
++
++	n = snprintf((char *)c->out, sizeof(c->out),
++		     "HTTP/1.1 200 OK\r\n"
++		     "Server: e2631rescue\r\n"
++		     "Content-Type: application/octet-stream\r\n"
++		     "Content-Disposition: attachment; filename=\"e2631-%s.bin\"\r\n"
++		     "Content-Length: %u\r\n"
++		     "X-E2631-CRC32: 0x%08x\r\n"
++		     "X-E2631-SHA256: %s\r\n"
++		     "X-E2631-Offset: 0x%08x\r\n"
++		     "X-E2631-Length: 0x%08x\r\n"
++		     "X-E2631-Part: %s\r\n"
++		     "Cache-Control: no-store\r\n"
++		     "Connection: close\r\n"
++		     "\r\n",
++		     part, len, crc, sha, off, len, part);
++	if (n <= 0 || (u32)n >= sizeof(c->out)) {
++		free(buf);
++		mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++
++	c->backup_buf = buf;
++	c->backup_off = off;
++	c->backup_total = len;
++	c->backup_sent = 0;
++	c->backup_stream = true;
++	c->responded = true;
++	backup_active = true;
++
++	if (mtk_tcp_send_data(c->conn, c->out, (u32)n)) {
++		c->backup_stream = false;
++		backup_active = false;
++		free(buf);
++		c->backup_buf = NULL;
++		mtk_tcp_close_conn(c->conn, 1);
++	}
++}
++
++static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
++{
++	char body[1024];
+ 
+ 	if (!strcmp(c->path, "/")) {
+ 		rescue_reply(c, 200, "OK", "text/html; charset=utf-8",
+@@ -450,145 +1004,665 @@ static void rescue_handle_get(struct e2631_rescue_conn *c)
+ 	}
+ 
+ 	if (!strcmp(c->path, "/status")) {
+-		rescue_status_text(body, sizeof(body));
++		char *text = malloc(4096);
++
++		if (!text) {
++			rescue_error_reply(c, "out of memory");
++			return;
++		}
++		rescue_status_text(text, 4096);
++		rescue_reply(c, 200, "OK", "text/plain", NULL, text,
++			     strlen(text));
++		free(text);
++		return;
++	}
++
++	if (!strcmp(c->path, "/slots")) {
++		const struct e2631_slots *slots = rescue_slots();
++		char *p = body;
++		size_t left = sizeof(body);
++		const struct e2631_slot_info *si;
++
++		rescue_fmt(&p, &left, "next_slot=%d\n", slots->next_slot);
++		rescue_fmt(&p, &left, "next_reason=%s\n",
++			   slots->next_reason ? slots->next_reason : "none");
++		rescue_fmt(&p, &left, "slot0_partition=mtd5\n");
++		rescue_fmt(&p, &left, "slot1_partition=mtd6\n");
++		rescue_fmt(&p, &left, "slot0_span=0x%08x\n", E2631_SLOT_SPAN);
++		rescue_fmt(&p, &left, "slot1_span=0x%08x\n", E2631_SLOT_SPAN);
++		rescue_fmt(&p, &left, "slot1_header=0x%08x\n",
++			   E2631_SLOT1_BASE + E2631_SLOT_HDR_OFS);
++		si = &slots->slot[0];
++		rescue_slot_fields(&p, &left, 0, si);
++		si = &slots->slot[1];
++		rescue_slot_fields(&p, &left, 1, si);
+ 		rescue_reply(c, 200, "OK", "text/plain", NULL, body,
+ 			     strlen(body));
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/env")) {
++		char *res = NULL;
++		ssize_t n;
++
++		n = hexport_r(&env_htab, '\n', 0, &res, 0, 0, NULL);
++		if (n < 0 || !res) {
++			free(res);
++			rescue_error_reply(c, "cannot export the environment");
++			return;
++		}
++		if (n >= (ssize_t)sizeof(c->out) - 256) {
++			free(res);
++			rescue_reply(c, 500, "Internal Server Error",
++				     "text/plain", NULL,
++				     "result=error\nerror=env is too large to display\n",
++				     strlen("result=error\nerror=env is too large to display\n"));
++			return;
++		}
++		rescue_reply(c, 200, "OK", "text/plain", NULL, res, (u32)n);
++		free(res);
++		return;
++	}
++
++	if (!strcmp(c->path, "/backup")) {
++		rescue_backup_start(c, query);
++		return;
++	}
++
+ 	rescue_reply(c, 404, "Not Found", "text/plain", NULL,
+ 		     "result=error\nerror=not found\n",
+ 		     strlen("result=error\nerror=not found\n"));
+ }
+ 
+-static void rescue_body_bytes(struct e2631_rescue_conn *c, const u8 *data,
+-			      u32 len)
++/*
++ * Capture the console output of one fast command into @out (a 4 KiB tail)
++ * and restore the console.  A command that prints more than the capture
++ * buffer keeps its first bytes and is flagged truncated; nothing here
++ * touches the rescue loop's input path.
++ */
++static int rescue_console_run(const char *cmd, char *out, size_t outsz,
++			      bool *truncated, bool *overflowed)
+ {
+-	u32 space = E2631_RESCUE_IMG_LEN - c->body_len;
++	char line[128];
++	size_t used = 0;
++	int ret, code;
+ 
+-	if (len > space)
+-		len = space;
++	*truncated = false;
++	*overflowed = false;
++	if (console_record_reset_enable())
++		return -1;
+ 
+-	if (len) {
+-		memcpy((void *)(uintptr_t)(E2631_RESCUE_IMG_ADDR + c->body_len),
+-		       data, len);
+-		c->body_len += len;
++	code = run_command(cmd, 0);
++
++	if (gd->flags & GD_FLG_RECORD_OVF)
++		*overflowed = true;
++	gd->flags &= ~(GD_FLG_RECORD | GD_FLG_RECORD_OVF);
++
++	while ((ret = console_record_readline(line, sizeof(line))) >= 0) {
++		size_t l = strlen(line);
++
++		if (used + l + 1 >= outsz) {
++			size_t drop = used + l + 1 - outsz;
++			size_t keep = used - drop;
++
++			memmove(out, out + drop, keep);
++			used = keep;
++			*truncated = true;
++		}
++		memcpy(out + used, line, l);
++		used += l;
++		out[used++] = '\n';
+ 	}
++	out[used] = 0;
++	console_record_reset();
+ 
+-	if (c->body_len < c->content_len)
++	return code;
++}
++
++static bool rescue_has_nul_escape(const char *s)
++{
++	while (s[0] && s[1] && s[2]) {
++		if (s[0] == '%' && s[1] == '0' && s[2] == '0')
++			return true;
++		s++;
++	}
++
++	return false;
++}
++
++static void rescue_console_escape(const char *in, char *out, size_t outsz,
++				  bool *truncated)
++{
++	size_t o = 0;
++
++	while (*in) {
++		if (*in == '\r') {
++			in++;
++			continue;
++		}
++		if (o + 2 >= outsz) {
++			*truncated = true;
++			break;
++		}
++		if (*in == '\\') {
++			out[o++] = '\\';
++			out[o++] = '\\';
++		} else if (*in == '\n') {
++			out[o++] = '\\';
++			out[o++] = 'n';
++		} else {
++			out[o++] = *in;
++		}
++		in++;
++	}
++	out[o] = 0;
++}
++
++static void rescue_console_reply(struct e2631_rescue_conn *c, int http,
++				 const char *result, int exit_code,
++				 const char *stdout_text, bool truncated,
++				 const char *error)
++{
++	char *body = malloc(16384);
++
++	if (!body) {
++		rescue_error_reply(c, "out of memory");
++		return;
++	}
++	snprintf(body, 16384,
++		 "result=%s\nexit=%d\nstdout=%s\ntruncated=%d\nerror=%s\n",
++		 result, exit_code, stdout_text, truncated ? 1 : 0,
++		 error ? error : "");
++	rescue_reply(c, http, http == 200 ? "OK" : "Error",
++		     "text/plain; charset=utf-8", NULL, body, strlen(body));
++	free(body);
++}
++
++static void rescue_handle_console(struct e2631_rescue_conn *c, const char *query)
++{
++	static const char *const bad_body =
++		"result=error\nexit=1\nstdout=\ntruncated=0\n"
++		"error=only a single command is allowed\n";
++	char raw_cmd[257] = "";
++	char cmd[257];
++	char *raw = NULL, *esc = NULL;
++	bool truncated = false, overflowed = false;
++	int code;
++
++	if (!query) {
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
++			     strlen(bad_body));
++		return;
++	}
++	rescue_query_value(query, "cmd=", raw_cmd, sizeof(raw_cmd));
++	if (!raw_cmd[0] || strlen(raw_cmd) > 256 ||
++	    rescue_has_nul_escape(raw_cmd)) {
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
++			     strlen(bad_body));
++		return;
++	}
++	snprintf(cmd, sizeof(cmd), "%s", raw_cmd);
++	rescue_url_decode(cmd);
++	if (strpbrk(cmd, ";\r\n")) {
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
++			     strlen(bad_body));
++		return;
++	}
++
++	raw = malloc(4096);
++	esc = malloc(16384);
++	if (!raw || !esc) {
++		free(raw);
++		free(esc);
++		rescue_error_reply(c, "out of memory");
++		return;
++	}
++
++	printf("e2631rescue: console command \"%s\"\n", cmd);
++	code = rescue_console_run(cmd, raw, 4096, &truncated, &overflowed);
++	if (code < 0) {
++		free(raw);
++		free(esc);
++		rescue_console_reply(c, 500, "error", 1, "", false,
++				     "console capture is not available");
++		return;
++	}
++	rescue_console_escape(raw, esc, 16384, &truncated);
++	rescue_console_reply(c, 200, "ok", code, esc, truncated || overflowed,
++			     "");
++	free(raw);
++	free(esc);
++}
++
++static void rescue_flash_body_complete(struct e2631_rescue_conn *c)
++{
++	char err[128];
++	char computed[SHA256_SUM_LEN * 2 + 1];
++	char expected[SHA256_SUM_LEN * 2 + 1];
++	char body[256];
++	const unsigned char *img = rescue_image();
++	int n;
++	bool have_expected;
++	int ret;
++
++	if (rescue_task_busy()) {
++		rescue_busy_reply(c);
++		return;
++	}
++
++	rescue_sha256(img, E2631_RESCUE_IMG_LEN, computed);
++	snprintf(rescue_status.mode, sizeof(rescue_status.mode), "%s",
++		 c->mode);
++	printf("e2631rescue: received %u bytes, sha256 %s\n", c->content_len,
++	       computed);
++
++	ret = rescue_check_image(img, c->content_len, err, sizeof(err));
++	if (ret) {
++		snprintf(body, sizeof(body), "result=error\nerror=%s\n", err);
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, body,
++			     strlen(body));
++		return;
++	}
++
++	have_expected = c->sha_header[0] != 0;
++	if (have_expected && !rescue_hex_digest_valid(c->sha_header)) {
++		rescue_error_reply(c, "malformed X-E2631-SHA256 header");
+ 		return;
++	}
++
++	snprintf(rescue_status.sha256, sizeof(rescue_status.sha256), "%s",
++		 computed);
++	rescue_status.have_crc = true;
++	rescue_status.crc = crc32(0, img, E2631_RESCUE_IMG_LEN);
+ 
+-	/* Body complete: this is called from the TCP receive callback. */
+-	{
+-		char err[128];
+-		char computed[SHA256_SUM_LEN * 2 + 1];
+-		char expected[SHA256_SUM_LEN * 2 + 1];
+-		char body[256];
+-		const unsigned char *img = rescue_image();
+-		u32 crc;
+-		int n;
+-		bool have_expected;
+-		int ret;
+-
+-		if (flash_pending || rescue_status.stage == RESCUE_ERASE ||
+-		    rescue_status.stage == RESCUE_BLANK ||
+-		    rescue_status.stage == RESCUE_WRITE ||
+-		    rescue_status.stage == RESCUE_READBACK ||
+-		    rescue_status.stage == RESCUE_COMPARE) {
+-			rescue_error_reply(c, "a flash operation is already active");
++	if (have_expected) {
++		rescue_hex_lower(c->sha_header, expected);
++		snprintf(rescue_status.browser_sha256,
++			 sizeof(rescue_status.browser_sha256), "%s", expected);
++		if (strcmp(expected, computed)) {
++			snprintf(rescue_status.sha_state,
++				 sizeof(rescue_status.sha_state), "mismatch");
++			printf("e2631rescue: sha256 mismatch (device %s, browser %s)\n",
++			       computed, expected);
++			rescue_error_reply(c, "sha256 mismatch");
+ 			return;
+ 		}
++		snprintf(rescue_status.sha_state,
++			 sizeof(rescue_status.sha_state), "ok");
++	} else {
++		snprintf(rescue_status.sha_state,
++			 sizeof(rescue_status.sha_state), "absent");
++	}
+ 
+-		rescue_sha256(img, E2631_RESCUE_IMG_LEN, computed);
+-		printf("e2631rescue: received %u bytes, sha256 %s\n",
+-		       c->content_len, computed);
++	if (!strcmp(c->mode, "write")) {
++		if (!have_expected) {
++			rescue_error_reply(c,
++					   "X-E2631-SHA256 header is required for a write");
++			return;
++		}
++		if (strcmp(c->confirm_header, "write")) {
++			rescue_error_reply(c,
++					   "X-E2631-Confirm: write is required");
++			return;
++		}
+ 
+-		ret = rescue_check_image(img, c->content_len, err, sizeof(err));
++		ret = e2631_flash_begin(E2631_RESCUE_FLASH_OFF,
++					E2631_RESCUE_FLASH_LEN, img);
+ 		if (ret) {
+-			snprintf(body, sizeof(body),
+-				 "result=error\nerror=%s\n", err);
+-			rescue_reply(c, 400, "Bad Request", "text/plain", NULL,
+-				     body, strlen(body));
++			rescue_error_reply(c,
++					   "the flash range was refused by the writer");
+ 			return;
+ 		}
++		flash_job_open = true;
++		flash_pending = true;
++		rescue_status.op = RESCUE_OP_FLASH;
++		rescue_status.stage = RESCUE_STAGED;
++		rescue_status.progress = 0;
++		rescue_status.error[0] = 0;
++		flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++		printf("e2631rescue: image accepted, write queued\n");
++		n = snprintf(body, sizeof(body),
++			     "result=accepted\nsha256=%s\nsha_match=ok\n",
++			     computed);
++		if (n < 0 || (size_t)n >= sizeof(body))
++			n = sizeof(body) - 1;
++		rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
++		return;
++	}
++
++	rescue_status.stage = RESCUE_IDLE;
++	rescue_status.progress = 0;
++	n = snprintf(body, sizeof(body),
++		     "result=ok\nsha256=%s\nsha_match=%s\n", computed,
++		     rescue_status.sha_state);
++	if (n < 0 || (size_t)n >= sizeof(body))
++		n = sizeof(body) - 1;
++	rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
++}
++
++static void rescue_firmware_body_complete(struct e2631_rescue_conn *c)
++{
++	const unsigned char *img =
++		(const unsigned char *)(uintptr_t)E2631_FW_STAGE_ADDR;
++	char computed[SHA256_SUM_LEN * 2 + 1];
++	char expected[SHA256_SUM_LEN * 2 + 1];
++	char err[96];
++	char body[512];
++	struct e2631_fwslot_validate val;
++	u32 len = c->content_len;
++	int ret, n;
++
++	rescue_sha256(img, len, computed);
++	printf("e2631rescue: received %u firmware bytes, sha256 %s\n", len,
++	       computed);
++
++	if (rescue_task_busy()) {
++		rescue_busy_reply(c);
++		return;
++	}
+ 
+-		have_expected = c->sha_header[0] != 0;
+-		if (have_expected && !rescue_hex_digest_valid(c->sha_header)) {
++	snprintf(rescue_status.sha256, sizeof(rescue_status.sha256), "%s",
++		 computed);
++	rescue_status.have_crc = true;
++	rescue_status.crc = crc32(0, img, len);
++	snprintf(rescue_status.mode, sizeof(rescue_status.mode), "%s",
++		 c->mode);
++	snprintf(rescue_status.slot_sel, sizeof(rescue_status.slot_sel), "%s",
++		 c->slot_sel);
++
++	if (c->sha_header[0]) {
++		if (!rescue_hex_digest_valid(c->sha_header)) {
+ 			rescue_error_reply(c, "malformed X-E2631-SHA256 header");
+ 			return;
+ 		}
+-
+-		snprintf(rescue_status.sha256, sizeof(rescue_status.sha256),
+-			 "%s", computed);
+-		rescue_status.have_crc = true;
+-		rescue_status.crc = crc32(0, img, E2631_RESCUE_IMG_LEN);
+-
+-		if (have_expected) {
+-			rescue_hex_lower(c->sha_header, expected);
+-			snprintf(rescue_status.browser_sha256,
+-				 sizeof(rescue_status.browser_sha256), "%s",
+-				 expected);
+-			if (strcmp(expected, computed)) {
+-				snprintf(rescue_status.sha_state,
+-					 sizeof(rescue_status.sha_state),
+-					 "mismatch");
+-				printf("e2631rescue: sha256 mismatch (device %s, browser %s)\n",
+-				       computed, expected);
+-				rescue_error_reply(c, "sha256 mismatch");
+-				return;
+-			}
+-			snprintf(rescue_status.sha_state,
+-				 sizeof(rescue_status.sha_state), "ok");
+-		} else {
++		rescue_hex_lower(c->sha_header, expected);
++		snprintf(rescue_status.browser_sha256,
++			 sizeof(rescue_status.browser_sha256), "%s", expected);
++		if (strcmp(expected, computed)) {
+ 			snprintf(rescue_status.sha_state,
+-				 sizeof(rescue_status.sha_state), "absent");
+-		}
+-
+-		if (!strcmp(c->mode, "write")) {
+-			if (!have_expected) {
+-				rescue_error_reply(c,
+-						   "X-E2631-SHA256 header is required for a write");
+-				return;
+-			}
+-			if (strcmp(c->confirm_header, "write")) {
+-				rescue_error_reply(c,
+-						   "X-E2631-Confirm: write is required");
+-				return;
+-			}
+-
+-			ret = e2631_flash_begin(E2631_RESCUE_FLASH_OFF,
+-						E2631_RESCUE_FLASH_LEN, img);
+-			if (ret) {
+-				rescue_error_reply(c,
+-						   "the flash range was refused by the writer");
+-				return;
+-			}
+-			flash_job_open = true;
+-			flash_pending = true;
+-			rescue_status.stage = RESCUE_STAGED;
+-			rescue_status.progress = 0;
+-			rescue_status.error[0] = 0;
+-			flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
+-			printf("e2631rescue: image accepted, write queued\n");
+-			n = snprintf(body, sizeof(body),
+-				     "result=accepted\nsha256=%s\nsha_match=ok\n",
+-				     computed);
+-			if (n < 0 || (size_t)n >= sizeof(body))
+-				n = sizeof(body) - 1;
+-			rescue_reply(c, 200, "OK", "text/plain", NULL, body,
+-				     (u32)n);
++				 sizeof(rescue_status.sha_state), "mismatch");
++			printf("e2631rescue: firmware sha256 mismatch (device %s, browser %s)\n",
++			       computed, expected);
++			rescue_error_reply(c, "sha256 mismatch");
+ 			return;
+ 		}
++		snprintf(rescue_status.sha_state,
++			 sizeof(rescue_status.sha_state), "ok");
++	} else {
++		snprintf(rescue_status.sha_state,
++			 sizeof(rescue_status.sha_state), "absent");
++	}
+ 
+-		rescue_status.stage = RESCUE_IDLE;
+-		rescue_status.progress = 0;
++	ret = e2631_fwslot_validate(img, len, c->fw_slot_sel, &val, err,
++				    sizeof(err));
++	if (ret) {
++		n = snprintf(body, sizeof(body),
++			     "result=error\nerror=%s\n", err);
++		if (n < 0 || (size_t)n >= sizeof(body))
++			n = sizeof(body) - 1;
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, body,
++			     (u32)n);
++		return;
++	}
++
++	rescue_status.slot_target = val.target_slot;
++	rescue_value(rescue_status.target_identity,
++		     sizeof(rescue_status.target_identity),
++		     e2631_slotcore_identity_name(val.target_identity));
++	rescue_value(rescue_status.guard, sizeof(rescue_status.guard),
++		     e2631_slotcore_guard_name(val.guard));
++	rescue_value(rescue_status.guard_reason,
++		     sizeof(rescue_status.guard_reason),
++		     val.guard_reason ? val.guard_reason : "");
++	rescue_status.written_serial = val.written_serial;
++	rescue_status.have_written_serial = true;
++
++	if (!strcmp(c->mode, "validate")) {
+ 		n = snprintf(body, sizeof(body),
+-			     "result=ok\nsha256=%s\nsha_match=%s\n",
+-			     computed, rescue_status.sha_state);
++			     "result=ok\nsha256=%s\nbrowser_sha256=%s\nsha_match=%s\ncrc32=0x%08x\nbody_len=%u\nslot_target=%d\nslot_target_identity=%s\nguard=%s\nguard_reason=%s\n",
++			     computed, rescue_status.browser_sha256,
++			     rescue_status.sha_state, val.body_crc, val.body_len,
++			     val.target_slot, rescue_status.target_identity,
++			     rescue_status.guard, rescue_status.guard_reason);
+ 		if (n < 0 || (size_t)n >= sizeof(body))
+ 			n = sizeof(body) - 1;
+ 		rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
++		return;
++	}
++
++	if (!c->sha_header[0]) {
++		rescue_error_reply(c,
++				   "X-E2631-SHA256 header is required for a write");
++		return;
+ 	}
++	if (strcmp(c->confirm_header, "write")) {
++		rescue_error_reply(c,
++				   "X-E2631-Confirm: write is required");
++		return;
++	}
++
++	ret = e2631_fwslot_begin(val.target_slot, img, len);
++	if (ret) {
++		rescue_error_reply(c, "cannot start the slot write");
++		return;
++	}
++
++	fw_pending = true;
++	fw_finished = false;
++	fw_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++	slots_ready = true;
++	rescue_status.op = RESCUE_OP_FIRMWARE;
++	rescue_status.progress = 0;
++	rescue_status.error[0] = 0;
++	printf("e2631rescue: firmware accepted for slot%d, serial %u\n",
++	       val.target_slot, val.written_serial);
++
++	n = snprintf(body, sizeof(body),
++		     "result=accepted\nsha256=%s\nslot_target=%d\nwritten_serial=%u\n",
++		     computed, val.target_slot, val.written_serial);
++	if (n < 0 || (size_t)n >= sizeof(body))
++		n = sizeof(body) - 1;
++	rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
++}
++
++static void rescue_body_bytes(struct e2631_rescue_conn *c, const u8 *data,
++			      u32 len)
++{
++	u32 space, base;
++
++	if (c->body_len >= c->content_len)
++		return;
++
++	if (c->upload_kind == UPLOAD_FIRMWARE) {
++		base = E2631_FW_STAGE_ADDR;
++		space = E2631_FW_STAGE_MAX - c->body_len;
++	} else {
++		base = E2631_RESCUE_IMG_ADDR;
++		space = E2631_RESCUE_IMG_LEN - c->body_len;
++	}
++
++	if (len > space)
++		len = space;
++
++	if (len) {
++		memcpy((void *)(uintptr_t)(base + c->body_len), data, len);
++		c->body_len += len;
++	}
++
++	if (c->body_len < c->content_len)
++		return;
++
++	if (c->upload_kind == UPLOAD_FIRMWARE)
++		rescue_firmware_body_complete(c);
++	else
++		rescue_flash_body_complete(c);
++}
++
++static void rescue_handle_boot(struct e2631_rescue_conn *c, const char *query)
++{
++	const struct e2631_slots *slots = rescue_slots();
++	char slot[8] = "";
++	char body[80];
++	int want;
++
++	if (!query || !rescue_query_value(query, "slot=", slot, sizeof(slot)))
++		goto bad;
++	rescue_url_decode(slot);
++	if (strcmp(slot, "0") && strcmp(slot, "1"))
++		goto bad;
++	want = slot[0] - '0';
++	if (!slots->slot[want].valid || !slots->slot[want].intact) {
++		rescue_error_reply(c, "slot is not bootable");
++		return;
++	}
++
++	env_set("e2631_next_slot", slot);
++	snprintf(body, sizeof(body), "result=ok\nnext_slot=%d\n", want);
++	printf("e2631rescue: next boot requested from slot%d\n", want);
++	rescue_reply(c, 200, "OK", "text/plain", NULL, body, strlen(body));
++	return;
++
++bad:
++	rescue_error_reply(c, "bad slot");
++}
++
++static void rescue_handle_factory(struct e2631_rescue_conn *c,
++				  const char *query, const char *hdr)
++{
++	char confirm[16] = "";
++	char err[96];
++	int ret;
++
++	if (query)
++		rescue_query_value(query, "confirm=", confirm, sizeof(confirm));
++	rescue_url_decode(confirm);
++	if (strcmp(confirm, "reset") ||
++	    !rescue_header_value(hdr, "X-E2631-Confirm", c->confirm_header,
++				 sizeof(c->confirm_header)) ||
++	    strcmp(c->confirm_header, "reset")) {
++		rescue_error_reply(c, "missing confirm");
++		return;
++	}
++	if (rescue_task_busy()) {
++		rescue_busy_reply(c);
++		return;
++	}
++
++	ret = e2631_factory_begin(err, sizeof(err));
++	if (ret) {
++		rescue_error_reply(c, err);
++		return;
++	}
++	factory_pending = true;
++	factory_finished = false;
++	factory_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++	rescue_status.op = RESCUE_OP_FACTORY;
++	rescue_status.progress = 0;
++	rescue_status.error[0] = 0;
++	printf("e2631rescue: factory reset accepted\n");
++	rescue_reply(c, 200, "OK", "text/plain", NULL,
++		     "result=accepted\n", strlen("result=accepted\n"));
++}
++
++static bool rescue_env_key_writable(const char *key)
++{
++	size_t i;
++
++	if (!key[0] || strlen(key) > 32)
++		return false;
++	for (i = 0; key[i]; i++) {
++		if (!((key[i] >= 'a' && key[i] <= 'z') ||
++		      (key[i] >= '0' && key[i] <= '9') || key[i] == '_'))
++			return false;
++	}
++
++	return !strcmp(key, "bootdelay") || !strncmp(key, "e2631_", 6);
++}
++
++static bool rescue_env_value_ok(const char *value)
++{
++	size_t i;
++
++	if (strlen(value) > 128)
++		return false;
++	for (i = 0; value[i]; i++) {
++		if (value[i] < 0x20 || value[i] > 0x7e)
++			return false;
++	}
++
++	return true;
++}
++
++static void rescue_handle_env(struct e2631_rescue_conn *c, const char *query,
++			      const char *hdr)
++{
++	char key[64] = "", value[161] = "";
++	char confirm[16] = "";
++	const struct e2631_env_status *es;
++	char err[96];
++	char body[160];
++	int ret, n;
++
++	if (query)
++		rescue_query_value(query, "confirm=", confirm, sizeof(confirm));
++	if (!query || strcmp(confirm, "write") ||
++	    !rescue_header_value(hdr, "X-E2631-Confirm", c->confirm_header,
++				 sizeof(c->confirm_header)) ||
++	    strcmp(c->confirm_header, "write")) {
++		rescue_error_reply(c, "missing confirm");
++		return;
++	}
++
++	rescue_query_value(query, "key=", key, sizeof(key));
++	rescue_query_value(query, "value=", value, sizeof(value));
++	rescue_url_decode(key);
++	rescue_url_decode(value);
++
++	if (!rescue_env_key_writable(key)) {
++		rescue_reply(c, 403, "Forbidden", "text/plain", NULL,
++			     "result=error\nerror=key is not writable\n",
++			     strlen("result=error\nerror=key is not writable\n"));
++		return;
++	}
++	if (!rescue_env_value_ok(value)) {
++		rescue_reply(c, 400, "Bad Request", "text/plain", NULL,
++			     "result=error\nerror=bad value\n",
++			     strlen("result=error\nerror=bad value\n"));
++		return;
++	}
++	if (e2631_env_write_busy()) {
++		rescue_busy_reply(c);
++		return;
++	}
++
++	ret = e2631_env_write_begin(key, value, err, sizeof(err));
++	if (ret < 0) {
++		if (ret == -EPERM)
++			rescue_reply(c, 403, "Forbidden", "text/plain", NULL,
++				     "result=error\nerror=key is not writable\n",
++				     strlen("result=error\nerror=key is not writable\n"));
++		else
++			rescue_error_reply(c, err);
++		return;
++	}
++
++	es = e2631_env_write_state();
++	if (ret == 1) {
++		n = snprintf(body, sizeof(body),
++			     "result=ok\nnew_crc32=0x%08x\nkeys=0\n",
++			     es->new_crc);
++		rescue_reply(c, 200, "OK", "text/plain", NULL, body,
++			     (u32)n);
++		return;
++	}
++
++	env_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++	rescue_status.op = RESCUE_OP_ENVWRITE;
++	snprintf(rescue_status.mode, sizeof(rescue_status.mode), "write");
++	n = snprintf(body, sizeof(body),
++		     "result=accepted\nnew_crc32=0x%08x\nkeys=1\n",
++		     es->new_crc);
++	rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
+ }
+ 
+ static void rescue_handle_request(struct e2631_rescue_conn *c)
+@@ -600,6 +1674,8 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 	char *rest;
+ 	char *query;
+ 	char value[32];
++	char mode[16] = "validate";
++	char slot[8] = "auto";
+ 
+ 	eol = strstr(c->hdr, "\r\n");
+ 	if (!eol)
+@@ -628,17 +1704,96 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 	c->hdr_done = true;
+ 
+ 	if (!strcmp(c->method, "GET")) {
+-		rescue_handle_get(c);
++		rescue_handle_get(c, query);
+ 		return;
+ 	}
+ 
+-	if (strcmp(c->method, "POST") || strcmp(c->path, "/flash"))
++	if (strcmp(c->method, "POST"))
+ 		goto bad;
+ 
++	if (!strcmp(c->path, "/console")) {
++		rescue_handle_console(c, query);
++		return;
++	}
++
++	if (!strcmp(c->path, "/boot")) {
++		rescue_handle_boot(c, query);
++		return;
++	}
++
++	if (!strcmp(c->path, "/factory")) {
++		rescue_handle_factory(c, query, hdr_start);
++		return;
++	}
++
++	if (!strcmp(c->path, "/env")) {
++		rescue_handle_env(c, query, hdr_start);
++		return;
++	}
++
++	if (!strcmp(c->path, "/firmware")) {
++		if (query)
++			rescue_query_value(query, "mode=", mode, sizeof(mode));
++		if (query)
++			rescue_query_value(query, "slot=", slot, sizeof(slot));
++		rescue_url_decode(slot);
++		if (strcmp(mode, "validate") && strcmp(mode, "write"))
++			goto bad;
++		if (!strcmp(slot, "auto")) {
++			c->fw_slot_sel = -1;
++		} else if (!strcmp(slot, "0")) {
++			c->fw_slot_sel = 0;
++		} else if (!strcmp(slot, "1")) {
++			c->fw_slot_sel = 1;
++		} else {
++			rescue_error_reply(c, "bad slot");
++			return;
++		}
++		if (rescue_task_busy()) {
++			rescue_busy_reply(c);
++			return;
++		}
++		if (!rescue_header_value(hdr_start, "Content-Length", value,
++					 sizeof(value)))
++			goto bad;
++		c->content_len = (u32)simple_strtoul(value, NULL, 10);
++		if (c->content_len < E2631_FW_PKG_MIN ||
++		    c->content_len > E2631_FW_PKG_MAX) {
++			rescue_error_reply(c, "package size out of range");
++			return;
++		}
++		snprintf(c->mode, sizeof(c->mode), "%s", mode);
++		snprintf(c->slot_sel, sizeof(c->slot_sel), "%s", slot);
++		if (!strcmp(mode, "write")) {
++			if (!rescue_header_value(hdr_start, "X-E2631-SHA256",
++						 c->sha_header,
++						 sizeof(c->sha_header)))
++				rescue_header_value(hdr_start, "X-File-Sha256",
++						    c->sha_header,
++						    sizeof(c->sha_header));
++			rescue_header_value(hdr_start, "X-E2631-Confirm",
++					    c->confirm_header,
++					    sizeof(c->confirm_header));
++		} else {
++			rescue_header_value(hdr_start, "X-E2631-SHA256",
++					    c->sha_header,
++					    sizeof(c->sha_header));
++		}
++		c->upload = true;
++		c->upload_kind = UPLOAD_FIRMWARE;
++		return;
++	}
++
++	if (strcmp(c->path, "/flash"))
++		goto bad;
++
++	if (rescue_task_busy()) {
++		rescue_busy_reply(c);
++		return;
++	}
+ 	if (!query || !rescue_query_value(query, "mode=", c->mode,
+ 					  sizeof(c->mode)))
+ 		goto bad;
+-
+ 	if (!rescue_header_value(hdr_start, "Content-Length", value,
+ 				 sizeof(value)))
+ 		goto bad;
+@@ -647,7 +1802,6 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 		rescue_error_reply(c, "Content-Length must be 655360");
+ 		return;
+ 	}
+-
+ 	if (!strcmp(c->mode, "write")) {
+ 		if (!rescue_header_value(hdr_start, "X-E2631-SHA256",
+ 					 c->sha_header, sizeof(c->sha_header)))
+@@ -663,8 +1817,8 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 	} else {
+ 		goto bad;
+ 	}
+-
+ 	c->upload = true;
++	c->upload_kind = UPLOAD_FLASH;
+ 	return;
+ 
+ bad:
+@@ -714,6 +1868,9 @@ static void rescue_conn_data(struct e2631_rescue_conn *c, const u8 *data,
+ 
+ static void rescue_conn_closed(struct e2631_rescue_conn *c)
+ {
++	if (c->backup_stream)
++		backup_active = false;
++	free(c->backup_buf);
+ 	free(c);
+ }
+ 
+@@ -739,6 +1896,18 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 	case MTK_TCP_CB_DATA_SENT:
+ 		if (!c)
+ 			return;
++		if (c->backup_stream) {
++			if (c->backup_sent >= c->backup_total) {
++				c->backup_stream = false;
++				backup_active = false;
++				mtk_tcp_close_conn(c->conn, 0);
++			} else if (rescue_backup_block(c)) {
++				c->backup_stream = false;
++				backup_active = false;
++				mtk_tcp_close_conn(c->conn, 1);
++			}
++			return;
++		}
+ 		if (c->close_after_send) {
+ 			c->close_after_send = false;
+ 			mtk_tcp_close_conn(c->conn, 0);
+@@ -762,85 +1931,169 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 	}
+ }
+ 
+-static void rescue_flash_poll(void)
++static void rescue_task_poll(void)
+ {
++	const struct e2631_fwslot_status *fws;
++	const struct e2631_factory_status *fas;
+ 	int ret;
+ 
+-	if (!flash_pending)
+-		return;
++	if (flash_pending) {
++		if (get_timer(0) < flash_next_ms)
++			return;
++
++		switch (rescue_status.stage) {
++		case RESCUE_STAGED:
++			rescue_status.stage = RESCUE_ERASE;
++			rescue_status.progress = 10;
++			break;
++		case RESCUE_ERASE:
++			printf("e2631rescue: erasing mtd0 0x%lx..0x%lx\n",
++			       (unsigned long)E2631_RESCUE_FLASH_OFF,
++			       (unsigned long)(E2631_RESCUE_FLASH_OFF +
++					       E2631_RESCUE_FLASH_LEN));
++			ret = e2631_flash_erase();
++			if (ret) {
++				rescue_set_error("erase failed");
++				return;
++			}
++			rescue_status.stage = RESCUE_BLANK;
++			rescue_status.progress = 30;
++			break;
++		case RESCUE_BLANK:
++			ret = e2631_flash_blank_check();
++			if (ret) {
++				rescue_set_error("blank check failed");
++				return;
++			}
++			rescue_status.stage = RESCUE_WRITE;
++			rescue_status.progress = 45;
++			break;
++		case RESCUE_WRITE:
++			printf("e2631rescue: writing %lu bytes to mtd0\n",
++			       (unsigned long)E2631_RESCUE_FLASH_LEN);
++			ret = e2631_flash_write_image(rescue_image());
++			if (ret) {
++				rescue_set_error("write failed");
++				return;
++			}
++			rescue_status.stage = RESCUE_READBACK;
++			rescue_status.progress = 80;
++			break;
++		case RESCUE_READBACK:
++			ret = e2631_flash_readback();
++			if (ret) {
++				rescue_set_error("read back failed");
++				return;
++			}
++			rescue_status.stage = RESCUE_COMPARE;
++			rescue_status.progress = 90;
++			break;
++		case RESCUE_COMPARE:
++			ret = e2631_flash_compare(rescue_image(),
++						  &rescue_status.crc);
++			e2631_flash_end();
++			flash_job_open = false;
++			bl_crc_valid = false;
++			if (ret) {
++				rescue_set_error("read back does not match the image");
++				return;
++			}
++			rescue_status.stage = RESCUE_DONE;
++			rescue_status.progress = 100;
++			flash_pending = false;
++			printf("e2631rescue: PASS: mtd0 updated, CRC32 0x%08x\n",
++			       rescue_status.crc);
++			printf("e2631rescue: nothing was rebooted; power-cycle or run reset\n");
++			return;
++		default:
++			flash_pending = false;
++			return;
++		}
+ 
+-	if (get_timer(0) < flash_next_ms)
++		flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
+ 		return;
++	}
+ 
+-	switch (rescue_status.stage) {
+-	case RESCUE_STAGED:
+-		rescue_status.stage = RESCUE_ERASE;
+-		rescue_status.progress = 10;
+-		break;
+-	case RESCUE_ERASE:
+-		printf("e2631rescue: erasing mtd0 0x%lx..0x%lx\n",
+-		       (unsigned long)E2631_RESCUE_FLASH_OFF,
+-		       (unsigned long)(E2631_RESCUE_FLASH_OFF +
+-				       E2631_RESCUE_FLASH_LEN));
+-		ret = e2631_flash_erase();
+-		if (ret) {
+-			rescue_set_error("erase failed");
++	if (fw_pending) {
++		if (get_timer(0) < fw_next_ms)
+ 			return;
+-		}
+-		rescue_status.stage = RESCUE_BLANK;
+-		rescue_status.progress = 30;
+-		break;
+-	case RESCUE_BLANK:
+-		ret = e2631_flash_blank_check();
+-		if (ret) {
+-			rescue_set_error("blank check failed");
++
++		ret = e2631_fwslot_poll();
++		fws = e2631_fwslot_state();
++		if (ret < 0) {
++			fw_pending = false;
++			fw_finished = true;
++			slots_ready = false;
++			printf("e2631rescue: FAIL: %s\n", fws->error);
++			e2631_fwslot_end();
+ 			return;
+ 		}
+-		rescue_status.stage = RESCUE_WRITE;
+-		rescue_status.progress = 45;
+-		break;
+-	case RESCUE_WRITE:
+-		printf("e2631rescue: writing %lu bytes to mtd0\n",
+-		       (unsigned long)E2631_RESCUE_FLASH_LEN);
+-		ret = e2631_flash_write_image(rescue_image());
+-		if (ret) {
+-			rescue_set_error("write failed");
++		if (ret > 0) {
++			fw_pending = false;
++			fw_finished = true;
++			slots_ready = false;
++			rescue_status.crc = fws->body_crc;
++			rescue_status.have_crc = true;
++			rescue_status.written_serial = fws->written_serial;
++			rescue_status.have_written_serial = true;
++			printf("e2631rescue: PASS: slot%d written, serial %u, CRC32 0x%08x\n",
++			       fws->target_slot, fws->written_serial,
++			       fws->body_crc);
++			printf("e2631rescue: nothing was rebooted; power-cycle or run reset\n");
++			e2631_fwslot_end();
+ 			return;
+ 		}
+-		rescue_status.stage = RESCUE_READBACK;
+-		rescue_status.progress = 80;
+-		break;
+-	case RESCUE_READBACK:
+-		ret = e2631_flash_readback();
+-		if (ret) {
+-			rescue_set_error("read back failed");
++		fw_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++		return;
++	}
++
++	if (factory_pending) {
++		if (get_timer(0) < factory_next_ms)
++			return;
++
++		ret = e2631_factory_poll();
++		fas = e2631_factory_state();
++		if (ret < 0) {
++			factory_pending = false;
++			factory_finished = true;
++			printf("e2631rescue: FAIL: %s\n", fas->error);
++			e2631_factory_end();
+ 			return;
+ 		}
+-		rescue_status.stage = RESCUE_COMPARE;
+-		rescue_status.progress = 90;
+-		break;
+-	case RESCUE_COMPARE:
+-		ret = e2631_flash_compare(rescue_image(),
+-					  &rescue_status.crc);
+-		e2631_flash_end();
+-		flash_job_open = false;
+-		if (ret) {
+-			rescue_set_error("read back does not match the image");
++		if (ret > 0) {
++			factory_pending = false;
++			factory_finished = true;
++			printf("e2631rescue: PASS: rootfs_data erased and blank\n");
++			printf("e2631rescue: nothing was rebooted; power-cycle or run reset\n");
++			e2631_factory_end();
+ 			return;
+ 		}
+-		rescue_status.stage = RESCUE_DONE;
+-		rescue_status.progress = 100;
+-		flash_pending = false;
+-		printf("e2631rescue: PASS: mtd0 updated, CRC32 0x%08x\n",
+-		       rescue_status.crc);
+-		printf("e2631rescue: nothing was rebooted; power-cycle or run reset\n");
+-		return;
+-	default:
+-		flash_pending = false;
++		factory_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
+ 		return;
+ 	}
+ 
+-	flash_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++	if (e2631_env_write_busy()) {
++		if (get_timer(0) < env_next_ms)
++			return;
++
++		ret = e2631_env_write_poll();
++		if (ret < 0) {
++			printf("e2631rescue: FAIL: %s\n",
++			       e2631_env_write_state()->error);
++			e2631_env_write_end();
++			return;
++		}
++		if (ret > 0) {
++			rescue_status.crc = e2631_env_write_state()->new_crc;
++			rescue_status.have_crc = true;
++			printf("e2631rescue: PASS: environment written, CRC32 0x%08x\n",
++			       rescue_status.crc);
++			printf("e2631rescue: nothing was rebooted; the new keys apply after the next boot\n");
++			e2631_env_write_end();
++			return;
++		}
++		env_next_ms = get_timer(0) + E2631_RESCUE_DWELL_MS;
++	}
+ }
+ 
+ static int rescue_loop(void)
+@@ -884,7 +2137,7 @@ static int rescue_loop(void)
+ 	while (!ctrlc()) {
+ 		eth_rx();
+ 		mtk_tcp_periodic_check();
+-		rescue_flash_poll();
++		rescue_task_poll();
+ 		udelay(200);
+ 		if (tstc()) {
+ 			ch = getchar();
+@@ -906,6 +2159,22 @@ static int rescue_loop(void)
+ 			      rescue_status.stage <= RESCUE_COMPARE))
+ 		printf("e2631rescue: WARNING: the flash update was interrupted before it completed\n");
+ 	flash_pending = false;
++	if (fw_pending || e2631_fwslot_job_open()) {
++		e2631_fwslot_end();
++		fw_pending = false;
++		slots_ready = false;
++		printf("e2631rescue: WARNING: the slot update was interrupted before it completed\n");
++	}
++	if (factory_pending || e2631_factory_busy()) {
++		e2631_factory_end();
++		factory_pending = false;
++		printf("e2631rescue: WARNING: the factory reset was interrupted before it completed\n");
++	}
++	if (e2631_env_write_busy()) {
++		e2631_env_write_end();
++		printf("e2631rescue: WARNING: the environment write was interrupted before it completed\n");
++	}
++	backup_active = false;
+ 
+ 	mtk_dhcpd_stop();
+ 	mtk_tcp_listen_stop(htons(E2631_RESCUE_TCP_PORT));
+@@ -945,7 +2214,9 @@ static int do_e2631rescue(struct cmd_tbl *cmdtp, int flag, int argc,
+ }
+ 
+ U_BOOT_CMD(e2631rescue, 1, 1, do_e2631rescue,
+-	   "serve the web bootloader rescue on lan1",
+-	   "e2631rescue - start DHCP and the HTTP rescue page; no flash is\n"
+-	   "              written until a validated image is uploaded and the\n"
+-	   "              X-E2631-Confirm: write header is present. Ctrl-C leaves.\n");
++	   "serve the web failsafe (v1+v2) on lan1",
++	   "e2631rescue - start DHCP and the HTTP failsafe page. GET /, /status,\n"
++	   "              /slots, /env, /backup; POST /flash, /firmware, /boot,\n"
++	   "              /factory, /env, /console.  No flash is written until a\n"
++	   "              validated image is uploaded with the X-E2631-Confirm\n"
++	   "              header.  Ctrl-C leaves the rescue mode.\n");
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index fd68f6f0..95886d66 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -17,6 +17,8 @@ CONFIG_TARGET_ZXHN_E2631=y
+ CONFIG_BOOTDELAY=3
+ CONFIG_USE_BOOTCOMMAND=y
+ CONFIG_BOOTCOMMAND="e2631boot"
++CONFIG_CONSOLE_RECORD=y
++CONFIG_CONSOLE_RECORD_OUT_SIZE=0x4000
+ # CONFIG_DISPLAY_CPUINFO is not set
+ # CONFIG_BOARD_INIT is not set
+ CONFIG_BOARD_LATE_INIT=y
+-- 
+2.56.1
+

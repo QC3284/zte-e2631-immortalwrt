@@ -1,0 +1,1321 @@
+From a9f17733e5e019c460d5b25f28d638e5f803efe4 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 11:39:34 +0800
+Subject: [PATCH 36/39] board: zte: add the shared slot core and the slot
+ writer
+
+The E4 v2 rescue must be able to install a firmware package into a slot
+without duplicating what the Linux e2631-fwslot tool does.  This adds a
+self-contained slot core (header layout, package parsing, identity and
+guard rules, CRC32) that the host test also compiles, plus a thin MTD
+writer around it:
+
+  - e2631_slotcore.[ch] is plain C over linux/types.h, shared byte for
+    byte with tests/native/uboot/ in the kit;
+  - e2631fwslot.[ch] scans and verifies the two slots the way cspboot and
+    e2631-fwslot do, refuses to replace a working vendor system, erases
+    the whole target slot, programs the body in erase blocks, stamps and
+    writes the version header after it, then reads the slot back and
+    erases the header if the read-back does not match.
+
+The writer is the only module allowed to program a slot; mtd0 stays with
+e2631flash and the environment block with e2631env.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/Makefile         |   2 +
+ board/zte/zxhn-e2631/e2631_slotcore.c | 287 ++++++++++
+ board/zte/zxhn-e2631/e2631_slotcore.h | 136 +++++
+ board/zte/zxhn-e2631/e2631fwslot.c    | 736 ++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631fwslot.h    |  86 +++
+ 5 files changed, 1247 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631_slotcore.c
+ create mode 100644 board/zte/zxhn-e2631/e2631_slotcore.h
+ create mode 100644 board/zte/zxhn-e2631/e2631fwslot.c
+ create mode 100644 board/zte/zxhn-e2631/e2631fwslot.h
+
+diff --git a/board/zte/zxhn-e2631/Makefile b/board/zte/zxhn-e2631/Makefile
+index c8c47ba2..7fb63e4e 100644
+--- a/board/zte/zxhn-e2631/Makefile
++++ b/board/zte/zxhn-e2631/Makefile
+@@ -6,6 +6,8 @@ obj-y += e2631boot.o
+ obj-y += e2631env.o
+ obj-y += e2631net.o
+ obj-y += e2631soc.o
++obj-y += e2631_slotcore.o
++obj-y += e2631fwslot.o
+ obj-y += zxhn-e2631.o
+ obj-y += e2631flash.o
+ obj-y += e2631rescue.o
+diff --git a/board/zte/zxhn-e2631/e2631_slotcore.c b/board/zte/zxhn-e2631/e2631_slotcore.c
+new file mode 100644
+index 00000000..896af918
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631_slotcore.c
+@@ -0,0 +1,287 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 firmware slot core (see e2631_slotcore.h).
++ *
++ * The validation order, the version-header constants, the identity rules,
++ * the guard matrix and the serial stamping are a byte-for-byte port of the
++ * Linux side (package/e2631/e2631-fwslot/src/e2631-fwslot.c); the kit keeps
++ * an identical copy under tests/native/uboot/ and the U-Boot build compares
++ * them before compiling.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <linux/string.h>
++#include <linux/types.h>
++
++#include "e2631_slotcore.h"
++
++static const u8 e2631_outer_magic[16] = {
++	0x99, 0x99, 0x99, 0x99, 0x44, 0x44, 0x44, 0x44,
++	0x55, 0x55, 0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa,
++};
++
++static const u8 e2631_inner_magic[16] = {
++	0x33, 0x33, 0x33, 0x33, 0x66, 0x66, 0x66, 0x66,
++	0x99, 0x99, 0x99, 0x99, 0xcc, 0xcc, 0xcc, 0xcc,
++};
++
++/* Reflected CRC-32 (IEEE) through a 16-entry nibble table: portable, no
++ * libc and small enough to keep the shared source free of U-Boot APIs.
++ */
++static const u32 e2631_crc_nibble[16] = {
++	0x00000000U, 0x1db71064U, 0x3b6e20c8U, 0x26d930acU,
++	0x76dc4190U, 0x6b6b51f4U, 0x4db26158U, 0x5005713cU,
++	0xedb88320U, 0xf00f9344U, 0xd6d6a3e8U, 0xcb61b38cU,
++	0x9b64c2b0U, 0x86d3d2d4U, 0xa00ae278U, 0xbdbdf21cU,
++};
++
++u32 e2631_slotcore_crc32(u32 crc, const void *buf, u32 len)
++{
++	const u8 *p = buf;
++	u32 i;
++
++	crc ^= 0xffffffffU;
++	for (i = 0; i < len; i++) {
++		crc = (crc >> 4) ^ e2631_crc_nibble[(crc ^ p[i]) & 0x0f];
++		crc = (crc >> 4) ^
++		      e2631_crc_nibble[(crc ^ (p[i] >> 4)) & 0x0f];
++	}
++	return crc ^ 0xffffffffU;
++}
++
++u32 e2631_slotcore_rd32(const u8 *p, u32 ofs)
++{
++	return (u32)p[ofs] | ((u32)p[ofs + 1] << 8) |
++	       ((u32)p[ofs + 2] << 16) | ((u32)p[ofs + 3] << 24);
++}
++
++void e2631_slotcore_wr32(u8 *p, u32 ofs, u32 v)
++{
++	p[ofs] = v & 0xff;
++	p[ofs + 1] = (v >> 8) & 0xff;
++	p[ofs + 2] = (v >> 16) & 0xff;
++	p[ofs + 3] = (v >> 24) & 0xff;
++}
++
++bool e2631_slotcore_header_ok(const u8 *hdr)
++{
++	if (memcmp(hdr + E2631_H_INNER_MAGIC, e2631_inner_magic, 16))
++		return false;
++	return e2631_slotcore_crc32(0, hdr, E2631_H_CRC) ==
++	       e2631_slotcore_rd32(hdr, E2631_H_CRC);
++}
++
++enum e2631_slot_identity e2631_slotcore_identity(const u8 *hdr)
++{
++	if (!e2631_slotcore_header_ok(hdr))
++		return E2631_SLOT_ID_EMPTY;
++	if (!strncmp((const char *)hdr + E2631_H_VERSION, "OpenWrt", 7) ||
++	    !strncmp((const char *)hdr + E2631_H_VERSION, "ImmortalWrt", 11))
++		return E2631_SLOT_ID_OURS;
++	if (!strncmp((const char *)hdr + E2631_H_VERSION, "V1.0.0.", 7))
++		return E2631_SLOT_ID_VENDOR;
++	return E2631_SLOT_ID_UNKNOWN;
++}
++
++enum e2631_pkg_error e2631_slotcore_pkg_parse(const u8 *img, u32 len,
++					      struct e2631_pkg *pkg)
++{
++	u32 hdr_off, body_off, body_len, koff, ksz, foff, fsz;
++	const u8 *hdr;
++
++	memset(pkg, 0, sizeof(*pkg));
++	pkg->data = img;
++	pkg->size = len;
++
++	if (len < E2631_OUTER_HDR_SIZE + E2631_VER_HDR_SIZE)
++		return E2631_PKG_TOO_SMALL;
++	if (len > E2631_PKG_MAX)
++		return E2631_PKG_TOO_LARGE;
++	if (memcmp(img, e2631_outer_magic, 16))
++		return E2631_PKG_BAD_OUTER_MAGIC;
++
++	hdr_off = E2631_OUTER_HDR_SIZE + e2631_slotcore_rd32(img, 0x10);
++	if (hdr_off < E2631_OUTER_HDR_SIZE ||
++	    hdr_off > len - E2631_VER_HDR_SIZE)
++		return E2631_PKG_TRUNCATED_HEADER;
++	body_off = hdr_off + E2631_VER_HDR_SIZE;
++	if (body_off > len)
++		return E2631_PKG_TRUNCATED_HEADER;
++
++	hdr = img + hdr_off;
++	body_len = len - body_off;
++
++	if (memcmp(hdr + E2631_H_INNER_MAGIC, e2631_inner_magic, 16))
++		return E2631_PKG_BAD_INNER_MAGIC;
++	if (e2631_slotcore_crc32(0, hdr, E2631_H_CRC) !=
++	    e2631_slotcore_rd32(hdr, E2631_H_CRC) ||
++	    e2631_slotcore_crc32(0, hdr, E2631_H_CRC2) !=
++	    e2631_slotcore_rd32(hdr, E2631_H_CRC2))
++		return E2631_PKG_HEADER_CRC;
++	if (memcmp(hdr + E2631_H_PRODUCT, E2631_PRODUCT_STRING,
++		   E2631_PRODUCT_LEN))
++		return E2631_PKG_WRONG_PRODUCT;
++	if (e2631_slotcore_rd32(hdr, E2631_H_BOOT_INCLUDED))
++		return E2631_PKG_BOOTLOADER;
++	if (e2631_slotcore_rd32(hdr, E2631_H_FW_SIZE) != body_len)
++		return E2631_PKG_BODY_SIZE;
++	if (e2631_slotcore_rd32(hdr, E2631_H_SLOT0) != E2631_SLOT0_BASE ||
++	    e2631_slotcore_rd32(hdr, E2631_H_SLOT1) != E2631_SLOT1_BASE)
++		return E2631_PKG_SLOT_ADDRESSES;
++
++	koff = e2631_slotcore_rd32(hdr, E2631_H_KERNEL_FILEOFS);
++	ksz = e2631_slotcore_rd32(hdr, E2631_H_KERNEL_SIZE);
++	foff = e2631_slotcore_rd32(hdr, E2631_H_FS_FILEOFS);
++	fsz = e2631_slotcore_rd32(hdr, E2631_H_FS_SIZE);
++	if ((u64)koff + ksz > len || (u64)foff + fsz > len)
++		return E2631_PKG_REGION_OUTSIDE;
++	if (e2631_slotcore_crc32(0, img + koff, ksz) !=
++	    e2631_slotcore_rd32(hdr, E2631_H_KERNEL_CRC))
++		return E2631_PKG_KERNEL_CRC;
++	if (e2631_slotcore_crc32(0, img + foff, fsz) !=
++	    e2631_slotcore_rd32(hdr, E2631_H_FS_CRC))
++		return E2631_PKG_ROOTFS_CRC;
++
++	pkg->hdr = hdr;
++	pkg->body = img + body_off;
++	pkg->hdr_off = hdr_off;
++	pkg->body_off = body_off;
++	pkg->body_len = body_len;
++	return E2631_PKG_OK;
++}
++
++enum e2631_pkg_error e2631_slotcore_regions(const u8 *hdr,
++					    struct e2631_slot_regions *regions)
++{
++	u32 body_len = e2631_slotcore_rd32(hdr, E2631_H_FW_SIZE);
++	u32 koff = e2631_slotcore_rd32(hdr, E2631_H_KERNEL_FILEOFS);
++	u32 foff = e2631_slotcore_rd32(hdr, E2631_H_FS_FILEOFS);
++	u32 kstart = E2631_UBOOT_SIZE + E2631_KERNEL_MAGIC_SIZE;
++	u32 rstart;
++
++	memset(regions, 0, sizeof(*regions));
++	if (!e2631_slotcore_header_ok(hdr))
++		return E2631_PKG_HEADER_CRC;
++	if (e2631_slotcore_crc32(0, hdr, E2631_H_CRC2) !=
++	    e2631_slotcore_rd32(hdr, E2631_H_CRC2))
++		return E2631_PKG_HEADER_CRC;
++	if (e2631_slotcore_rd32(hdr, E2631_H_BOOT_INCLUDED))
++		return E2631_PKG_BOOTLOADER;
++	if (foff < koff)
++		return E2631_PKG_REGION_OUTSIDE;
++	if (body_len > E2631_PKG_BODY_MAX)
++		return E2631_PKG_BODY_SIZE;
++
++	rstart = kstart + (foff - koff);
++	regions->body_len = body_len;
++	regions->kernel_start = kstart;
++	regions->kernel_len = e2631_slotcore_rd32(hdr, E2631_H_KERNEL_SIZE);
++	regions->kernel_crc = e2631_slotcore_rd32(hdr, E2631_H_KERNEL_CRC);
++	regions->rootfs_start = rstart;
++	regions->rootfs_len = e2631_slotcore_rd32(hdr, E2631_H_FS_SIZE);
++	regions->rootfs_crc = e2631_slotcore_rd32(hdr, E2631_H_FS_CRC);
++	if (regions->kernel_start + regions->kernel_len > body_len ||
++	    regions->rootfs_start + regions->rootfs_len > body_len)
++		return E2631_PKG_REGION_OUTSIDE;
++	return E2631_PKG_OK;
++}
++
++enum e2631_slot_guard e2631_slotcore_target_guard(enum e2631_slot_identity id,
++						  bool known, bool intact)
++{
++	if (!known)
++		return E2631_GUARD_REFUSE;
++	if (id == E2631_SLOT_ID_VENDOR && intact)
++		return E2631_GUARD_REFUSE;
++	return E2631_GUARD_OK;
++}
++
++enum e2631_slot_guard e2631_slotcore_fallback_guard(enum e2631_slot_identity id,
++						    bool known, bool intact)
++{
++	if (!known || !intact)
++		return E2631_GUARD_REFUSE;
++	if (id == E2631_SLOT_ID_VENDOR)
++		return E2631_GUARD_OK;
++	return E2631_GUARD_WEAK;
++}
++
++void e2631_slotcore_stamp(u8 *hdr, int slot, u32 max_serial, u32 pkg_serial,
++			  u32 *written_serial)
++{
++	u32 serial = max_serial + 1;
++
++	if (pkg_serial > serial)
++		serial = pkg_serial;
++	e2631_slotcore_wr32(hdr, E2631_H_SLOT_START,
++			    slot == 0 ? E2631_SLOT0_BASE : E2631_SLOT1_BASE);
++	e2631_slotcore_wr32(hdr, E2631_H_SERIAL, serial);
++	e2631_slotcore_wr32(hdr, E2631_H_NEW, 1);
++	e2631_slotcore_wr32(hdr, E2631_H_CRC2,
++			    e2631_slotcore_crc32(0, hdr, E2631_H_CRC2));
++	if (written_serial)
++		*written_serial = serial;
++}
++
++const char *e2631_slotcore_identity_name(enum e2631_slot_identity id)
++{
++	switch (id) {
++	case E2631_SLOT_ID_EMPTY:
++		return "empty";
++	case E2631_SLOT_ID_VENDOR:
++		return "vendor";
++	case E2631_SLOT_ID_OURS:
++		return "ours";
++	default:
++		return "unknown";
++	}
++}
++
++const char *e2631_slotcore_guard_name(enum e2631_slot_guard guard)
++{
++	switch (guard) {
++	case E2631_GUARD_OK:
++		return "ok";
++	case E2631_GUARD_WEAK:
++		return "weak";
++	default:
++		return "refuse";
++	}
++}
++
++const char *e2631_slotcore_error_name(enum e2631_pkg_error err)
++{
++	switch (err) {
++	case E2631_PKG_OK:
++		return "ok";
++	case E2631_PKG_TOO_SMALL:
++		return "package too small";
++	case E2631_PKG_BAD_OUTER_MAGIC:
++		return "bad outer magic";
++	case E2631_PKG_TRUNCATED_HEADER:
++		return "truncated header";
++	case E2631_PKG_BAD_INNER_MAGIC:
++		return "bad version header magic";
++	case E2631_PKG_HEADER_CRC:
++		return "header CRC mismatch";
++	case E2631_PKG_WRONG_PRODUCT:
++		return "package is not for this product";
++	case E2631_PKG_BOOTLOADER:
++		return "package wants to update the bootloader";
++	case E2631_PKG_BODY_SIZE:
++		return "body size mismatch";
++	case E2631_PKG_SLOT_ADDRESSES:
++		return "package declares different slot addresses";
++	case E2631_PKG_REGION_OUTSIDE:
++		return "region outside package";
++	case E2631_PKG_KERNEL_CRC:
++		return "kernel CRC mismatch";
++	case E2631_PKG_ROOTFS_CRC:
++		return "rootfs CRC mismatch";
++	case E2631_PKG_TOO_LARGE:
++		return "package larger than the slot";
++	default:
++		return "invalid package";
++	}
++}
+diff --git a/board/zte/zxhn-e2631/e2631_slotcore.h b/board/zte/zxhn-e2631/e2631_slotcore.h
+new file mode 100644
+index 00000000..07c8b1d6
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631_slotcore.h
+@@ -0,0 +1,136 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 firmware slot core, shared verbatim by the U-Boot rescue
++ * (e2631fwslot) and the host-side golden-vector fixture.
++ *
++ * This file is the single source of the slot/package semantics that the
++ * rescue UI uses: package layout and validation order, version-header
++ * identity, the target/fallback guard rules and the serial stamping.  It
++ * mirrors package/e2631/e2631-fwslot/src/e2631-fwslot.c in the tree fork;
++ * the kit keeps a byte-identical copy under tests/native/uboot/ and the
++ * U-Boot build asserts the two match with cmp(1).
++ *
++ * Only portable C and linux/types.h/linux/string.h are used, so the same
++ * bytes compile inside U-Boot and on the CI host.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631_SLOTCORE_H__
++#define __E2631_SLOTCORE_H__
++
++#include <linux/types.h>
++
++/* Flash truth (kernel DTS, MTD table and the kit image Makefile). */
++#define E2631_SLOT0_BASE		0x00700000U
++#define E2631_SLOT1_BASE		0x02300000U
++#define E2631_SLOT_SPAN		0x01C00000U
++#define E2631_SLOT_HDR_OFS	0x1500000U
++#define E2631_ROOTFS_DATA_OFF	0x03360000U
++#define E2631_ROOTFS_DATA_LEN	0x004A0000U
++#define E2631_BOOTLOADER_OFF	0x00020000U
++#define E2631_BOOTLOADER_LEN	0x000A0000U
++
++/* Upgrade package layout (see e2631-fwslot.c). */
++#define E2631_OUTER_HDR_SIZE	0x14U
++#define E2631_VER_HDR_SIZE	0x200U
++#define E2631_KERNEL_MAGIC_SIZE	0x20U
++#define E2631_UBOOT_SIZE	0x0U
++#define E2631_PKG_BODY_MAX	(E2631_SLOT_SPAN - 0x20000U)
++#define E2631_PKG_MAX		(E2631_PKG_BODY_MAX + E2631_OUTER_HDR_SIZE + E2631_VER_HDR_SIZE)
++
++/* Version-header field offsets. */
++#define E2631_H_VERSION		0x10U
++#define E2631_H_FW_SIZE		0x30U
++#define E2631_H_KERNEL_SIZE	0x34U
++#define E2631_H_KERNEL_FILEOFS	0x38U
++#define E2631_H_KERNEL_CRC	0x3cU
++#define E2631_H_FS_SIZE		0x40U
++#define E2631_H_FS_FILEOFS	0x44U
++#define E2631_H_FS_CRC		0x48U
++#define E2631_H_SLOT0		0x4cU
++#define E2631_H_SLOT1		0x5cU
++#define E2631_H_PRODUCT		0x6cU
++#define E2631_H_BOOT_INCLUDED	0x8cU
++#define E2631_H_CRC		0xa4U
++#define E2631_H_INNER_MAGIC	0xf4U
++#define E2631_H_SLOT_START	0x1f0U
++#define E2631_H_SERIAL		0x1f4U
++#define E2631_H_NEW		0x1f8U
++#define E2631_H_CRC2		0x1fcU
++
++#define E2631_PRODUCT_STRING	"ZXHN E2631 V1.0.0"
++#define E2631_PRODUCT_LEN	16U
++
++enum e2631_slot_identity {
++	E2631_SLOT_ID_EMPTY = 0,
++	E2631_SLOT_ID_VENDOR,
++	E2631_SLOT_ID_OURS,
++	E2631_SLOT_ID_UNKNOWN,
++};
++
++enum e2631_slot_guard {
++	E2631_GUARD_OK = 0,
++	E2631_GUARD_WEAK,
++	E2631_GUARD_REFUSE,
++};
++
++enum e2631_pkg_error {
++	E2631_PKG_OK = 0,
++	E2631_PKG_TOO_SMALL,
++	E2631_PKG_BAD_OUTER_MAGIC,
++	E2631_PKG_TRUNCATED_HEADER,
++	E2631_PKG_BAD_INNER_MAGIC,
++	E2631_PKG_HEADER_CRC,
++	E2631_PKG_WRONG_PRODUCT,
++	E2631_PKG_BOOTLOADER,
++	E2631_PKG_BODY_SIZE,
++	E2631_PKG_SLOT_ADDRESSES,
++	E2631_PKG_REGION_OUTSIDE,
++	E2631_PKG_KERNEL_CRC,
++	E2631_PKG_ROOTFS_CRC,
++	E2631_PKG_TOO_LARGE,
++};
++
++struct e2631_pkg {
++	const u8 *data;
++	u32 size;
++	const u8 *hdr;
++	const u8 *body;
++	u32 hdr_off;
++	u32 body_off;
++	u32 body_len;
++};
++
++/* Expected kernel/rootfs extents inside the slot, from the version header. */
++struct e2631_slot_regions {
++	u32 body_len;
++	u32 kernel_start;
++	u32 kernel_len;
++	u32 kernel_crc;
++	u32 rootfs_start;
++	u32 rootfs_len;
++	u32 rootfs_crc;
++};
++
++u32 e2631_slotcore_rd32(const u8 *p, u32 ofs);
++void e2631_slotcore_wr32(u8 *p, u32 ofs, u32 v);
++u32 e2631_slotcore_crc32(u32 crc, const void *buf, u32 len);
++
++enum e2631_pkg_error e2631_slotcore_pkg_parse(const u8 *img, u32 len,
++					      struct e2631_pkg *pkg);
++bool e2631_slotcore_header_ok(const u8 *hdr);
++enum e2631_slot_identity e2631_slotcore_identity(const u8 *hdr);
++enum e2631_pkg_error e2631_slotcore_regions(const u8 *hdr,
++					    struct e2631_slot_regions *regions);
++enum e2631_slot_guard e2631_slotcore_target_guard(enum e2631_slot_identity id,
++						  bool known, bool intact);
++enum e2631_slot_guard e2631_slotcore_fallback_guard(enum e2631_slot_identity id,
++						    bool known, bool intact);
++void e2631_slotcore_stamp(u8 *hdr, int slot, u32 max_serial, u32 pkg_serial,
++			  u32 *written_serial);
++const char *e2631_slotcore_identity_name(enum e2631_slot_identity id);
++const char *e2631_slotcore_guard_name(enum e2631_slot_guard guard);
++const char *e2631_slotcore_error_name(enum e2631_pkg_error err);
++
++#endif /* __E2631_SLOTCORE_H__ */
+diff --git a/board/zte/zxhn-e2631/e2631fwslot.c b/board/zte/zxhn-e2631/e2631fwslot.c
+new file mode 100644
+index 00000000..3bb4a132
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631fwslot.c
+@@ -0,0 +1,736 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * ZTE ZXHN E2631 firmware slot writer for the web rescue (E4 v2).
++ *
++ * Thin MTD shim around the shared slot core:
++ *   - refresh(): scan both slots, optionally verify the body CRCs
++ *   - validate(): package checks, target/fallback guards, bad-block precheck
++ *   - begin()/poll()/end(): erase the whole target slot, program the body
++ *     in erase blocks, stamp and write the version header, then read the
++ *     slot back the way cspboot checks it
++ *
++ * It writes slot0/slot1 and nothing else: mtd0 belongs to e2631flash, the
++ * environment block to e2631env and rootfs_data to e2631factory.  No other
++ * module may program a slot, and this one never touches mtd0 or env.
++ *
++ * The meta layer (rescue HTTP) advances the job from GET /status, at most
++ * eight erase blocks or sixteen program/readback blocks per call.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#include <config.h>
++#include <linux/errno.h>
++#include <linux/mtd/mtd.h>
++#include <linux/string.h>
++#include <linux/types.h>
++#include <linux/build_bug.h>
++#include <malloc.h>
++#include <mtd.h>
++#include <stdio.h>
++#include <u-boot/crc.h>
++#include <vsprintf.h>
++
++#include "e2631_slotcore.h"
++#include "e2631fwslot.h"
++
++#define E2631_FW_MTD_DEV	"spi-nand0"
++
++/* Bound one GET /status step: 8 erase blocks (1 MiB) and 16 program or
++ * readback blocks (2 MiB).
++ */
++#define E2631_FW_ERASE_STEP	8U
++#define E2631_FW_IO_STEP	16U
++
++static_assert(E2631_SLOT_SPAN % 0x20000U == 0,
++	      "the slot span must be a whole number of 128 KiB blocks");
++static_assert(E2631_ROOTFS_DATA_OFF + E2631_ROOTFS_DATA_LEN ==
++	      0x3800000U,
++	      "rootfs_data must end where the slot1 header window starts");
++
++static struct mtd_info *fw_mtd;
++static struct e2631_slots fw_slots;
++static bool fw_slots_valid;
++static u8 *fw_blk_raw;
++static u8 *fw_blk;
++
++struct e2631_fw_job {
++	bool open;
++	enum e2631_fwslot_stage stage;
++	int target;
++	const u8 *img;
++	u32 len;
++	const u8 *body;
++	u32 body_len;
++	u32 body_crc;
++	u32 bs;
++	u32 blocks;
++	u32 pos;
++	u32 ofs;
++	u32 bytes_total;
++	u32 bytes_done;
++	const u8 *hdr;
++	u8 hdr_copy[E2631_VER_HDR_SIZE];
++	u32 serial;
++	u32 kcrc;
++	u32 rcrc;
++	struct e2631_slot_regions regions;
++	u8 *blk_raw;
++	u8 *blk;
++	char error[96];
++};
++
++static struct e2631_fw_job fw_job;
++static struct e2631_fwslot_status fw_status;
++
++static int fw_mtd_get(void)
++{
++	struct mtd_info *mtd;
++
++	if (fw_mtd)
++		return 0;
++	mtd_probe_devices();
++	mtd = get_mtd_device_nm(E2631_FW_MTD_DEV);
++	if (!mtd) {
++		printf("e2631fwslot: %s is not available\n", E2631_FW_MTD_DEV);
++		return -ENODEV;
++	}
++	if (!mtd->size || !mtd->erasesize ||
++	    mtd->size < E2631_SLOT1_BASE + E2631_SLOT_SPAN) {
++		printf("e2631fwslot: %s reports no usable geometry\n",
++		       E2631_FW_MTD_DEV);
++		put_mtd_device(mtd);
++		return -EINVAL;
++	}
++	fw_mtd = mtd;
++	return 0;
++}
++
++static void fw_mtd_put(void)
++{
++	if (!fw_mtd)
++		return;
++	put_mtd_device(fw_mtd);
++	fw_mtd = NULL;
++}
++
++static u64 fw_slot_base(int slot)
++{
++	return slot ? E2631_SLOT1_BASE : E2631_SLOT0_BASE;
++}
++
++static int fw_read(u64 abs, void *buf, u32 len)
++{
++	size_t retlen = 0;
++	int ret;
++
++	ret = mtd_read(fw_mtd, abs, len, &retlen, buf);
++	if (ret || retlen != len)
++		return ret ? ret : -EIO;
++	return 0;
++}
++
++/* Find this slot's version header the way cspboot does: scan erase blocks
++ * for the inner magic and a valid CRC1, skipping factory bad blocks.
++ */
++static long fw_scan(int slot, u32 *serial)
++{
++	u8 hdr[E2631_VER_HDR_SIZE];
++	u64 base = fw_slot_base(slot);
++	u32 bs = fw_mtd->erasesize;
++	u64 ofs;
++
++	for (ofs = 0; ofs + E2631_VER_HDR_SIZE <= E2631_SLOT_SPAN;
++	     ofs += bs) {
++		if (mtd_block_isbad(fw_mtd, base + ofs))
++			continue;
++		if (fw_read(base + ofs, hdr, sizeof(hdr)))
++			return -1;
++		if (!e2631_slotcore_header_ok(hdr))
++			continue;
++		if (serial)
++			*serial = e2631_slotcore_rd32(hdr, E2631_H_SERIAL);
++		return (long)ofs;
++	}
++	return -1;
++}
++
++static u32 fw_max_serial(void)
++{
++	u32 best = 0;
++	u32 serial;
++	int slot;
++
++	for (slot = 0; slot < 2; slot++) {
++		if (fw_scan(slot, &serial) >= 0 && serial > best)
++			best = serial;
++	}
++	return best;
++}
++
++struct fw_region {
++	u32 start;
++	u32 len;
++	u32 want;
++	u32 crc;
++};
++
++static void fw_region_feed(struct fw_region *r, u32 pos, const u8 *buf,
++			   u32 n)
++{
++	u32 lo = pos > r->start ? pos : r->start;
++	u32 hi = pos + n < r->start + r->len ? pos + n : r->start + r->len;
++
++	if (lo < hi)
++		r->crc = crc32(r->crc, buf + (lo - pos), hi - lo);
++}
++
++/* Verify a slot the way cspboot checks it: header CRCs, then the kernel and
++ * filesystem extents the header records, read from the good blocks that
++ * follow from the start of the slot.
++ */
++static const char *fw_verify_slot(int slot, const u8 *hdr, u32 *kcrc,
++				  u32 *rcrc)
++{
++	struct e2631_slot_regions regions;
++	struct fw_region reg[2];
++	u64 base = fw_slot_base(slot);
++	u32 bs = fw_mtd->erasesize;
++	u32 pos = 0;
++	u32 ofs = 0;
++	u32 n;
++	enum e2631_pkg_error perr;
++	const char *bad = NULL;
++
++	perr = e2631_slotcore_regions(hdr, &regions);
++	if (perr == E2631_PKG_HEADER_CRC)
++		return "version header CRC mismatch";
++	if (perr == E2631_PKG_BOOTLOADER)
++		return "package claims to update the bootloader";
++	if (perr != E2631_PKG_OK)
++		return "bad firmware layout";
++
++	reg[0].start = regions.kernel_start;
++	reg[0].len = regions.kernel_len;
++	reg[0].want = regions.kernel_crc;
++	reg[0].crc = 0;
++	reg[1].start = regions.rootfs_start;
++	reg[1].len = regions.rootfs_len;
++	reg[1].want = regions.rootfs_crc;
++	reg[1].crc = 0;
++
++	while (pos < regions.body_len) {
++		n = regions.body_len - pos < bs ? regions.body_len - pos : bs;
++		if (ofs + bs > E2631_SLOT_SPAN) {
++			bad = "payload runs past the end of the slot";
++			break;
++		}
++		if (mtd_block_isbad(fw_mtd, base + ofs)) {
++			ofs += bs;
++			continue;
++		}
++		if (fw_read(base + ofs, fw_job.blk, n)) {
++			bad = "read error";
++			break;
++		}
++		fw_region_feed(&reg[0], pos, fw_job.blk, n);
++		fw_region_feed(&reg[1], pos, fw_job.blk, n);
++		pos += n;
++		ofs += bs;
++	}
++	if (bad)
++		return bad;
++	if (kcrc)
++		*kcrc = reg[0].crc;
++	if (rcrc)
++		*rcrc = reg[1].crc;
++	if (reg[0].crc != reg[0].want)
++		return "kernel CRC mismatch";
++	if (reg[1].crc != reg[1].want)
++		return "root filesystem CRC mismatch";
++	return NULL;
++}
++
++static void fw_slot_version(struct e2631_slot_info *si)
++{
++	u32 i;
++
++	for (i = 0; i < 32 && si->hdr[E2631_H_VERSION + i]; i++)
++		si->version[i] = (char)si->hdr[E2631_H_VERSION + i];
++	si->version[i] = 0;
++	si->version_len = i;
++}
++
++static int fw_ensure_blk(void)
++{
++	if (!fw_blk_raw) {
++		fw_blk_raw = malloc(fw_mtd->erasesize + 64);
++		if (!fw_blk_raw)
++			return -ENOMEM;
++		fw_blk = (u8 *)(((uintptr_t)fw_blk_raw + 63) & ~63UL);
++	}
++	fw_job.blk = fw_blk;
++	return 0;
++}
++
++void e2631_fwslot_refresh(bool full)
++{
++	struct e2631_slot_info *si;
++	long hpos;
++	int slot;
++	int best = -1;
++
++	memset(&fw_slots, 0, sizeof(fw_slots));
++	fw_slots.next_reason = "none";
++	if (fw_mtd_get()) {
++		fw_slots_valid = false;
++		return;
++	}
++	if (fw_ensure_blk())
++		return;
++
++	for (slot = 0; slot < 2; slot++) {
++		si = &fw_slots.slot[slot];
++		si->known = true;
++		hpos = fw_scan(slot, &si->serial);
++		si->hpos = hpos;
++		if (hpos < 0) {
++			si->identity = E2631_SLOT_ID_EMPTY;
++			continue;
++		}
++		si->valid = true;
++		if (fw_read(fw_slot_base(slot) + hpos, si->hdr,
++			    sizeof(si->hdr))) {
++			si->valid = false;
++			continue;
++		}
++		si->identity = e2631_slotcore_identity(si->hdr);
++		fw_slot_version(si);
++		if (full) {
++			si->intact = !fw_verify_slot(slot, si->hdr, NULL, NULL);
++			si->verify_done = true;
++		}
++	}
++
++	for (slot = 0; slot < 2; slot++) {
++		if (!fw_slots.slot[slot].valid)
++			continue;
++		if (best < 0 ||
++		    fw_slots.slot[slot].serial > fw_slots.slot[best].serial)
++			best = slot;
++	}
++	fw_slots.next_slot = best;
++	if (best < 0)
++		fw_slots.next_reason = "none";
++	else if (!fw_slots.slot[best ^ 1].valid)
++		fw_slots.next_reason = "only-slot";
++	else
++		fw_slots.next_reason = "serial";
++	fw_slots_valid = true;
++}
++
++const struct e2631_slots *e2631_fwslot_slots(void)
++{
++	if (!fw_slots_valid)
++		e2631_fwslot_refresh(false);
++	return &fw_slots;
++}
++
++static int fw_target_slot(int slot_sel)
++{
++	if (slot_sel >= 0)
++		return slot_sel;
++	if (!fw_slots_valid)
++		e2631_fwslot_refresh(false);
++	return fw_slots.next_slot;
++}
++
++int e2631_fwslot_validate(const void *img, u32 len, int slot_sel,
++			  struct e2631_fwslot_validate *out,
++			  char *err, unsigned int errsz)
++{
++	struct e2631_pkg pkg;
++	struct e2631_slot_info *target_si;
++	struct e2631_slot_info *other_si;
++	enum e2631_pkg_error perr;
++	enum e2631_slot_guard tguard;
++	enum e2631_slot_guard oguard;
++	u64 need;
++	u64 ofs;
++	int target;
++	u32 serial;
++
++	perr = e2631_slotcore_pkg_parse(img, len, &pkg);
++	if (perr != E2631_PKG_OK) {
++		snprintf(err, errsz, "%s",
++			 e2631_slotcore_error_name(perr));
++		return -EINVAL;
++	}
++	if (fw_mtd_get()) {
++		snprintf(err, errsz,
++			 "the firmware storage is not available");
++		return -ENODEV;
++	}
++	if (fw_ensure_blk())
++		return -ENOMEM;
++
++	e2631_fwslot_refresh(false);
++	target = fw_target_slot(slot_sel);
++	if (target < 0) {
++		snprintf(err, errsz, "no bootable slot");
++		return -EINVAL;
++	}
++
++	e2631_fwslot_refresh(true);
++	target_si = &fw_slots.slot[target];
++	other_si = &fw_slots.slot[target ^ 1];
++
++	if (pkg.body_len > E2631_PKG_BODY_MAX) {
++		snprintf(err, errsz, "package larger than the slot");
++		return -EINVAL;
++	}
++
++	tguard = e2631_slotcore_target_guard(target_si->identity,
++					     target_si->known,
++					     target_si->intact);
++	oguard = e2631_slotcore_fallback_guard(other_si->identity,
++					       other_si->known,
++					       other_si->intact);
++	if (tguard == E2631_GUARD_REFUSE) {
++		if (target_si->identity == E2631_SLOT_ID_VENDOR &&
++		    target_si->intact)
++			snprintf(err, errsz,
++				 "refusing to overwrite a working vendor system");
++		else
++			snprintf(err, errsz,
++				 "target slot is not writable");
++		return -EACCES;
++	}
++	if (oguard == E2631_GUARD_REFUSE) {
++		snprintf(err, errsz,
++			 "the fallback slot cannot be verified");
++		return -EACCES;
++	}
++
++	need = ((u64)pkg.body_len + fw_mtd->erasesize) /
++	       fw_mtd->erasesize * fw_mtd->erasesize;
++	for (ofs = 0; ofs < need; ofs += fw_mtd->erasesize) {
++		if (mtd_block_isbad(fw_mtd,
++				    fw_slot_base(target) + ofs)) {
++			snprintf(err, errsz,
++				 "target slot has a bad block");
++			return -EINVAL;
++		}
++	}
++
++	serial = fw_max_serial() + 1;
++	if (e2631_slotcore_rd32(pkg.hdr, E2631_H_SERIAL) > serial)
++		serial = e2631_slotcore_rd32(pkg.hdr, E2631_H_SERIAL);
++
++	memset(out, 0, sizeof(*out));
++	out->target_slot = target;
++	out->target_identity = target_si->identity;
++	out->guard = oguard == E2631_GUARD_WEAK ? E2631_GUARD_WEAK :
++		      tguard;
++	out->guard_reason = oguard == E2631_GUARD_WEAK ?
++			    "the fallback slot is not a vendor image" : "";
++	out->body_len = pkg.body_len;
++	out->body_crc = crc32(0, pkg.body, pkg.body_len);
++	out->written_serial = serial;
++	return 0;
++}
++
++static int fw_block_erase(u64 abs)
++{
++	struct erase_info ei;
++
++	memset(&ei, 0, sizeof(ei));
++	ei.mtd = fw_mtd;
++	ei.addr = abs;
++	ei.len = fw_mtd->erasesize;
++	return mtd_erase(fw_mtd, &ei);
++}
++
++static int fw_block_write(u64 abs, const u8 *data)
++{
++	size_t retlen = 0;
++	int ret;
++
++	ret = mtd_write(fw_mtd, abs, fw_mtd->erasesize, &retlen, data);
++	if (ret || retlen != fw_mtd->erasesize)
++		return ret ? ret : -EIO;
++	return 0;
++}
++
++static void fw_fail(const char *msg)
++{
++	snprintf(fw_job.error, sizeof(fw_job.error), "%s", msg);
++	snprintf(fw_status.error, sizeof(fw_status.error), "%s", msg);
++	fw_job.stage = E2631_FWS_ERROR;
++	fw_status.stage = E2631_FWS_ERROR;
++	printf("e2631fwslot: FAIL: %s\n", msg);
++}
++
++static void fw_status_sync(void)
++{
++	fw_status.stage = fw_job.stage;
++	fw_status.bytes_total = fw_job.body_len;
++	fw_status.written_serial = fw_job.serial;
++	fw_status.target_slot = fw_job.target;
++}
++
++int e2631_fwslot_begin(int target, const void *img, u32 len)
++{
++	struct e2631_pkg pkg;
++	enum e2631_pkg_error perr;
++	u32 pkg_serial;
++
++	if (fw_job.open)
++		return -EBUSY;
++	if (target < 0 || target > 1)
++		return -EINVAL;
++	if (fw_mtd_get())
++		return -ENODEV;
++	if (fw_ensure_blk())
++		return -ENOMEM;
++	perr = e2631_slotcore_pkg_parse(img, len, &pkg);
++	if (perr != E2631_PKG_OK)
++		return -EINVAL;
++
++	memset(&fw_job, 0, sizeof(fw_job));
++	if (fw_ensure_blk())
++		return -ENOMEM;
++	fw_job.open = true;
++	fw_job.target = target;
++	fw_job.img = img;
++	fw_job.len = len;
++	fw_job.body = pkg.body;
++	fw_job.body_len = pkg.body_len;
++	fw_job.hdr = pkg.hdr;
++	fw_job.bs = fw_mtd->erasesize;
++	fw_job.blocks = 0;
++	fw_job.stage = E2631_FWS_ERASE;
++
++	memcpy(fw_job.hdr_copy, pkg.hdr, E2631_VER_HDR_SIZE);
++	pkg_serial = e2631_slotcore_rd32(pkg.hdr, E2631_H_SERIAL);
++	e2631_slotcore_stamp(fw_job.hdr_copy, target, fw_max_serial(),
++			     pkg_serial, &fw_job.serial);
++	fw_job.body_crc = crc32(0, pkg.body, pkg.body_len);
++	if (e2631_slotcore_regions(fw_job.hdr_copy, &fw_job.regions))
++		return -EINVAL;
++
++	memset(&fw_status, 0, sizeof(fw_status));
++	fw_status.stage = E2631_FWS_ERASE;
++	fw_status.target_slot = target;
++	fw_status.written_serial = fw_job.serial;
++	fw_status.bytes_total = fw_job.body_len;
++	fw_status.progress = 0;
++	printf("e2631fwslot: writing slot%d, serial %u, body %#x\n",
++	       target, fw_job.serial, fw_job.body_len);
++	return 0;
++}
++
++static u32 fw_good_block(u64 base, u32 ofs)
++{
++	u32 bs = fw_job.bs;
++
++	while (ofs < E2631_SLOT_SPAN &&
++	       mtd_block_isbad(fw_mtd, base + ofs)) {
++		printf("e2631fwslot: skipping bad block at slot offset %#x\n",
++		       ofs);
++		ofs += bs;
++	}
++	return ofs;
++}
++
++int e2631_fwslot_poll(void)
++{
++	u32 done = 0;
++	u64 base;
++	u32 n;
++	u32 hdr_block;
++	const char *why;
++	long hpos;
++	struct fw_region reg[2];
++	u8 hdr[E2631_VER_HDR_SIZE];
++
++	if (!fw_job.open)
++		return 1;
++
++	base = fw_slot_base(fw_job.target);
++
++	switch (fw_job.stage) {
++	case E2631_FWS_ERASE:
++		while (fw_job.blocks < E2631_SLOT_SPAN / fw_job.bs &&
++		       done < E2631_FW_ERASE_STEP) {
++			u64 abs = base + (u64)fw_job.blocks * fw_job.bs;
++
++			fw_job.blocks++;
++			if (mtd_block_isbad(fw_mtd, abs))
++				continue;
++			if (fw_block_erase(abs)) {
++				fw_fail("erase failed");
++				return -1;
++			}
++			done++;
++		}
++		fw_status.progress = 35 * (int)fw_job.blocks /
++				      (int)(E2631_SLOT_SPAN / fw_job.bs);
++		fw_status_sync();
++		if (fw_job.blocks >= E2631_SLOT_SPAN / fw_job.bs) {
++			fw_job.stage = E2631_FWS_WRITE;
++			fw_job.pos = 0;
++			fw_job.ofs = 0;
++			fw_status.progress = 35;
++		}
++		return 0;
++	case E2631_FWS_WRITE:
++		while (fw_job.pos < fw_job.body_len &&
++		       done < E2631_FW_IO_STEP) {
++			n = fw_job.body_len - fw_job.pos < fw_job.bs ?
++			    fw_job.body_len - fw_job.pos : fw_job.bs;
++			fw_job.ofs = fw_good_block(base, fw_job.ofs);
++			if (fw_job.ofs + fw_job.bs > E2631_SLOT_SPAN) {
++				fw_fail("ran out of good blocks");
++				return -1;
++			}
++			memset(fw_job.blk, 0xff, fw_job.bs);
++			memcpy(fw_job.blk, fw_job.body + fw_job.pos, n);
++			if (fw_block_write(base + fw_job.ofs, fw_job.blk)) {
++				fw_fail("write failed");
++				return -1;
++			}
++			fw_job.ofs += fw_job.bs;
++			fw_job.pos += n;
++			fw_job.bytes_done = fw_job.pos;
++			done++;
++		}
++		fw_status.bytes_done = fw_job.bytes_done;
++		fw_status.progress = 35 + (int)(50ULL * fw_job.pos /
++						 fw_job.body_len);
++		fw_status_sync();
++		if (fw_job.pos >= fw_job.body_len) {
++			fw_job.ofs = fw_good_block(base, fw_job.ofs);
++			if (fw_job.ofs + fw_job.bs > E2631_SLOT_SPAN) {
++				fw_fail("ran out of good blocks");
++				return -1;
++			}
++			hdr_block = fw_job.ofs;
++			memset(fw_job.blk, 0xff, fw_job.bs);
++			memcpy(fw_job.blk, fw_job.hdr_copy, E2631_VER_HDR_SIZE);
++			if (fw_block_write(base + hdr_block, fw_job.blk)) {
++				fw_fail("header write failed");
++				return -1;
++			}
++			fw_job.stage = E2631_FWS_READBACK;
++			fw_job.pos = 0;
++			fw_job.ofs = 0;
++			fw_status.progress = 85;
++		}
++		return 0;
++	case E2631_FWS_READBACK:
++		while (fw_job.pos < fw_job.body_len &&
++		       done < E2631_FW_IO_STEP) {
++			n = fw_job.body_len - fw_job.pos < fw_job.bs ?
++			    fw_job.body_len - fw_job.pos : fw_job.bs;
++			fw_job.ofs = fw_good_block(base, fw_job.ofs);
++			if (fw_job.ofs + fw_job.bs > E2631_SLOT_SPAN) {
++				fw_fail("payload runs past the end of the slot");
++				return -1;
++			}
++			if (fw_read(base + fw_job.ofs, fw_job.blk, n)) {
++				fw_fail("read back failed");
++				return -1;
++			}
++			reg[0].start = fw_job.regions.kernel_start;
++			reg[0].len = fw_job.regions.kernel_len;
++			reg[0].want = fw_job.regions.kernel_crc;
++			reg[0].crc = fw_job.kcrc;
++			reg[1].start = fw_job.regions.rootfs_start;
++			reg[1].len = fw_job.regions.rootfs_len;
++			reg[1].want = fw_job.regions.rootfs_crc;
++			reg[1].crc = fw_job.rcrc;
++			fw_region_feed(&reg[0], fw_job.pos, fw_job.blk, n);
++			fw_region_feed(&reg[1], fw_job.pos, fw_job.blk, n);
++			fw_job.kcrc = reg[0].crc;
++			fw_job.rcrc = reg[1].crc;
++			fw_job.ofs += fw_job.bs;
++			fw_job.pos += n;
++			done++;
++		}
++		fw_status.progress = 85 + (int)(5ULL * fw_job.pos /
++						 fw_job.body_len);
++		fw_status_sync();
++		if (fw_job.pos >= fw_job.body_len) {
++			fw_job.stage = E2631_FWS_COMPARE;
++			fw_status.progress = 90;
++		}
++		return 0;
++	case E2631_FWS_COMPARE:
++		hpos = fw_scan(fw_job.target, NULL);
++		if (hpos < 0) {
++			fw_fail("no readable version header");
++			return -1;
++		}
++		if (fw_read(base + (u64)hpos, hdr, sizeof(hdr))) {
++			fw_fail("read back failed");
++			return -1;
++		}
++		why = NULL;
++		if (!e2631_slotcore_header_ok(hdr) ||
++		    e2631_slotcore_crc32(0, hdr, E2631_H_CRC2) !=
++		    e2631_slotcore_rd32(hdr, E2631_H_CRC2))
++			why = "version header reads back damaged";
++		else if (fw_job.kcrc != fw_job.regions.kernel_crc)
++			why = "kernel CRC mismatch";
++		else if (fw_job.rcrc != fw_job.regions.rootfs_crc)
++			why = "root filesystem CRC mismatch";
++		if (why) {
++			/* Never leave a half-written slot bootable: drop the
++			 * version header so cspboot stays on the other slot.
++			 */
++			fw_block_erase(base + (u64)hpos);
++			fw_job.kcrc = 0;
++			fw_job.rcrc = 0;
++			snprintf(fw_job.error, sizeof(fw_job.error),
++				 "verify failed, header erased");
++			snprintf(fw_status.error, sizeof(fw_status.error),
++				 "%s", fw_job.error);
++			fw_job.stage = E2631_FWS_ERROR;
++			fw_status.stage = E2631_FWS_ERROR;
++			printf("e2631fwslot: FAIL: %s (%s)\n", why,
++			       fw_job.error);
++			return -1;
++		}
++		fw_job.stage = E2631_FWS_DONE;
++		fw_status.body_crc = fw_job.body_crc;
++		fw_status_sync();
++		fw_status.stage = E2631_FWS_DONE;
++		fw_status.progress = 100;
++		fw_slots_valid = false;
++		printf("e2631fwslot: PASS: slot%d serial %u written, crc32 0x%08x\n",
++		       fw_job.target, fw_job.serial, fw_job.body_crc);
++		return 1;
++	case E2631_FWS_DONE:
++		return 1;
++	default:
++		return -1;
++	}
++}
++
++void e2631_fwslot_end(void)
++{
++	memset(&fw_job, 0, sizeof(fw_job));
++	fw_slots_valid = false;
++	fw_mtd_put();
++}
++
++const struct e2631_fwslot_status *e2631_fwslot_state(void)
++{
++	return &fw_status;
++}
++
++bool e2631_fwslot_job_open(void)
++{
++	return fw_job.open;
++}
+diff --git a/board/zte/zxhn-e2631/e2631fwslot.h b/board/zte/zxhn-e2631/e2631fwslot.h
+new file mode 100644
+index 00000000..3dfcc58a
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631fwslot.h
+@@ -0,0 +1,86 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 firmware slot writer for the web rescue (E4 v2).
++ *
++ * This is the U-Boot-side semantic port of package/e2631/e2631-fwslot/src/
++ * e2631-fwslot.c: package validation, the target/fallback guard matrix, the
++ * serial stamping and the erase/write/verify sequence all come from the
++ * shared core (e2631_slotcore.h) and this thin MTD shim.  It owns slot0 and
++ * slot1 only; mtd0 stays owned by e2631flash and the env block by e2631env.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __E2631FWSLOT_H__
++#define __E2631FWSLOT_H__
++
++#include <linux/types.h>
++
++#include "e2631_slotcore.h"
++
++struct e2631_slot_info {
++	bool known;
++	bool valid;
++	bool intact;
++	bool verify_done;
++	enum e2631_slot_identity identity;
++	long hpos;
++	u32 serial;
++	u32 version_len;
++	char version[33];
++	u8 hdr[E2631_VER_HDR_SIZE];
++};
++
++struct e2631_slots {
++	struct e2631_slot_info slot[2];
++	int next_slot;
++	const char *next_reason;
++};
++
++struct e2631_fwslot_validate {
++	int target_slot;
++	enum e2631_slot_identity target_identity;
++	enum e2631_slot_guard guard;
++	const char *guard_reason;
++	u32 body_len;
++	u32 body_crc;
++	u32 written_serial;
++};
++
++enum e2631_fwslot_stage {
++	E2631_FWS_IDLE = 0,
++	E2631_FWS_ERASE,
++	E2631_FWS_WRITE,
++	E2631_FWS_READBACK,
++	E2631_FWS_COMPARE,
++	E2631_FWS_DONE,
++	E2631_FWS_ERROR,
++};
++
++struct e2631_fwslot_status {
++	enum e2631_fwslot_stage stage;
++	int progress;
++	u32 bytes_total;
++	u32 bytes_done;
++	u32 body_crc;
++	u32 written_serial;
++	int target_slot;
++	char error[96];
++};
++
++/* Re-scan the slot headers; full=true also verifies the body CRCs. */
++void e2631_fwslot_refresh(bool full);
++const struct e2631_slots *e2631_fwslot_slots(void);
++
++/* Validate a package and decide the target slot and the guard verdict. */
++int e2631_fwslot_validate(const void *img, u32 len, int slot_sel,
++			  struct e2631_fwslot_validate *out,
++			  char *err, unsigned int errsz);
++
++int e2631_fwslot_begin(int target, const void *img, u32 len);
++int e2631_fwslot_poll(void);
++void e2631_fwslot_end(void);
++const struct e2631_fwslot_status *e2631_fwslot_state(void);
++bool e2631_fwslot_job_open(void);
++
++#endif /* __E2631FWSLOT_H__ */
+-- 
+2.56.1
+

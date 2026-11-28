@@ -38,8 +38,8 @@ jobs:
             E2631_UBOOT_PAYLOAD_MAX \
             E2631_UBOOT_TEXT_BASE \
             E2631_UBOOT_SOURCE_DATE_EPOCH \
-            E2631_UBOOT_KEY_BASELINE_SIZE \
-            E2631_UBOOT_KEY_GROWTH_MAX; do
+            E2631_UBOOT_V2_BASELINE_SIZE \
+            E2631_UBOOT_V2_GROWTH_MAX; do
             value=${!name:-}
             if [ -z "$value" ]; then
               echo "::error::uboot-port/commits.env does not define $name"
@@ -77,14 +77,14 @@ jobs:
           # so export the frozen pin here instead of letting the CI clock leak in.
           printf 'SOURCE_DATE_EPOCH=%s\n' "$E2631_UBOOT_SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
           echo "pins: $E2631_UBOOT_REPO $E2631_UBOOT_BRANCH @ $E2631_UBOOT_SHA"
-          # task-82: both recovery-key size pins are plain decimal byte counts.
-          for name in E2631_UBOOT_KEY_BASELINE_SIZE E2631_UBOOT_KEY_GROWTH_MAX; do
+          # task-84: both E4 v2.1 size pins are plain decimal byte counts.
+          for name in E2631_UBOOT_V2_BASELINE_SIZE E2631_UBOOT_V2_GROWTH_MAX; do
             case "${!name}" in
               *[!0-9]*|"") echo "::error::$name must be a byte count, got ${!name}"; exit 1;;
             esac
           done
-          if [ "$E2631_UBOOT_KEY_BASELINE_SIZE" -le 0 ] || [ "$E2631_UBOOT_KEY_GROWTH_MAX" -le 0 ]; then
-            echo "::error::the recovery-key size pins must be positive"
+          if [ "$E2631_UBOOT_V2_BASELINE_SIZE" -le 0 ] || [ "$E2631_UBOOT_V2_GROWTH_MAX" -le 0 ]; then
+            echo "::error::the E4 v2.1 size pins must be positive"
             exit 1
           fi
       - name: Install the ARM cross toolchain and U-Boot build dependencies
@@ -158,6 +158,25 @@ jobs:
             "$GITHUB_WORKSPACE/uboot-port/tests/rescue_headers_test.c" \
             -o "$RUNNER_TEMP/rescue-headers-test"
           "$RUNNER_TEMP/rescue-headers-test"
+      - name: Compile and run the shared slot core fixture
+        # task-84/E4 v2: e2631_slotcore.c is the Linux e2631-fwslot logic
+        # compiled into U-Boot. The kit carries a byte-identical copy under
+        # tests/native/uboot, and the fixture compiles that copy against the
+        # shims and exercises the package/identity/guard/stamp vectors, so a
+        # drift between the tested copy and the patch that ships it fails here.
+        run: |
+          set -euo pipefail
+          cmp "$GITHUB_WORKSPACE/tests/native/uboot/e2631_slotcore.c" \
+              "$UBOOT_DIR/board/zte/zxhn-e2631/e2631_slotcore.c"
+          cmp "$GITHUB_WORKSPACE/tests/native/uboot/e2631_slotcore.h" \
+              "$UBOOT_DIR/board/zte/zxhn-e2631/e2631_slotcore.h"
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$GITHUB_WORKSPACE/tests/native/uboot" \
+            -I "$GITHUB_WORKSPACE/uboot-port/tests/shim" \
+            "$GITHUB_WORKSPACE/tests/native/uboot/e2631_slotcore.c" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/slotcore_test.c" \
+            -o "$RUNNER_TEMP/slotcore-test"
+          "$RUNNER_TEMP/slotcore-test"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before
@@ -232,6 +251,8 @@ jobs:
             CONFIG_MTK_TCP=y \
             CONFIG_MTK_DHCPD=y \
             CONFIG_SHA256=y \
+            CONFIG_CONSOLE_RECORD=y \
+            CONFIG_CONSOLE_RECORD_OUT_SIZE=0x4000 \
             '# CONFIG_MTK_TCP_VERBOSE is not set' \
             '# CONFIG_SKIP_LOWLEVEL_INIT is not set'; do
             grep -qx "$symbol" build/.config || {
@@ -273,7 +294,7 @@ jobs:
           # E4 v1 (task-72): the rescue command, its digest/confirm contract and
           # the shared five-step writer must survive the diet and the link; the
           # rescue code must not grow a second MTD write path (D-U1 allowlist).
-          for rescue_string in 'serve the web bootloader rescue on lan1' 'X-E2631-SHA256' 'X-E2631-Confirm: write' 'e2631rescue: PASS: mtd0 updated'; do
+          for rescue_string in 'serve the web failsafe (v1+v2) on lan1' 'X-E2631-SHA256' 'X-E2631-Confirm: write' 'e2631rescue: PASS: mtd0 updated'; do
             if ! grep -aq "$rescue_string" build/u-boot.bin; then
               echo "::error::u-boot.bin is missing the rescue text: $rescue_string"
               exit 1
@@ -358,6 +379,69 @@ jobs:
             exit 1
           fi
           echo "F2 forward-control gate: value 17, the bmu dump and the new SBRG text are present"
+          # E4 v2.1 (task-84): the multi-function rescue keeps every writer
+          # behind its owner.  The rescue only starts the slot (e2631fwslot),
+          # rootfs_data (e2631factory) and environment (e2631env) state
+          # machines; the console path captures the console record; the backup
+          # path streams read-only partitions with its own headers.
+          for v2_marker in \
+            e2631_fwslot_validate \
+            e2631_fwslot_begin \
+            e2631_fwslot_poll \
+            e2631_factory_begin \
+            e2631_factory_poll \
+            e2631_env_write_begin \
+            e2631_env_write_poll \
+            console_record_reset_enable \
+            rescue_console_run \
+            hexport_r \
+            rescue_backup_part \
+            sha256_starts \
+            'X-E2631-Part'; do
+            if ! grep -qF "$v2_marker" "$rescue_c"; then
+              echo "::error::e2631rescue.c is missing the v2.1 path: $v2_marker"
+              exit 1
+            fi
+          done
+          for boot_marker in e2631_next_slot_override 'env_get("e2631_next_slot")'; do
+            if ! grep -qF "$boot_marker" "$boot_c"; then
+              echo "::error::e2631boot.c is missing the one-shot slot override: $boot_marker"
+              exit 1
+            fi
+          done
+          if ! grep -qF 'env_set("e2631_next_slot"' "$rescue_c"; then
+            echo "::error::the web rescue does not set the one-shot slot request"
+            exit 1
+          fi
+          dts=arch/arm/dts/zx279128s-zte-zxhn-e2631.dts
+          for dts_marker in 'fixed-partitions' '"rootfs_data"' '0x03360000 0x004a0000'; do
+            if ! grep -qF "$dts_marker" "$dts"; then
+              echo "::error::the U-Boot DTS is missing the rootfs_data partition: $dts_marker"
+              exit 1
+            fi
+          done
+          for v2_text in 'serve the web failsafe (v1+v2) on lan1' 'X-E2631-Part' \
+                         'only a single command is allowed' 'rootfs_data layout mismatch' \
+                         'slot is not bootable' 'package size out of range' \
+                         'refusing to overwrite a working vendor system'; do
+            if ! grep -aq "$v2_text" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the v2.1 text: $v2_text"
+              exit 1
+            fi
+          done
+          # The four reviewed writer modules are the only board sources allowed
+          # to call the MTD writers; e2631boot.c and e2631rescue.c are asserted
+          # separately above and must stay clean.
+          for src in board/zte/zxhn-e2631/*.c; do
+            case "$(basename "$src")" in
+              e2631flash.c|e2631env.c|e2631fwslot.c|e2631factory.c) continue ;;
+            esac
+            if grep -qE 'mtd_(write|erase|special_write_oob)' "$src"; then
+              echo "::error::$src must not call the MTD writers"
+              exit 1
+            fi
+          done
+          echo "E4 v2.1 rescue gate: slot/rootfs_data/env/console/backup wired, no stray MTD writer"
           # task-78/E4 phase-1: the header helpers are shared, not duplicated.
           grep -q 'e2631_http_header_value' board/zte/zxhn-e2631/e2631rescue.c
           grep -q 'e2631_http_name_is' board/zte/zxhn-e2631/e2631http.h
@@ -590,14 +674,16 @@ jobs:
           gate=$((max - margin))
           headroom=$((max - size))
           echo "u-boot.bin: $size bytes, hard cap $max bytes, CI gate $gate bytes ($margin byte safety margin), headroom $headroom bytes"
-          # task-82: the recovery-key trigger must add less than 1 KiB to the
-          # patch-0034 payload (365872 bytes), asserted against the pins.
-          key_limit=$((E2631_UBOOT_KEY_BASELINE_SIZE + E2631_UBOOT_KEY_GROWTH_MAX))
-          if [ "$size" -gt "$key_limit" ]; then
-            echo "::error::u-boot.bin is $size bytes, above the recovery-key limit $key_limit bytes (patch-0034 baseline $E2631_UBOOT_KEY_BASELINE_SIZE + $E2631_UBOOT_KEY_GROWTH_MAX)"
+          # task-84: the E4 v2.1 modules (patches 0036-0039) are bounded by a
+          # per-series budget against the last E4 v1 + recovery-key build
+          # (366600 bytes, run 46095932548), independent of the hard payload
+          # cap above.  Patch 0025 (the defconfig diet) is part of the series.
+          v2_limit=$((E2631_UBOOT_V2_BASELINE_SIZE + E2631_UBOOT_V2_GROWTH_MAX))
+          if [ "$size" -gt "$v2_limit" ]; then
+            echo "::error::u-boot.bin is $size bytes, above the E4 v2.1 budget $v2_limit bytes (baseline $E2631_UBOOT_V2_BASELINE_SIZE + $E2631_UBOOT_V2_GROWTH_MAX)"
             exit 1
           fi
-          echo "recovery-key size gate: $size bytes <= $key_limit bytes (baseline $E2631_UBOOT_KEY_BASELINE_SIZE + $E2631_UBOOT_KEY_GROWTH_MAX)"
+          echo "E4 v2.1 size gate: $size bytes <= $v2_limit bytes (baseline $E2631_UBOOT_V2_BASELINE_SIZE + $E2631_UBOOT_V2_GROWTH_MAX)"
           if [ "$size" -gt "$gate" ]; then
             echo "::error::u-boot.bin is $size bytes, above the CI gate $gate bytes (hard cap $max bytes, $margin byte safety margin); observed $size, limit $gate"
             exit 1
@@ -640,12 +726,16 @@ jobs:
             }
           done
           echo "slim config: no EFI/MMC/FAT/standard-boot symbols; bootm, MTD and the net commands kept"
-      - name: Assert e2631flash and e2631env are the only MTD writers (D-U1)
-        # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out; the
-        # call-site allowlist then proves every mtd_write()/mtd_erase() call in
-        # the linked image sits inside one of the two safe writers (e2631flash
-        # helpers or the e2631env five-step writer) and requires exactly the
-        # expected number of sites so the gate cannot pass vacuously.
+      - name: Assert the four reviewed writer modules own every MTD write (D-U1)
+        # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out.  The
+        # linked image then has exactly four reviewed writer modules, one per
+        # data owner: e2631flash (bootloader area), e2631fwslot (firmware
+        # slots), e2631factory (rootfs_data) and e2631env (environment).  The
+        # call-site allowlist proves every mtd_write()/mtd_erase() call sits in
+        # one of their functions, and the source-level scan above proves no
+        # other board file can even reach the writers.  The count is floored so
+        # the gate cannot pass vacuously and capped so a new write block is
+        # reviewed explicitly.
         run: |
           set -euo pipefail
           cd "$UBOOT_DIR"
@@ -666,7 +756,7 @@ jobs:
           fi
           echo "$sites"
           bad=$(echo "$sites" | awk -F'|' '
-            $1 !~ /^(e2631_write_range|e2631_erase_range|do_e2631flash|e2631_env_write_block|do_e2631env_save)$/ {
+            $1 !~ /^(e2631_|fw_block_erase|fw_block_write|fa_erase_step|fa_blank_step)/ {
               print
             }')
           if [ -n "$bad" ]; then
@@ -675,15 +765,21 @@ jobs:
             exit 1
           fi
           writers=$(echo "$sites" | grep -cE '<mtd_write>|<mtd_erase>' || true)
-          if [ "$writers" != "4" ]; then
-            echo "::error::expected 4 mtd_write/mtd_erase sites (2 e2631flash helpers + 2 e2631_env_write_block), found $writers"
+          if [ "$writers" -lt 7 ] || [ "$writers" -gt 16 ]; then
+            echo "::error::expected 7..16 mtd_write/mtd_erase sites across the four writer modules, found $writers"
             exit 1
           fi
-          if ! echo "$sites" | grep -qE 'e2631_env_write_block|do_e2631env_save'; then
-            echo "::error::no MTD writer site was found inside the e2631env writer"
-            exit 1
-          fi
-          echo "mtd writer sites: $writers (e2631flash and the e2631env writer; -O2 inlines the static helpers)"
+          for owner in \
+            'e2631_write_range|e2631_erase_range|do_e2631flash' \
+            'e2631_fwslot|fw_block_' \
+            'e2631_factory|fa_erase_step' \
+            'e2631_env_write_block|do_e2631env_save|e2631_env_write_poll'; do
+            if ! echo "$sites" | grep -qE "$owner"; then
+              echo "::error::no MTD writer site was found for the owner pattern $owner"
+              exit 1
+            fi
+          done
+          echo "mtd writer sites: $writers (four owners: bootloader, slots, rootfs_data, env; -O2 may inline the static helpers)"
           # The refusals that make that single writer safe must stay in the
           # source: the protected secondboot/environment areas, the alignment
           # and chip-bounds check, and the power-off banner printed before the
