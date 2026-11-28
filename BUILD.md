@@ -307,7 +307,8 @@ structural 8 KiB safety margin remains as the last line of defence.
 | P1 reclaim (patch 0042) | 12,380 bytes (`CONFIG_CMD_FDT` 8229 + `CONFIG_CMD_TFTPBOOT` 4151) |
 | v3 page growth | +11,131 bytes (page gzip 24904 vs the v1 13773 baseline) |
 | P2 reclaim (patch 0051) | 11,520 bytes measured (`CONFIG_CMD_MII`; applied after the first unified v3 build measured 410,040 bytes) |
-| current `u-boot.bin` (task-92 rebuild, run 46121809714) | **398,520 bytes**; 9,032 bytes below the E4 v3 gate, 6,848 bytes below the v3 baseline, 254,792 bytes (39.00%) below the hard cap |
+| DHCP fix growth (patch 0052) | +32 bytes (the `ntohl()` helper and its inline header) |
+| current `u-boot.bin` (task-92 second rebuild, run 46124073666) | **398,552 bytes**; 9,000 bytes below the E4 v3 gate, 6,816 bytes below the v3 baseline, 254,760 bytes (39.00%) below the hard cap |
 | failure behaviour | above 407,552 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
 
 The budget ruling was exercised exactly once: the first unified v3 build

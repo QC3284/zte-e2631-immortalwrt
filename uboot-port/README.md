@@ -850,8 +850,9 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
   `POST /env` 对这四个键做语义校验（池不越过 .254、不含服务器地址）。干净环境必须保持 `dhcp_source=default` 且无 warning
   （0052：主机八位组经 `ntohl()` 取，192.168.1.1 的主机八位组是 1，默认池 100..200 不包含它）。
 
-尺寸：0042 回收 12,380 B、0051 再回收 11,520 B；统一 v3 构建最终 `u-boot.bin` 398,520 B（≤ 407,552，余量 9,032 B，
-比 v3 基线 405,368 B 低 6,848 B；硬上限 653,312 − 240 KiB headroom 的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B；第二次统一 v3 构建（run 46124073666）最终
+`u-boot.bin` 398,552 B（≤ 407,552，余量 9,000 B，比 v3 基线 405,368 B 低 6,816 B；硬上限 653,312 − 240 KiB headroom
+的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### 恢复键进救援（0035，task-82；零写入）
 
@@ -1323,5 +1324,14 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   在小端机上得到的是第一字节（192.168.1.1 → 192），默认池 100..200 被误判为包含服务器，干净环境也报
   `dhcp_source=fallback` + `dhcp_warning=e2631_dhcp_pool_start`。改为 `ntohl()` 取最后一字节，并把范围/冲突校验收进
   `e2631dhcp.h`；新增主机 fixture `uboot-port/tests/dhcp_pool_test.c`（14 项，含 first-octet 回归守卫）；52 patches /
-  tree `cf1ff6c50f0295bb279f7dd333ddd3f41145d265`；task-92 的 51-patch 构建身份（§8 的 398,520 B）需按新 pin 重跑，
-  本批不派发构建。证据 [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md) §9。
+  tree `cf1ff6c50f0295bb279f7dd333ddd3f41145d265`；构建由 task-92 重开后在 run 46124073666 重跑（见下一条）。证据
+  [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md) §9。
+- 2026-11-28（task-92 重开，第二次统一构建）：run `46124073666`（head `eb19224`，52 patches）22/22 步绿、约 2 分钟。
+  `u-boot.bin` **398,552 B**（比 51-patch 构建 +32 B），crc32 `bd3c9269`，sha256
+  `3031d610741d3c0b173d464d31b667ccd169b01f2dfb2833d06efd8ff6257610`；`mtd0.bin` 655,360 B crc32 `64f5fe0b`
+  sha256 `c10b521601ef6d03b340a13e56a0f82178bb5dad7be39a93de6889dcadc13d31`；装配后首 0x800 sha256
+  `47ae703aebc0be48beb4236965dfb2a4250be455b597a3733ffe6dce7e774f48`；banner `U-Boot 2027.01-rc2-g0b0d0199f691`；
+  env 块 `6eee153b…`、`.config` `1e925cf2…` 未变；artifact `e2631-uboot-46124073666`（id 15254433840，553,694 B）。
+  门禁：`E4 v3 size gate: 398552 <= 407552`（余量 9,000 B）、结构门禁余量 254,760 B (39.00%)、slot core fixture 52、
+  DHCP pool fixture 14、mii reclaimed (P2 applied)、writer sites 9、checkpatch 0E/0W、页面 gzip 24,904 B 未变。
+  无 Release/tag、无 firmware.yml、无设备动作。证据 [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md) §9.4。
