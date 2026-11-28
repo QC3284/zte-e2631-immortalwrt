@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Local, offline preview server for the E4 rescue page (task-81).
+// Local, offline preview server for the E4 rescue page.
 // Serves the real uboot-port/failsafe/e2631-failsafe.html and mocks the HTTP
-// endpoints of evidence/e4-v2-contract-design-20261128.md on 127.0.0.1 only.
-// It never touches flash and never talks to a device. For UI review only.
+// endpoints of evidence/e4-v2-contract-design-20261128.md (v2.1) plus the v3
+// additions of evidence/e4-v3-contract-delta-20261128.md: /sysinfo, /log,
+// /integrity, /backup?part=slot0|slot1|rootfs|header, /reboot, the
+// e2631_dhcp_* env keys and their /status fields. Localhost only; it never
+// touches flash and never talks to a device. For UI review only.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -99,7 +102,12 @@ const PART_DEFS = {
   tag: { off: '0x100000', len: 1048576, file: 'e2631-tag.bin' },
   wifi: { off: '0x200000', len: 1048576, file: 'e2631-wifi.bin' },
   usercfg: { off: '0x300000', len: 2097152, file: 'e2631-usercfg.bin' },
-  defcfg: { off: '0x500000', len: 2097152, file: 'e2631-defcfg.bin' }
+  defcfg: { off: '0x500000', len: 2097152, file: 'e2631-defcfg.bin' },
+  // v3 whole-slot / window downloads (read-only)
+  slot0: { off: '0x700000', len: 0x1c00000, file: 'e2631-slot0.bin' },
+  slot1: { off: '0x2300000', len: 0x1c00000, file: 'e2631-slot1.bin' },
+  rootfs: { off: '0x2700000', len: 0x1100000, file: 'e2631-rootfs.bin' },
+  header: { off: '0x3800000', len: 0x20000, file: 'e2631-slot1-header.bin' }
 };
 const partCache = {};
 function partMeta(p) {
@@ -143,7 +151,8 @@ const SLOTS = {
 
 const ENV_ORDER = [
   'baudrate', 'bootcmd', 'bootdelay', 'bootfile', 'console', 'ethaddr',
-  'gatewayip', 'ipaddr', 'netmask', 'serverip', 'e2631_pocload', 'e2631_flashboot'
+  'gatewayip', 'ipaddr', 'netmask', 'serverip', 'e2631_pocload', 'e2631_flashboot',
+  'e2631_dhcp_ipaddr', 'e2631_dhcp_netmask', 'e2631_dhcp_pool_start', 'e2631_dhcp_pool_size'
 ];
 const ENV_MAP = {
   baudrate: '115200',
@@ -157,7 +166,11 @@ const ENV_MAP = {
   netmask: '255.255.255.0',
   serverip: '192.168.1.100',
   e2631_pocload: 'tftp 0x43000000 u-boot.bin',
-  e2631_flashboot: 'reset'
+  e2631_flashboot: 'reset',
+  e2631_dhcp_ipaddr: '192.168.1.1',
+  e2631_dhcp_netmask: '255.255.255.0',
+  e2631_dhcp_pool_start: '100',
+  e2631_dhcp_pool_size: '101'
 };
 function envText() {
   const lines = ENV_ORDER.map((k) => k + '=' + ENV_MAP[k]);
@@ -204,6 +217,44 @@ function mockConsole(cmd) {
   return { code: 1, text: 'Unknown command \'' + cmd + '\' - try \'help\'\n' };
 }
 
+const BOOT_LOG = [
+  'U-Boot 2027.01-rc2 (mock E4 v3)',
+  'Model: ZTE ZXHN E2631 (ZX279128S)',
+  'DRAM:  256 MiB',
+  'Core:  10 devices, 8 uclasses, devicetree: embed',
+  'Loading Environment from MTD... OK',
+  'In:    serial',
+  'Out:   serial',
+  'Err:   serial',
+  'Net:   lan1',
+  'e2631boot: slot0 serial 7, slot1 serial 12',
+  'e2631boot: boot slot1',
+  'Starting kernel ...'
+].join('\n') + '\n';
+
+function validIpv4(s) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s || '');
+  if (!m) return false;
+  return m.slice(1).every((x) => Number(x) <= 255);
+}
+
+function dhcpConfig() {
+  const defaults = { ip: '192.168.1.1', netmask: '255.255.255.0', pool_start: 100, pool_size: 101 };
+  const env = (k, d) => (Object.prototype.hasOwnProperty.call(ENV_MAP, k) && ENV_MAP[k] !== '' ? ENV_MAP[k] : d);
+  const ip = env('e2631_dhcp_ipaddr', defaults.ip);
+  const netmask = env('e2631_dhcp_netmask', defaults.netmask);
+  const ps = env('e2631_dhcp_pool_start', String(defaults.pool_start));
+  const pn = env('e2631_dhcp_pool_size', String(defaults.pool_size));
+  const source = ['e2631_dhcp_ipaddr', 'e2631_dhcp_netmask', 'e2631_dhcp_pool_start', 'e2631_dhcp_pool_size'].some((k) => Object.prototype.hasOwnProperty.call(ENV_MAP, k)) ? 'env' : 'default';
+  const warnings = [];
+  let poolStart = Number(ps), poolSize = Number(pn);
+  if (!validIpv4(ip)) warnings.push('bad e2631_dhcp_ipaddr');
+  if (!validIpv4(netmask)) warnings.push('bad e2631_dhcp_netmask');
+  if (!Number.isInteger(poolStart) || poolStart < 1 || poolStart > 254) { warnings.push('bad e2631_dhcp_pool_start'); poolStart = defaults.pool_start; }
+  if (!Number.isInteger(poolSize) || poolSize < 1 || poolSize > 200) { warnings.push('bad e2631_dhcp_pool_size'); poolSize = defaults.pool_size; }
+  return { ip: validIpv4(ip) ? ip : defaults.ip, netmask: validIpv4(netmask) ? netmask : defaults.netmask, poolStart, poolSize, source: warnings.length ? 'fallback' : source, warning: warnings.join(',') };
+}
+
 function statusText() {
   const s = task;
   const out = [
@@ -229,6 +280,17 @@ function statusText() {
   for (const k of ['slot0', 'slot1']) {
     for (const f of ['valid', 'intact', 'identity', 'serial', 'version']) out.push(k + '_' + f + '=' + SLOTS[k + '_' + f]);
   }
+  const d = dhcpConfig();
+  out.push('dhcp_ip=' + d.ip);
+  out.push('dhcp_netmask=' + d.netmask);
+  out.push('dhcp_pool_start=' + d.poolStart);
+  out.push('dhcp_pool_size=' + d.poolSize);
+  out.push('dhcp_source=' + d.source);
+  out.push('dhcp_warning=' + d.warning);
+  out.push('backup=' + (backupActive ? 'active' : 'idle'));
+  out.push('backup_part=' + (backupActive ? backupPart : ''));
+  out.push('log_bytes=' + BOOT_LOG.length);
+  out.push('reboot_pending=' + (rebootPending ? '1' : '0'));
   return out.join('\n') + '\n';
 }
 function readBody(req) {
@@ -262,11 +324,89 @@ function header(req, name) {
   return Array.isArray(v) ? v[0] : v || '';
 }
 
+let backupActive = false;
+let backupPart = '';
+let rebootPending = false;
+function jobActive() {
+  return task.stage !== 'idle' && task.stage !== 'done' && task.stage !== 'error';
+}
+function sendBackup(res, part) {
+  const def = PART_DEFS[part];
+  const m = partMeta(part);
+  backupActive = true;
+  backupPart = part;
+  res.on('finish', () => { backupActive = false; backupPart = ''; });
+  return send(res, 200, m.buf, 'application/octet-stream', {
+    'Content-Disposition': 'attachment; filename="' + def.file + '"',
+    'X-E2631-CRC32': m.crc,
+    'X-E2631-SHA256': m.sha,
+    'X-E2631-Offset': def.off,
+    'X-E2631-Length': '0x' + def.len.toString(16).toUpperCase(),
+    'X-E2631-Part': part,
+    'Content-Length': String(m.buf.length)
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://' + HOST + ':' + PORT);
   try {
     if (req.method === 'GET' && u.pathname === '/') {
       return send(res, 200, PAGE_GZ, 'text/html; charset=utf-8', { 'Content-Encoding': 'gzip' });
+    }
+    if (req.method === 'GET' && u.pathname === '/sysinfo') {
+      const lines = [
+        'result=ok',
+        'version=U-Boot 2027.01-rc2 (mock E4 v3)',
+        'banner=U-Boot 2027.01-rc2 (mock E4 v3)',
+        'build=Nov 28 2026 - 00:00:00 +0000',
+        'board=ZTE ZXHN E2631',
+        'soc=ZX279128S',
+        'cpu=ARM Cortex-A9',
+        'dram=0x10000000',
+        'dram_mb=256',
+        'mtd0_size=0x100000',
+        'spi_nand=spi-nand0',
+        'spi_size=0x8000000',
+        'spi_erasesize=0x20000',
+        'spi_writesize=0x800',
+        'spi_oobsize=0x40',
+        'spi_id=a1a1a1a1a1',
+        'sctlr=0x08c50878',
+        'midr=0x410fc090',
+        'clidr=0x09200003',
+        'ttbr0=0x00000000',
+        'vbar=0x47f00000',
+        'actlr=0x00000000',
+        'dacr=0x55555555',
+        'pll_a9_cfg0=0x00000000',
+        'pll_a9_cfg1=0x00000000',
+        'top_ctrl8=0x10061fff',
+        'top_clk_sel=0x00517800',
+        'crm2_10=0x00000100',
+        'crm_4c=0x000381ff',
+        'lsp1_04=0x0001381b',
+        'net_pll_cfg0=0x0004176b',
+        'net_pll_cfg1=0x144fdf3b',
+        'cpu_mhz=1000',
+        'cpu_mhz_source=known'
+      ];
+      return send(res, 200, lines.join('\n') + '\n');
+    }
+    if (req.method === 'GET' && u.pathname === '/log') {
+      const dl = parseQuery(u).download === '1';
+      return send(res, 200, BOOT_LOG, 'text/plain; charset=utf-8', {
+        'X-E2631-Log-Bytes': String(BOOT_LOG.length),
+        ...(dl ? { 'Content-Disposition': 'attachment; filename="e2631-bootlog.txt"' } : {})
+      });
+    }
+    if (req.method === 'POST' && u.pathname === '/integrity') {
+      const expect = (parseQuery(u).expect || header(req, 'x-e2631-sha256') || '').toLowerCase();
+      if (expect && !/^[0-9a-f]{64}$/.test(expect)) return send(res, 400, 'result=error\nerror=bad sha256\n');
+      const crc = hex32(BOOTLOADER_CRC);
+      const match = expect ? (expect === BOOTLOADER_SHA ? 'ok' : 'mismatch') : 'absent';
+      const lines = ['result=ok', 'offset=0x20000', 'length=0xa0000', 'crc32=' + crc, 'sha256=' + BOOTLOADER_SHA, 'match=' + match];
+      if (expect) lines.push('expected=' + expect);
+      return send(res, 200, lines.join('\n') + '\n');
     }
     if (req.method === 'GET' && u.pathname === '/status') {
       advance();
@@ -286,6 +426,17 @@ const server = http.createServer(async (req, res) => {
       const writable = key === 'bootdelay' || key.indexOf('e2631_') === 0;
       if (!/^[a-z0-9_]{1,32}$/.test(key) || !writable) return send(res, 403, 'result=error\nerror=key is not writable\n');
       if (value.length > 128 || !/^[\x20-\x7e]*$/.test(value)) return send(res, 400, 'result=error\nerror=bad value\n');
+      if (key === 'e2631_dhcp_ipaddr' || key === 'e2631_dhcp_netmask') {
+        if (!validIpv4(value)) return send(res, 400, 'result=error\nerror=bad value\n');
+      }
+      if (key === 'e2631_dhcp_pool_start') {
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < 1 || n > 254) return send(res, 400, 'result=error\nerror=bad value\n');
+      }
+      if (key === 'e2631_dhcp_pool_size') {
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < 1 || n > 200) return send(res, 400, 'result=error\nerror=bad value\n');
+      }
       if (Object.prototype.hasOwnProperty.call(ENV_MAP, key) && ENV_MAP[key] === value) {
         return send(res, 200, 'result=ok\nnew_crc32=' + hex32(crc32(Buffer.from(envText(), 'utf8'))) + '\nkeys=0\n');
       }
@@ -311,15 +462,8 @@ const server = http.createServer(async (req, res) => {
       const part = parseQuery(u).part || 'bootloader';
       const def = PART_DEFS[part];
       if (!def) return send(res, 400, 'result=error\nerror=bad part\n');
-      const m = partMeta(part);
-      return send(res, 200, m.buf, 'application/octet-stream', {
-        'Content-Disposition': 'attachment; filename="' + def.file + '"',
-        'X-E2631-CRC32': m.crc,
-        'X-E2631-SHA256': m.sha,
-        'X-E2631-Offset': def.off,
-        'X-E2631-Length': '0x' + def.len.toString(16).toUpperCase(),
-        'X-E2631-Part': part
-      });
+      if (backupActive) return send(res, 409, 'result=error\nerror=busy\n');
+      return sendBackup(res, part);
     }
     if (req.method === 'POST' && u.pathname === '/boot') {
       const slot = parseQuery(u).slot;
@@ -376,6 +520,14 @@ const server = http.createServer(async (req, res) => {
       task = { op: 'factory', mode: 'erase', stage: 'erase', progress: 20, bytesDone: 0, bytesTotal: 0x4a0000, crc32: '', sha256: '', browser: '', match: '', result: '', error: '', slotTarget: '', writtenSerial: '', version: task.version };
       return send(res, 200, 'result=accepted\n');
     }
+    if (req.method === 'POST' && u.pathname === '/reboot') {
+      if (header(req, 'x-e2631-confirm') !== 'reboot') return send(res, 400, 'result=error\nerror=missing confirm\n');
+      if (jobActive() || backupActive) return send(res, 409, 'result=error\nerror=busy\n');
+      rebootPending = true;
+      return send(res, 200, 'result=accepted\nreboot=1\n');
+    }
+    const KNOWN = new Set(['/', '/status', '/slots', '/env', '/backup', '/sysinfo', '/log', '/integrity', '/reboot', '/console', '/boot', '/flash', '/firmware', '/factory']);
+    if (KNOWN.has(u.pathname)) return send(res, 405, 'result=error\nerror=method not allowed\n');
     send(res, 404, 'result=error\nerror=not found\n');
   } catch (e) {
     send(res, 500, 'result=error\nerror=' + String(e.message || e).replace(/\s+/g, ' ').slice(0, 120) + '\n');
