@@ -1,5 +1,7 @@
 # task-99 t92f 修复：telnet 行尾/执行槽、冷启动救援、DNS 地址（2026-11-28）
 
+状态：代码已提交（kit `5f2c1b6`）；t92f 统一构建已执行（run `46145688356`，身份见 §10），真机零写复测待 verify-docs。
+
 结论摘要：t92e 零写门禁 283/285，失败项与另外两处回归都定位到确定性代码缺陷，分三个 patch 修复：
 
 - 0062：telnet 行编辑器把上一行残留字节带进新命令（`version` 后 `bdinfo` 变成 `bdinfon`）；同一会话状态里还有两个
@@ -104,7 +106,7 @@ memcpy(telnetd.exec_line, telnetd.line, telnetd.line_len + 1);
 - 三个新 fixture 与扩充后的 DNS fixture 在本地对 patched 树全过：telnetd line 8、refclk state 11、task-99 contract
   15、DNS 35。checkpatch（`--ignore FILE_PATH_CHANGES,CMD_TEST,LIVETREE,PREFER_IF`）对 0062/0063/0064 各 0 errors /
   0 warnings。
-- 本机不跑交叉编译；构建由 task-92 统一派发 `uboot-build.yml`。
+- 本机不跑交叉编译；构建由 task-92 派发 `uboot-build.yml`，t92f run `46145688356` 已 SUCCESS（见 §10）。
 
 ## 6. 回放验证记录
 
@@ -118,7 +120,7 @@ memcpy(telnetd.exec_line, telnetd.line, telnetd.line_len + 1);
   0 errors / 0 warnings（“no obvious style problems”）。
 - kit 提交 `5f2c1b6`（12 files, +1128/−9）已 push 到 `origin/iwrt-adaptation`；kit「Upgrade safety checks」
   run `46145244404` SUCCESS。
-- 本机未跑交叉编译；uboot-build 由 task-92 统一派发。
+- 本机未跑交叉编译；uboot-build 由 task-92 派发，t92f run `46145688356` 30/30 步 SUCCESS（见 §10）。
 
 ## 7. 真机验收要点（t92f，零写）
 
@@ -148,3 +150,23 @@ memcpy(telnetd.exec_line, telnetd.line, telnetd.line_len + 1);
 - 契约：`evidence/e4-v3-contract-delta-20261128.md`（§15 与 telnet/web console 端点）。
 - 台账：`uboot-port/README.md` §1（pin 表）、§4 item 39/40、§5「E4 v3.1 t92f 修复」、§6 风险、§8 变更记录。
 - patch sha256：0062 `bc272f4c…`、0063 `36731dad…`、0064 `86b8cb48…`。
+
+## 10. t92f 统一构建（run 46145688356）
+
+- 触发：`uboot-build.yml` workflow_dispatch（kit head `bedfc30`，64 patches，`checkpatch=true`），
+  2026-11-28T12:38:41Z → 12:40:24Z，30/30 步 SUCCESS。
+- 身份：banner `U-Boot 2027.01-rc2-gfc5588d5b067 (Nov 19 2026 - 15:44:39 +0000)`；`u-boot.bin` **418,640 B**
+  sha256 `6ba5e06bb44d95d656b08d0348af13a1c99b7e9a949e8fe404aa1d95fda27a9f` crc32 `1e8419a5`；
+  `mtd0.bin` 655,360 B sha256 `3daa0ffb5005996c9260e524818e2a90113a5453c73134a7208e7d9b9855f2d9`
+  crc32 `4bfb9a56`；装配后首 0x800 sha256 `846eeababa1fc57703bbcb4676de2043ab4e824e84f2a99f32d6153cedf5831f`；
+  env 块 `6eee153b…` 与 `.config` `0670a0aa…` 未变；entry `0x47f00000`；post-am tree `548f064a…`。
+- 尺寸：418,640 ≤ 460,000（余量 41,360 B；比 v3 基线 405,368 B 高 13,272 B，比 t92e 的 417,752 B 多 888 B），
+  硬上限余量 234,672 B（35.92%）；页面未改动（raw 113,057 / gzip 31,518 / sha256 `e452fb02…`）。
+- 门禁实测：fixture 全 PASS——rescue header、slot core 52、DHCP pool 18、DNS 35、env align 13、
+  env candidate 65、env tweak 27、telnetd line 8、refclk state 11、task-99 契约 15、web console 13、
+  console query 14、page stream 17（8 chunks）；task-99/task-98/task-97、E4 v3 rescue、self-check、
+  DHCP pool、page stream、E4 v3 size gate 全绿；`mtd writer sites: 9`；`command set: mii reclaimed`；
+  `checkpatch: errors=0 warnings=0`（64 patches）。
+- 产物：artifact `e2631-uboot-46145688356`（id `15263512772`，zip 594,271 B，11 文件 `sha256sum -c` 全过）；
+  归档 `/home/qc233/zte/e2631-t5-artifacts/t92f-46145688356/`。
+- 边界：无 Release/tag、无 firmware.yml dispatch、kit main 未动、真机未碰；真机零写复测（§7）交 verify-docs。

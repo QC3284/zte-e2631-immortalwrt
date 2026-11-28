@@ -312,7 +312,8 @@ as the last line of defence.
 | page-stream fix (patch 0053/0054) | -72 bytes net (streaming send and the connection release replace the copy path) |
 | task-97 growth (patches 0055-0059 + page v3.1) | +18,544 bytes measured (398,480 -> 417,024; the page gzip grew 24,904 -> 31,518) |
 | task-98 env-write fix (patches 0060/0061) | +728 bytes measured (417,024 -> 417,752; the two new host fixtures cover the candidate builder and the tweak copy) |
-| current `u-boot.bin` (task-92 t92e fifth rebuild, run 46136469366) | **417,752 bytes**; 42,248 bytes below the E4 v3 gate, 12,384 bytes above the v3 baseline, 235,560 bytes (36.06%) below the hard cap |
+| task-99 fixes (patches 0062-0064) | +888 bytes measured (417,752 -> 418,640; telnet line/release, cold-refclk skip, pinned DNS answer) |
+| current `u-boot.bin` (task-92 t92f sixth rebuild, run 46145688356) | **418,640 bytes**; 41,360 bytes below the E4 v3 gate, 13,272 bytes above the v3 baseline, 234,672 bytes (35.92%) below the hard cap |
 | failure behaviour | above 460,000 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
 
 The budget ruling was exercised exactly once: the first unified v3 build

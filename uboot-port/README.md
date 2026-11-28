@@ -931,7 +931,9 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
 web console/env 对齐/池规则）与页面 v3.1 合计 +18,544 B，第四次统一构建（run 46132729322）时
 `u-boot.bin` 417,024 B（≤ 460,000，余量 42,976 B，比 v3 基线 405,368 B 高 11,656 B；
 硬上限 653,312 − 193,312 headroom 的算法见 §4 item 3/26）；0060/0061 的修复（构造器与键名副本）实测 +728 B，
-第五次统一构建（t92e，run 46136469366）最终 `u-boot.bin` 417,752 B（≤ 460,000，余量 42,248 B，比 v3 基线高 12,384 B）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+第五次统一构建（t92e，run 46136469366）时 `u-boot.bin` 417,752 B（≤ 460,000，余量 42,248 B，比 v3 基线高 12,384 B）；
+0062-0064（task-99 三项修复）实测 +888 B，第六次统一构建（t92f，run 46145688356）最终 `u-boot.bin` 418,640 B
+（≤ 460,000，余量 41,360 B，比 v3 基线高 13,272 B）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### E4 v3.1 上游对齐服务（0055-0059，task-97；零写入优先）
 
@@ -1556,6 +1558,16 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   被重编程，打断 PHY 自协商——改六寄存器状态检测后跳过，另加 `eth_init()` 三次重试）；0064（A 记录读共享 `net_ip`——
   改 `mtk_dnsd_set_answer()` 固定救援地址，日志打印两者，主循环告警并恢复）。64 patches / tree
   `548f064a900ce01e2e51d7bf4b6e6454a21884d1`；主机 fixture 新增 telnetd line 8 项、refclk state 11 项、task-99 源码契约
-  15 项，DNS fixture 由 29 扩到 35 项（A 记录字节向量）；checkpatch 0062-0064 各 0/0。t92f 统一构建由 task-92 执行，
-  身份见后续 t92f 条；真机零写复测由 verify-docs 执行。证据
+  15 项，DNS fixture 由 29 扩到 35 项（A 记录字节向量）；checkpatch 0062-0064 各 0/0。t92f 统一构建 run `46145688356`（`u-boot.bin` 418,640 B；fixture telnetd line 8 / refclk state 11 /
+  task-99 契约 15 / DNS 35 全过，checkpatch 0/0）已执行；真机零写复测由 verify-docs 执行。证据
   [evidence/uboot-e4-v31-telnet-cold-dns-20261128.md](../evidence/uboot-e4-v31-telnet-cold-dns-20261128.md)。
+- 2026-11-28（task-92 t92f，第六次统一构建）：run `46145688356`（head `bedfc30`，64 patches）30/30 步绿。
+  `u-boot.bin` **418,640 B** sha256 `6ba5e06bb44d95d656b08d0348af13a1c99b7e9a949e8fe404aa1d95fda27a9f`
+  crc32 `1e8419a5`（≤ 460,000，余量 41,360 B；比 t92e +888 B）；`mtd0.bin` 655,360 B sha256
+  `3daa0ffb5005996c9260e524818e2a90113a5453c73134a7208e7d9b9855f2d9` crc32 `4bfb9a56`；装配后首 0x800 sha256
+  `846eeaba…`；env 块 `6eee153b…`、`.config` `0670a0aa…` 未变；banner `U-Boot 2027.01-rc2-gfc5588d5b067`；
+  页面 gzip 31,518 B（≤ 32,768）。fixture：slot core 52 / DHCP pool 18 / DNS **35** / env align 13 /
+  env candidate 65 / env tweak 27 / **telnetd line 8** / **refclk state 11** / **task-99 契约 15** /
+  web console 13 / console query 14 / page stream 17；writer sites 9、checkpatch 0E/0W；
+  artifact `e2631-uboot-46145688356`（id 15263512772，11 文件 `sha256sum -c` 全过）。
+  无 Release/tag、无设备动作。证据 [evidence/uboot-e4-v31-telnet-cold-dns-20261128.md](../evidence/uboot-e4-v31-telnet-cold-dns-20261128.md) §10。
