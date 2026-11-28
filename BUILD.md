@@ -293,22 +293,36 @@ A1/A2/A3 run it from RAM, where the cap does not apply, but the same binary must
 fit mtd0 later, so CI enforces the budget up front.
 
 Since E4, space is a first-class constraint: `uboot-build.yml` gates the payload
-*before* the "Package the flashable mtd0 image" step, with a safety margin.
+*before* the "Package the flashable mtd0 image" step. Two limits apply: the
+E4 v3 budget keeps at least 240 KiB of headroom below the hard cap, and a
+structural 8 KiB safety margin remains as the last line of defence.
 
 | item | value |
 |---|---|
 | payload window | mtd0 `0x20800..0xBFFFF` (0x9F800) |
 | hard cap | **653312 bytes (638 KiB)** |
-| CI gate | **645120 bytes** (hard cap - 8192 bytes = 8 KiB safety margin) |
-| current `u-boot.bin` (2026-11-27, 24 patches) | 494880 bytes; headroom to the hard cap 158432 bytes (24.25%), headroom to the CI gate 150240 bytes |
-| failure behaviour | above 645120 bytes the build fails and prints both the observed size and the limit |
+| E4 v3 gate (`E2631_UBOOT_HARD_LIMIT` - `E2631_UBOOT_HEADROOM_MIN`) | **407,552 bytes** (653312 - 245,760 = 240 KiB headroom) |
+| structural safety gate | **645120 bytes** (hard cap - 8192 bytes; last line of defence before mtd0 assembly) |
+| E4 v3 baseline (`E2631_UBOOT_SIZE_BASELINE`) | 405,368 bytes (task-84 build, run 46109519805) |
+| P1 reclaim (patch 0042) | 12,380 bytes (`CONFIG_CMD_FDT` 8229 + `CONFIG_CMD_TFTPBOOT` 4151) |
+| v3 page growth | +11,131 bytes (page gzip 24904 vs the v1 13773 baseline) |
+| current `u-boot.bin` (task-92 rebuild) | 405,368 - 12,380 (P1) + page/code growth; the task-92 artifact records the exact value |
+| failure behaviour | above 407,552 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
+
+The reserve P2 (`CONFIG_CMD_MII`, ~5,724 bytes) is not applied. The budget
+ruling is: if the unified build trips 407,552 bytes, reclaim P2 first
+(pre-approved), and only then cut the rescue-page I18N as the last resort -
+I18N is preserved ahead of mii. The command set follows the same ruling:
+bootm/MTD/DHCP/PING/OF_LIBFDT/LMB stay mandatory; tftp/mii are conditional
+(patch 0042 drops fdt+tftp, and mii disappears only if P2 is applied).
 
 Every successful build records a footprint table in the artifact's
 `UBOOT-INFO.txt`: `u-boot.bin` bytes, mtd0 image bytes, the environment block
-sha256, the `.config` sha256, and the headroom in bytes and percent (against both
-the hard cap and the CI gate). `node tools/check-workflows.mjs` cross-checks the
-workflow's 8192/645120 values against `uboot-port/README.md`
-(0x9F800/653312/638 KiB) and asserts the gate still runs before mtd0 assembly.
+sha256, the `.config` sha256, the headroom against both the hard cap and the
+E4 v3 gate, and the size delta against the v3 baseline.
+`node tools/check-workflows.mjs` cross-checks the 8 KiB/645120 structural gate
+and the 407552/245760 v3 gate against `uboot-port/README.md` and this table,
+and asserts both gates run before mtd0 assembly.
 
 Besides UBOOT-INFO.txt, every build ships `UBOOT-SIZES.txt`: the authoritative
 per-object `.text` table (`arm-none-eabi-size` over all built objects plus the

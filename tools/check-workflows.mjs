@@ -477,6 +477,54 @@ ok('UBOOT-INFO.txt carries the payload footprint table',
     'headroom bytes vs CI gate:', 'env block sha256:', '.config sha256:'].every((s) => has(UBOOT_WF, s)) &&
   has(UBOOT_WF, 'sha256sum build/.config'));
 
+// E4 v3 (task-90, unified rebuild in task-92): the size policy moved from the
+// v2.1 baseline+growth pair to the pinned baseline / 240 KiB headroom / hard
+// limit triple, and the budget ruling made the command reclaim explicit: P1
+// drops fdt+tftp, P2 (mii) is held in reserve, and the core command set must
+// stay.  These checks pin the ruling, the new gates and the v3 endpoint
+// markers so a later edit cannot silently lose them.
+const ubootV3Baseline = Number(uboot.E2631_UBOOT_SIZE_BASELINE);
+const ubootV3Headroom = Number(uboot.E2631_UBOOT_HEADROOM_MIN);
+const ubootV3Hard = Number(uboot.E2631_UBOOT_HARD_LIMIT);
+const ubootV3Limit = ubootV3Hard - ubootV3Headroom;
+const ubootV3GateAt = UBOOT_WF.indexOf('E4 v3 size gate:');
+ok('the E4 v3 size budget uses the pinned baseline/headroom/hard-limit triple',
+  ubootV3Baseline === 405368 && ubootV3Headroom === 245760 && ubootV3Hard === 653312 &&
+  ubootV3Limit === 407552 &&
+  has(UBOOT_WF, 'E2631_UBOOT_SIZE_BASELINE') &&
+  has(UBOOT_WF, 'v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))') &&
+  has(UBOOT_WF, 'above the E4 v3 budget $v3_limit bytes') &&
+  has(UBOOT_WF, 'E4 v3 size gate: $size bytes <= $v3_limit bytes') &&
+  ubootV3GateAt > 0 && ubootV3GateAt < ubootPackAt,
+  'v3 gate ' + ubootV3Limit + ' bytes (baseline ' + ubootV3Baseline + ', headroom ' + ubootV3Headroom + '), before mtd0 packaging');
+ok('the P1 reclaim and the retained command set follow the v3 budget ruling',
+  has(UBOOT_WF, "'# CONFIG_CMD_FDT is not set'") &&
+  has(UBOOT_WF, "'# CONFIG_CMD_TFTPBOOT is not set'") &&
+  !has(UBOOT_WF, 'CONFIG_CMD_TFTPBOOT=y') &&
+  ['CONFIG_CMD_BOOTM=y', 'CONFIG_CMD_MTD=y', 'CONFIG_CMD_DHCP=y', 'CONFIG_CMD_PING=y',
+    'CONFIG_OF_LIBFDT=y', 'CONFIG_LMB=y'].every((s) => has(UBOOT_WF, s)) &&
+  has(UBOOT_WF, 'command set: mii retained (P2 not applied)') &&
+  has(UBOOT_WF, 'command set: mii reclaimed (P2 applied)') &&
+  has(UBOOT_WF, 'no defined CONFIG_CMD_MII state'));
+ok('the E4 v3 rescue endpoints and binary texts are gated',
+  ['rescue_query_raw_len', 'rescue_sysinfo_text', 'rescue_log_snapshot', 'rescue_integrity',
+    'rescue_handle_reboot', 'rescue_led_start', 'rescue_dhcp_load'].every((m) => has(UBOOT_WF, m)) &&
+  has(UBOOT_WF, 'E2631_PRODUCT_LEN[[:space:]]+17U') &&
+  has(UBOOT_WF, 'e2631_dhcp_pool_start') &&
+  ['X-E2631-Log-Bytes', 'X-E2631-Expected-Sha256', 'e2631-bootlog.txt', 'method not allowed']
+    .every((s) => has(UBOOT_WF, s)) &&
+  has(UBOOT_WF, 'E4 v3 rescue gate: sysinfo/log/integrity/reboot/LED/DHCP wired') &&
+  has(UBOOT_WF, 'rescue_sha256') &&
+  has(UBOOT_WF, "grep -q 'sha256_csum_wd' \"$src\"") &&
+  has(UBOOT_WF, "grep -q '(52 checks'"));
+ok('UBOOT-INFO records the E4 v3 budget and the final size chain',
+  ['E4 v3 gate bytes:', 'headroom bytes vs E4 v3 gate:', 'size delta vs v3 baseline:',
+    'E4 v3 budget:'].every((s) => has(UBOOT_WF, s)));
+ok('BUILD.md and uboot-port/README.md document the E4 v3 gate, baseline and P1 reclaim',
+  ['407,552', '245,760', '405,368', '12,380'].every((s) => has(UBOOT_BUDGET_DOC, s)) &&
+  ['407552', '245760', '405,368', '12,380'].every((s) => has(UBOOT_README, s)) &&
+  has(UBOOT_BUDGET_DOC, 'E4 v3 gate') && has(UBOOT_BUDGET_DOC, 'E2631_UBOOT_HEADROOM_MIN'));
+
 // E4 v1 (task-73) / v2 (v2.1 task-88) / v3 (task-91): the rescue page is one self-contained HTML
 // file that the build gzip-embeds into the U-Boot tree; the page talks to the
 // rescue HTTP server with a raw POST body and polls /status. The page, the embed
@@ -530,7 +578,7 @@ ok('the U-Boot workflow embeds the rescue page after git am, before make, and sh
   UBOOT_WF.includes('e2631_failsafe_asset.c') &&
   UBOOT_WF.includes('e2631_failsafe_asset.h') &&
   /sha256sum[^\n]*e2631_failsafe_asset\.c/.test(UBOOT_WF) &&
-  UBOOT_WF.includes('failsafe rescue page (E4 v2.1, task-73/task-87/task-88):'),
+  UBOOT_WF.includes('failsafe rescue page (E4 v3, task-73/task-87/task-88/task-90):'),
   'embed at ' + failsafeEmbedAt + ', post-am at ' + failsafePatchAt + ', build at ' + failsafeBuildAt);
 ok('uboot-port/failsafe/README.md documents the frozen interface, the protocol and the size budget',
   ['e2631_failsafe_html_gz', 'e2631_failsafe_html_gz_len', 'POST /flash?mode=validate',

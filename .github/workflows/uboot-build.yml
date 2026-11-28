@@ -250,7 +250,6 @@ jobs:
             CONFIG_MDIO_ZX279128S=y \
             CONFIG_NET_RANDOM_ETHADDR=y \
             CONFIG_CMD_DHCP=y \
-            CONFIG_CMD_MII=y \
             CONFIG_CMD_PING=y \
             '# CONFIG_CMD_FDT is not set' \
             '# CONFIG_CMD_TFTPBOOT is not set' \
@@ -767,13 +766,30 @@ jobs:
               exit 1
             fi
           done
-          for kept in CONFIG_CMD_BOOTM=y CONFIG_CMD_MTD=y CONFIG_CMD_DHCP=y CONFIG_CMD_TFTPBOOT=y CONFIG_CMD_MII=y CONFIG_CMD_PING=y CONFIG_OF_LIBFDT=y CONFIG_LMB=y; do
+          for kept in CONFIG_CMD_BOOTM=y CONFIG_CMD_MTD=y CONFIG_CMD_DHCP=y CONFIG_CMD_PING=y CONFIG_OF_LIBFDT=y CONFIG_LMB=y; do
             grep -qx "$kept" build/.config || {
               echo "::error::build/.config lost $kept"
               exit 1
             }
           done
-          echo "slim config: no EFI/MMC/FAT/standard-boot symbols; bootm, MTD and the net commands kept"
+          # task-92/E4 v3 budget ruling: P1 (patch 0042) reclaims CONFIG_CMD_FDT
+          # and CONFIG_CMD_TFTPBOOT, so the console has no fdt/tftp any more; P2
+          # (CONFIG_CMD_MII, ~5724 B) is held in reserve in case the size gate
+          # trips.  The core command set above stays mandatory; the tftp/mii
+          # pair is conditional and must have a defined state either way.
+          grep -qx '# CONFIG_CMD_TFTPBOOT is not set' build/.config || {
+            echo "::error::build/.config still enables CONFIG_CMD_TFTPBOOT (P1 reclaim missing)"
+            exit 1
+          }
+          if grep -qx 'CONFIG_CMD_MII=y' build/.config; then
+            echo "command set: mii retained (P2 not applied)"
+          elif grep -qx '# CONFIG_CMD_MII is not set' build/.config; then
+            echo "command set: mii reclaimed (P2 applied)"
+          else
+            echo "::error::build/.config has no defined CONFIG_CMD_MII state"
+            exit 1
+          fi
+          echo "slim config: no EFI/MMC/FAT/standard-boot symbols; bootm, MTD, DHCP/PING, OF and LMB kept; fdt/tftp reclaimed"
       - name: Assert the four reviewed writer modules own every MTD write (D-U1)
         # CMD_MTD_WRITE=n compiles the raw mtd write/erase subcommands out.  The
         # linked image then has exactly four reviewed writer modules, one per
@@ -1035,6 +1051,11 @@ jobs:
           headroom=$((payload_max - size))
           headroom_pct=$(awk -v h="$headroom" -v m="$payload_max" 'BEGIN { printf "%.2f", 100 * h / m }')
           gate_headroom=$((gate - size))
+          # task-90/task-92: E4 v3 keeps at least 240 KiB of headroom; report
+          # the v3 gate, its headroom and the delta against the pinned baseline.
+          v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))
+          v3_headroom=$((v3_limit - size))
+          size_delta=$((size - E2631_UBOOT_SIZE_BASELINE))
           mkdir -p artifacts
           cp build/u-boot.bin build/u-boot.map build/.config build/build.log artifacts/
           # E4 v1 (task-73): ship the generated rescue-page asset files too, so
@@ -1114,13 +1135,16 @@ jobs:
             echo "  mtd0 image bytes: $mtd0_size"
             echo "  hard cap bytes: $payload_max"
             echo "  CI gate bytes: $gate (hard cap - 8192 safety margin)"
+            echo "  E4 v3 gate bytes: $v3_limit (hard cap - $E2631_UBOOT_HEADROOM_MIN byte headroom; v3 baseline $E2631_UBOOT_SIZE_BASELINE bytes)"
             echo "  headroom bytes vs hard cap: $headroom"
             echo "  headroom percent vs hard cap: $headroom_pct%"
             echo "  headroom bytes vs CI gate: $gate_headroom"
+            echo "  headroom bytes vs E4 v3 gate: $v3_headroom"
+            echo "  size delta vs v3 baseline: $size_delta"
             echo "  env block sha256: $env_sha"
             echo "  .config sha256: $config_sha"
             echo ""
-            echo "failsafe rescue page (E4 v2.1, task-73/task-87/task-88):"
+            echo "failsafe rescue page (E4 v3, task-73/task-87/task-88/task-90):"
             sed 's/^/  /' artifacts/E2631-FAILSAFE-ASSET.txt
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
@@ -1138,10 +1162,11 @@ jobs:
             echo "- crc32: u-boot.bin $payload_crc, mtd0 image $mtd0_crc"
             echo "- command help: E2631-COMMAND-HELP.txt (static dump of the new commands)"
             echo "- sizes: UBOOT-SIZES.txt (per-object .text, sorted descending; see the artifact)"
-            echo "- failsafe page: E2631-FAILSAFE-ASSET.txt ($(grep '^gzip_bytes=' artifacts/E2631-FAILSAFE-ASSET.txt), served as a gzip asset; limit 32768 bytes (E4 v2 page budget))"
+            echo "- failsafe page: E2631-FAILSAFE-ASSET.txt ($(grep '^gzip_bytes=' artifacts/E2631-FAILSAFE-ASSET.txt), served as a gzip asset; limit 32768 bytes (E4 v2/v3 page budget, task-83 contract))"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
             echo "- payload footprint: u-boot.bin $size / hard cap $payload_max bytes (headroom $headroom bytes, $headroom_pct%); CI gate $gate bytes; mtd0 image $mtd0_size bytes"
+            echo "- E4 v3 budget: $size <= $v3_limit bytes (baseline $E2631_UBOOT_SIZE_BASELINE, size delta $size_delta, headroom vs gate $v3_headroom)"
             echo "- env block sha256: $env_sha, .config sha256: $config_sha"
             echo "- note: no flash writes; A1/A2/A3 load it over tftp into RAM; the image asset is for the future, user-approved flash stage"
           } >> "$GITHUB_STEP_SUMMARY"
