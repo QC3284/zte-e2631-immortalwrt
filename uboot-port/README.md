@@ -1208,3 +1208,19 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   MTD 写点仍 4 个；key rescue 与 recovery-key size 门禁均现于日志。首个 run `46095628957` 因新 pin
   未导出到门禁步骤而失败（尺寸本身合格），修复见 `a3426f8`。证据
   [evidence/uboot-key-rescue-20261128.md](../evidence/uboot-key-rescue-20261128.md) §5。
+- 2026-11-28（task-84，E4 v2.1 模块 C）：新增 patch 0036-0039——共享槽核心与槽写者（包解析/身份/守卫/
+  擦槽/写 body/写版本头/回读/失败擦头）、rootfs_data 恢复出厂与一次性启动槽 `e2631_next_slot`、
+  e2631env 分阶段写 API、`e2631rescue` 的 v2.1 端点（/slots、/env、/backup 五分区、/firmware
+  validate|write、/boot、/factory、/console、/env 写）。写 owner 仍是 e2631flash / e2631fwslot /
+  e2631factory / e2631env 四个；v1 的 /flash 与净载荷契约不变；页面资产 gzip 13,773 B（限 32,768）。
+  39 patches / post-am tree `788fda24b59a21b4e8a3491b166be48978e22a0b`。
+  CI run `46109519805`（run 46，head `065742d`）绿：14/14 步、checkpatch 0E/0W、slot core fixture
+  51 项 PASS、`mtd writer sites: 9`、E4 v2.1 门禁与尺寸门禁通过；`u-boot.bin` 405,368 B
+  （≤407,560 B）sha256 `481368a4e7350229a79192f47398413bb236f17e998520e9b7a0b6671f0555bf`
+  crc32 `0c5ef993`；mtd0 镜像 sha256 `856703a10c741bae202eb308c548fe5a24d5ac15ac9c8200f973d48a8f272bbe`
+  crc32 `64c4e55d`；装配后首 0x800 sha256
+  `c034cfd5d766b3a7e11b3505563eb97edca8b8484ed74bdda80ef7458df65752`；env 块 `6eee153b…` 未变；
+  banner `U-Boot 2027.01-rc2-g49f13e0cbe40`。三次 CI 失败均为门禁脚本问题（`66aae3a` boot_c 未定义、
+  `796c2a4` 工厂错误串由 %s 拼接、`065742d` -O2 内联后的 do_ 前缀）。真机验收（零写入 validate +
+  只读探针 + 首次真实写）交 task-86，需 Lead/用户批准。证据
+  [evidence/uboot-e4-v2-20261128.md](../evidence/uboot-e4-v2-20261128.md)。
