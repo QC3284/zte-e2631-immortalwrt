@@ -1,80 +1,317 @@
 <!DOCTYPE html>
+<html lang="zh-CN">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>E2631 U-Boot 救援</title>
+<title>E2631 恢复模式</title>
 <style>
-body{font:14px/1.5 system-ui,sans-serif;margin:0;background:#f4f4f4;color:#222}
-main{max-width:640px;margin:0 auto;padding:20px}
-h1{font-size:20px;margin:0 0 4px}
-p{margin:6px 0}
-.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin:12px 0}
-.mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all}
-#sha{color:#555}
-#bar{height:14px;background:#e3e3e3;border-radius:7px;overflow:hidden}
-#fill{height:100%;width:0;background:#2c6ebd;transition:width .2s}
-#log{border-top:1px solid #eee;margin-top:8px;padding-top:6px}
-#log div{padding:1px 0}
-.ok{color:#187a2f}.err{color:#b00020}
-button{font:inherit;padding:8px 18px;margin:8px 8px 0 0;border-radius:6px;border:1px solid #2c6ebd;background:#2c6ebd;color:#fff;cursor:pointer}
-button.alt{background:#fff;color:#2c6ebd}
-button:disabled{opacity:.45;cursor:default}
-.small{font-size:12px;color:#666}
+:root{--bg:#f4f6fb;--card:#fff;--line:#e3e8f0;--text:#1f2937;--muted:#6b7280;--accent:#2563eb;--ok:#15803d;--warn:#b45309;--err:#b91c1c;--chip:#eef2ff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#151f33;--line:#26334d;--text:#e5e7eb;--muted:#94a3b8;--accent:#60a5fa;--ok:#4ade80;--warn:#fbbf24;--err:#f87171;--chip:#1e293b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+.app{display:flex;min-height:100vh}
+.sidebar{width:232px;flex:0 0 232px;background:var(--card);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:10px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.title{font-weight:650;font-size:15px}
+.sub{color:var(--muted);font-size:11px;font-family:var(--mono);word-break:break-all}
+.navsec{color:var(--muted);font-size:11px;letter-spacing:.08em;margin:8px 0 4px;padding:0 8px}
+.navlink{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer;margin:2px 0}
+.navlink:hover{background:var(--chip)}
+.navlink.active{background:var(--accent);color:#fff}
+.navlink:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sidebar-note{margin-top:auto;color:var(--muted);font-size:11px;border-top:1px solid var(--line);padding-top:10px}
+main{flex:1;padding:22px 26px;max-width:1080px}
+h1{font-size:21px;margin:0 0 4px}
+h2{font-size:15px;margin:0}
+h3{font-size:12px;margin:0 0 6px;color:var(--muted)}
+.hint{color:var(--muted);margin:0 0 16px}
+.panel{display:none}
+.panel.active{display:block}
+.rail{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 16px;color:var(--muted);font-size:12px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.step.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:0 0 14px}
+.chead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.cmain{padding:12px 16px}
+.cfoot{padding:10px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+.cfoot ul{margin:4px 0 0;padding-left:18px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}
+.kv span{color:var(--muted);flex:0 0 auto}
+.kv b{font-weight:500;text-align:right;overflow-wrap:anywhere}
+.mono{font-family:var(--mono);font-size:12px}
+.bar{height:10px;background:var(--chip);border-radius:999px;overflow:hidden;margin:10px 0}
+.bar div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.btn{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;text-decoration:none;display:inline-block;margin:8px 6px 0 0}
+.btn.alt{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.danger{border-color:var(--err);background:var(--err)}
+label.field{display:block;margin:8px 0}
+label.field span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+input[type=file],select{width:100%;font:inherit;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+input[type=checkbox]{width:16px;height:16px;vertical-align:-2px;margin-right:6px}
+.log{border-top:1px dashed var(--line);margin-top:8px;padding-top:6px;font-size:12px;max-height:220px;overflow:auto}
+.log div{padding:1px 0}
+.ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}
+.pill{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.slot{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}
+.slot.next{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.slot .name{font-weight:650}
+.slot .meta{color:var(--muted);font-size:12px}
+.badge{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--chip);color:var(--muted);margin-left:4px}
+.badge.ok{color:var(--ok)}.badge.warn{color:var(--warn)}.badge.err{color:var(--err)}
+.note{border-left:3px solid var(--warn);background:var(--chip);padding:8px 12px;border-radius:6px;font-size:12px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+th{color:var(--muted);font-weight:500}
+@media (max-width:760px){.app{display:block}.sidebar{width:auto;flex:none;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}.grid{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><div class="logo" aria-hidden="true">E2631</div><div><div class="title">恢复模式</div><div class="sub" id="ubver">U-Boot</div></div></div>
+<nav aria-label="主导航">
+<div class="navsec">救援</div>
+<button class="navlink active" data-tab="status">系统状态</button>
+<button class="navlink" data-tab="firmware">固件更新</button>
+<button class="navlink" data-tab="boot">引导区</button>
+<div class="navsec">系统</div>
+<button class="navlink" data-tab="env">环境变量</button>
+<button class="navlink" data-tab="factory">恢复出厂</button>
+</nav>
+<div class="sidebar-note">本页只在救援模式生效；不自动重启，不写入 env。所有写操作结束后都需要<b>断电重启</b>。</div>
+</aside>
 <main>
-<h1>ZTE E2631 U-Boot 救援</h1>
-<p class="small">设备 IP 192.168.1.1。请选择官方 mtd0 镜像（恰 655360 字节）后先“仅校验”，通过后再“写入待命”。</p>
+
+<section id="tab-status" class="panel active">
+<h1>系统状态</h1>
+<p class="hint">启动路径、槽位与引导区备份。数据来自设备只读接口。</p>
+<div class="rail" aria-label="启动路径">
+<span class="step">BootROM</span><span class="step">secondboot</span><span class="step">U-Boot</span><span class="step on">救援模式</span>
+</div>
+<div class="grid">
 <div class="card">
-<input id="file" type="file" accept=".bin,application/octet-stream">
-<p id="meta" class="small">未选择文件</p>
-<p class="small">SHA-256（浏览器端）：<span id="sha" class="mono">—</span></p>
-<p class="small">SHA-256（设备端）：<span id="devsha" class="mono">—</span></p>
-<p class="small">摘要比对：<span id="match" class="mono">—</span></p>
-<button id="validate" disabled>仅校验</button>
-<button id="write" class="alt" disabled>写入待命</button>
+<div class="chead"><h2>运行状态</h2><span class="pill" id="stpill">空闲</span></div>
+<div class="cmain">
+<div class="kv"><span>任务</span><b id="st-op">—</b></div>
+<div class="kv"><span>阶段</span><b id="st-stage">—</b></div>
+<div class="kv"><span>进度</span><b id="st-progress">—</b></div>
+<div class="kv"><span>CRC32</span><b class="mono" id="st-crc">—</b></div>
+<div class="kv"><span>设备摘要</span><b class="mono" id="st-sha">—</b></div>
+<div class="kv"><span>摘要比对</span><b id="st-mat">—</b></div>
+<div class="kv"><span>结果</span><b id="st-result">—</b></div>
+<div class="kv"><span>错误</span><b class="mono" id="st-error">—</b></div>
+<div class="bar" aria-hidden="true"><div id="st-bar"></div></div>
+<button id="refresh" class="btn alt" type="button">刷新</button>
+</div>
 </div>
 <div class="card">
-<div id="bar"><div id="fill"></div></div>
-<div id="log" aria-live="polite"></div>
+<div class="chead"><h2>槽位</h2><span class="pill" id="nextpill">—</span></div>
+<div class="cmain" id="slotcards"><p class="hint">读取中…</p></div>
 </div>
-<p class="small">写入成功后不会自动重启：请断电重启（拔电再上电）。U-Boot 的 reset 命令当前不可用（后续修复），串口只打印下一步提示。写入需串口可用。</p>
+</div>
+<div class="card">
+<div class="chead"><h2>引导区备份（mtd0 0x20000..0xC0000）</h2></div>
+<div class="cmain">
+<div class="kv"><span>区间长度</span><b class="mono">655360 B</b></div>
+<div class="kv"><span>区域 CRC32</span><b class="mono" id="bk-crc">—</b></div>
+<div class="kv"><span>区域 SHA-256</span><b class="mono" id="bk-sha">—</b></div>
+<button id="bk-probe" class="btn alt" type="button">读取校验值</button>
+<a id="bk-dl" class="btn" href="/backup" download="e2631-uboot-region.bin">下载镜像区</a>
+</div>
+<div class="cfoot">下载与读取校验值均为只读，不写入 flash。</div>
+</div>
+</section>
+
+<section id="tab-firmware" class="panel">
+<h1>固件更新</h1>
+<p class="hint">写入启动槽（设备升级包 .bin；默认写本次会启动的槽）。</p>
+<div class="grid">
+<div class="card">
+<div class="chead"><h2>选择镜像</h2><span class="pill" id="fwpill">未选择</span></div>
+<div class="cmain">
+<label class="field" for="fwfile"><span>固件包（.bin，按原始字节上传）</span><input id="fwfile" type="file" accept=".bin,application/octet-stream"></label>
+<div class="kv"><span>文件</span><b id="fwmeta">未选择</b></div>
+<div class="kv"><span>大小</span><b id="fwsize">—</b></div>
+<div class="kv"><span>SHA-256（浏览器）</span><b class="mono" id="fwsha">—</b></div>
+<label class="field" for="fwslot"><span>目标槽</span><select id="fwslot"><option value="auto">auto（serial 最大）</option><option value="0">slot0</option><option value="1">slot1</option></select></label>
+<div class="kv"><span>解析目标</span><b id="fwtarget">—</b></div>
+<div class="kv"><span>目标槽身份</span><b id="fwident">—</b></div>
+<div class="kv"><span>写入守卫</span><b id="fwguard">—</b></div>
+<div class="kv"><span>设备摘要</span><b class="mono" id="fwdevsha">—</b></div>
+<div class="kv"><span>摘要比对</span><b id="fwmatch">—</b></div>
+<div class="bar" aria-hidden="true"><div id="fwbar"></div></div>
+<button id="fwvalidate" class="btn" type="button" disabled>仅校验</button>
+<button id="fwwrite" class="btn alt" type="button" disabled>写入待命</button>
+</div>
+<div class="cfoot"><h3>注意事项</h3><ul><li>校验通过、摘要一致且守卫不为 refuse 时才可写。</li><li>写入成功后下次启动目标槽；<b>断电重启后生效</b>。</li><li>写入期间不得断电；失败后启动仍在另一槽。</li><li>唯一拒绝覆盖的是“完整可用的原厂槽”；损坏或无法识别的槽可重写（救砖）。</li></ul></div>
+</div>
+<div class="card">
+<div class="chead"><h2>任务日志</h2><span class="pill" id="fwlogpill">空闲</span></div>
+<div class="cmain"><div id="fwlog" class="log" aria-live="polite"></div></div>
+</div>
+</div>
+</section>
+
+<section id="tab-boot" class="panel">
+<h1>引导区</h1>
+<p class="hint">只写 mtd0 的 U-Boot 镜像区 0x20000..0xC0000（655360 B）；secondboot 与 env 不动。</p>
+<div class="grid">
+<div class="card">
+<div class="chead"><h2>bootloader 镜像</h2><span class="pill" id="blpill">未选择</span></div>
+<div class="cmain">
+<div class="kv"><span>当前区域 CRC32</span><b class="mono" id="bl-crc">—</b></div>
+<label class="field" for="file"><span>镜像文件（e2631-uboot-mtd0.bin）</span><input id="file" type="file" accept=".bin,application/octet-stream"></label>
+<div class="kv"><span>文件</span><b id="meta">未选择</b></div>
+<div class="kv"><span>大小</span><b id="size">—</b></div>
+<div class="kv"><span>SHA-256（浏览器）</span><b class="mono" id="sha">—</b></div>
+<div class="kv"><span>SHA-256（设备端）</span><b class="mono" id="devsha">—</b></div>
+<div class="kv"><span>摘要比对</span><b id="match">—</b></div>
+<div class="bar" aria-hidden="true"><div id="bar"><div id="fill"></div></div></div>
+<button id="validate" class="btn" type="button" disabled>仅校验</button>
+<button id="write" class="btn alt" type="button" disabled>写入待命</button>
+</div>
+<div class="cfoot"><h3>注意事项</h3><ul><li>镜像必须<b>恰为 655360 字节</b>；只写 0x20000..0xC0000。</li><li>写入成功后<b>断电重启后生效</b>；不得断电。</li><li>串口可用时同步打印五步进度；Ctrl-C 可中止。</li></ul></div>
+</div>
+<div class="card">
+<div class="chead"><h2>任务日志</h2><span class="pill" id="logpill">空闲</span></div>
+<div class="cmain"><div id="log" class="log" aria-live="polite"></div></div>
+</div>
+</div>
+</section>
+
+<section id="tab-env" class="panel">
+<h1>环境变量</h1>
+<p class="hint">当前 U-Boot env 的只读快照。写入请用串口 <b>e2631env</b>（白名单），本页不提供写入。</p>
+<div class="card">
+<div class="chead"><h2>env 快照</h2><span class="pill" id="envpill">—</span></div>
+<div class="cmain">
+<button id="envrefresh" class="btn alt" type="button">刷新</button>
+<div id="envtable"></div>
+</div>
+<div class="cfoot">只读；任何情况下不回写 flash env。环境变量由 U-Boot 启动时按厂商格式加载。</div>
+</div>
+</section>
+
+<section id="tab-factory" class="panel">
+<h1>恢复出厂</h1>
+<p class="hint">擦除 overlay 分区（rootfs_data），下次启动 Linux 时重新格式化，恢复默认配置。</p>
+<div class="card">
+<div class="chead"><h2>擦除 rootfs_data</h2><span class="pill" id="facpill">空闲</span></div>
+<div class="cmain">
+<div class="kv"><span>目标分区</span><b class="mono">rootfs_data（按名核对）</b></div>
+<div class="kv"><span>偏移 / 长度</span><b class="mono">0x3360000 / 0x4A0000</b></div>
+<div class="note">擦除后 <b>overlay 与配置将丢失</b>；squashfs 与两个启动槽不动。成功提示后需要<b>断电重启</b>。失败时 Linux 仍可启动，只影响 overlay。</div>
+<p><label><input id="faccheck" type="checkbox"> 我已了解：overlay 与配置将被清除，且需要断电重启。</label></p>
+<div class="bar" aria-hidden="true"><div id="facbar"></div></div>
+<button id="factorygo" class="btn danger" type="button" disabled>擦除 overlay</button>
+</div>
+<div class="cfoot"><h3>注意事项</h3><ul><li>只擦按名核对的 rootfs_data，绝不换擦 mtd7。</li><li>擦除后回读校验全 0xFF；不写任何数据。</li><li>成功文案只提示断电重启，不提示 reset。</li></ul></div>
+</div>
+<div class="card">
+<div class="chead"><h2>任务日志</h2></div>
+<div class="cmain"><div id="faclog" class="log" aria-live="polite"></div></div>
+</div>
+</section>
+
 </main>
+</div>
 <script>
-(()=>{
+(function(){
 "use strict";
-const EXPECT=655360,POLL=500,MAX_FAIL=20;
-const $=id=>document.getElementById(id);
-const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
-const rotr=(x,n)=>(x>>>n)|(x<<(32-n));
-function sha256(buf){const l=buf.byteLength,H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19],bl=((l+8)>>6)+1,p=new Uint8Array(bl*64);p.set(new Uint8Array(buf));p[l]=0x80;const dv=new DataView(p.buffer),bit=l*8;dv.setUint32(bl*64-8,Math.floor(bit/0x100000000));dv.setUint32(bl*64-4,bit>>>0);const w=new Uint32Array(64);for(let i=0;i<bl;i++){const off=i*64;for(let t=0;t<16;t++)w[t]=dv.getUint32(off+t*4);for(let t=16;t<64;t++){const s0=rotr(w[t-15],7)^rotr(w[t-15],18)^(w[t-15]>>>3),s1=rotr(w[t-2],17)^rotr(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)>>>0}let a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];for(let t=0;t<64;t++){const S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[t]+w[t])>>>0,S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0}return H.map(x=>x.toString(16).padStart(8,"0")).join("")}
-let file=null,sha="",validated=false,deviceSha="";
-const log=(m,c)=>{const d=document.createElement("div");d.textContent=m;if(c)d.className=c;$("log").appendChild(d)};
-const setPct=p=>{$("fill").style.width=(p<0?0:p>100?100:p)+"%"};
-const busy=on=>{$("validate").disabled=on;$("write").disabled=on||!validated};
-const fail=m=>{log(m,"err");busy(false)};
-function lines(t){const o={};for(const ln of (t||"").split(/\r?\n/)){const m=/^([a-z_]+)=(.*)$/i.exec(ln.trim());if(m)o[m[1].toLowerCase()]=m[2]}return o}
-const STAGE={idle:"空闲",staged:"已上传待命",validating:"校验中",erase:"擦除中",blank:"擦除校验中",write:"写入中",readback:"回读中",compare:"比对中",done:"完成",error:"错误"};
-async function hashFile(f){try{const b=await f.arrayBuffer();const t=performance.now();sha=sha256(b);$("sha").textContent=sha;log("SHA-256 计算完成（"+Math.round(performance.now()-t)+" ms，浏览器端）")}catch(e){$("sha").textContent="计算失败";log("SHA-256 计算失败："+e,"err")}}
-$("file").addEventListener("change",async ev=>{const f=ev.target.files[0];file=f||null;sha="";$("sha").textContent="—";$("log").innerHTML="";setPct(0);if(!f){$("meta").textContent="未选择文件";$("validate").disabled=$("write").disabled=true;return}
-$("meta").textContent=f.name+" · "+f.size+" 字节"+(f.size===EXPECT?"（尺寸正确）":"（期望 "+EXPECT+" 字节，尺寸不符）");validated=false;deviceSha="";$("devsha").textContent="—";$("match").textContent="—";$("validate").disabled=false;$("write").disabled=true;await hashFile(f)});
-function showDigest(r){if(r.sha256){deviceSha=r.sha256;$("devsha").textContent=deviceSha}if(r.sha_match){$("match").textContent=r.sha_match}return r.sha256||deviceSha}
-function validateDone(r){setPct(100);const d=showDigest(r);if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));const ok=d&&d.toLowerCase()===sha&&(r.sha_match||"ok")==="ok";if(!ok){fail("摘要不一致：设备 "+(d||"?")+" / 浏览器 "+sha+(r.sha_match?"（sha_match="+r.sha_match+"）":""));return}validated=true;busy(false);log("校验通过：设备与浏览器摘要一致（sha_match=ok）","ok");log("可以点“写入待命”；写入过程不得断电。")}
-function done(r){setPct(100);const d=showDigest(r);if(d&&d.toLowerCase()!==sha){fail("写入后摘要不一致：设备 "+(d||"?")+" / 浏览器 "+sha);return}if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));log("成功："+(r.message||r.msg||"设备已完成"),"ok");log("未自动重启：请断电重启（拔电再上电）。U-Boot 的 reset 命令当前不可用（后续修复），串口只打印下一步提示。");busy(false)}
-function poll(){let fails=0,tries=0;const timer=setInterval(async()=>{tries++;if(tries>1200){clearInterval(timer);return fail("等待超时：设备未在 10 分钟内完成")}try{const res=await fetch("/status",{cache:"no-store"});const t=await res.text();const st=lines(t);fails=0;if(st.progress)setPct(Number(st.progress));if(st.stage){$("meta").textContent="阶段："+(STAGE[st.stage]||st.stage)}showDigest(st);if(st.crc32)log("CRC32："+st.crc32);if(st.result==="ok"||st.stage==="done"){clearInterval(timer);done(st)}else if(st.result==="error"||st.stage==="error"||st.error){clearInterval(timer);fail(st.error||"设备返回错误")}}catch(e){if(++fails>=MAX_FAIL){clearInterval(timer);return fail("状态查询连续失败："+e)}}},POLL)}
-function start(mode){if(!file)return;if(file.size!==EXPECT){fail("文件尺寸必须恰为 "+EXPECT+" 字节，当前 "+file.size);return}
-if(!confirm(mode==="validate"?"仅校验：上传并校验镜像，不写入 flash。继续？":"写入待命：上传→校验→擦写 mtd0 镜像区（0x20000..0xC0000）。写入期间不得断电，且需确保串口可用。继续？"))return;
-busy(true);setPct(0);$("log").innerHTML="";log(mode==="validate"?"上传中（仅校验）…":"上传中（写入待命）…");
-const xhr=new XMLHttpRequest();xhr.open("POST","/flash?mode="+mode);xhr.setRequestHeader("Content-Type","application/octet-stream");xhr.setRequestHeader("X-E2631-SHA256",sha);if(mode==="write")xhr.setRequestHeader("X-E2631-Confirm","write");
-xhr.upload.onprogress=ev=>{if(ev.lengthComputable){const p=ev.loaded/ev.total*100;setPct(p);$("meta").textContent=file.name+" · 上传 "+p.toFixed(1)+"%"}};
-xhr.upload.onload=()=>{log("上传完成，等待设备处理…");setPct(100)};
-xhr.onerror=()=>fail("网络错误：设备未响应（检查网线与设备是否在救援模式）");
-xhr.onload=()=>{const r=lines(xhr.responseText||"");if(xhr.status<200||xhr.status>=300){fail(r.error||"HTTP "+xhr.status);return}
-if(r.crc32||r.crc)log("CRC32："+(r.crc32||r.crc));
-if(r.result==="error"||r.error){fail(r.error||"设备拒绝");return}
-if(mode==="validate"&&(r.result==="ok"||r.stage==="done")){validateDone(r);return}
-if(r.result==="ok"){validateDone(r);return}
-if(r.result==="staged"||r.result==="accepted"||r.stage){poll();return}
-fail("无法识别的设备响应："+(xhr.responseText||"").slice(0,200).replace(/\s+/g," "))};
+var $=function(id){return document.getElementById(id)};
+var STAGE={idle:"空闲",staged:"已上传待命",validating:"校验中",erase:"擦除中",blank:"擦除校验中",write:"写入中",readback:"回读中",compare:"比对中",done:"完成",error:"错误"};
+var OP={idle:"空闲",flash:"引导区写入",firmware:"固件更新",factory:"恢复出厂"};
+var IDENT={empty:"空槽",vendor:"原厂",ours:"本固件",unknown:"无法识别"};
+var GUARD={ok:"允许",weak:"允许（回退为非原厂）",refuse:"拒绝"};
+var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function rotr(x,n){return (x>>>n)|(x<<(32-n))}
+function sha256(buf){var l=buf.byteLength,H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19],bl=((l+8)>>6)+1,p=new Uint8Array(bl*64);p.set(new Uint8Array(buf));p[l]=0x80;var dv=new DataView(p.buffer),bit=l*8;dv.setUint32(bl*64-8,Math.floor(bit/0x100000000));dv.setUint32(bl*64-4,bit>>>0);var w=new Uint32Array(64);for(var i=0;i<bl;i++){var off=i*64;for(var t=0;t<16;t++)w[t]=dv.getUint32(off+t*4);for(t=16;t<64;t++){var s0=rotr(w[t-15],7)^rotr(w[t-15],18)^(w[t-15]>>>3),s1=rotr(w[t-2],17)^rotr(w[t-2],19)^(w[t-2]>>>10);w[t]=(w[t-16]+s0+w[t-7]+s1)>>>0}var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];for(t=0;t<64;t++){var S1=rotr(e,6)^rotr(e,11)^rotr(e,25),ch=(e&f)^(~e&g),t1=(h+S1+ch+K[t]+w[t])>>>0,S0=rotr(a,2)^rotr(a,13)^rotr(a,22),maj=(a&b)^(a&c)^(b&c),t2=(S0+maj)>>>0;h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0}H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0}var out="";for(i=0;i<8;i++)out+=("00000000"+H[i].toString(16)).slice(-8);return out}
+function lines(t){var o={};String(t||"").split(/\r?\n/).forEach(function(ln){var m=/^([A-Za-z0-9_]+)=(.*)$/.exec(ln.trim());if(m)o[m[1].toLowerCase()]=m[2]});return o}
+function getText(u){return fetch(u,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text()})}
+function setTxt(id,t){var el=$(id);if(el)el.textContent=t}
+function setHtml(id,t){var el=$(id);if(el)el.innerHTML=t}
+function pct(id,p){var el=$(id);if(el)el.style.width=Math.max(0,Math.min(100,p))+"%"}
+function addLog(id,msg,cls){var box=$(id);if(!box)return;var d=document.createElement("div");d.textContent=msg;if(cls)d.className=cls;box.appendChild(d);box.scrollTop=box.scrollHeight}
+function failLog(id,msg){addLog(id,msg,"err")}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+var slotsState={};var statusTimer=null;
+function startStatusPoll(){if(statusTimer)return;statusTimer=setInterval(refreshStatus,1000)}
+function stopStatusPoll(){if(statusTimer){clearInterval(statusTimer);statusTimer=null}}
+function tabs(){var list=document.querySelectorAll(".navlink");Array.prototype.forEach.call(list,function(b){b.addEventListener("click",function(){Array.prototype.forEach.call(list,function(x){x.classList.remove("active")});b.classList.add("active");Array.prototype.forEach.call(document.querySelectorAll(".panel"),function(p){p.classList.remove("active")});var el=$("tab-"+b.getAttribute("data-tab"));if(el)el.classList.add("active");var tab=b.getAttribute("data-tab");if(tab==="status"){refreshStatus();loadSlots();startStatusPoll()}else{stopStatusPoll()}if(tab==="env")loadEnv()})})}
+function loadSlots(){return getText("/slots").then(function(t){var s=lines(t);slotsState=s;renderSlots(s);fwRefreshInfo();return s}).catch(function(e){setHtml("slotcards",'<p class="err">槽位读取失败：'+esc(e.message)+"</p>")})}
+function badge(ok,onText,offText){return '<span class="badge '+(ok?"ok":"err")+'">'+esc(ok?onText:offText)+"</span>"}
+function renderSlots(s){var next=s.next_slot;setTxt("nextpill",next==="0"?"本次启动 slot0":next==="1"?"本次启动 slot1":"无可启动槽");
+var h="";[0,1].forEach(function(n){var pre="slot"+n;var valid=s[pre+"_valid"]==="1",intact=s[pre+"_intact"]==="1";var ident=s[pre+"_identity"]||"unknown";var serial=s[pre+"_serial"]||"",ver=s[pre+"_version"]||"";
+h+='<div class="slot'+(String(n)===String(next)?" next":"")+'"><div><div class="name">'+pre+(String(n)===String(next)?' <span class="badge ok">next</span>':"")+'</div><div class="meta">serial '+esc(serial||"-")+" · "+esc(ver||"无版本")+' <span class="badge">'+esc(IDENT[ident]||ident)+"</span>"+badge(valid,"头有效","头无效")+badge(intact,"完好","不完整")+'</div></div><div><button class="btn alt" type="button" data-boot="'+n+'"'+(valid&&intact?"":" disabled")+">下次启动此槽</button></div></div>"});
+setHtml("slotcards",h);Array.prototype.forEach.call(document.querySelectorAll("[data-boot]"),function(b){b.addEventListener("click",function(){bootSlot(b.getAttribute("data-boot"))})})}
+function bootSlot(n){if(!confirm("设置本次启动槽 slot"+n+"（仅 RAM，不写 flash）。按 Ctrl-C 退出救援后运行 e2631boot 生效。继续？"))return;fetch("/boot?slot="+n,{method:"POST"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||"HTTP 失败");alert("已设置：按 Ctrl-C 退出救援后运行 e2631boot 生效（仅本次）。")}).catch(function(e){alert("设置失败："+e.message)})}
+function stStage(s){return STAGE[s]||s||"—"}
+function refreshStatus(){return getText("/status").then(function(t){var s=lines(t);if(s.version)setTxt("ubver",s.version);setTxt("st-op",OP[s.op]||s.op||"—");setTxt("st-stage",stStage(s.stage));var prog=(s.progress||"0")+"%";if(s.bytes_total&&s.bytes_total!=="0")prog+="（"+(s.bytes_done||"0")+"/"+s.bytes_total+"）";setTxt("st-progress",prog);setTxt("st-crc",s.crc32||"—");setTxt("st-sha",s.sha256||"—");setTxt("st-mat",s.sha_match||"—");setTxt("st-result",s.result||"—");setTxt("st-error",s.error||"—");setTxt("stpill",stStage(s.stage));pct("st-bar",Number(s.progress||0));if(s.bootloader_region_crc32){setTxt("bl-crc",s.bootloader_region_crc32);setTxt("bk-crc",s.bootloader_region_crc32)}return s}).catch(function(){return null})}
+function probeBackup(){var btn=$("bk-probe");btn.disabled=true;fetch("/backup",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);var crc=r.headers.get("X-E2631-CRC32")||"—",sha=r.headers.get("X-E2631-SHA256")||"";return r.arrayBuffer().then(function(b){var local=sha256(b);setTxt("bk-crc",crc);setTxt("bk-sha",sha||local);if(sha&&local!==sha.toLowerCase())addLog("log","警告：区域 SHA-256 本地复算与响应头不一致","warn")})}).catch(function(e){setTxt("bk-crc","读取失败："+e.message)}).then(function(){btn.disabled=false})}
+function loadEnv(){setTxt("envpill","读取中…");getText("/env").then(function(t){var rows=String(t||"").split(/\r?\n/).filter(function(x){return x&&x.indexOf("=")>0});var size="",h='<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>';rows.forEach(function(r){if(r.indexOf("env_size=")===0){size=r.slice(9);return}var i=r.indexOf("=");h+='<tr><td class="mono">'+esc(r.slice(0,i))+'</td><td class="mono">'+esc(r.slice(i+1))+"</td></tr>"});h+="</tbody></table>";setHtml("envtable",h);setTxt("envpill",size?("容量 "+size):(rows.length+" 项"))}).catch(function(e){setTxt("envpill","读取失败");setHtml("envtable",'<p class="err">'+esc(e.message)+"</p>")})}
+var busy=false;
+function refreshButtons(){["refresh","bk-probe","envrefresh"].forEach(function(id){var el=$(id);if(el)el.disabled=busy});var fv=$("fwvalidate");if(fv)fv.disabled=busy||!fwFile;var fww=$("fwwrite");if(fww)fww.disabled=busy||!fwOk||fwGuard==="refuse";var v=$("validate");if(v)v.disabled=busy||!blFile;var w=$("write");if(w)w.disabled=busy||!blOk;syncFactoryBtn()}
+function setBusy(b){busy=b;refreshButtons()}
+function syncFactoryBtn(){var el=$("factorygo");if(el)el.disabled=busy||!$("faccheck").checked}
+function waitStatus(opts){var fails=0,tries=0;var timer=setInterval(function(){tries++;if(tries>1800){clearInterval(timer);if(opts.onfail)opts.onfail("等待超时：设备未在 15 分钟内完成");return}getText("/status").then(function(t){var s=lines(t);fails=0;if(opts.pctId)pct(opts.pctId,Number(s.progress||0));if(opts.onstatus)opts.onstatus(s);if(s.stage==="done"||s.result==="ok"){clearInterval(timer);if(opts.ondone)opts.ondone(s)}else if(s.stage==="error"||s.result==="error"||s.error){clearInterval(timer);if(opts.onfail)opts.onfail(s.error||"设备返回错误")}}).catch(function(e){if(++fails>=20){clearInterval(timer);if(opts.onfail)opts.onfail("状态查询连续失败："+e.message)}})},500)}
+var fwFile=null,fwSha="",fwOk=false,fwDevSha="",fwGuard="ok";
+function fwIdentityText(ident,valid,intact){var t=IDENT[ident]||ident||"未知";if(valid&&intact)return t+"（完好）";if(ident==="unknown"||ident==="")return "无法识别/已损坏";return t+"（不完整）"}
+function fwRefreshInfo(){var s=slotsState||{};var pick=$("fwslot").value;var target=pick==="auto"?s.next_slot:pick;setTxt("fwtarget",target===undefined||target===""?"未知":(target==="-1"?"无可启动槽":"slot"+target));
+if(target!==undefined&&target!==""&&target!=="-1"){var pre="slot"+target;var ident=s[pre+"_identity"]||"unknown",intact=s[pre+"_intact"]==="1";setTxt("fwident",fwIdentityText(ident,s[pre+"_valid"]==="1",intact));var g="ok";if(ident==="vendor"&&intact)g="refuse";else{var other="slot"+(String(target)==="0"?"1":"0");if(intact&&s[other+"_identity"]==="ours"&&s[other+"_intact"]==="1")g="weak"}setTxt("fwguard",GUARD[g]||g);setTxt("fwpill",g==="refuse"?"目标是完整原厂槽":(fwFile?"就绪":"未选择"));return g}
+setTxt("fwident","—");setTxt("fwguard","—");return "ok"}
+$("fwslot").addEventListener("change",fwRefreshInfo);
+$("fwfile").addEventListener("change",function(ev){fwFile=ev.target.files[0]||null;fwSha="";fwDevSha="";fwOk=false;fwGuard="ok";setTxt("fwsha","—");setTxt("fwdevsha","—");setTxt("fwmatch","—");$("fwwrite").disabled=true;setHtml("fwlog","");pct("fwbar",0);if(!fwFile){setTxt("fwmeta","未选择");setTxt("fwsize","—");setTxt("fwpill","未选择");$("fwvalidate").disabled=true;return}
+var ok=fwFile.size>=0x214&&fwFile.size<=0x1BE0214;setTxt("fwmeta",fwFile.name);setTxt("fwsize",fwFile.size+" B"+(ok?"":"（超出 0x214..0x1BE0214）"));setTxt("fwpill",ok?"已选择":"尺寸不符");$("fwvalidate").disabled=!ok;if(!ok)return;fwFile.arrayBuffer().then(function(b){var t=performance.now();fwSha=sha256(b);setTxt("fwsha",fwSha);addLog("fwlog","浏览器 SHA-256 完成（"+Math.round(performance.now()-t)+" ms）")}).catch(function(e){failLog("fwlog","摘要计算失败："+e.message)})});
+function startFw(mode){if(!fwFile||busy)return;var slotv=$("fwslot").value;if(mode==="write"&&(!fwOk||fwSha!==fwDevSha)){alert("请先通过“仅校验”且设备与浏览器摘要一致。");return}
+if(mode==="write"&&fwGuard==="refuse"){alert("写入守卫：目标槽是完整可用的原厂系统，拒绝覆盖。");return}
+var targetTxt=$("fwtarget").textContent;if(mode==="write"&&!confirm("写入固件到 "+targetTxt+"。写入后下次启动该槽；断电重启后生效。写入期间不得断电。继续？"))return;
+setBusy(true);pct("fwbar",0);setHtml("fwlog","");setTxt("fwpill",mode==="write"?"写入中":"校验中");addLog("fwlog","上传中（"+(mode==="validate"?"仅校验":"写入待命")+"）…");
+var xhr=new XMLHttpRequest();xhr.open("POST","/firmware?mode="+mode+"&slot="+encodeURIComponent(slotv));xhr.setRequestHeader("Content-Type","application/octet-stream");xhr.setRequestHeader("X-E2631-SHA256",fwSha);if(mode==="write")xhr.setRequestHeader("X-E2631-Confirm","write");
+xhr.upload.onprogress=function(ev){if(!ev.lengthComputable)return;var p=ev.loaded/ev.total*100;pct("fwbar",p);setTxt("fwpill","上传 "+p.toFixed(1)+"%")};
+xhr.onerror=function(){failLog("fwlog","网络错误：设备未响应");setBusy(false)};
+xhr.onload=function(){var d=lines(xhr.responseText||"");if(xhr.status<200||xhr.status>=300||d.result==="error"||d.error){failLog("fwlog","设备拒绝："+(d.error||("HTTP "+xhr.status)));setTxt("fwpill","失败");setBusy(false);return}
+if(d.sha256)setTxt("fwdevsha",d.sha256);if(d.sha_match)setTxt("fwmatch",d.sha_match);if(d.crc32)addLog("fwlog","CRC32："+d.crc32);if(d.slot_target!==undefined)setTxt("fwtarget","slot"+d.slot_target);if(d.guard){fwGuard=d.guard;setTxt("fwguard",GUARD[d.guard]||d.guard)}if(d.guard_reason)addLog("fwlog","守卫说明："+d.guard_reason,"warn");
+if(mode==="validate"){var ds=d.sha256||"";var ok=!!(ds&&ds.toLowerCase()===fwSha&&(d.sha_match||"ok")==="ok"&&fwGuard!=="refuse");fwDevSha=ds;fwOk=ok;if(ok){addLog("fwlog","校验通过：设备与浏览器摘要一致（sha_match=ok）。可点“写入待命”。","ok");$("fwwrite").disabled=false;setTxt("fwpill","校验通过")}else{failLog("fwlog","校验未通过：设备摘要 "+(ds||"?")+" / 浏览器 "+fwSha+"（sha_match="+(d.sha_match||"absent")+"，guard="+fwGuard+"）");setTxt("fwpill","未通过")}setBusy(false);return}
+if(d.result==="accepted"){addLog("fwlog","设备已接收，开始擦写…");setTxt("fwpill","写入中");waitStatus({pctId:"fwbar",onstatus:function(s){setTxt("fwpill",stStage(s.stage)+" "+(s.progress||"0")+"%");if(s.error)addLog("fwlog","错误："+s.error,"err")},ondone:function(s){setBusy(false);setTxt("fwpill","完成");addLog("fwlog","成功：写入完成"+(s.written_serial?("，新 serial "+s.written_serial):"")+(s.crc32?("，CRC32 "+s.crc32):""),"ok");addLog("fwlog","断电重启后生效；启动将进入 "+(s.slot_target!==undefined?("slot"+s.slot_target):targetTxt)+"。","ok")},onfail:function(m){setBusy(false);setTxt("fwpill","失败");failLog("fwlog","写入失败："+m);addLog("fwlog","启动仍留在另一槽。","warn")}});return}
+setBusy(false);failLog("fwlog","无法识别的设备响应："+String(xhr.responseText||"").slice(0,200))};
+xhr.send(fwFile)}
+$("fwvalidate").addEventListener("click",function(){startFw("validate")});
+$("fwwrite").addEventListener("click",function(){startFw("write")});
+var blFile=null,blSha="",blOk=false,blDevSha="";
+var EXPECT=655360;
+$("file").addEventListener("change",function(ev){blFile=ev.target.files[0]||null;blSha="";blOk=false;blDevSha="";setTxt("sha","—");setTxt("devsha","—");setTxt("match","—");$("write").disabled=true;setHtml("log","");pct("fill",0);if(!blFile){setTxt("meta","未选择");setTxt("size","—");setTxt("blpill","未选择");$("validate").disabled=true;return}
+setTxt("meta",blFile.name);setTxt("size",blFile.size+" B"+(blFile.size===EXPECT?"（尺寸正确）":"（期望 "+EXPECT+" 字节）"));setTxt("blpill",blFile.size===EXPECT?"已选择":"尺寸不符");$("validate").disabled=false;blFile.arrayBuffer().then(function(b){blSha=sha256(b);setTxt("sha",blSha);addLog("log","浏览器 SHA-256 完成")}).catch(function(e){failLog("log","摘要计算失败："+e.message)})});
+function startBl(mode){if(!blFile||busy)return;if(blFile.size!==EXPECT){failLog("log","文件尺寸必须恰为 "+EXPECT+" 字节");return}
+if(mode==="write"&&(!blOk||blSha!==blDevSha)){alert("请先通过“仅校验”且设备与浏览器摘要一致。");return}
+if(mode==="write"&&!confirm("写入待命：上传→校验→擦写 mtd0 镜像区（0x20000..0xC0000）。写入期间不得断电。继续？"))return;
+setBusy(true);pct("fill",0);setHtml("log","");setTxt("blpill",mode==="write"?"写入中":"校验中");addLog("log",mode==="validate"?"上传中（仅校验）…":"上传中（写入待命）…");
+var file=blFile;
+var xhr=new XMLHttpRequest();xhr.open("POST","/flash?mode="+mode);xhr.setRequestHeader("Content-Type","application/octet-stream");xhr.setRequestHeader("X-E2631-SHA256",blSha);if(mode==="write")xhr.setRequestHeader("X-E2631-Confirm","write");
+xhr.upload.onprogress=function(ev){if(!ev.lengthComputable)return;var p=ev.loaded/ev.total*100;pct("fill",p);setTxt("blpill","上传 "+p.toFixed(1)+"%")};
+xhr.onerror=function(){failLog("log","网络错误：设备未响应");setBusy(false)};
+xhr.onload=function(){var d=lines(xhr.responseText||"");if(xhr.status<200||xhr.status>=300||d.result==="error"||d.error){failLog("log","设备拒绝："+(d.error||("HTTP "+xhr.status)));setTxt("blpill","失败");setBusy(false);return}
+if(d.sha256)setTxt("devsha",d.sha256);if(d.sha_match)setTxt("match",d.sha_match);if(d.crc32)addLog("log","CRC32："+d.crc32);
+if(mode==="validate"){var ds=d.sha256||"";var ok=!!(ds&&ds.toLowerCase()===blSha&&(d.sha_match||"ok")==="ok");blDevSha=ds;blOk=ok;if(ok){addLog("log","校验通过：设备与浏览器摘要一致（sha_match=ok）。可点“写入待命”。","ok");$("write").disabled=false;setTxt("blpill","校验通过")}else{failLog("log","校验未通过：设备摘要 "+(ds||"?")+" / 浏览器 "+blSha)}setBusy(false);return}
+if(d.result==="accepted"){addLog("log","设备已接收，开始擦写…");setTxt("blpill","写入中");waitStatus({pctId:"fill",onstatus:function(s){setTxt("blpill",stStage(s.stage)+" "+(s.progress||"0")+"%")},ondone:function(s){setBusy(false);setTxt("blpill","完成");addLog("log","成功：写入完成"+(s.crc32?("，CRC32 "+s.crc32):""),"ok");addLog("log","断电重启后生效。","ok")},onfail:function(m){setBusy(false);setTxt("blpill","失败");failLog("log","写入失败："+m)}});return}
+setBusy(false);failLog("log","无法识别的设备响应："+String(xhr.responseText||"").slice(0,200))};
 xhr.send(file)}
-$("validate").onclick=()=>start("validate");$("write").onclick=()=>start("write");
+$("validate").addEventListener("click",function(){startBl("validate")});
+$("write").addEventListener("click",function(){startBl("write")});
+var facBusy=false;
+$("faccheck").addEventListener("change",syncFactoryBtn);
+$("factorygo").addEventListener("click",function(){if(facBusy||busy)return;if(!$("faccheck").checked){alert("请先勾选“我已了解”。");return}
+if(!confirm("擦除 rootfs_data：overlay 与配置将丢失，成功后需断电重启。确定继续？"))return;
+facBusy=true;setBusy(true);$("factorygo").disabled=true;pct("facbar",0);setHtml("faclog","");addLog("faclog","请求擦除 overlay…");setTxt("facpill","擦除中");
+fetch("/factory?confirm=reset",{method:"POST",headers:{"X-E2631-Confirm":"reset"}}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||"HTTP 失败");addLog("faclog","设备已接收，擦除中…");waitStatus({pctId:"facbar",onstatus:function(s){setTxt("facpill",stStage(s.stage)+" "+(s.progress||"0")+"%")},ondone:function(s){facBusy=false;setBusy(false);setTxt("facpill","完成");addLog("faclog","擦除完成并回读校验为全 0xFF。断电重启后生效。","ok")},onfail:function(m){facBusy=false;setBusy(false);setTxt("facpill","失败");failLog("faclog","擦除失败："+m)}})}).catch(function(e){facBusy=false;setBusy(false);setTxt("facpill","失败");failLog("faclog","擦除失败："+e.message)})});
+$("envrefresh").addEventListener("click",loadEnv);
+$("refresh").addEventListener("click",function(){refreshStatus();loadSlots()});
+$("bk-probe").addEventListener("click",probeBackup);
+tabs();refreshStatus();loadSlots();startStatusPoll();
 })();
 </script>
+</body>
+</html>
