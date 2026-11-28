@@ -219,3 +219,78 @@ curl 实测：page 200/44003；`version` stdout+exit=0；`a;b` 400；`e2631_test
 - 页面不提供 env vendor 键编辑；`/console` 不新增 MTD 写路径（命令仍由 e2631flash/fwslot 等所有者执行）。
 - base-builder task-84 按契约 §15 实现 `/console`、`/env`、`/backup?part=`；本任务只改页面/契约/mock/文档。
 - task-86 真机验收按 README §8 的 v2.1 补充项执行。
+## 11. v3 页面扩展（task-91，2026-11-28）
+
+### 11.1 范围与依据
+
+task-91 按 `evidence/e4-v3-contract-delta-20261128.md`（task-89 v3 契约）扩展页面：
+六个标签不变（系统状态/固件更新/引导区/环境变量/串口台/恢复出厂），新增
+系统信息、启动日志、完整性自检、用户确认重启、整槽/rootfs/版本头备份、DHCP 配置，
+以及中英双语。v3 明确不做 UBI/SIMG，也不做网页终端 stdin；页面仍不自动重启。
+
+### 11.2 尺寸与确定性
+
+| 项 | v2.1（task-88） | v3（task-91） |
+|---|---|---|
+| 原始 | 44,003 B | 78,957 B |
+| gzip | 13,773 B | 24,904 B |
+| 页面 sha256 | d6bff922… | b70ce1c9… |
+| gzip sha256 | 496c5651… | 8172e720… |
+| 预算 | 32,768 B | 32,768 B（未抬闸） |
+
+`tools/embed-failsafe.sh --check`：`raw 78957 B, gzip 24904 B (limit 32768 B)`。
+嵌入仍为 `gzip -9 -n` 确定性输出；冻结符号 `e2631_failsafe_html_gz` /
+`e2631_failsafe_html_gz_len` 未改。当前生成物：`.c` sha256
+`df66458e2ae93a3d11d0cb540c6633e98cba3add97edee15fcd2bc5b6fbb9d87`，
+`.h` sha256 `e4ea1fe10374b7263caf1f61be2e595180629d6e52b40eae6e3184fbe3ef8ad4`；
+两次生成逐字节相同。
+
+### 11.3 页面实现
+
+- **系统信息**：状态页 33 行键值表（version/banner/build/board/SoC/DRAM/SPI-NAND/CP15/时钟），
+  数据来自只读 `GET /sysinfo`；刷新按钮手动触发。
+- **启动日志**：`GET /log` 原始文本（不翻译），读取 `X-E2631-Log-Bytes` /
+  `X-E2631-Log-Overflow`，支持下载 `/log`。
+- **完整性自检**：`POST /integrity` 返回 mtd0 镜像区 CRC32/SHA-256，与 `/status` 的
+  `bootloader_region_crc32` 比对显示“一致/不一致”。
+- **重启**：`POST /reboot` 且 `X-E2631-Confirm: reboot`；二次确认后只显示“已接收”，
+  不自动刷新、不自动重启；文案要求断电重启或等待复位。
+- **引导区备份**：`/backup?part=` 扩为 9 项（v2.1 五项 + slot0/slot1/rootfs/header）；
+  rootfs/header 偏移按 `/slots` 的 `next_slot` 计算（slot0 0x00B00000/0x01C00000；
+  slot1 0x02700000/0x03800000）；页面显示偏移/长度/CRC32/SHA-256 并可下载。
+- **DHCP 配置**：`e2631_dhcp_ipaddr/netmask/pool_start/pool_size` 白名单键；
+  `fillDhcp` 从 `/env` 回填（缺省 192.168.1.1 / 255.255.255.0 / 100 / 101），
+  前端校验 IPv4、池范围与地址冲突，逐键调用 `POST /env?...&confirm=write` 并轮询
+  `op=envwrite` 五步；成功后需要下次进入救援模式生效。
+- **I18N**：单文件 265 条中→英字典；`trText` 精确匹配再按长键内嵌替换；`setTxt/setHtml/
+  addLog/failLog` 与 `alert/confirm` 均走翻译；静态节点由 `applyStaticLang` 遍历文本与
+  `placeholder/aria-label/title` 属性；默认中文，切换写 `localStorage.e2631_lang` 后
+  `location.reload()`；忙时禁止切换。
+- **兼容性/无障碍**：保留侧边栏 + 卡片形态、键盘 focus-visible、`prefers-reduced-motion`、
+  760px 单列；无外部 URL/字体/框架；v1 `/flash` 写入契约原样保留。
+
+### 11.4 测试证据
+
+- **jsdom 26 功能测试**（`/tmp/jsd`，非仓库依赖）：加载真实页面后无 JS 错误；
+  自动加载 `/status`、`/sysinfo`、`/log`（304 B）；env 白名单渲染、DHCP 改
+  `pool_size=120` 后保存按钮启用、`POST /env` 返回 accepted、`/status` 五步完成、
+  回填 120 且按钮回到 disabled；引导区 rootfs 显示 `0x2700000 / 17825792 B`、
+  header `0x3800000 / 131072 B`；完整性自检 CRC `0x0721e716` 与运行记录一致；
+  重启 POST 返回 accepted 且提示“已接收”；EN 模式标题 `E2631 Recovery`、导航
+  `Status,Firmware,Boot Area,Environment,Console,Factory Reset`、系统信息表头
+  `Key=Value` 且无 JS 错误。测试中发现并修复 `loadEnv` 未返回 Promise 导致
+  `origLoadEnv().then` 报错、以及 `/env` 读取失败不应启用 DHCP 写入的问题。
+- **验收脚本自测**（mock，`tools/mock-failsafe.mjs`，127.0.0.1:18110）：
+  `--v21` PASS=138 FAIL=0 NOTE=1（NOTE 为 mock `/env` 键数少）；v1 默认
+  PASS=19 FAIL=0 NOTE=0；均 RESULT: PASS。
+- **门禁**：`node tools/check-workflows.mjs` 107 PASS / OK；`make check` 通过
+  （仅树 fork 缺省 SKIP 有说明）；`node --check` 抽出脚本通过；页面 sha/gzip sha
+  与 README 记录一致；105 个 id 无重复。
+
+### 11.5 预算与后续
+
+页面 gzip 比 v2.1 增加 11,131 B（I18N 与 v3 功能），仍在 32,768 B 门内。
+二进制余量需 task-92 复核：当前 U-Boot 405,368 B + 页面 24,904 B + 其余，
+P1 回收（CMD_FDT/CMD_TFTPBOOT）后约 249 KB 余量，task-90 的 C 模块仍可能逼近
+240 KB 门；必要时按契约在页面 gzip > 26,000 B 或余量门被破时裁 I18N。
+页面端点已按 v3 契约实现，base-builder 的补丁 0040+ 落地后即可做 task-93 真机验收。

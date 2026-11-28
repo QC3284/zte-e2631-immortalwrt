@@ -73,12 +73,15 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 .kvrow span{color:var(--muted);font-size:12px;flex:0 0 200px}
 .kvrow input{flex:1}
 @media (max-width:760px){.kvrow{display:block}.kvrow span{flex:none;display:block;margin-bottom:4px}}
+.langbtn{margin-left:auto;font-size:11px;padding:4px 8px;margin-top:0}
+@media (max-width:760px){.langbtn{margin-left:0}}
+pre.out{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:12px;min-height:110px;max-height:260px;overflow:auto;margin:8px 0}
 </style>
 </head>
 <body>
 <div class="app">
 <aside class="sidebar">
-<div class="brand"><div class="logo" aria-hidden="true">E2631</div><div><div class="title">恢复模式</div><div class="sub" id="ubver">U-Boot</div></div></div>
+<div class="brand"><div class="logo" aria-hidden="true">E2631</div><div><div class="title">恢复模式</div><div class="sub" id="ubver">U-Boot</div></div><button id="lang" class="btn alt langbtn" type="button" aria-label="切换语言 / Switch language">EN</button></div>
 <nav aria-label="主导航">
 <div class="navsec">救援</div>
 <button class="navlink active" data-tab="status">系统状态</button>
@@ -99,6 +102,7 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 <div class="rail" aria-label="启动路径">
 <span class="step">BootROM</span><span class="step">secondboot</span><span class="step">U-Boot</span><span class="step on">救援模式</span>
 </div>
+<div class="note">蓝色 LED 慢闪 = 救援模式；离开救援或重启后恢复。</div>
 <div class="grid">
 <div class="card">
 <div class="chead"><h2>运行状态</h2><span class="pill" id="stpill">空闲</span></div>
@@ -118,6 +122,26 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 <div class="card">
 <div class="chead"><h2>槽位</h2><span class="pill" id="nextpill">—</span></div>
 <div class="cmain" id="slotcards"><p class="hint">读取中…</p></div>
+</div>
+<div class="card">
+<div class="chead"><h2>系统信息</h2><span class="pill" id="syspill">—</span></div>
+<div class="cmain"><button id="sysrefresh" class="btn alt" type="button">读取系统信息</button><div id="systable"></div></div>
+<div class="cfoot">只读：版本、DRAM、CP15、SPI-NAND ID 与时钟寄存器。</div>
+</div>
+<div class="card">
+<div class="chead"><h2>启动日志</h2><span class="pill" id="logpill2">—</span></div>
+<div class="cmain"><p class="hint">日志截止进入救援模式时；之后的操作不记录。</p><pre id="logbox" class="out">（尚未读取）</pre><button id="logrefresh" class="btn alt" type="button">刷新日志</button><a id="logdl" class="btn" href="/log?download=1" download="e2631-bootlog.txt">下载日志</a></div>
+<div class="cfoot">原始文本，不翻译；溢出时显示标记。</div>
+</div>
+<div class="card">
+<div class="chead"><h2>完整性自检</h2><span class="pill" id="intpill">—</span></div>
+<div class="cmain">
+<div class="kv"><span>CRC32</span><b class="mono" id="int-crc">—</b></div>
+<div class="kv"><span>SHA-256</span><b class="mono" id="int-sha">—</b></div>
+<div class="kv"><span>与运行记录</span><b id="int-match">—</b></div>
+<button id="integrityrun" class="btn alt" type="button">自检 mtd0 镜像区</button>
+</div>
+<div class="cfoot">只读：对 mtd0 0x20000..0xC0000 计算 CRC32/SHA-256；不写 flash。</div>
 </div>
 </div>
 </section>
@@ -181,14 +205,28 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 <option value="wifi">wifi — 0x200000，1048576 B</option>
 <option value="usercfg">usercfg — 0x300000，2097152 B</option>
 <option value="defcfg">defcfg — 0x500000，2097152 B</option>
+<option value="slot0">slot0 — 完整启动槽 0x700000，29360128 B</option>
+<option value="slot1">slot1 — 完整启动槽 0x2300000，29360128 B</option>
+<option value="rootfs">rootfs — 下次启动槽 rootfs 窗口，17825792 B</option>
+<option value="header">header — 下次启动槽版本头块，131072 B</option>
 </select></label>
 <div class="kv"><span>偏移 / 长度</span><b class="mono" id="bk-range">0x20000 / 655360 B</b></div>
 <div class="kv"><span>分区 CRC32</span><b class="mono" id="bk-crc">—</b></div>
 <div class="kv"><span>分区 SHA-256</span><b class="mono" id="bk-sha">—</b></div>
+<div class="kv"><span>下载状态</span><b id="bkmsg" aria-live="polite">—</b></div>
 <button id="bk-probe" class="btn alt" type="button">读取校验值</button>
 <a id="bk-dl" class="btn" href="/backup?part=bootloader" download="e2631-bootloader.bin">下载分区</a>
 </div>
 <div class="cfoot">只读：读取校验值与下载都不写 flash。写分区仍归各所有者（bootloader=e2631flash、启动槽=fwslot、overlay=e2631factory）。</div>
+</div>
+<div class="card">
+<div class="card">
+<div class="chead"><h2>重启设备</h2><span class="pill" id="rbpill">—</span></div>
+<div class="cmain">
+<div class="note">复位后离开救援模式，约 20–30 秒回到系统。仅在无写入/下载任务时可用。</div>
+<button id="rebootgo" class="btn danger" type="button">重启设备</button>
+</div>
+<div class="cfoot">页面不自动刷新；若 30 秒内无反应，请断电重启。</div>
 </div>
 <div class="card">
 <div class="chead"><h2>任务日志</h2><span class="pill" id="logpill">空闲</span></div>
@@ -216,6 +254,20 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 <div class="card">
 <div class="chead"><h2>env 快照（只读）</h2><span class="pill" id="envsnappill">—</span></div>
 <div class="cmain"><div id="envtable"></div><div id="envlog" class="log" aria-live="polite"></div></div>
+</div>
+<div class="card">
+<div class="chead"><h2>DHCP 配置</h2><span class="pill" id="dhcppill">—</span></div>
+<div class="cmain">
+<label class="field" for="dhcp-ip"><span>救援地址</span><input id="dhcp-ip" type="text" value="192.168.1.1" inputmode="decimal"></label>
+<label class="field" for="dhcp-mask"><span>子网掩码</span><input id="dhcp-mask" type="text" value="255.255.255.0" inputmode="decimal"></label>
+<label class="field" for="dhcp-start"><span>池起始</span><input id="dhcp-start" type="text" value="100" inputmode="numeric"></label>
+<label class="field" for="dhcp-size"><span>池大小</span><input id="dhcp-size" type="text" value="101" inputmode="numeric"></label>
+<div class="kv"><span>当前生效</span><b id="dhcpstat">—</b></div>
+<button id="dhcpsave" class="btn alt" type="button" disabled>保存 DHCP 配置</button>
+<button id="dhcpreset" class="btn alt" type="button">恢复默认</button>
+<div id="dhcplog" class="log" aria-live="polite"></div>
+</div>
+<div class="cfoot">写入 e2631_dhcp_* 白名单键，走 e2631env 五步；下次进入救援模式生效。池起点+大小−1 ≤ 254，且不含救援地址。</div>
 </div>
 </div>
 </section>
@@ -247,8 +299,8 @@ input[type=text]{width:100%;font:inherit;padding:7px;border:1px solid var(--line
 <div class="card">
 <div class="chead"><h2>擦除 rootfs_data</h2><span class="pill" id="facpill">空闲</span></div>
 <div class="cmain">
-<div class="kv"><span>目标分区</span><b class="mono">rootfs_data（按名核对）</b></div>
-<div class="kv"><span>偏移 / 长度</span><b class="mono">0x3360000 / 0x4A0000</b></div>
+<div class="kv"><span>目标分区</span><b class=\"mono\">rootfs_data（按名核对）</b></div>
+<div class="kv"><span>偏移 / 长度</span><b class=\"mono\">0x3360000 / 0x4A0000</b></div>
 <div class="note">擦除后 <b>overlay 与配置将丢失</b>；squashfs 与两个启动槽不动。成功提示后需要<b>断电重启</b>。失败时 Linux 仍可启动，只影响 overlay。</div>
 <p><label><input id="faccheck" type="checkbox"> 我已了解：overlay 与配置将被清除，且需要断电重启。</label></p>
 <div class="bar" aria-hidden="true"><div id="facbar"></div></div>
@@ -288,7 +340,7 @@ var slotsState={};var statusTimer=null;
 function startStatusPoll(){if(statusTimer)return;statusTimer=setInterval(refreshStatus,1000)}
 function stopStatusPoll(){if(statusTimer){clearInterval(statusTimer);statusTimer=null}}
 function tabs(){var list=document.querySelectorAll(".navlink");Array.prototype.forEach.call(list,function(b){b.addEventListener("click",function(){Array.prototype.forEach.call(list,function(x){x.classList.remove("active")});b.classList.add("active");Array.prototype.forEach.call(document.querySelectorAll(".panel"),function(p){p.classList.remove("active")});var el=$("tab-"+b.getAttribute("data-tab"));if(el)el.classList.add("active");var tab=b.getAttribute("data-tab");if(tab==="status"){refreshStatus();loadSlots();startStatusPoll()}else{stopStatusPoll()}if(tab==="env")loadEnv();if(tab==="console")$("concmd").focus()})})}
-function loadSlots(){return getText("/slots").then(function(t){var s=lines(t);slotsState=s;renderSlots(s);fwRefreshInfo();return s}).catch(function(e){setHtml("slotcards",'<p class="err">槽位读取失败：'+esc(e.message)+"</p>")})}
+function loadSlots(){return getText("/slots").then(function(t){var s=lines(t);slotsState=s;renderSlots(s);fwRefreshInfo();if(typeof v3AfterSlots==="function")v3AfterSlots();return s}).catch(function(e){setHtml("slotcards",'<p class=\"err\">槽位读取失败：'+esc(e.message)+"</p>")})}
 function badge(ok,onText,offText){return '<span class="badge '+(ok?"ok":"err")+'">'+esc(ok?onText:offText)+"</span>"}
 function renderSlots(s){var next=s.next_slot;setTxt("nextpill",next==="0"?"本次启动 slot0":next==="1"?"本次启动 slot1":"无可启动槽");
 var h="";[0,1].forEach(function(n){var pre="slot"+n;var valid=s[pre+"_valid"]==="1",intact=s[pre+"_intact"]==="1";var ident=s[pre+"_identity"]||"unknown";var serial=s[pre+"_serial"]||"",ver=s[pre+"_version"]||"";
@@ -298,7 +350,7 @@ function bootSlot(n){if(!confirm("设置本次启动槽 slot"+n+"（仅 RAM，�
 function stStage(s){return STAGE[s]||s||"—"}
 function refreshStatus(){return getText("/status").then(function(t){var s=lines(t);if(s.version)setTxt("ubver",s.version);setTxt("st-op",OP[s.op]||s.op||"—");setTxt("st-stage",stStage(s.stage));var prog=(s.progress||"0")+"%";if(s.bytes_total&&s.bytes_total!=="0")prog+="（"+(s.bytes_done||"0")+"/"+s.bytes_total+"）";setTxt("st-progress",prog);setTxt("st-crc",s.crc32||"—");setTxt("st-sha",s.sha256||"—");setTxt("st-mat",s.sha_match||"—");setTxt("st-result",s.result||"—");setTxt("st-error",s.error||"—");setTxt("stpill",stStage(s.stage));pct("st-bar",Number(s.progress||0));if(s.bootloader_region_crc32){setTxt("bl-crc",s.bootloader_region_crc32);if($("partsel")&&$("partsel").value==="bootloader")setTxt("bk-crc",s.bootloader_region_crc32)}return s}).catch(function(){return null})}
 function probeBackup(){var btn=$("bk-probe");btn.disabled=true;var p=$("partsel").value;fetch("/backup?part="+p,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);var crc=r.headers.get("X-E2631-CRC32")||"—",sha=r.headers.get("X-E2631-SHA256")||"";return r.arrayBuffer().then(function(b){var local=sha256(b);setTxt("bk-crc",crc);setTxt("bk-sha",sha||local);setTxt("bkpill",p+" · "+b.byteLength+" B");if(sha&&local!==sha.toLowerCase())addLog("envlog","警告："+p+" SHA-256 本地复算与响应头不一致","warn")})}).catch(function(e){setTxt("bk-crc","读取失败："+e.message);setTxt("bkpill","失败")}).then(function(){btn.disabled=false})}
-function loadEnv(){setTxt("envpill","读取中…");setTxt("envsnappill","读取中…");getText("/env").then(function(t){var rows=String(t||"").split(/\r?\n/).filter(function(x){return x&&x.indexOf("=")>0});var size="",h="",rh="",n=0;envVals={};rows.forEach(function(r){if(r.indexOf("env_size=")===0){size=r.slice(9);return}var i=r.indexOf("=");var k=r.slice(0,i),v=r.slice(i+1);rh+="<tr><td class=\"mono\">"+esc(k)+"</td><td class=\"mono\">"+esc(v)+"</td></tr>";if(envWritable(k)){envVals[k]=v;n++;h+="<div class=\"kvrow\"><span class=\"mono\">"+esc(k)+"</span><input class=\"envval\" data-key=\""+esc(k)+"\" type=\"text\" value=\""+esc(v)+"\" aria-label=\""+esc(k)+"\"></div>"}});setHtml("envedit",h||"<p class=\"hint\">没有白名单键。</p>");setHtml("envtable","<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>"+rh+"</tbody></table>");setTxt("envpill","可写 "+n+" 项"+(size?(" · 容量 "+size):""));setTxt("envsnappill",rows.length+" 项");Array.prototype.forEach.call(document.querySelectorAll(".envval"),function(el){el.addEventListener("input",syncEnvBtn)});syncEnvBtn()}).catch(function(e){setTxt("envpill","读取失败");setTxt("envsnappill","读取失败");setHtml("envedit","<p class=\"err\">"+esc(e.message)+"</p>")})}
+function loadEnv(){setTxt("envpill","读取中…");setTxt("envsnappill","读取中…");return getText("/env").then(function(t){var rows=String(t||"").split(/\r?\n/).filter(function(x){return x&&x.indexOf("=")>0});var size="",h="",rh="",n=0;envVals={};rows.forEach(function(r){if(r.indexOf("env_size=")===0){size=r.slice(9);return}var i=r.indexOf("=");var k=r.slice(0,i),v=r.slice(i+1);rh+="<tr><td class=\"mono\">"+esc(k)+"</td><td class=\"mono\">"+esc(v)+"</td></tr>";if(envWritable(k)){envVals[k]=v;n++;h+="<div class=\"kvrow\"><span class=\"mono\">"+esc(k)+"</span><input class=\"envval\" data-key=\""+esc(k)+"\" type=\"text\" value=\""+esc(v)+"\" aria-label=\""+esc(k)+"\"></div>"}});setHtml("envedit",h||"<p class=\"hint\">没有白名单键。</p>");setHtml("envtable","<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>"+rh+"</tbody></table>");setTxt("envpill","可写 "+n+" 项"+(size?(" · 容量 "+size):""));setTxt("envsnappill",rows.length+" 项");Array.prototype.forEach.call(document.querySelectorAll(".envval"),function(el){el.addEventListener("input",syncEnvBtn)});syncEnvBtn()}).catch(function(e){setTxt("envpill","读取失败");setTxt("envsnappill","读取失败");setHtml("envedit","<p class=\"err\">"+esc(e.message)+"</p>");return false})}
 var envVals={};
 function envWritable(k){return k==="bootdelay"||k.indexOf("e2631_")===0}
 function envKeyOk(k){return /^[a-z0-9_]+$/.test(k)&&k.length<=32&&envWritable(k)}
@@ -376,7 +428,67 @@ $("conclear").addEventListener("click",function(){setHtml("conout","（尚未执
 $("partsel").addEventListener("change",updatePart);
 $("refresh").addEventListener("click",function(){refreshStatus();loadSlots()});
 $("bk-probe").addEventListener("click",probeBackup);
-tabs();updatePart();refreshStatus();loadSlots();startStatusPoll();
+
+/* ===== v3 additions (task-91) ===== */
+var I18N={"E2631 恢复模式":"E2631 Recovery","恢复模式":"Recovery Mode","救援":"Rescue","系统状态":"Status","固件更新":"Firmware","引导区":"Boot Area","系统":"System","环境变量":"Environment","串口台":"Console","恢复出厂":"Factory Reset","本页只在救援模式生效；不自动重启。bootloader/槽位/env 写入后都需要":"This page only works in rescue mode and never reboots automatically. bootloader/slot/env writes need a","断电重启":"power cycle","启动路径与槽位。数据来自设备只读接口。":"Boot path and slots. Data comes from read-only device endpoints.","救援模式":"Rescue Mode","运行状态":"Run Status","空闲":"Idle","任务":"Task","阶段":"Stage","进度":"Progress","设备摘要":"Device SHA-256","摘要比对":"Digest Match","结果":"Result","错误":"Error","刷新":"Refresh","槽位":"Slots","读取中…":"Loading...","写入启动槽（设备升级包 .bin；默认写本次会启动的槽）。":"Write a boot slot (factory .bin; defaults to the slot that would boot).","选择镜像":"Select Image","未选择":"Not selected","固件包（.bin，按原始字节上传）":"Firmware package (.bin, uploaded raw)","文件":"File","大小":"Size","SHA-256（浏览器）":"SHA-256 (browser)","目标槽":"Target Slot","auto（serial 最大）":"auto (highest serial)","解析目标":"Resolved Target","目标槽身份":"Target Identity","写入守卫":"Write Guard","仅校验":"Validate Only","写入待命":"Write Pending","注意事项":"Warnings","校验通过、摘要一致且守卫不为 refuse 时才可写。":"Writing needs a passing validation, matching digests and a non-refuse guard.","写入成功后下次启动目标槽；":"After a successful write the target slot boots next;","断电重启后生效":"takes effect after a power cycle","写入期间不得断电；失败后启动仍在另一槽。":"Do not cut power during a write; on failure the other slot still boots.","唯一拒绝覆盖的是“完整可用的原厂槽”；损坏或无法识别的槽可重写（救砖）。":"The only refused target is a complete working vendor slot; damaged or unknown slots may be rewritten (unbrick).","任务日志":"Task Log","只写 mtd0 的 U-Boot 镜像区 0x20000..0xC0000（655360 B）；secondboot 与 env 不动。":"Writes only the mtd0 U-Boot image area 0x20000..0xC0000 (655360 B); secondboot and env are untouched.","bootloader 镜像":"Bootloader Image","当前区域 CRC32":"Current Region CRC32","镜像文件（e2631-uboot-mtd0.bin）":"Image file (e2631-uboot-mtd0.bin)","SHA-256（设备端）":"SHA-256 (device)","镜像必须":"The image must be","恰为 655360 字节":"exactly 655360 bytes","；只写 0x20000..0xC0000。":"; only 0x20000..0xC0000 is written.","写入成功后":"After a successful write","；不得断电。":"; do not cut power.","串口可用时同步打印五步进度；Ctrl-C 可中止。":"Five-step progress is mirrored on serial; Ctrl-C aborts.","分区备份（只读）":"Partition Backup (read-only)","分区":"Partition","bootloader — U-Boot 镜像区 0x20000，655360 B":"bootloader — U-Boot image area 0x20000, 655360 B","偏移 / 长度":"Offset / Length","分区 CRC32":"Partition CRC32","分区 SHA-256":"Partition SHA-256","读取校验值":"Read Digests","下载分区":"Download Partition","只读：读取校验值与下载都不写 flash。写分区仍归各所有者（bootloader=e2631flash、启动槽=fwslot、overlay=e2631factory）。":"Read-only: neither digests nor downloads write flash. Writes stay with their owners (bootloader=e2631flash, slots=fwslot, overlay=e2631factory).","只读快照 + 白名单编辑。仅 bootdelay 与 e2631_* 可写；vendor 键（bootcmd/bootargs/memsize/versioninfo）永远只读。写入走 e2631env 五步，成功后断电重启生效。":"Read-only snapshot plus whitelist editing. Only bootdelay and e2631_* are writable; vendor keys (bootcmd/bootargs/memsize/versioninfo) are always read-only. Writes use the e2631env five-step path and need a power cycle.","可写键（白名单）":"Writable Keys (whitelist)","新增变量":"New variable","我已了解：只写白名单键；写入走 e2631env 五步；":"I understand: only whitelist keys are written; writes use the e2631env five-step path;","写入 env":"Write env","同一时刻只允许一个 env 写任务；页面按顺序逐键提交。":"One env write job at a time; the page submits keys in order.","vendor 键与未知键一律拒绝（403），页面不提供编辑入口。":"Vendor and unknown keys are refused (403); the page offers no editor for them.","掉电最坏回到默认 env，两条启动链都能启动。":"Worst case a power loss falls back to the default env; both boot chains still work.","env 快照（只读）":"env Snapshot (read-only)","执行一条 U-Boot 命令并捕获输出（stdout）。只适合快速命令；不与救援循环 stdin 共享，交互式命令请用物理串口。":"Runs one U-Boot command and captures stdout. For quick commands only; stdin is not shared with the rescue loop, use the physical serial port for interactive commands.","执行命令":"Run Command","命令（单条；不支持分号与多行）":"Command (single; no semicolons or newlines)","执行":"Run","清空输出":"Clear Output","命令立即执行，可能改变设备状态（如 reset、mtd 擦写）；执行前会二次确认。输出最多 4 KiB，超出会截断。":"Commands run immediately and may change device state (e.g. reset, mtd erase/write); a second confirmation is shown. Output is capped at 4 KiB.","限制":"Limits","无 stdin：需要按键/确认的命令不支持，也不会挂住救援循环。":"No stdin: commands needing input are unsupported and cannot wedge the rescue loop.","执行期间页面等待响应；长命令请改用物理串口。":"The page waits for the response; use the physical serial port for long commands.","输出":"Output","（尚未执行）":"(not run yet)","擦除 overlay 分区（rootfs_data），下次启动 Linux 时重新格式化，恢复默认配置。":"Erases the overlay partition (rootfs_data); the next Linux boot formats it fresh and restores defaults.","擦除 rootfs_data":"Erase rootfs_data","目标分区":"Target Partition","rootfs_data（按名核对）":"rootfs_data (verified by name)","擦除后":"After erasing","overlay 与配置将丢失":"the overlay and configuration will be lost","；squashfs 与两个启动槽不动。成功提示后需要":"; squashfs and both boot slots are untouched. After success you need a","。失败时 Linux 仍可启动，只影响 overlay。":". On failure Linux still boots; only the overlay is affected.","我已了解：overlay 与配置将被清除，且需要断电重启。":"I understand: the overlay and configuration will be cleared and a power cycle is required.","擦除 overlay":"Erase Overlay","只擦按名核对的 rootfs_data，绝不换擦 mtd7。":"Erases only rootfs_data after a name check, never mtd7.","擦除后回读校验全 0xFF；不写任何数据。":"Read-back after erase must be all 0xFF; no data is written.","成功文案只提示断电重启，不提示 reset。":"Success text only mentions a power cycle, never reset.","系统信息":"System Info","读取系统信息":"Read System Info","启动日志":"Boot Log","日志截止进入救援模式时；之后的操作不记录。":"The log ends when rescue mode is entered; later operations are not recorded.","（尚未读取）":"(not loaded)","刷新日志":"Refresh Log","下载日志":"Download Log","原始文本，不翻译；溢出时显示标记。":"Raw text, not translated; overflow is flagged.","完整性自检":"Integrity Check","与运行记录":"vs. Run Record","自检 mtd0 镜像区":"Check mtd0 Image Area","只读：对 mtd0 0x20000..0xC0000 计算 CRC32/SHA-256；不写 flash。":"Read-only CRC32/SHA-256 over mtd0 0x20000..0xC0000; no flash writes.","蓝色 LED 慢闪 = 救援模式；离开救援或重启后恢复。":"Slow blue LED blink = rescue mode; restored after leaving rescue or rebooting.","重启设备":"Reboot Device","复位后离开救援模式，约 20–30 秒回到系统。仅在无写入/下载任务时可用。":"Leaves rescue mode and returns to the system in ~20-30 s. Only available when no write/download is running.","页面不自动刷新；若 30 秒内无反应，请断电重启。":"The page does not auto-refresh; if nothing happens in 30 s, power-cycle the device.","DHCP 配置":"DHCP Config","救援地址":"Rescue Address","子网掩码":"Netmask","池起始":"Pool Start","池大小":"Pool Size","当前生效":"Currently Effective","保存 DHCP 配置":"Save DHCP Config","恢复默认":"Restore Defaults","写入 e2631_dhcp_* 白名单键，走 e2631env 五步；下次进入救援模式生效。池起点+大小−1 ≤ 254，且不含救援地址。":"Writes e2631_dhcp_* whitelist keys via the e2631env five-step path; applies at the next rescue start. Pool start+size-1 <= 254 and must not include the rescue address.","slot0 — 完整启动槽 0x700000，29360128 B":"slot0 — full boot slot 0x700000, 29360128 B","slot1 — 完整启动槽 0x2300000，29360128 B":"slot1 — full boot slot 0x2300000, 29360128 B","rootfs — 下次启动槽 rootfs 窗口，17825792 B":"rootfs — next boot slot rootfs window, 17825792 B","header — 下次启动槽版本头块，131072 B":"header — next boot slot version header, 131072 B","下载状态":"Download Status","正在下载 …（可能 28 MB，请等待）":"Downloading... (up to 28 MB, please wait)","下载已开始；若浏览器未保存，请重试。":"Download started; retry if the browser did not save it.","已上传待命":"Staged","校验中":"Validating","差异比对":"Diffing","坏块预检":"Bad-block precheck","擦除中":"Erasing","擦除校验中":"Blank check","写入中":"Writing","回读中":"Reading back","回读校验":"Verify","比对中":"Comparing","完成":"Done","引导区写入":"Boot area write","环境变量写入":"Env write","空槽":"Empty slot","原厂":"Vendor","本固件":"This firmware","无法识别":"Unknown","允许":"Allow","允许（回退为非原厂）":"Allow (fallback becomes non-vendor)","拒绝":"Refuse","已选择":"Selected","尺寸不符":"Size mismatch","校验通过":"Validation passed","未通过":"Failed","失败":"Failed","就绪":"Ready","头有效":"Header valid","头无效":"Header invalid","完好":"Intact","不完整":"Incomplete","无版本":"No version","无法识别/已损坏":"Unknown/corrupted","本次启动 slot0":"Boots slot0 this time","本次启动 slot1":"Boots slot1 this time","无可启动槽":"No bootable slot","下次启动此槽":"Boot this slot next","设置本次启动槽 slot":"Set boot slot ","（仅 RAM，不写 flash）。按 Ctrl-C 退出救援后运行 e2631boot 生效。继续？":" (RAM only, no flash write). After Ctrl-C run e2631boot; continue?","已设置：按 Ctrl-C 退出救援后运行 e2631boot 生效（仅本次）。":"Set: after Ctrl-C run e2631boot (this session only).","设置失败：":"Set failed: ","槽位读取失败：":"Slot read failed: ","上传中（仅校验）…":"Uploading (validate only)...","上传中（写入待命）…":"Uploading (write pending)...","上传中（":"Uploading (","上传 ":"Upload ","设备已接收，开始擦写…":"Device accepted; starting erase/write...","设备拒绝：":"Device refused: ","网络错误：设备未响应":"Network error: no response from device","无法识别的设备响应：":"Unrecognized device response: ","校验未通过：设备摘要 ":"Validation failed: device digest "," / 浏览器 ":" / browser ","校验通过：设备与浏览器摘要一致（sha_match=ok）。可点“写入待命”。":"Validated: device and browser digests match (sha_match=ok). Write Pending is now enabled.","请先通过“仅校验”且设备与浏览器摘要一致。":"Run Validate Only first; device and browser digests must match.","写入守卫：目标槽是完整可用的原厂系统，拒绝覆盖。":"Write guard: the target is a complete working vendor system; refusing to overwrite.","写入待命：上传→校验→擦写 mtd0 镜像区（0x20000..0xC0000）。写入期间不得断电。继续？":"Write Pending: upload, validate, then erase/write the mtd0 image area (0x20000..0xC0000). Do not cut power. Continue?","文件尺寸必须恰为 ":"File size must be exactly ","摘要计算失败：":"Digest calculation failed: ","成功：写入完成":"Success: write complete","，新 serial ":", new serial ","断电重启后生效；启动将进入 ":"Takes effect after a power cycle; the target boots ","启动仍留在另一槽。":"Boot stays on the other slot.","写入失败：":"Write failed: ","请求失败：":"Request failed: ","读取失败：":"Read failed: ","擦除失败：":"Erase failed: ","擦除 rootfs_data：overlay 与配置将丢失，成功后需断电重启。确定继续？":"Erase rootfs_data: the overlay and configuration will be lost; a power cycle is required. Continue?","擦除完成并回读校验为全 0xFF。断电重启后生效。":"Erase complete; read-back verified all 0xFF. Takes effect after a power cycle.","设备已接收，擦除中…":"Device accepted; erasing...","请求擦除 overlay…":"Requesting overlay erase...","请先勾选“我已了解”。":"Tick the acknowledgement first.","参数不符":"Invalid parameters","无修改":"No changes","待写入 ":"To write "," 项":" item(s)","已接收":"accepted","写入完成":"write complete","开始写入 ":"Starting write of "," 个键…":" key(s)...","全部完成；断电重启后生效。":"All done; takes effect after a power cycle.","请先勾选确认。":"Tick the confirmation first.","没有修改。":"No changes.","不允许的键：":"Disallowed key: ","不允许的值：":"Disallowed value: ","（空）":"(empty)","（可打印 ASCII，≤128 B）":"(printable ASCII, <=128 B)","执行中…":"Running...","完成（输出截断）":"Done (output truncated)","命令过长（≤256 B）。":"Command too long (<=256 B).","只允许单条命令：不能包含分号或换行。":"Only a single command is allowed: no semicolons or newlines.","请输入一条命令。":"Enter a command.","将立即执行：":"Will run now: ","命令可能改变设备状态（如 reset、mtd 擦写）。继续？":"Commands may change device state (e.g. reset, mtd erase/write). Continue?","（无输出）":"(no output)","客户端校验失败":"Client validation failed","日志读取失败：":"Log read failed: ","字节":"bytes","溢出":"overflow","自检中…":"Checking...","自检完成":"Check complete","自检失败：":"Check failed: ","一致":"Match","不一致":"Mismatch","未知":"Unknown","设备正在重启，约 20–30 秒后回到系统；重启后不再处于救援模式。":"Device is rebooting; back in ~20-30 s. It will no longer be in rescue mode.","重启失败：":"Reboot failed: ","请等待任务完成后再切换语言。":"Wait for the running task to finish before switching language.","正在重启…":"Rebooting...","读取系统信息失败：":"System info read failed: ","恢复默认值":"Restore default values","下次进入救援模式生效":"applies at the next rescue start","未生效":"not effective","版本":"Version","构建时间":"Build","板型":"Board","DRAM 基址/大小":"DRAM base/size","容量":"Size","擦除块":"Erase block","写页":"Page size","MHz 来源":"MHz source","键":"Key","值":"Value","重启设备：复位后离开救援模式，约 20–30 秒回到系统；重启后不再处于救援模式。仅在无写入/下载任务时继续。":"Reboot: leave rescue mode and return in ~20-30 s; rescue mode will not come back. Continue only when no write/download is running.","救援地址必须是合法 IPv4":"Rescue address must be a valid IPv4","子网掩码必须是合法 IPv4":"Netmask must be a valid IPv4","池起始必须是 1..254":"Pool start must be 1..254","池大小必须是 1..200":"Pool size must be 1..200","池起点+大小−1 不能超过 254":"Pool start+size-1 must not exceed 254","池不能包含救援地址":"Pool must not include the rescue address","个 DHCP 键：":" DHCP key(s): ","下次进入救援模式生效；写入走 e2631env 五步。继续？":" takes effect at the next rescue start; writes use the e2631env five-step path. Continue?","全部完成；下次进入救援模式生效。":"All done; takes effect at the next rescue start.","个键…":" key(s)...","重启设备：":"Reboot: ","只读：版本、DRAM、CP15、SPI-NAND ID 与时钟寄存器。":"Read-only: version, DRAM, CP15, SPI-NAND ID and clock registers.","切换语言 / Switch language":"Switch language","主导航":"Main navigation","启动路径":"Boot path","新变量名":"New variable name","新变量值":"New variable value","例如 version / printenv bootdelay / md 0x40000000 4":"e.g. version / printenv bootdelay / md 0x40000000 4"};
+var LANG=(function(){try{return localStorage.getItem("e2631_lang")==="en"?"en":"zh"}catch(e){return "zh"}})();
+var I18N_KEYS=Object.keys(I18N).sort(function(a,b){return b.length-a.length});
+function trText(s){var str=String(s===undefined||s===null?"":s);if(LANG!=="en"||!str)return str;if(I18N[str])return I18N[str];for(var i=0;i<I18N_KEYS.length;i++){var k=I18N_KEYS[i];if(str.indexOf(k)>=0)str=str.split(k).join(I18N[k])}return str}
+function translateNode(root){if(!root||LANG!=="en")return;var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null);var ns=[];while(w.nextNode())ns.push(w.currentNode);ns.forEach(function(n){var p=n.parentNode;if(!p||/^(SCRIPT|STYLE|TEXTAREA)$/.test(p.tagName))return;var raw=n.nodeValue;if(!raw)return;var key=raw.replace(/^\s+|\s+$/g,"");if(key&&I18N[key])n.nodeValue=raw.replace(key,I18N[key])});if(root.querySelectorAll)Array.prototype.forEach.call(root.querySelectorAll("[placeholder],[aria-label],[title]"),function(el){["placeholder","aria-label","title"].forEach(function(a){var v=el.getAttribute(a);if(v&&I18N[v])el.setAttribute(a,I18N[v])})})}
+setTxt=function(id,t){var el=$(id);if(el)el.textContent=trText(t)};
+setHtml=function(id,t){var el=$(id);if(!el)return;el.innerHTML=String(t===undefined||t===null?"":t);translateNode(el)};
+addLog=function(id,msg,cls){var box=$(id);if(!box)return;var d=document.createElement("div");d.textContent=trText(msg);if(cls)d.className=cls;box.appendChild(d);box.scrollTop=box.scrollHeight};
+failLog=function(id,msg){addLog(id,msg,"err")};
+var nativeAlert=window.alert,nativeConfirm=window.confirm;
+window.alert=function(m){nativeAlert(trText(m))};
+window.confirm=function(m){return nativeConfirm(trText(m))};
+function applyStaticLang(){if(LANG!=="en")return;document.documentElement.lang="en";document.title=I18N["E2631 恢复模式"]||"E2631 Recovery";var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null);var ns=[];while(w.nextNode())ns.push(w.currentNode);ns.forEach(function(n){var p=n.parentNode;if(!p||/^(SCRIPT|STYLE|TEXTAREA)$/.test(p.tagName))return;var raw=n.nodeValue;if(!raw)return;var key=raw.replace(/^\s+|\s+$/g,"");if(key&&I18N[key])n.nodeValue=raw.replace(key,I18N[key])});Array.prototype.forEach.call(document.querySelectorAll("[placeholder],[aria-label],[title]"),function(el){["placeholder","aria-label","title"].forEach(function(a){var v=el.getAttribute(a);if(v&&I18N[v])el.setAttribute(a,I18N[v])})})}
+var PARTS={bootloader:{off:"0x20000",len:655360},tag:{off:"0x100000",len:1048576},wifi:{off:"0x200000",len:1048576},usercfg:{off:"0x300000",len:2097152},defcfg:{off:"0x500000",len:2097152},slot0:{off:"0x700000",len:29360128},slot1:{off:"0x2300000",len:29360128},rootfs:{off:null,len:17825792},header:{off:null,len:131072}};
+var statusLast={},intCrc="",sysLoaded=false,logLoaded=false;
+function hex(n){return "0x"+n.toString(16).toUpperCase()}
+partInfo=function(){var p=$("partsel")?$("partsel").value:"bootloader";if(p==="rootfs"||p==="header"){var n=slotsState&&slotsState.next_slot;var base=p==="rootfs"?(n==="0"?0x00B00000:0x02700000):(n==="0"?0x01C00000:0x03800000);return {off:hex(base),len:p==="rootfs"?0x1100000:0x20000}}return PARTS[p]||PARTS.bootloader};
+updatePart=function(){var p=$("partsel").value,info=partInfo();setTxt("bk-range",info.off+" / "+info.len+" B");setTxt("bkpill","—");setTxt("bk-crc","—");setTxt("bk-sha","—");setTxt("bkmsg","—");var a=$("bk-dl");a.setAttribute("href","/backup?part="+p);a.setAttribute("download","e2631-"+p+".bin")};
+function v3AfterSlots(){var p=$("partsel").value;if(p==="rootfs"||p==="header")updatePart()}
+var SYS_ROWS=[["version","版本"],["banner","Banner"],["build","构建时间"],["board","板型"],["soc","SoC"],["cpu","CPU"],["dram","DRAM 基址/大小"],["dram_mb","DRAM"],["mtd0_size","mtd0"],["spi_nand","SPI-NAND"],["spi_size","容量"],["spi_erasesize","擦除块"],["spi_writesize","写页"],["spi_oobsize","OOB"],["spi_id","SPI ID"],["sctlr","SCTLR"],["midr","MIDR"],["clidr","CLIDR"],["ttbr0","TTBR0"],["vbar","VBAR"],["actlr","ACTLR"],["dacr","DACR"],["pll_a9_cfg0","A9 PLL cfg0"],["pll_a9_cfg1","A9 PLL cfg1"],["top_ctrl8","TOP Ctrl8"],["top_clk_sel","TOP ClkSel"],["crm2_10","CRM2+0x10"],["crm_4c","CRM+0x4c"],["lsp1_04","LSP1+0x04"],["net_pll_cfg0","Net PLL cfg0"],["net_pll_cfg1","Net PLL cfg1"],["cpu_mhz","CPU MHz"],["cpu_mhz_source","MHz 来源"]];
+function loadSysinfo(){if(!$("systable"))return;setTxt("syspill","读取中…");return getText("/sysinfo").then(function(t){var d=lines(t),h="<table><thead><tr><th>键</th><th>值</th></tr></thead><tbody>";SYS_ROWS.forEach(function(r){h+="<tr><td>"+esc(r[1])+"</td><td class=\"mono\">"+esc(d[r[0]]||"—")+"</td></tr>"});h+="</tbody></table>";setHtml("systable",h);setTxt("syspill",d.result==="ok"?"完成":"失败");sysLoaded=true}).catch(function(e){setHtml("systable","<p class=\"err\">"+esc(trText("读取系统信息失败："))+esc(e.message)+"</p>");setTxt("syspill","失败")})}
+function loadLog(){if(!$("logbox"))return;setTxt("logpill2","读取中…");return fetch("/log",{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);var bytes=r.headers.get("X-E2631-Log-Bytes")||"",ovf=r.headers.get("X-E2631-Log-Overflow")||"0";return r.text().then(function(t){$("logbox").textContent=t;setTxt("logpill2",(bytes?bytes+" "+trText("字节"):"")+(ovf==="1"?" · "+trText("溢出"):""));logLoaded=true})}).catch(function(e){$("logbox").textContent=trText("日志读取失败：")+e.message;setTxt("logpill2","失败")})}
+function loadIntegrity(){if(busy)return;setTxt("intpill","自检中…");setTxt("int-match","—");fetch("/integrity",{method:"POST",cache:"no-store"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||("HTTP "+x.status));intCrc=d.crc32||"";setTxt("int-crc",d.crc32||"—");setTxt("int-sha",d.sha256||"—");setTxt("intpill","自检完成");updateIntegrityCompare()}).catch(function(e){setTxt("intpill","失败");setTxt("int-match",trText("自检失败：")+e.message)})}
+function updateIntegrityCompare(){if(!intCrc){setTxt("int-match","—");return}var run=statusLast&&statusLast.bootloader_region_crc32;if(!run){setTxt("int-match",trText("未知"));return}setTxt("int-match",(intCrc===run?trText("一致"):trText("不一致"))+"（"+run+"）")}
+function doReboot(){if(busy)return;if(!confirm("重启设备：复位后离开救援模式，约 20–30 秒回到系统；重启后不再处于救援模式。仅在无写入/下载任务时继续。"))return;setBusy(true);setTxt("rbpill","正在重启…");fetch("/reboot",{method:"POST",headers:{"X-E2631-Confirm":"reboot"},cache:"no-store"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||d.error)throw new Error(d.error||("HTTP "+x.status));stopStatusPoll();setTxt("rbpill","已接收");alert("设备正在重启，约 20–30 秒后回到系统；重启后不再处于救援模式。")}).catch(function(e){setBusy(false);setTxt("rbpill","失败");alert("重启失败："+e.message)})}
+function validIPv4(s){if(!/^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(s))return false;var p=s.split(".");for(var i=0;i<4;i++){var n=Number(p[i]);if(n<0||n>255)return false}return true}
+var DHCP_DEFAULT={ipaddr:"192.168.1.1",netmask:"255.255.255.0",pool_start:"100",pool_size:"101"};
+var DHCP_KEYS={ipaddr:"e2631_dhcp_ipaddr",netmask:"e2631_dhcp_netmask",pool_start:"e2631_dhcp_pool_start",pool_size:"e2631_dhcp_pool_size"};
+function fillDhcp(){var els={ipaddr:"dhcp-ip",netmask:"dhcp-mask",pool_start:"dhcp-start",pool_size:"dhcp-size"};Object.keys(els).forEach(function(k){var el=$(els[k]);if(!el)return;var v=envVals[DHCP_KEYS[k]];el.value=trText(v||DHCP_DEFAULT[k])})}
+function dhcpList(){return [["ipaddr","dhcp-ip"],["netmask","dhcp-mask"],["pool_start","dhcp-start"],["pool_size","dhcp-size"]].map(function(x){return [DHCP_KEYS[x[0]],$(x[1]).value.trim()]})}
+function dhcpError(list){var m={};list.forEach(function(kv){m[kv[0]]=kv[1]});var ip=m[DHCP_KEYS.ipaddr],mask=m[DHCP_KEYS.netmask],st=m[DHCP_KEYS.pool_start],sz=m[DHCP_KEYS.pool_size];if(!validIPv4(ip))return "救援地址必须是合法 IPv4";if(!validIPv4(mask))return "子网掩码必须是合法 IPv4";if(!/^[0-9]{1,3}$/.test(st))return "池起始必须是 1..254";if(!/^[0-9]{1,3}$/.test(sz))return "池大小必须是 1..200";var a=Number(st),b=Number(sz);if(a<1||a>254)return "池起始必须是 1..254";if(b<1||b>200)return "池大小必须是 1..200";if(a+b-1>254)return "池起点+大小−1 不能超过 254";var last=ip.split(".");var host=Number(last[3]);if(host>=a&&host<=a+b-1)return "池不能包含救援地址";return ""}
+function dhcpChanged(){var list=dhcpList(),out=[];list.forEach(function(kv){if(envVals[kv[0]]!==kv[1])out.push(kv)});return out}
+function syncDhcpBtn(){var el=$("dhcpsave");if(!el)return;if(!envLoaded){el.disabled=true;return}var list=dhcpChanged();var err=dhcpError(dhcpList());el.disabled=busy||!list.length||!!err;var p=$("dhcppill");if(p)setTxt("dhcppill",err?"参数不符":(list.length?"待写入 "+list.length+" 项":"无修改"))}
+function updateDhcpStatus(s){if(!s)return;var v="";if(s.dhcp_ip)v+=s.dhcp_ip;if(s.dhcp_netmask)v+=" / "+s.dhcp_netmask;if(s.dhcp_pool_start)v+=" · pool "+s.dhcp_pool_start;if(s.dhcp_pool_size)v+=" +"+s.dhcp_pool_size;if(s.dhcp_source)v+=" · "+s.dhcp_source;if(s.dhcp_warning)v+=" · "+s.dhcp_warning;setTxt("dhcpstat",v||"—")}
+function saveDhcp(){if(busy)return;var list=dhcpChanged();var err=dhcpError(dhcpList());if(err){alert(err);return}if(!list.length){alert("没有修改。");return}if(!confirm("将写入 "+list.length+" 个 DHCP 键：\n"+list.map(function(x){return x[0]}).join("、")+"\n\n下次进入救援模式生效；写入走 e2631env 五步。继续？"))return;setBusy(true);setHtml("dhcplog","");addLog("dhcplog","开始写入 "+list.length+" 个键…");var chain=Promise.resolve();list.forEach(function(kv){chain=chain.then(function(){return envWriteOne(kv[0],kv[1],"dhcplog","dhcppill")})});chain.then(function(){setBusy(false);addLog("dhcplog","全部完成；下次进入救援模式生效。","ok");loadEnv()}).catch(function(e){setBusy(false);failLog("dhcplog","写入失败："+e.message);loadEnv()})}
+var envLoaded=false;
+var origLoadEnv=loadEnv;
+loadEnv=function(){return origLoadEnv().then(function(ok){if(ok===false)return;envLoaded=true;fillDhcp();syncDhcpBtn()})};
+var origRefreshStatus=refreshStatus;
+refreshStatus=function(){return origRefreshStatus().then(function(s){if(!s)return s;statusLast=s;updateDhcpStatus(s);updateIntegrityCompare();if(s.reboot_pending==="1")setTxt("rbpill","正在重启…");return s})};
+var origEnvWriteOne=envWriteOne;
+envWriteOne=function(k,v,logId,pillId){logId=logId||"envlog";pillId=pillId||"envpill";return new Promise(function(res,rej){fetch("/env?key="+encodeURIComponent(k)+"&value="+encodeURIComponent(v)+"&confirm=write",{method:"POST",headers:{"X-E2631-Confirm":"write"},cache:"no-store"}).then(function(r){return r.text().then(function(t){return {ok:r.ok,t:t}})}).then(function(x){var d=lines(x.t);if(!x.ok||d.result==="error"||(d.error&&d.result!=="accepted"))throw new Error(d.error||("HTTP "+x.status));addLog(logId,"["+k+"] "+trText("已接收")+(d.new_crc32?(" CRC32 "+d.new_crc32):""));waitStatus({op:"envwrite",onstatus:function(s){setTxt(pillId,stStage(s.stage)+" "+(s.progress||"0")+"%")},ondone:function(s){addLog(logId,"["+k+"] "+trText("写入完成")+(s.crc32?(" CRC32 "+s.crc32):""),"ok");res()},onfail:function(m){rej(new Error(m))}})}).catch(rej)})};
+var origRefreshButtons=refreshButtons;
+refreshButtons=function(){origRefreshButtons();["sysrefresh","logrefresh","integrityrun","rebootgo","dhcpreset"].forEach(function(id){var el=$(id);if(el)el.disabled=busy});syncDhcpBtn()};
+function v3Init(){var lb=$("lang");if(lb){lb.textContent=LANG==="en"?"中文":"EN";lb.setAttribute("aria-label",LANG==="en"?"Switch to Chinese":"切换到英文");lb.addEventListener("click",function(){if(busy){alert("请等待任务完成后再切换语言。");return}try{localStorage.setItem("e2631_lang",LANG==="en"?"zh":"en")}catch(e){}location.reload()})}
+applyStaticLang();if(LANG==="en"&&$("logbox"))$("logbox").textContent="(not loaded)";
+["sysrefresh"].forEach(function(id){var el=$(id);if(el)el.addEventListener("click",loadSysinfo)});
+["logrefresh"].forEach(function(id){var el=$(id);if(el)el.addEventListener("click",loadLog)});
+["integrityrun"].forEach(function(id){var el=$(id);if(el)el.addEventListener("click",loadIntegrity)});
+["rebootgo"].forEach(function(id){var el=$(id);if(el)el.addEventListener("click",doReboot)});
+["dhcp-ip","dhcp-mask","dhcp-start","dhcp-size"].forEach(function(id){var el=$(id);if(el)el.addEventListener("input",syncDhcpBtn)});
+$("dhcpsave").addEventListener("click",saveDhcp);
+$("dhcpreset").addEventListener("click",function(){if(busy)return;fillDhcp();[["dhcp-ip",DHCP_DEFAULT.ipaddr],["dhcp-mask",DHCP_DEFAULT.netmask],["dhcp-start",DHCP_DEFAULT.pool_start],["dhcp-size",DHCP_DEFAULT.pool_size]].forEach(function(x){$(x[0]).value=x[1]});syncDhcpBtn()});
+$("bk-dl").addEventListener("click",function(){setTxt("bkmsg","正在下载 …（可能 28 MB，请等待）");setTimeout(function(){setTxt("bkmsg","下载已开始；若浏览器未保存，请重试。")},1200)});
+Array.prototype.forEach.call(document.querySelectorAll(".navlink"),function(b){b.addEventListener("click",function(){var t=b.getAttribute("data-tab");if(t==="status"){if(!sysLoaded)loadSysinfo();if(!logLoaded)loadLog()}if(t==="boot")updatePart();if(t==="env")loadEnv()})});
+loadSysinfo();loadLog();syncDhcpBtn()
+}
+
+v3Init();tabs();updatePart();refreshStatus();loadSlots();startStatusPoll();
 })();
 </script>
 </body>

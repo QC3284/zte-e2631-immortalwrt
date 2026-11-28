@@ -1,30 +1,35 @@
-# E4 救援页资源（v2.1 六标签 Web UI）
+# E4 救援页资源（v3 六标签 Web UI，中英双语）
 
-本目录只有**一个**文件是源码：`e2631-failsafe.html`。它是 E4 v2.1（task-88，用户裁定「把功能都加上」）
-的救援页面：设备端 U-Boot 通过 `e2631rescue` 进入救援模式后，内置 HTTP 服务器把该页面（gzip 后）发给
-浏览器。页面形态照上游 failsafe（`Yuzhii0718/bl-mt798x-dhcpd`）的侧边栏 + 卡片布局重做，
-但**不搬**其资产：上游整套资源 gzip 后约 70,858 B（含 i18n 18,468 B），本页 gzip 13,773 B。
+本目录只有**一个**文件是源码：`e2631-failsafe.html`。它是 E4 v3（task-91，承接 v2.1/task-88 的
+用户裁定「把功能都加上」）的救援页面：设备端 U-Boot 通过 `e2631rescue` 进入救援模式后，内置 HTTP
+服务器把该页面（gzip 后）发给浏览器。页面形态照上游 failsafe（`Yuzhii0718/bl-mt798x-dhcpd`）的
+侧边栏 + 卡片布局重做，但**不搬**其资产：上游整套资源 gzip 后约 70,858 B（含 i18n 18,468 B），
+本页 gzip 24,904 B。
 页面不引用任何外部资源（无 CDN、无字体、无框架、无外链），完全离线可用。
 
-页面实现 `evidence/e4-v2-contract-design-20261128.md` 的 v2 契约与 §15 v2.1 增补；v1 的 bootloader
-写入（`/flash`）原样保留。v2.1 相对 v2 新增：串口台（`/console` 单命令）、env 白名单写回
-（`/env` 复用 `e2631env` 五步）、引导区分区备份（`/backup?part=`）。明确不做 UBI/SIMG（MT798x 专属）
-与 I18N（中文单语）。
+**v3（task-91）增量**：系统信息 `GET /sysinfo`、启动日志快照 `GET /log`（可下载）、完整性自检 `POST /integrity`、用户确认的重启 `POST /reboot`（`X-E2631-Confirm: reboot`）、引导区备份扩为 9 项（加 `slot0/slot1/rootfs/header`）、DHCP 配置卡（`e2631_dhcp_*` 白名单键）、蓝色 LED 救援提示，以及**中/EN 双语**（单文件字典约 265 条，默认中文，`localStorage` 键 `e2631_lang`；忙时不允许切换）。v3 契约见 `evidence/e4-v3-contract-delta-20261128.md`；v3 的页面端点与 v3 状态字段见该文档 §3-§11。
+
+页面实现 `evidence/e4-v2-contract-design-20261128.md` 的 v2/v2.1 契约与
+`evidence/e4-v3-contract-delta-20261128.md` 的 v3 契约；v1 的 bootloader 写入（`/flash`）原样保留。
+v2.1 新增串口台（`/console` 单命令）、env 白名单写回（`/env` 复用 `e2631env` 五步）、引导区
+分区备份（`/backup?part=`）；v3 新增系统信息/日志/完整性/重启/整槽备份/DHCP 与中英双语。
+明确不做 UBI/SIMG（MT798x 专属）、不做网页终端 stdin。
 
 ## 1. 目录内容
 
 | 文件 | 提交 | 说明 |
 |---|---|---|
-| `e2631-failsafe.html` | 是 | 单文件页面（HTML/CSS/JS；原始 44,003 B，gzip 13,773 B） |
+| `e2631-failsafe.html` | 是 | 单文件页面（HTML/CSS/JS；原始 **78,957 B**，gzip **24,904 B**） |
 | `../../tools/embed-failsafe.sh` | 是 | 构建期 gzip 嵌入脚本（确定性输出） |
 | `../../tools/mock-failsafe.mjs` | 是 | 本地离线预览服务器（只绑 127.0.0.1，模拟端点） |
 | `README.md` | 是 | 本文件 |
 | `<u-boot>/board/zte/zxhn-e2631/e2631_failsafe_asset.c/.h` | **否** | 脚本生成物；每次构建重新生成，不入库 |
 
 尺寸预算：**gzip 后 ≤ 32768 B**（task-87 抬闸；v1 曾为 6144 B）。
-当前实测：原始 **44,003 B**，gzip **13,773 B**（limit 32,768 B），
-页面 sha256 `d6bff9225bee6b85f453f2e7b64f15b72eaa7106f8aebfbd6c79aca94b4d2ba2`，
-gzip sha256 `496c56514ad79a4aab95cd71f57d01bb0f081c49019991778a96e0b1aaac9f7f`
+当前实测：原始 **78,957 B**，gzip **24,904 B**（limit 32,768 B；v3 的 I18N 字典占增量大部分；
+契约规定仅当页面 gzip > 26,000 B 或二进制余量门被破时才整块删 I18N，当前保留双语）。
+页面 sha256 `b70ce1c9a99fea72050b0b24c35e6c7307a45c6f92c842ce9fae18f8c51743e6`，
+gzip sha256 `8172e720a50576a2367736eb1d4a8d04fdf0a0689a175b5abd597e9fd55d7d19`
 （`tools/embed-failsafe.sh --check` 实测）。超限不得抬闸，只裁功能。
 
 ## 2. 冻结接口（不要改符号名/类型）

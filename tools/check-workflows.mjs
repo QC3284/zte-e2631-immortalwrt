@@ -477,12 +477,12 @@ ok('UBOOT-INFO.txt carries the payload footprint table',
     'headroom bytes vs CI gate:', 'env block sha256:', '.config sha256:'].every((s) => has(UBOOT_WF, s)) &&
   has(UBOOT_WF, 'sha256sum build/.config'));
 
-// E4 v1 (task-73) / v2 (task-83): the rescue page is one self-contained HTML
+// E4 v1 (task-73) / v2 (v2.1 task-88) / v3 (task-91): the rescue page is one self-contained HTML
 // file that the build gzip-embeds into the U-Boot tree; the page talks to the
 // rescue HTTP server with a raw POST body and polls /status. The page, the embed
 // tool, the frozen symbols and the workflow hook are pinned here so that an
 // external dependency, a multipart regression or a symbol rename cannot land
-// silently. The page budget is 32768 bytes: the task-83 v2 contract, raised from
+// silently. The page budget is 32768 bytes (v3 keeps it): the task-83 v2 contract, raised from
 // the v1 6144-byte gate by task-87 (evidence/e4-v2-contract-design-20261128.md).
 const failsafeCheck = (() => {
   try {
@@ -493,7 +493,7 @@ const failsafeCheck = (() => {
     return { out: String(e.stdout || e.message), ok: false };
   }
 })();
-ok('the E4 rescue page is a single self-contained gzip asset within the 32768-byte v2 budget',
+ok('the E4 rescue page is a single self-contained gzip asset within the 32768-byte v3 budget',
   failsafeCheck.ok && failsafeCheck.limit === 32768 && failsafeCheck.gzip <= failsafeCheck.limit &&
   failsafeCheck.raw > failsafeCheck.gzip &&
   FAILSAFE_PAGE.includes('xhr.send(file)') && !/FormData|multipart/.test(FAILSAFE_PAGE) &&
@@ -504,7 +504,8 @@ ok('the E4 rescue page is a single self-contained gzip asset within the 32768-by
   FAILSAFE_PAGE.includes('X-E2631-SHA256') && FAILSAFE_PAGE.includes('sha_match') &&
   FAILSAFE_PAGE.includes('devsha') && !/https?:\/\//.test(FAILSAFE_PAGE) &&
   !/<script[^>]+src=/.test(FAILSAFE_PAGE) && !/<link[^>]+href=/.test(FAILSAFE_PAGE) &&
-  !/\/reboot/.test(FAILSAFE_PAGE),
+  (!FAILSAFE_PAGE.includes('/reboot') || (FAILSAFE_PAGE.includes('X-E2631-Confirm') &&
+    FAILSAFE_PAGE.includes('function doReboot') && FAILSAFE_PAGE.includes('confirm('))),
   failsafeCheck.ok ? 'raw ' + failsafeCheck.raw + ' B, gzip ' + failsafeCheck.gzip + ' B, limit ' + failsafeCheck.limit + ' B' : failsafeCheck.out.slice(0, 200));
 ok('tools/embed-failsafe.sh defines the frozen symbols and emits deterministic asset files',
   FAILSAFE_EMBED.includes('e2631_failsafe_html_gz[]') &&

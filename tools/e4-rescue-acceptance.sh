@@ -256,7 +256,11 @@ fi
 page_sha=$(sha256sum "$PAGE" | awk '{print $1}')
 log "local page sha256: $page_sha"
 if grep -q '/reboot' "$PAGE"; then
-	failcase "page calls /reboot; per the behaviour contract the page must never trigger a reboot"
+	if grep -q 'X-E2631-Confirm' "$PAGE" && grep -q 'function doReboot' "$PAGE" && grep -q 'confirm(' "$PAGE"; then
+		pass "page offers /reboot only as a user-confirmed v3 action carrying X-E2631-Confirm: reboot"
+	else
+		failcase "page calls /reboot without the v3 user-confirmation and X-E2631-Confirm guard"
+	fi
 else
 	pass "page does not call /reboot"
 fi
