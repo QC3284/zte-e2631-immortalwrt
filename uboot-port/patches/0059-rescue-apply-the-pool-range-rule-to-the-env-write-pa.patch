@@ -1,0 +1,101 @@
+From d6b49521933df68c23e1018eb6df68ff3887dfb4 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 17:32:24 +0800
+Subject: [PATCH 59/59] rescue: apply the pool range rule to the env write path
+ (task-97)
+
+The t92c probe showed POST /env e2631_dhcp_pool_start=254 was accepted
+up to the baseline bug, and the contract requires 400 when
+pool_start + pool_size - 1 exceeds 254 or when the pool contains the
+server address.  rescue_env_semantic_ok() only checked start 1..254 and
+size 1..200 independently.
+
+Reuse e2631_dhcp_pool_ok() (the helper from the DHCP fallback fix) for
+both keys, with the other pool value taken from the current effective
+configuration (e2631_dhcp_* first, then dhcpd_pool_*, then the built-in
+default).  The write path and the rescue startup path now apply exactly
+the same rule.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 52 +++++++++++++++++++++++++++---
+ 1 file changed, 47 insertions(+), 5 deletions(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index eff51fbe..931259cf 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -968,23 +968,65 @@ static void rescue_dhcp_load(void)
+ 	rescue_dhcp.source = bad ? "fallback" : from_env ? "env" : "default";
+ }
+ 
++/* Current effective value of the other pool setting (v3 contract rules). */
++static u32 rescue_env_pool_other(bool want_start)
++{
++	const char *s = env_get(want_start ? "e2631_dhcp_pool_start" :
++						 "e2631_dhcp_pool_size");
++	char *end;
++	u32 v;
++
++	if (!s || !*s)
++		s = env_get(want_start ? "dhcpd_pool_start" : "dhcpd_pool_size");
++	if (!s || !*s)
++		return want_start ? 100 : 101;
++
++	v = simple_strtoul(s, &end, 0);
++	if (end && *end)
++		return want_start ? 100 : 101;
++	if (want_start && (v < 1 || v > 254))
++		return 100;
++	if (!want_start && (v < 1 || v > 200))
++		return 101;
++
++	return v;
++}
++
++/*
++ * The v3 contract requires pool_start + pool_size - 1 <= 254 and the pool
++ * must not contain the server address (contract line 186).  Reuse the
++ * e2631_dhcp_pool_ok() helper introduced for the DHCP fallback fix so the
++ * web write path and the rescue startup path apply exactly the same rule.
++ */
+ static bool rescue_env_semantic_ok(const char *key, const char *value)
+ {
++	bool is_start = !strcmp(key, "e2631_dhcp_pool_start");
++	bool is_size = !strcmp(key, "e2631_dhcp_pool_size");
++	const char *ip_str;
++	struct in_addr ip;
+ 	char *end;
+ 	u32 v;
+ 
+ 	if (!strcmp(key, "e2631_dhcp_ipaddr") ||
+ 	    !strcmp(key, "e2631_dhcp_netmask"))
+ 		return string_to_ip(value).s_addr != 0;
+-	if (strcmp(key, "e2631_dhcp_pool_start") &&
+-	    strcmp(key, "e2631_dhcp_pool_size"))
++	if (!is_start && !is_size)
+ 		return true;
++
+ 	v = simple_strtoul(value, &end, 0);
+ 	if (!end || *end)
+ 		return false;
+-	if (!strcmp(key, "e2631_dhcp_pool_start"))
+-		return v >= 1 && v <= 254;
+-	return v >= 1 && v <= 200;
++	if (is_start && (v < 1 || v > 254))
++		return false;
++	if (is_size && (v < 1 || v > 200))
++		return false;
++
++	ip_str = env_get("e2631_dhcp_ipaddr");
++	ip = (ip_str && *ip_str) ? string_to_ip(ip_str) : rescue_dhcp.ip;
++
++	return e2631_dhcp_pool_ok(ip.s_addr,
++				  is_start ? v : rescue_env_pool_other(true),
++				  is_size ? v : rescue_env_pool_other(false));
+ }
+ static void rescue_status_text(char *buf, size_t bufsz)
+ {
+-- 
+2.56.1
+

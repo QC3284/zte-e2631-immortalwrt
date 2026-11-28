@@ -294,14 +294,15 @@ fit mtd0 later, so CI enforces the budget up front.
 
 Since E4, space is a first-class constraint: `uboot-build.yml` gates the payload
 *before* the "Package the flashable mtd0 image" step. Two limits apply: the
-E4 v3 budget keeps at least 240 KiB of headroom below the hard cap, and a
-structural 8 KiB safety margin remains as the last line of defence.
+E4 v3 budget keeps the pinned headroom below the hard cap (task-97: 193,312
+bytes, i.e. a 460,000-byte gate), and a structural 8 KiB safety margin remains
+as the last line of defence.
 
 | item | value |
 |---|---|
 | payload window | mtd0 `0x20800..0xBFFFF` (0x9F800) |
 | hard cap | **653312 bytes (638 KiB)** |
-| E4 v3 gate (`E2631_UBOOT_HARD_LIMIT` - `E2631_UBOOT_HEADROOM_MIN`) | **407,552 bytes** (653312 - 245,760 = 240 KiB headroom) |
+| E4 v3 gate (`E2631_UBOOT_HARD_LIMIT` - `E2631_UBOOT_HEADROOM_MIN`) | **460,000 bytes** (653312 - 193,312 = 193,312 headroom; task-97 moved this from the v3 407,552-byte gate) |
 | structural safety gate | **645120 bytes** (hard cap - 8192 bytes; last line of defence before mtd0 assembly) |
 | E4 v3 baseline (`E2631_UBOOT_SIZE_BASELINE`) | 405,368 bytes (task-84 build, run 46109519805) |
 | P1 reclaim (patch 0042) | 12,380 bytes (`CONFIG_CMD_FDT` 8229 + `CONFIG_CMD_TFTPBOOT` 4151) |
@@ -310,7 +311,7 @@ structural 8 KiB safety margin remains as the last line of defence.
 | DHCP fix growth (patch 0052) | +32 bytes (the `ntohl()` helper and its inline header) |
 | page-stream fix (patch 0053/0054) | -72 bytes net (streaming send and the connection release replace the copy path) |
 | current `u-boot.bin` (task-92 third rebuild, run 46126880665) | **398,480 bytes**; 9,072 bytes below the E4 v3 gate, 6,888 bytes below the v3 baseline, 254,832 bytes (39.01%) below the hard cap |
-| failure behaviour | above 407,552 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
+| failure behaviour | above 460,000 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
 
 The budget ruling was exercised exactly once: the first unified v3 build
 (410,040 bytes) tripped the 407,552-byte gate by 2,488 bytes, so the

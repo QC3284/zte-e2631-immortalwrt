@@ -76,6 +76,16 @@ int main(void)
 	CHECK(!e2631_dhcp_pool_ok(IP_192_168_1_1, 1, 0),
 	      "empty pool is rejected");
 
+	/* v3 contract line 186: pool_start + pool_size - 1 <= 254. */
+	CHECK(e2631_dhcp_pool_ok(IP_192_168_1_1, 254, 1),
+	      "start 254 with a single address is accepted");
+	CHECK(!e2631_dhcp_pool_ok(IP_192_168_1_1, 254, 2),
+	      "start 254 with two addresses overflows 254");
+	CHECK(e2631_dhcp_pool_ok(IP_192_168_1_1, 253, 2),
+	      "start 253 with two addresses ends at 254");
+	CHECK(!e2631_dhcp_pool_ok(IP_192_168_1_1, 1, 1),
+	      "a pool holding the server address is rejected");
+
 	if (failures) {
 		printf("rescue dhcp pool fixture: FAIL (%d/%d checks)\n",
 		       failures, checks);

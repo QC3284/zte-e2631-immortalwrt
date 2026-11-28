@@ -1,0 +1,538 @@
+From bf43b962b78e89c541a84a8ead8f61c6989222fe Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 17:15:21 +0800
+Subject: [PATCH 55/59] net: add the minimal DNS responder for the rescue page
+ (task-97)
+
+Port the bl-mt798x-dhcpd DNS server (release 2026-10-08, GPL-2.0,
+Copyright Yuzhii0718) so the rescue page can be reached by name
+instead of only by address.
+
+The wire helpers (encoded-name parsing, case-insensitive matching and
+the A-record reply layout) live in include/net/mtk_dnsd.h so a host
+fixture can test them without the network stack.  The handler answers
+A queries for one domain from the dnsd_domain environment variable
+(default failsafe.lan) with the active net_ip, returns NXDOMAIN for
+other names and NOERROR/NODATA for non-A queries, and chains any
+unrelated UDP traffic to the previous handler.
+
+e2631rescue starts the server after DHCP; a DNS failure only warns,
+because the rescue must not depend on the convenience name.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c         |   6 +
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   2 +-
+ include/net/mtk_dnsd.h                     | 197 +++++++++++++++++++
+ net/Kconfig                                |   9 +
+ net/Makefile                               |   1 +
+ net/mtk_dnsd.c                             | 210 +++++++++++++++++++++
+ 6 files changed, 424 insertions(+), 1 deletion(-)
+ create mode 100644 include/net/mtk_dnsd.h
+ create mode 100644 net/mtk_dnsd.c
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 269eeb50..8ed7e0a2 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -71,6 +71,7 @@
+ #include <linux/mtd/spinand.h>
+ #include <linux/types.h>
+ #include <net/mtk_dhcpd.h>
++#include <net/mtk_dnsd.h>
+ #include <net/mtk_tcp.h>
+ 
+ #include "e2631env.h"
+@@ -3008,6 +3009,10 @@ static int rescue_loop(void)
+ 		return CMD_RET_FAILURE;
+ 	}
+ 
++	/* A local DNS answer is a convenience: never fail the rescue for it. */
++	if (mtk_dnsd_start())
++		printf("e2631rescue: WARNING: cannot start the DNS server\n");
++
+ 	printf("e2631rescue: open http://%s/ from a lan1 host\n",
+ 	       rescue_dhcp.ip_str);
+ 	printf("e2631rescue: press Ctrl-C to leave the rescue mode\n");
+@@ -3065,6 +3070,7 @@ static int rescue_loop(void)
+ 	}
+ 	backup_active = false;
+ 
++	mtk_dnsd_stop();
+ 	mtk_dhcpd_stop();
+ 	mtk_tcp_listen_stop(htons(E2631_RESCUE_TCP_PORT));
+ 	mtk_tcp_close_all_conn();
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 38c98bc2..8acc5fec 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -28,7 +28,6 @@ CONFIG_CMD_MEMTEST=y
+ CONFIG_CMD_MTD=y
+ # CONFIG_CMD_MTD_WRITE is not set
+ CONFIG_CMD_DHCP=y
+-# CONFIG_CMD_MII is not set
+ CONFIG_CMD_PING=y
+ # CONFIG_CMD_TFTPBOOT is not set
+ CONFIG_OF_CONTROL=y
+@@ -37,6 +36,7 @@ CONFIG_ENV_IS_IN_MTD=y
+ CONFIG_ENV_MTD_DEV="spi-nand0"
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_MTK_TCP=y
++CONFIG_MTK_DNSD=y
+ CONFIG_MTK_DHCPD=y
+ CONFIG_CLK=y
+ # CONFIG_MMC is not set
+diff --git a/include/net/mtk_dnsd.h b/include/net/mtk_dnsd.h
+new file mode 100644
+index 00000000..f6a24904
+--- /dev/null
++++ b/include/net/mtk_dnsd.h
+@@ -0,0 +1,197 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * Minimal DNS server for MediaTek web failsafe.
++ * Resolves a configurable domain name to the device's IP address,
++ * allowing users to access the failsafe UI via a friendly hostname.
++ *
++ * Ported for the ZTE ZXHN E2631 rescue page from
++ * bl-mt798x-dhcpd (tail of the U-Boot fork), commit
++ * e4cf4dc72d451dc7a86c9508390ad5a2e50743c4, GPL-2.0.
++ *
++ * The wire helpers (name parsing, case-insensitive matching and the
++ * A-record reply layout) live in this header so the host fixture can
++ * exercise them without the U-Boot network stack.  The handler in
++ * net/mtk_dnsd.c adds the Ethernet/IP/UDP framing and the handler
++ * registration.
++ */
++
++#ifndef __NET_MTK_DNSD_H__
++#define __NET_MTK_DNSD_H__
++
++#include <stdbool.h>
++#include <stdint.h>
++#include <string.h>
++
++/* DNS wire constants used by the tiny reply builder. */
++#define MTK_DNSD_FLAG_QR	0x8000
++#define MTK_DNSD_FLAG_AA	0x0400
++#define MTK_DNSD_FLAG_RD	0x0100
++#define MTK_DNSD_RCODE_NOERROR	0x0000
++#define MTK_DNSD_RCODE_NXDOMAIN	0x0003
++#define MTK_DNSD_CLASS_IN	0x0001
++#define MTK_DNSD_TYPE_A		0x0001
++#define MTK_DNSD_TTL		300
++#define MTK_DNSD_NAME_MAX	256
++
++/*
++ * Parse a DNS name label-by-label to obtain the total octet length of the
++ * raw encoded name in the query packet (including the terminating
++ * zero-length label).  Returns 0 on failure.
++ */
++static inline int mtk_dnsd_parse_name_len(const unsigned char *pkt, int pkt_len,
++					  int offset)
++{
++	int count = 0;
++	int hopped = 0;
++
++	while (hopped < 10) {
++		uint8_t label_len;
++
++		if (offset < 0 || offset >= pkt_len)
++			return 0;
++		label_len = pkt[offset];
++
++		if (label_len == 0)
++			return count + 1;
++
++		if ((label_len & 0xC0) == 0xC0)
++			return count + 2;
++
++		count += label_len + 1;
++		offset += label_len + 1;
++		hopped++;
++	}
++
++	return 0;
++}
++
++/*
++ * Check whether the DNS name in the query matches our configured domain.
++ * Matching is case-insensitive.
++ */
++static inline bool mtk_dnsd_name_matches(const unsigned char *pkt, int pkt_len,
++					 int offset, const char *domain)
++{
++	const char *d = domain;
++
++	while (*d) {
++		uint8_t label_len;
++		int i;
++
++		if (offset < 0 || offset >= pkt_len)
++			return false;
++
++		label_len = pkt[offset];
++		if (label_len == 0 || (label_len & 0xC0))
++			return false;
++
++		offset++;
++
++		for (i = 0; i < label_len; i++) {
++			char dc, pc;
++
++			if (offset >= pkt_len)
++				return false;
++
++			dc = *d++;
++			if (dc >= 'A' && dc <= 'Z')
++				dc += 'a' - 'A';
++			pc = pkt[offset];
++			if (pc >= 'A' && pc <= 'Z')
++				pc += 'a' - 'A';
++
++			if (dc != pc)
++				return false;
++			offset++;
++		}
++
++		if (*d == '.')
++			d++;
++		else if (*d != '\0')
++			return false;
++	}
++
++	if (offset >= pkt_len || pkt[offset] != 0)
++		return false;
++
++	return true;
++}
++
++/*
++ * Build a DNS reply payload (header + echoed question + optional A answer).
++ *
++ * @query:     received DNS payload
++ * @name_off:  offset of the question name (normally 12)
++ * @name_len:  encoded name length from mtk_dnsd_parse_name_len()
++ * @rcode:     MTK_DNSD_RCODE_*
++ * @ip:        IPv4 address in network byte order for the A record
++ * @out:       output buffer (at least 12 + name_len + 4 + 16 bytes)
++ * @outsz:     size of @out
++ *
++ * Return: reply length, or -1 when @out is too small.
++ *
++ * With @rcode == NXDOMAIN or @ip == 0 the reply carries no answer record.
++ */
++static inline int mtk_dnsd_build_reply(const unsigned char *query, int name_off,
++				       int name_len, uint16_t rcode, uint32_t ip,
++				       unsigned char *out, int outsz)
++{
++	bool answer = (rcode == MTK_DNSD_RCODE_NOERROR) && ip;
++	uint16_t flags;
++	uint32_t ttl = MTK_DNSD_TTL;
++	int pos;
++
++	if (outsz < 12 + name_len + 4 || (answer && outsz < 12 + name_len + 4 + 16))
++		return -1;
++
++	out[0] = query[0];
++	out[1] = query[1];
++
++	flags = MTK_DNSD_FLAG_QR | MTK_DNSD_FLAG_AA |
++		(((uint16_t)query[2] << 8 | query[3]) & MTK_DNSD_FLAG_RD) | rcode;
++	out[2] = (flags >> 8) & 0xFF;
++	out[3] = flags & 0xFF;
++
++	out[4] = query[4];
++	out[5] = query[5];
++	out[6] = 0;
++	out[7] = answer ? 1 : 0;
++	out[8] = 0;
++	out[9] = 0;
++	out[10] = 0;
++	out[11] = 0;
++
++	memcpy(out + 12, query + name_off, name_len + 4);
++	pos = 12 + name_len + 4;
++
++	if (answer) {
++		/* Compression pointer to the question name (0xC00C). */
++		out[pos++] = 0xC0;
++		out[pos++] = 0x0C;
++		/* Type A, class IN. */
++		out[pos++] = 0x00;
++		out[pos++] = 0x01;
++		out[pos++] = 0x00;
++		out[pos++] = 0x01;
++		/* TTL. */
++		out[pos++] = (ttl >> 24) & 0xFF;
++		out[pos++] = (ttl >> 16) & 0xFF;
++		out[pos++] = (ttl >> 8) & 0xFF;
++		out[pos++] = ttl & 0xFF;
++		/* RDLENGTH = 4, RDATA = the address in network order. */
++		out[pos++] = 0x00;
++		out[pos++] = 0x04;
++		memcpy(out + pos, &ip, 4);
++		pos += 4;
++	}
++
++	return pos;
++}
++
++int mtk_dnsd_start(void);
++void mtk_dnsd_stop(void);
++bool mtk_dnsd_is_running(void);
++
++#endif /* __NET_MTK_DNSD_H__ */
+diff --git a/net/Kconfig b/net/Kconfig
+index 0d4a8386..e088c9df 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -332,6 +332,15 @@ config MTK_TCP_VERBOSE
+ 	  minimal TCP stack. This is noisy and only meant for debugging
+ 	  the rescue server on a lab unit.
+ 
++config MTK_DNSD
++	bool "Minimal DNS server for the web failsafe"
++	depends on NET_LEGACY
++	help
++	  A tiny DNS responder used by the ZTE ZXHN E2631 rescue page: it
++	  answers A-record queries for one configurable domain (default
++	  failsafe.lan) with the device address, so the page can be opened
++	  by name instead of by IP.
++
+ config MTK_DHCPD
+ 	bool "Minimal DHCPv4 server for the web failsafe"
+ 	depends on NET_LEGACY
+diff --git a/net/Makefile b/net/Makefile
+index 02a225da..8ccd15bb 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -31,6 +31,7 @@ obj-$(CONFIG_PROT_TCP) += tcp.o
+ obj-$(CONFIG_WGET) += wget.o
+ obj-$(CONFIG_MTK_TCP) += mtk_tcp.o
+ obj-$(CONFIG_MTK_DHCPD) += mtk_dhcpd.o
++obj-$(CONFIG_MTK_DNSD) += mtk_dnsd.o
+ 
+ # Disable this warning as it is triggered by:
+ # sprintf(buf, index ? "foo%d" : "foo", index)
+diff --git a/net/mtk_dnsd.c b/net/mtk_dnsd.c
+new file mode 100644
+index 00000000..09de0626
+--- /dev/null
++++ b/net/mtk_dnsd.c
+@@ -0,0 +1,210 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * Minimal DNS server for MediaTek web failsafe.
++ *
++ * Resolves a single domain name to the device's IP address.
++ * The domain is read from the environment variable "dnsd_domain".
++ * If not set, it is automatically created with the fallback value
++ * "failsafe.lan".  The IP address is taken from the active U-Boot network
++ * address, with fallbacks to the "ipaddr" environment variable and
++ * 192.168.1.1.
++ *
++ * Listens on UDP port 53 and responds to standard DNS A-record queries.
++ *
++ * Ported for the ZTE ZXHN E2631 rescue page from the upstream
++ * bl-mt798x-dhcpd U-Boot fork (commit
++ * e4cf4dc72d451dc7a86c9508390ad5a2e50743c4, GPL-2.0).  The wire helpers
++ * live in include/net/mtk_dnsd.h so the host fixture can test them.
++ */
++
++#include <env.h>
++#include <log.h>
++#include <net.h>
++
++#include "dns.h"
++#include <net/mtk_dnsd.h>
++
++static rxhand_f *prev_udp_handler;
++static bool dnsd_running;
++
++#define DNSD_FALLBACK_DOMAIN "failsafe.lan"
++#define DNSD_FALLBACK_IP     "192.168.1.1"
++#define DNSD_ENV_DOMAIN      "dnsd_domain"
++#define DNSD_ENV_IPADDR      "ipaddr"
++
++static struct in_addr dnsd_get_our_ip(void)
++{
++	char *ip_str;
++	struct in_addr ip = net_ip;
++
++	if (ip.s_addr)
++		return ip;
++
++	ip_str = env_get(DNSD_ENV_IPADDR);
++	if (!ip_str || !*ip_str)
++		ip_str = DNSD_FALLBACK_IP;
++
++	return string_to_ip(ip_str);
++}
++
++static void dnsd_send_reply(const uchar *pkt, int name_offset, int name_len,
++			    uint16_t rcode, struct ethernet_hdr *eth_hdr,
++			    struct in_addr sip, unsigned int sport,
++			    struct in_addr answer_ip)
++{
++	uchar *pkt_hdr;
++	int eth_size;
++	uchar *resp;
++	int len;
++
++	if (!net_tx_packet)
++		return;
++
++	pkt_hdr = (uchar *)net_tx_packet;
++	eth_size = net_set_ether(pkt_hdr, eth_hdr->et_src, PROT_IP);
++	resp = pkt_hdr + eth_size + IP_UDP_HDR_SIZE;
++
++	len = mtk_dnsd_build_reply(pkt, name_offset, name_len, rcode,
++				   answer_ip.s_addr, resp,
++				   1500 - eth_size - IP_UDP_HDR_SIZE);
++	if (len < 0)
++		return;
++
++	net_set_udp_header(pkt_hdr + eth_size, sip, sport, DNS_SERVICE_PORT, len);
++	net_send_packet(pkt_hdr, eth_size + IP_UDP_HDR_SIZE + len);
++}
++
++/*
++ * DNS query handler.
++ * Forwards non-DNS packets to the previous UDP handler.
++ */
++static void dnsd_handler(uchar *pkt, unsigned int dport,
++			 struct in_addr sip, unsigned int sport,
++			 unsigned int len)
++{
++	struct ethernet_hdr *eth_hdr;
++	uint16_t flags, qdcount;
++	uint16_t qtype, qclass;
++	char *domain_str;
++	int name_offset, name_len;
++	struct in_addr our_ip;
++	int qtype_offset;
++
++	if (!dnsd_running || dport != DNS_SERVICE_PORT || len < 17)
++		goto forward;
++
++	flags = ((uint16_t)pkt[2] << 8) | pkt[3];
++	if ((flags & MTK_DNSD_FLAG_QR) || (flags & 0x7800) != 0)
++		goto forward;
++
++	qdcount = ((uint16_t)pkt[4] << 8) | pkt[5];
++	if (qdcount != 1)
++		goto forward;
++
++	name_offset = 12;
++	name_len = mtk_dnsd_parse_name_len(pkt, len, name_offset);
++	if (name_len <= 0 || name_len > MTK_DNSD_NAME_MAX)
++		goto forward;
++
++	qtype_offset = name_offset + name_len;
++	if (qtype_offset + 4 > len)
++		goto forward;
++
++	qtype = ((uint16_t)pkt[qtype_offset] << 8) | pkt[qtype_offset + 1];
++	qclass = ((uint16_t)pkt[qtype_offset + 2] << 8) | pkt[qtype_offset + 3];
++
++	if (qclass != MTK_DNSD_CLASS_IN)
++		goto forward;
++	if (!net_tx_packet)
++		goto forward;
++
++	/*
++	 * Safely retrieve the client MAC from the received frame header.
++	 * In U-Boot, 'pkt' points to the UDP payload; subtracting the IP
++	 * and UDP headers gives us the Ethernet header.
++	 */
++	eth_hdr = (struct ethernet_hdr *)(pkt - IP_UDP_HDR_SIZE -
++					  ETHER_HDR_SIZE);
++
++	domain_str = env_get(DNSD_ENV_DOMAIN);
++	if (!domain_str || !*domain_str)
++		domain_str = DNSD_FALLBACK_DOMAIN;
++
++	if (!mtk_dnsd_name_matches(pkt, len, name_offset, domain_str)) {
++		dnsd_send_reply(pkt, name_offset, name_len,
++				MTK_DNSD_RCODE_NXDOMAIN, eth_hdr, sip, sport,
++				(struct in_addr){ 0 });
++		return;
++	}
++
++	/* Return NOERROR/NODATA for non-A queries such as AAAA and HTTPS. */
++	if (qtype != DNS_A_RECORD) {
++		dnsd_send_reply(pkt, name_offset, name_len,
++				MTK_DNSD_RCODE_NOERROR, eth_hdr, sip, sport,
++				(struct in_addr){ 0 });
++		return;
++	}
++
++	our_ip = dnsd_get_our_ip();
++	if (our_ip.s_addr == 0)
++		goto forward;
++
++	dnsd_send_reply(pkt, name_offset, name_len, MTK_DNSD_RCODE_NOERROR,
++			eth_hdr, sip, sport, our_ip);
++	return;
++
++forward:
++	if (prev_udp_handler)
++		prev_udp_handler(pkt, dport, sip, sport, len);
++}
++
++int mtk_dnsd_start(void)
++{
++	char *domain;
++	struct in_addr ip;
++
++	if (dnsd_running) {
++		if (net_get_udp_handler() != dnsd_handler) {
++			prev_udp_handler = net_get_udp_handler();
++			net_set_udp_handler(dnsd_handler);
++		}
++		return 0;
++	}
++
++	domain = env_get(DNSD_ENV_DOMAIN);
++	if (!domain || !*domain) {
++		domain = DNSD_FALLBACK_DOMAIN;
++		env_set(DNSD_ENV_DOMAIN, DNSD_FALLBACK_DOMAIN);
++	}
++
++	ip = dnsd_get_our_ip();
++	if (ip.s_addr == 0)
++		return 1;
++
++	prev_udp_handler = net_get_udp_handler();
++	net_set_udp_handler(dnsd_handler);
++
++	dnsd_running = true;
++	printf("dnsd: started, resolving '%s' -> %pI4\n", domain, &ip);
++
++	return 0;
++}
++
++void mtk_dnsd_stop(void)
++{
++	if (!dnsd_running)
++		return;
++
++	if (net_get_udp_handler() == dnsd_handler)
++		net_set_udp_handler(prev_udp_handler);
++	prev_udp_handler = NULL;
++	dnsd_running = false;
++	debug("dnsd: stopped\n");
++}
++
++bool mtk_dnsd_is_running(void)
++{
++	return dnsd_running;
++}
+-- 
+2.56.1
+

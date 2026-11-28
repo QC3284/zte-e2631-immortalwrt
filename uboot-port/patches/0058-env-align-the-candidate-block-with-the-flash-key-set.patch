@@ -1,0 +1,291 @@
+From dd5e67f7aa871da8d629f54e08f3f0724a957501 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 17:32:10 +0800
+Subject: [PATCH 58/59] env: align the candidate block with the flash key set
+ (task-97)
+
+A genuine no-change write through POST /env was refused with 403
+'key is not writable' in the t92c device probe.  e2631_env_build_candidate
+exported the RAM environment, which also carries runtime-only values:
+fdtcontroladdr points into the loaded device tree and stdin/stdout/stderr
+point at the live serial device ("serial@9440...") while flash stores
+the plain "serial" names.  The diff therefore always contained keys that
+the whitelist check then refused.
+
+Align the candidate with the flash baseline before the final export:
+whitelisted keys (e2631_* and bootdelay) keep their RAM value, every
+other key takes the flash value or is dropped when flash does not have
+it, and the device-tree pointer is never persisted.  The RAM values are
+restored after the candidate has been exported.  With a blank/invalid
+baseline only fdtcontroladdr is dropped, so the first-write behaviour is
+unchanged.
+
+The per-key rule lives in e2631env_align.h so a host fixture can pin it.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631env.c       | 136 ++++++++++++++++++++++++--
+ board/zte/zxhn-e2631/e2631env_align.h |  54 ++++++++++
+ 2 files changed, 180 insertions(+), 10 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631env_align.h
+
+diff --git a/board/zte/zxhn-e2631/e2631env.c b/board/zte/zxhn-e2631/e2631env.c
+index 4851995b..84dbd69d 100644
+--- a/board/zte/zxhn-e2631/e2631env.c
++++ b/board/zte/zxhn-e2631/e2631env.c
+@@ -48,6 +48,7 @@
+ #include <u-boot/crc.h>
+ 
+ #include "e2631env.h"
++#include "e2631env_align.h"
+ 
+ #define E2631_ENV_MTD_DEV		"spi-nand0"
+ #define E2631_ENV_MAX_ENTRIES		64
+@@ -225,16 +226,104 @@ static int e2631_env_restore_vendor_keys(void)
+ 	return 0;
+ }
+ 
++struct e2631_env_tweak {
++	const char *key;
++	char *saved;
++	bool existed;
++};
++
++/*
++ * Align the non-whitelisted keys with the flash baseline before exporting
++ * the candidate block.
++ *
++ * The RAM environment carries runtime-only values that must never be
++ * persisted: fdtcontroladdr points into the loaded device tree, and the
++ * stdin/stdout/stderr variables point at the live serial device
++ * ("serial@9440...") while the flash block stores the plain "serial" names.
++ * Diffing the raw RAM environment against flash would flag those keys, so a
++ * genuine no-change write would be refused with "key is not writable".
++ *
++ * Whitelisted keys (e2631_* and bootdelay) keep their RAM value; every other
++ * key is aligned with the flash block, or removed when flash does not have
++ * it.  The caller restores the RAM values after the candidate has been
++ * exported.
++ */
++static int e2631_env_align_with_baseline(const struct e2631_env_entry *base,
++					 int base_n, bool base_valid,
++					 struct e2631_env_entry *ents, int n,
++					 struct e2631_env_tweak *tweaks,
++					 int *ntweak)
++{
++	int i, ret = 0;
++
++	*ntweak = 0;
++	for (i = 0; i < n; i++) {
++		const char *key = ents[i].key;
++		const char *base_value;
++		enum e2631_env_align_action action;
++		const char *want;
++		const char *cur;
++
++		base_value = base_valid ? e2631_env_find(base, base_n, key) :
++					  NULL;
++		action = e2631_env_align_action(key, ents[i].value,
++						base_value, base_valid,
++						e2631_env_key_allowed(key));
++		if (action == E2631_ENV_ALIGN_KEEP)
++			continue;
++		want = action == E2631_ENV_ALIGN_SET ? base_value : NULL;
++
++		if (*ntweak >= E2631_ENV_MAX_CHANGES)
++			return -ENOSPC;
++
++		cur = env_get(key);
++		tweaks[*ntweak].key = key;
++		tweaks[*ntweak].existed = cur != NULL;
++		tweaks[*ntweak].saved = NULL;
++		if (cur) {
++			size_t len = strlen(cur) + 1;
++
++			tweaks[*ntweak].saved = malloc(len);
++			if (!tweaks[*ntweak].saved)
++				return -ENOMEM;
++			strlcpy(tweaks[*ntweak].saved, cur, len);
++		}
++		(*ntweak)++;
++
++		ret = env_set(key, want);
++		if (ret)
++			return ret;
++	}
++
++	return ret;
++}
++
++static void e2631_env_restore_tweaks(struct e2631_env_tweak *tweaks,
++				     int ntweak)
++{
++	while (ntweak-- > 0) {
++		struct e2631_env_tweak *t = &tweaks[ntweak];
++
++		env_set(t->key, t->existed ? t->saved : NULL);
++		free(t->saved);
++	}
++}
++
+ /*
+  * Export the current RAM environment into a fresh block, with the vendor
+- * keys restored to their load-time snapshot first.
++ * keys restored to their load-time snapshot first and the non-whitelisted
++ * keys aligned with the flash baseline.
+  */
+ static int e2631_env_build_candidate(u8 *cand,
+ 				     struct e2631_env_entry *ents, int *count,
+-				     u32 *crc)
++				     u32 *crc,
++				     const struct e2631_env_entry *base,
++				     int base_n, bool base_valid)
+ {
+-	u32 calc_crc;
+-	int ret;
++	struct e2631_env_entry probe[E2631_ENV_MAX_ENTRIES];
++	struct e2631_env_tweak tweaks[E2631_ENV_MAX_CHANGES];
++	u32 calc_crc, probe_crc = 0, probe_calc = 0;
++	int ntweak = 0, ret, probe_n = 0;
+ 
+ 	if (!e2631_env_snapshot_taken) {
+ 		printf("e2631env: the vendor-key snapshot was not taken; refusing to touch the env block\n");
+@@ -253,18 +342,42 @@ static int e2631_env_build_candidate(u8 *cand,
+ 		return -EIO;
+ 	}
+ 
++	ret = e2631_env_parse(cand, CONFIG_ENV_SIZE, probe,
++			      E2631_ENV_MAX_ENTRIES, &probe_n, &probe_crc,
++			      &probe_calc);
++	if (ret) {
++		printf("e2631env: the exported environment is malformed\n");
++		return ret;
++	}
++
++	ret = e2631_env_align_with_baseline(base, base_n, base_valid, probe,
++					    probe_n, tweaks, &ntweak);
++	if (ret)
++		goto restore;
++
++	memset(cand, 0, CONFIG_ENV_SIZE);
++	if (env_export((env_t *)cand)) {
++		printf("e2631env: cannot export the environment\n");
++		ret = -EIO;
++		goto restore;
++	}
++
+ 	ret = e2631_env_parse(cand, CONFIG_ENV_SIZE, ents,
+ 			      E2631_ENV_MAX_ENTRIES, count, crc, &calc_crc);
+ 	if (ret) {
+ 		printf("e2631env: the exported environment is malformed\n");
+-		return ret;
++		goto restore;
+ 	}
+ 	if (*crc != calc_crc) {
+ 		printf("e2631env: the exported environment CRC does not match\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto restore;
+ 	}
+ 
+-	return 0;
++restore:
++	e2631_env_restore_tweaks(tweaks, ntweak);
++
++	return ret;
+ }
+ 
+ /* All differences are listed in both directions, order-insensitive. */
+@@ -578,7 +691,8 @@ static int do_e2631env_diff(struct mtd_info *mtd)
+ 		old_valid = !ret && old_crc == old_calc;
+ 	}
+ 
+-	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc,
++					old_ents, old_n, old_valid);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -659,7 +773,8 @@ static int do_e2631env_save(struct mtd_info *mtd)
+ 	if (ret)
+ 		goto out;
+ 
+-	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc,
++					old_ents, old_n, old_valid);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -862,7 +977,8 @@ int e2631_env_write_begin(const char *key, const char *value, char *err,
+ 		goto fail;
+ 	}
+ 
+-	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc);
++	ret = e2631_env_build_candidate(cand, new_ents, &new_n, &new_crc,
++					old_ents, old_n, old_valid);
+ 	if (ret) {
+ 		snprintf(err, errsz, "cannot build the candidate block");
+ 		goto fail;
+diff --git a/board/zte/zxhn-e2631/e2631env_align.h b/board/zte/zxhn-e2631/e2631env_align.h
+new file mode 100644
+index 00000000..5fe7b8f6
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631env_align.h
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Baseline alignment rule for the whitelisted environment write.
++ *
++ * The rescue page may only persist e2631_* keys and bootdelay.  The rest of
++ * the RAM environment, however, carries runtime-only values: fdtcontroladdr
++ * points into the loaded device tree and stdin/stdout/stderr point at the
++ * live serial device ("serial@9440...") while flash stores plain "serial".
++ * Exported as-is, those keys show up in the change set and a genuine
++ * no-change write is refused with "key is not writable" (t92c Phase A).
++ *
++ * The rule is: whitelisted keys keep their RAM value; with a valid flash
++ * baseline every other key is aligned with the baseline (or removed when
++ * flash does not have it); without a usable baseline only the device-tree
++ * pointer is always removed.  The header is standalone so the host fixture
++ * can pin the rule without the U-Boot environment.
++ */
++
++#ifndef __BOARD_ZTE_E2631_ENV_ALIGN_H__
++#define __BOARD_ZTE_E2631_ENV_ALIGN_H__
++
++#include <stdbool.h>
++#include <string.h>
++
++enum e2631_env_align_action {
++	E2631_ENV_ALIGN_KEEP,	/* leave the RAM value in the candidate */
++	E2631_ENV_ALIGN_SET,	/* use the flash baseline value instead */
++	E2631_ENV_ALIGN_DELETE,	/* remove the key from the candidate */
++};
++
++static inline enum e2631_env_align_action
++e2631_env_align_action(const char *key, const char *value,
++		       const char *base_value, bool base_valid,
++		       bool whitelisted)
++{
++	if (whitelisted)
++		return E2631_ENV_ALIGN_KEEP;
++
++	if (base_valid) {
++		if (base_value && !strcmp(value, base_value))
++			return E2631_ENV_ALIGN_KEEP;
++		if (base_value)
++			return E2631_ENV_ALIGN_SET;
++		return E2631_ENV_ALIGN_DELETE;
++	}
++
++	/* No usable flash baseline: never persist the device-tree pointer. */
++	if (!strcmp(key, "fdtcontroladdr"))
++		return E2631_ENV_ALIGN_DELETE;
++
++	return E2631_ENV_ALIGN_KEEP;
++}
++
++#endif /* __BOARD_ZTE_E2631_ENV_ALIGN_H__ */
+-- 
+2.56.1
+

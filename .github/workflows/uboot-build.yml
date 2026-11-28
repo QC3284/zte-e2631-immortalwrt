@@ -195,7 +195,44 @@ jobs:
             "$GITHUB_WORKSPACE/uboot-port/tests/dhcp_pool_test.c" \
             -o "$RUNNER_TEMP/dhcp-pool-test"
           "$RUNNER_TEMP/dhcp-pool-test" | tee "$RUNNER_TEMP/dhcp-pool-test.out"
-          grep -q '(14 checks' "$RUNNER_TEMP/dhcp-pool-test.out"
+          grep -q '(18 checks' "$RUNNER_TEMP/dhcp-pool-test.out"
+      - name: Compile and run the DNS server fixture
+        # task-97/patch 0055: the rescue DNS responder answers A queries for
+        # one domain. The fixture pins the name parse/match and the exact
+        # A-record reply layout against the shipped e2631dns header.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -idirafter "$UBOOT_DIR/include" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/dnsd_test.c" \
+            -o "$RUNNER_TEMP/dnsd-test"
+          "$RUNNER_TEMP/dnsd-test" | tee "$RUNNER_TEMP/dnsd-test.out"
+          grep -q 'dnsd fixture: PASS (29 checks)' "$RUNNER_TEMP/dnsd-test.out"
+      - name: Compile and run the environment align fixture
+        # task-97/patch 0058: a genuine no-change env write must not see the
+        # runtime-only keys (fdtcontroladdr, serial@... stdio). The fixture
+        # pins the per-key keep/set/drop rule of e2631env_align.h.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/env_align_test.c" \
+            -o "$RUNNER_TEMP/env-align-test"
+          "$RUNNER_TEMP/env-align-test" | tee "$RUNNER_TEMP/env-align-test.out"
+          grep -q 'env align fixture: PASS' "$RUNNER_TEMP/env-align-test.out"
+      - name: Compile and run the web console fixture
+        # task-97/patch 0057: the rescue page drives the console through
+        # multipart /console/exec and reads JSON /console/poll. The fixture
+        # pins the boundary and field extraction of e2631webconsole.h and the
+        # JSON escaping so a malformed body cannot reach run_command().
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/webconsole_test.c" \
+            -o "$RUNNER_TEMP/webconsole-test"
+          "$RUNNER_TEMP/webconsole-test" | tee "$RUNNER_TEMP/webconsole-test.out"
+          grep -q 'webconsole fixture: PASS' "$RUNNER_TEMP/webconsole-test.out"
       - name: Compile and run the console query fixture
         # task-95/patch 0054: the request parser used to copy the URI into a
         # 96-byte buffer before the console length guard, so a 257-byte
@@ -300,6 +337,8 @@ jobs:
             '# CONFIG_CMD_FDT is not set' \
             '# CONFIG_CMD_TFTPBOOT is not set' \
             CONFIG_MTK_TCP=y \
+            CONFIG_MTK_DNSD=y \
+            CONFIG_MTK_TELNETD=y \
             CONFIG_MTK_DHCPD=y \
             CONFIG_SHA256=y \
             CONFIG_CONSOLE_RECORD=y \
@@ -595,6 +634,40 @@ jobs:
             exit 1
           fi
           echo "console query gate: untruncated URI, raw length guard, released connections"
+          # task-97: the upstream-alignment services (DNS + telnet + web
+          # console) and the two t92c env fixes.  The DNS and telnet servers
+          # are board-local ports of the upstream failsafe architecture; the
+          # web console shares its single execution slot with telnetd, and the
+          # env candidate is aligned with the flash key set so a genuine
+          # no-change write stops failing on runtime-only keys.
+          for task97_file in net/mtk_dnsd.c net/mtk_telnetd.c include/net/mtk_dnsd.h include/net/mtk_telnetd.h board/zte/zxhn-e2631/e2631webconsole.h board/zte/zxhn-e2631/e2631env_align.h; do
+            if [ ! -s "$task97_file" ]; then
+              echo "::error::the task-97 file $task97_file is missing"
+              exit 1
+            fi
+          done
+          grep -q 'mtk_dnsd_start' net/mtk_dnsd.c
+          grep -q 'mtk_telnetd_poll' net/mtk_telnetd.c
+          grep -q 'weak failsafe_console_is_busy' net/mtk_telnetd.c
+          grep -q 'failsafe_console_is_busy' "$rescue_c"
+          grep -q 'rescue_webconsole_exec_start' "$rescue_c"
+          grep -q 'rescue_webconsole_poll' "$rescue_c"
+          grep -q 'webconsole_net_reinit' "$rescue_c"
+          grep -q 'mtk_telnetd_start' "$rescue_c"
+          grep -q 'mtk_dnsd_start' "$rescue_c"
+          grep -q 'e2631_env_align_with_baseline' board/zte/zxhn-e2631/e2631env.c
+          grep -q 'e2631_dhcp_pool_ok' "$rescue_c"
+          if grep -q 's_addr & 0xff' "$rescue_c"; then
+            echo "::error::the rescue still extracts the pool host octet without ntohl()"
+            exit 1
+          fi
+          for task97_string in 'console is busy' 'dnsd: started, resolving' 'cannot start the telnet server' 'cannot start the DNS server'; do
+            if ! grep -aq "$task97_string" build/u-boot.bin; then
+              echo "::error::u-boot.bin is missing the task-97 text: $task97_string"
+              exit 1
+            fi
+          done
+          echo "task-97 gate: DNS + telnet + web console wired, shared console slot, env candidate aligned"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c
@@ -815,7 +888,8 @@ jobs:
           headroom=$((max - size))
           echo "u-boot.bin: $size bytes, hard cap $max bytes, CI gate $gate bytes ($margin byte safety margin), headroom $headroom bytes"
           # task-90: E4 v3 starts from the task-84 v2.1 build and must keep
-          # at least 240 KiB of headroom below the hard payload ceiling.
+          # the pinned headroom below the hard payload ceiling (task-97 ruling:
+          # 193312 bytes, so the self-imposed gate is 460000 bytes).
           v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))
           if [ "$size" -gt "$v3_limit" ]; then
             echo "::error::u-boot.bin is $size bytes, above the E4 v3 budget $v3_limit bytes (hard cap $E2631_UBOOT_HARD_LIMIT minus $E2631_UBOOT_HEADROOM_MIN bytes of headroom)"
@@ -1142,7 +1216,7 @@ jobs:
           headroom=$((payload_max - size))
           headroom_pct=$(awk -v h="$headroom" -v m="$payload_max" 'BEGIN { printf "%.2f", 100 * h / m }')
           gate_headroom=$((gate - size))
-          # task-90/task-92: E4 v3 keeps at least 240 KiB of headroom; report
+          # task-90/task-92: E4 v3 keeps the pinned headroom; report
           # the v3 gate, its headroom and the delta against the pinned baseline.
           v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))
           v3_headroom=$((v3_limit - size))

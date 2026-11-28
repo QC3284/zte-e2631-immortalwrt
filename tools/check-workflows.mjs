@@ -478,8 +478,10 @@ ok('UBOOT-INFO.txt carries the payload footprint table',
   has(UBOOT_WF, 'sha256sum build/.config'));
 
 // E4 v3 (task-90, unified rebuild in task-92): the size policy moved from the
-// v2.1 baseline+growth pair to the pinned baseline / 240 KiB headroom / hard
-// limit triple, and the budget ruling made the command reclaim explicit: P1
+// v2.1 baseline+growth pair to the pinned baseline / headroom / hard limit
+// triple; task-97 moved the headroom to 193312 bytes (a 460000-byte gate) for
+// the upstream-alignment batch. The budget ruling made the command reclaim
+// explicit: P1
 // drops fdt+tftp, P2 (mii) is held in reserve, and the core command set must
 // stay.  These checks pin the ruling, the new gates and the v3 endpoint
 // markers so a later edit cannot silently lose them.
@@ -489,8 +491,8 @@ const ubootV3Hard = Number(uboot.E2631_UBOOT_HARD_LIMIT);
 const ubootV3Limit = ubootV3Hard - ubootV3Headroom;
 const ubootV3GateAt = UBOOT_WF.indexOf('E4 v3 size gate:');
 ok('the E4 v3 size budget uses the pinned baseline/headroom/hard-limit triple',
-  ubootV3Baseline === 405368 && ubootV3Headroom === 245760 && ubootV3Hard === 653312 &&
-  ubootV3Limit === 407552 &&
+  ubootV3Baseline === 405368 && ubootV3Headroom === 193312 && ubootV3Hard === 653312 &&
+  ubootV3Limit === 460000 &&
   has(UBOOT_WF, 'E2631_UBOOT_SIZE_BASELINE') &&
   has(UBOOT_WF, 'v3_limit=$((E2631_UBOOT_HARD_LIMIT - E2631_UBOOT_HEADROOM_MIN))') &&
   has(UBOOT_WF, 'above the E4 v3 budget $v3_limit bytes') &&
@@ -535,12 +537,31 @@ ok('the task-95 page-stream and console-query fixes stay pinned',
   has(UBOOT_WF, "if grep -q 'snprintf(c->path'") &&
   has(UBOOT_WF, 'the request path is copied into a fixed buffer again') &&
   has(UBOOT_WF, 'rescue_conn_closed(c);'));
+// task-97: the upstream-alignment batch (DNS responder, minimal telnet
+// server, web console endpoints, env candidate alignment, DHCP pool range on
+// the /env path).  The three new services share one execution slot, every
+// fixture runs in CI, and the budget gate moved to 460000 bytes.
+ok('the task-97 upstream-alignment batch stays pinned',
+  ['Compile and run the DNS server fixture', 'Compile and run the environment align fixture',
+    'Compile and run the web console fixture'].every((s) => has(UBOOT_WF, s)) &&
+  has(UBOOT_WF, 'dnsd fixture: PASS (29 checks)') &&
+  has(UBOOT_WF, 'env align fixture: PASS') &&
+  has(UBOOT_WF, 'webconsole fixture: PASS') &&
+  has(UBOOT_WF, '-idirafter "$UBOOT_DIR/include"') &&
+  ['CONFIG_MTK_DNSD=y', 'CONFIG_MTK_TELNETD=y'].every((s) => has(UBOOT_WF, s)) &&
+  ['mtk_dnsd_start', 'mtk_telnetd_poll', 'weak failsafe_console_is_busy',
+    'failsafe_console_is_busy', 'rescue_webconsole_exec_start', 'rescue_webconsole_poll',
+    'webconsole_net_reinit', 'e2631_env_align_with_baseline', 'e2631_dhcp_pool_ok']
+    .every((m) => has(UBOOT_WF, m)) &&
+  has(UBOOT_WF, "grep -q 's_addr & 0xff'") &&
+  has(UBOOT_WF, 'console is busy') &&
+  has(UBOOT_WF, 'task-97 gate: DNS + telnet + web console wired, shared console slot, env candidate aligned'));
 ok('UBOOT-INFO records the E4 v3 budget and the final size chain',
   ['E4 v3 gate bytes:', 'headroom bytes vs E4 v3 gate:', 'size delta vs v3 baseline:',
     'E4 v3 budget:'].every((s) => has(UBOOT_WF, s)));
 ok('BUILD.md and uboot-port/README.md document the E4 v3 gate, baseline and P1 reclaim',
-  ['407,552', '245,760', '405,368', '12,380'].every((s) => has(UBOOT_BUDGET_DOC, s)) &&
-  ['407552', '245760', '405,368', '12,380'].every((s) => has(UBOOT_README, s)) &&
+  ['460,000', '193,312', '405,368', '12,380'].every((s) => has(UBOOT_BUDGET_DOC, s)) &&
+  ['460000', '193312', '405,368', '12,380'].every((s) => has(UBOOT_README, s)) &&
   has(UBOOT_BUDGET_DOC, 'E4 v3 gate') && has(UBOOT_BUDGET_DOC, 'E2631_UBOOT_HEADROOM_MIN'));
 
 // E4 v1 (task-73) / v2 (v2.1 task-88) / v3 (task-91): the rescue page is one self-contained HTML

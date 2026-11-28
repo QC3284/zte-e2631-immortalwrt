@@ -1,0 +1,813 @@
+From 5114cd51792f7833f976c2b6e46533e3d34aa04b Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 17:30:42 +0800
+Subject: [PATCH 56/59] net: add the minimal telnet server for the rescue page
+ (task-97)
+
+The upstream web failsafe exposes a telnet server next to the HTTP
+page.  Add a minimal RFC-854 server for the E2631 rescue image: one
+connection at a time, IAC option negotiation (ECHO/SGA), line editing
+with backspace and Ctrl-U, a 256-byte command line, and command
+execution through the shared single slot so the web console and telnet
+cannot run commands at the same time.
+
+Output capture spans console record: the server swaps gd->console_out
+for a private membuf around run_command(), drains it after the command
+with CRLF normalisation and streams it back through the existing TCP
+callback.  Ctrl-C during a command raises mtk_tcp_abort_request();
+net_loop() now calls mtk_tcp_periodic_check() and consumes the pending
+abort with the same cleanup as the serial Ctrl-C path.
+
+The server listens on the telnet_port environment value, default 23,
+and is started by e2631rescue next to the DHCP and DNS helpers.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c         |  10 +-
+ configs/zx279128s_zte_zxhn-e2631_defconfig |   1 +
+ include/net/mtk_telnetd.h                  |  66 +++
+ net/Kconfig                                |   9 +
+ net/Makefile                               |   1 +
+ net/mtk_telnetd.c                          | 579 +++++++++++++++++++++
+ net/net.c                                  |  14 +
+ 7 files changed, 679 insertions(+), 1 deletion(-)
+ create mode 100644 include/net/mtk_telnetd.h
+ create mode 100644 net/mtk_telnetd.c
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 8ed7e0a2..00b9fb72 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -72,6 +72,7 @@
+ #include <linux/types.h>
+ #include <net/mtk_dhcpd.h>
+ #include <net/mtk_dnsd.h>
++#include <net/mtk_telnetd.h>
+ #include <net/mtk_tcp.h>
+ 
+ #include "e2631env.h"
+@@ -3013,6 +3014,10 @@ static int rescue_loop(void)
+ 	if (mtk_dnsd_start())
+ 		printf("e2631rescue: WARNING: cannot start the DNS server\n");
+ 
++	/* Telnet shares the single command slot with the web console. */
++	if (mtk_telnetd_start(mtk_telnetd_env_port("telnet_port", 23)))
++		printf("e2631rescue: WARNING: cannot start the telnet server\n");
++
+ 	printf("e2631rescue: open http://%s/ from a lan1 host\n",
+ 	       rescue_dhcp.ip_str);
+ 	printf("e2631rescue: press Ctrl-C to leave the rescue mode\n");
+@@ -3022,6 +3027,7 @@ static int rescue_loop(void)
+ 	while (!ctrlc()) {
+ 		eth_rx();
+ 		mtk_tcp_periodic_check();
++		mtk_telnetd_poll();
+ 		rescue_task_poll();
+ 		rescue_led_tick();
+ 		if (reboot_pending &&
+@@ -3070,6 +3076,7 @@ static int rescue_loop(void)
+ 	}
+ 	backup_active = false;
+ 
++	mtk_telnetd_stop();
+ 	mtk_dnsd_stop();
+ 	mtk_dhcpd_stop();
+ 	mtk_tcp_listen_stop(htons(E2631_RESCUE_TCP_PORT));
+@@ -3115,6 +3122,7 @@ U_BOOT_CMD(e2631rescue, 1, 1, do_e2631rescue,
+ 	   "e2631rescue - start DHCP and the HTTP failsafe page. GET /, /status,\n"
+ 	   "              /slots, /env, /backup, /sysinfo, /log; POST /flash,\n"
+ 	   "              /firmware, /boot, /factory, /env, /console, /integrity,\n"
+-	   "              /reboot.  No flash is written until a\n"
++	   "              /reboot.  Also serves telnet (port 23) and answers DNS\n"
++	   "              queries for failsafe.lan.  No flash is written until a\n"
+ 	   "              validated image is uploaded with the X-E2631-Confirm\n"
+ 	   "              header.  Ctrl-C leaves the rescue mode.\n");
+diff --git a/configs/zx279128s_zte_zxhn-e2631_defconfig b/configs/zx279128s_zte_zxhn-e2631_defconfig
+index 8acc5fec..de02ec98 100644
+--- a/configs/zx279128s_zte_zxhn-e2631_defconfig
++++ b/configs/zx279128s_zte_zxhn-e2631_defconfig
+@@ -37,6 +37,7 @@ CONFIG_ENV_MTD_DEV="spi-nand0"
+ CONFIG_NET_RANDOM_ETHADDR=y
+ CONFIG_MTK_TCP=y
+ CONFIG_MTK_DNSD=y
++CONFIG_MTK_TELNETD=y
+ CONFIG_MTK_DHCPD=y
+ CONFIG_CLK=y
+ # CONFIG_MMC is not set
+diff --git a/include/net/mtk_telnetd.h b/include/net/mtk_telnetd.h
+new file mode 100644
+index 00000000..4af2a363
+--- /dev/null
++++ b/include/net/mtk_telnetd.h
+@@ -0,0 +1,66 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * Minimal telnet server for MediaTek web failsafe.
++ *
++ * Serves one RFC-854 connection at a time on the rescue network and runs
++ * U-Boot commands entered by the client.  Ported and reduced for the ZTE
++ * ZXHN E2631 rescue page from the upstream bl-mt798x-dhcpd U-Boot fork
++ * (commit e4cf4dc72d451dc7a86c9508390ad5a2e50743c4, GPL-2.0).
++ */
++
++#ifndef __NET_MTK_TELNETD_H__
++#define __NET_MTK_TELNETD_H__
++
++#include <stdbool.h>
++#include <linux/types.h>
++
++/**
++ * mtk_telnetd_env_port() - Resolve a TCP port from an environment variable
++ *
++ * @name: environment variable name (e.g. "telnet_port")
++ * @def:  fallback port when @name is unset or holds an invalid value
++ *
++ * Return: a valid port in [1, 65535]
++ */
++u16 mtk_telnetd_env_port(const char *name, u16 def);
++
++/**
++ * mtk_telnetd_start() - Start the telnet server on a given port
++ *
++ * @port: TCP port number (host byte order)
++ * Return: 0 on success, negative on error
++ */
++int mtk_telnetd_start(u16 port);
++
++/**
++ * mtk_telnetd_stop() - Stop the telnet server
++ */
++void mtk_telnetd_stop(void);
++bool mtk_telnetd_is_running(void);
++
++/**
++ * mtk_telnetd_exec_pending() - a telnet command is queued but not started
++ */
++bool mtk_telnetd_exec_pending(void);
++
++/**
++ * mtk_telnetd_exec_active() - a telnet command is queued or running
++ *
++ * The web console uses this to refuse starting a second command while a
++ * telnet command occupies the single execution slot.
++ */
++bool mtk_telnetd_exec_active(void);
++
++/**
++ * mtk_telnetd_poll() - run a queued telnet command
++ *
++ * MUST be called from the failsafe main poll loop, outside any eth_rx()
++ * frame.  Executing run_command() (which may enter net_loop() for ping,
++ * dhcp, ...) from inside the eth_rx() -> TCP callback chain would nest
++ * eth_rx() over the same DMA RX ring and corrupt it.
++ */
++void mtk_telnetd_poll(void);
++
++#endif /* __NET_MTK_TELNETD_H__ */
+diff --git a/net/Kconfig b/net/Kconfig
+index e088c9df..90fb1e8e 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -341,6 +341,15 @@ config MTK_DNSD
+ 	  failsafe.lan) with the device address, so the page can be opened
+ 	  by name instead of by IP.
+ 
++config MTK_TELNETD
++	bool "Minimal telnet server for the web failsafe"
++	depends on NET_LEGACY
++	help
++	  A small RFC-854 telnet server used by the ZTE ZXHN E2631 rescue
++	  page: it serves one connection at a time, runs the commands the
++	  client enters and streams the captured console output back.  It
++	  shares the single command execution slot with the web console.
++
+ config MTK_DHCPD
+ 	bool "Minimal DHCPv4 server for the web failsafe"
+ 	depends on NET_LEGACY
+diff --git a/net/Makefile b/net/Makefile
+index 8ccd15bb..56b44c9f 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -32,6 +32,7 @@ obj-$(CONFIG_WGET) += wget.o
+ obj-$(CONFIG_MTK_TCP) += mtk_tcp.o
+ obj-$(CONFIG_MTK_DHCPD) += mtk_dhcpd.o
+ obj-$(CONFIG_MTK_DNSD) += mtk_dnsd.o
++obj-$(CONFIG_MTK_TELNETD) += mtk_telnetd.o
+ 
+ # Disable this warning as it is triggered by:
+ # sprintf(buf, index ? "foo%d" : "foo", index)
+diff --git a/net/mtk_telnetd.c b/net/mtk_telnetd.c
+new file mode 100644
+index 00000000..7228398a
+--- /dev/null
++++ b/net/mtk_telnetd.c
+@@ -0,0 +1,579 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2026 Yuzhii0718
++ *
++ * Minimal telnet server for MediaTek web failsafe.
++ *
++ * Serves one RFC-854 connection on the rescue network and executes the
++ * U-Boot commands entered there.  This is a reduced port of the upstream
++ * bl-mt798x-dhcpd telnetd (commit e4cf4dc72d451dc7a86c9508390ad5a2e50743c4,
++ * GPL-2.0): one connection, a 256-byte command line, no history and no
++ * cursor movement, but the same architecture - the line editor only
++ * queues a command, mtk_telnetd_poll() runs run_command() from the rescue
++ * loop, and the output is captured through the console record buffer and
++ * streamed back in chunks.
++ *
++ * Ctrl-C on the client requests an out-of-band abort through
++ * mtk_tcp_abort_request(); net_loop() consumes it with the same exit path
++ * as the serial Ctrl-C, so a network command (ping, dhcp, ...) can be
++ * interrupted.  A command that never enters net_loop() cannot be
++ * interrupted, which is the same limitation as the serial console.
++ */
++
++#include <command.h>
++#include <console.h>
++#include <env.h>
++#include <malloc.h>
++#include <membuf.h>
++#include <net.h>
++#include <stdio.h>
++#include <string.h>
++#include <asm/global_data.h>
++
++#include <net/mtk_tcp.h>
++#include <net/mtk_telnetd.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++/* --- Telnet protocol (RFC 854) --- */
++#define TELNETD_IAC		255
++#define TELNETD_WILL		251
++#define TELNETD_WONT		252
++#define TELNETD_DO		253
++#define TELNETD_DONT		254
++#define TELNETD_SB		250
++#define TELNETD_SE		240
++
++#define TELNETD_TELOPT_ECHO	1
++#define TELNETD_TELOPT_SGA	3
++
++/* --- Buffer sizes --- */
++#define TELNETD_CMD_MAX		256
++#define TELNETD_INBUF_SIZE	1024
++#define TELNETD_RING_SIZE	4096
++#define TELNETD_TXBUF_SIZE	1024
++#define TELNETD_OUTBUF_SIZE	0x4000
++#define TELNETD_STREAM_CHUNK	1024
++#define TELNETD_PROMPT		"=> "
++#define TELNETD_GREETING	\
++	"\r\nU-Boot telnet rescue console (one command at a time)\r\n" TELNETD_PROMPT
++
++enum telnetd_iac_state {
++	TELNETD_IAC_NONE,
++	TELNETD_IAC_COMMAND,
++	TELNETD_IAC_OPTION,
++	TELNETD_IAC_SB,
++	TELNETD_IAC_SB_IAC,
++};
++
++struct telnetd_pdata {
++	const void *conn;
++	/* raw TCP input and the IAC parser state */
++	char inbuf[TELNETD_INBUF_SIZE];
++	unsigned int in_len;
++	enum telnetd_iac_state iac_state;
++	unsigned char iac_command;
++	/* line editor */
++	char line[TELNETD_CMD_MAX + 1];
++	unsigned int line_len;
++	bool skip_lf;
++	/* output ring: absolute counters, data is ring[tail % SIZE] */
++	char ring[TELNETD_RING_SIZE];
++	unsigned int ring_head;
++	unsigned int ring_tail;
++	char txbuf[TELNETD_TXBUF_SIZE];
++	bool tx_inflight;
++	/* deferred command execution */
++	bool exec_queued;
++	char exec_line[TELNETD_CMD_MAX + 1];
++	bool exec_active;
++	/* output capture and streaming */
++	bool draining;
++	struct membuf saved_out;
++	bool conn_dead;
++};
++
++static struct telnetd_pdata telnetd;
++static bool telnetd_running;
++static u16 telnetd_port;
++
++static void telnetd_pump(void);
++
++/* ---------------------------------------------------------------- */
++/* Output ring                                                       */
++/* ---------------------------------------------------------------- */
++
++static unsigned int telnetd_ring_free(void)
++{
++	return TELNETD_RING_SIZE - (telnetd.ring_head - telnetd.ring_tail);
++}
++
++static void telnetd_emit(const char *data, unsigned int len)
++{
++	unsigned int i;
++
++	for (i = 0; i < len && telnetd_ring_free(); i++) {
++		telnetd.ring[telnetd.ring_head % TELNETD_RING_SIZE] = data[i];
++		telnetd.ring_head++;
++	}
++
++	telnetd_pump();
++}
++
++static void telnetd_puts(const char *s)
++{
++	telnetd_emit(s, strlen(s));
++}
++
++/*
++ * Send the next queued chunk.  mtk_tcp_send_data() keeps the buffer until
++ * the peer acknowledges it, so the chunk is copied into txbuf first; the
++ * DATA_SENT callback frees the slot and pumps the next one.
++ */
++static void telnetd_pump(void)
++{
++	unsigned int len;
++	unsigned int i;
++
++	if (telnetd.tx_inflight || !telnetd.conn || telnetd.conn_dead)
++		return;
++
++	len = telnetd.ring_head - telnetd.ring_tail;
++	if (!len)
++		return;
++
++	if (len > TELNETD_TXBUF_SIZE)
++		len = TELNETD_TXBUF_SIZE;
++
++	for (i = 0; i < len; i++)
++		telnetd.txbuf[i] = telnetd.ring[(telnetd.ring_tail + i) %
++						 TELNETD_RING_SIZE];
++
++	if (mtk_tcp_send_data(telnetd.conn, telnetd.txbuf, len) == 0) {
++		telnetd.ring_tail += len;
++		telnetd.tx_inflight = true;
++	}
++}
++
++/* ---------------------------------------------------------------- */
++/* Command execution                                                 */
++/* ---------------------------------------------------------------- */
++
++static void telnetd_finish_capture(void)
++{
++	if (!telnetd.draining)
++		return;
++
++	membuf_dispose(&gd->console_out);
++	gd->console_out = telnetd.saved_out;
++	telnetd.draining = false;
++}
++
++/*
++ * Move captured console output into the TCP ring.  Newlines are converted
++ * to CRLF for the telnet client, but an existing CRLF stays intact.
++ */
++static void telnetd_drain_capture(void)
++{
++	struct membuf *mb = (struct membuf *)&gd->console_out;
++	char raw[TELNETD_STREAM_CHUNK];
++	char norm[2 * TELNETD_STREAM_CHUNK + 2];
++	unsigned int norm_len = 0;
++	int avail;
++	int got;
++	int i;
++	char prev = 0;
++
++	if (!telnetd.draining)
++		return;
++
++	if (telnetd_ring_free() < 2 * TELNETD_STREAM_CHUNK)
++		return;
++
++	avail = membuf_avail(mb);
++	if (avail <= 0) {
++		if (!telnetd.exec_active) {
++			telnetd_finish_capture();
++			if (telnetd.conn_dead)
++				return;
++			telnetd_puts("\r\n" TELNETD_PROMPT);
++		}
++		return;
++	}
++
++	if (avail > TELNETD_STREAM_CHUNK)
++		avail = TELNETD_STREAM_CHUNK;
++
++	got = membuf_get(mb, raw, avail);
++	if (got <= 0)
++		return;
++
++	for (i = 0; i < got; i++) {
++		if (raw[i] == '\n' && prev != '\r') {
++			norm[norm_len++] = '\r';
++			norm[norm_len++] = '\n';
++		} else {
++			norm[norm_len++] = raw[i];
++		}
++		prev = raw[i];
++	}
++
++	telnetd_emit(norm, norm_len);
++}
++
++static bool telnetd_ensure_recording(void)
++{
++	if (gd->console_out.start)
++		return true;
++
++	if (console_record_init())
++		return false;
++
++	return gd->console_out.start != NULL;
++}
++
++static void telnetd_execute(void)
++{
++	struct membuf private_out;
++
++	if (!telnetd.conn || telnetd.conn_dead)
++		return;
++
++	if (!telnetd_ensure_recording()) {
++		telnetd_puts("\r\nError: console recording unavailable\r\n"
++			     TELNETD_PROMPT);
++		return;
++	}
++
++	telnetd.saved_out = gd->console_out;
++	if (!membuf_new(&private_out, TELNETD_OUTBUF_SIZE)) {
++		gd->console_out = private_out;
++		telnetd.draining = true;
++	} else {
++		/*
++		 * Without a private buffer the output still goes to the
++		 * console, but it cannot be streamed back.
++		 */
++		telnetd.draining = false;
++	}
++
++	console_record_reset();
++
++	telnetd.exec_active = true;
++	mtk_tcp_abort_clear();
++	run_command(telnetd.exec_line, 0);
++	telnetd.exec_active = false;
++	mtk_tcp_abort_clear();
++
++	if (telnetd.conn_dead) {
++		telnetd_finish_capture();
++		return;
++	}
++
++	if (!telnetd.draining)
++		telnetd_puts("\r\n" TELNETD_PROMPT);
++}
++
++bool mtk_telnetd_exec_pending(void)
++{
++	return telnetd.exec_queued;
++}
++
++bool mtk_telnetd_exec_active(void)
++{
++	return telnetd.exec_queued || telnetd.exec_active || telnetd.draining;
++}
++
++void mtk_telnetd_poll(void)
++{
++	if (!telnetd_running)
++		return;
++
++	if (telnetd.draining)
++		telnetd_drain_capture();
++
++	if (telnetd.exec_queued && !telnetd.exec_active &&
++	    !telnetd.draining && telnetd.conn && !telnetd.conn_dead) {
++		telnetd.exec_line[telnetd.line_len] = '\0';
++		memcpy(telnetd.exec_line, telnetd.line,
++		       telnetd.line_len + 1);
++		telnetd.line_len = 0;
++		telnetd.exec_queued = false;
++		telnetd_execute();
++	}
++
++	telnetd_pump();
++}
++
++/* ---------------------------------------------------------------- */
++/* Line editor                                                       */
++/* ---------------------------------------------------------------- */
++
++static void telnetd_prompt(void)
++{
++	telnetd_puts("\r\n" TELNETD_PROMPT);
++}
++
++static void telnetd_queue_line(void)
++{
++	if (!telnetd.line_len)
++		return;
++
++	telnetd.exec_queued = true;
++}
++
++static void telnetd_handle_char(char ch)
++{
++	if (telnetd.skip_lf) {
++		telnetd.skip_lf = false;
++		if (ch == '\n')
++			return;
++	}
++
++	if (ch == '\r' || ch == '\n') {
++		if (ch == '\r')
++			telnetd.skip_lf = true;
++		telnetd_puts("\r\n");
++		if (telnetd.line_len)
++			telnetd_queue_line();
++		else
++			telnetd_puts(TELNETD_PROMPT);
++		return;
++	}
++
++	if (ch == 0x03) {
++		/* Ctrl-C: interrupt a network command, otherwise clear. */
++		if (telnetd.exec_active || telnetd.draining) {
++			mtk_tcp_abort_request();
++			telnetd_puts("^C\r\n");
++		} else {
++			telnetd.line_len = 0;
++			telnetd_puts("^C\r\n" TELNETD_PROMPT);
++		}
++		return;
++	}
++
++	if (ch == 0x7f || ch == 0x08) {
++		if (telnetd.line_len) {
++			telnetd.line_len--;
++			telnetd_puts("\b \b");
++		}
++		return;
++	}
++
++	if (ch == 0x15) {	/* Ctrl-U: erase the line */
++		while (telnetd.line_len) {
++			telnetd.line_len--;
++			telnetd_puts("\b \b");
++		}
++		return;
++	}
++
++	if (ch < 0x20 || ch > 0x7e)
++		return;
++
++	if (telnetd.line_len >= TELNETD_CMD_MAX)
++		return;
++
++	telnetd.line[telnetd.line_len++] = ch;
++	telnetd_emit(&ch, 1);
++}
++
++static void telnetd_handle_iac(void)
++{
++	unsigned char c = (unsigned char)telnetd.inbuf[0];
++
++	switch (telnetd.iac_state) {
++	case TELNETD_IAC_NONE:
++		if (c == TELNETD_IAC)
++			telnetd.iac_state = TELNETD_IAC_COMMAND;
++		else
++			telnetd_handle_char((char)c);
++		break;
++	case TELNETD_IAC_COMMAND:
++		if (c == TELNETD_IAC) {
++			/* Escaped 0xFF: a literal data byte. */
++			telnetd.iac_state = TELNETD_IAC_NONE;
++			telnetd_handle_char((char)c);
++			break;
++		}
++		telnetd.iac_command = c;
++		if (c == TELNETD_SB) {
++			telnetd.iac_state = TELNETD_IAC_SB;
++		} else if (c == TELNETD_WILL || c == TELNETD_WONT ||
++			   c == TELNETD_DO || c == TELNETD_DONT) {
++			telnetd.iac_state = TELNETD_IAC_OPTION;
++		} else {
++			telnetd.iac_state = TELNETD_IAC_NONE;
++		}
++		break;
++	case TELNETD_IAC_OPTION:
++		telnetd.iac_state = TELNETD_IAC_NONE;
++		if (telnetd.iac_command == TELNETD_WILL) {
++			if (c == TELNETD_TELOPT_ECHO || c == TELNETD_TELOPT_SGA) {
++				char reply[3] = { (char)TELNETD_IAC,
++						  (char)TELNETD_DO, (char)c };
++
++				telnetd_emit(reply, sizeof(reply));
++			}
++		} else if (telnetd.iac_command == TELNETD_DO) {
++			if (c == TELNETD_TELOPT_ECHO || c == TELNETD_TELOPT_SGA) {
++				char reply[3] = { (char)TELNETD_IAC,
++						  (char)TELNETD_WILL, (char)c };
++
++				telnetd_emit(reply, sizeof(reply));
++			}
++		}
++		break;
++	case TELNETD_IAC_SB:
++		if (c == TELNETD_IAC)
++			telnetd.iac_state = TELNETD_IAC_SB_IAC;
++		break;
++	case TELNETD_IAC_SB_IAC:
++		telnetd.iac_state = (c == TELNETD_SE) ? TELNETD_IAC_NONE :
++							 TELNETD_IAC_SB;
++		break;
++	}
++}
++
++static void telnetd_input(const char *data, unsigned int len)
++{
++	unsigned int i;
++
++	for (i = 0; i < len; i++) {
++		telnetd.inbuf[0] = data[i];
++		telnetd.in_len = 1;
++		if (telnetd.iac_state == TELNETD_IAC_NONE &&
++		    (unsigned char)data[i] != TELNETD_IAC)
++			telnetd_handle_char(data[i]);
++		else
++			telnetd_handle_iac();
++	}
++}
++
++/* ---------------------------------------------------------------- */
++/* TCP callbacks                                                     */
++/* ---------------------------------------------------------------- */
++
++static void telnetd_reset_session(void)
++{
++	memset(&telnetd, 0, sizeof(telnetd));
++}
++
++static void telnetd_cb(struct mtk_tcp_cb_data *cbd)
++{
++	struct telnetd_pdata *pdata = cbd->pdata;
++
++	switch (cbd->status) {
++	case MTK_TCP_CB_NEW_CONN:
++		if (telnetd.conn) {
++			mtk_tcp_close_conn(cbd->conn, 1);
++			return;
++		}
++		telnetd_reset_session();
++		telnetd.conn = cbd->conn;
++		mtk_tcp_conn_set_pdata(cbd->conn, &telnetd);
++		telnetd_puts(TELNETD_GREETING);
++		break;
++	case MTK_TCP_CB_DATA_RCVD:
++		if (!pdata || pdata != &telnetd)
++			return;
++		telnetd_input(cbd->data, cbd->datalen);
++		break;
++	case MTK_TCP_CB_DATA_SENT:
++		if (!pdata || pdata != &telnetd)
++			return;
++		pdata->tx_inflight = false;
++		telnetd_pump();
++		break;
++	case MTK_TCP_CB_POLL:
++		if (!pdata || pdata != &telnetd)
++			return;
++		if (pdata->draining)
++			telnetd_drain_capture();
++		telnetd_pump();
++		break;
++	case MTK_TCP_CB_REMOTE_CLOSING:
++		mtk_tcp_close_conn(cbd->conn, 0);
++		fallthrough;
++	case MTK_TCP_CB_REMOTE_CLOSED:
++	case MTK_TCP_CB_CLOSED:
++		if (!pdata || pdata != &telnetd)
++			return;
++		pdata->conn = NULL;
++		pdata->conn_dead = true;
++		pdata->tx_inflight = false;
++		mtk_tcp_conn_set_pdata(cbd->conn, NULL);
++		if (!pdata->exec_active && !pdata->draining)
++			telnetd_reset_session();
++		break;
++	default:
++		break;
++	}
++}
++
++/* ---------------------------------------------------------------- */
++/* Public API                                                        */
++/* ---------------------------------------------------------------- */
++
++u16 mtk_telnetd_env_port(const char *name, u16 def)
++{
++	const char *val = env_get(name);
++	unsigned long port = 0;
++	const char *p;
++
++	if (!val || !*val)
++		return def;
++
++	for (p = val; *p; p++) {
++		if (*p < '0' || *p > '9')
++			return def;
++		port = port * 10 + (*p - '0');
++		if (port > 65535)
++			return def;
++	}
++
++	if (port < 1 || port > 65535)
++		return def;
++
++	return (u16)port;
++}
++
++int mtk_telnetd_start(u16 port)
++{
++	int ret;
++
++	if (telnetd_running)
++		return 0;
++
++	telnetd_reset_session();
++	ret = mtk_tcp_listen(htons(port), telnetd_cb);
++	if (ret) {
++		printf("telnetd: cannot listen on port %u\n", port);
++		return ret;
++	}
++
++	telnetd_port = port;
++	telnetd_running = true;
++	printf("telnetd: listening on port %u (one connection)\n", port);
++
++	return 0;
++}
++
++void mtk_telnetd_stop(void)
++{
++	if (!telnetd_running)
++		return;
++
++	mtk_tcp_listen_stop(htons(telnetd_port));
++	mtk_tcp_close_conn_by_port(htons(telnetd_port));
++	telnetd_finish_capture();
++	telnetd_reset_session();
++	telnetd_running = false;
++	debug("telnetd: stopped\n");
++}
++
++bool mtk_telnetd_is_running(void)
++{
++	return telnetd_running;
++}
+diff --git a/net/net.c b/net/net.c
+index 126850ff..38ae7177 100644
+--- a/net/net.c
++++ b/net/net.c
+@@ -628,6 +628,20 @@ restart:
+ #if defined(CONFIG_PROT_TCP)
+ 		tcp_streams_poll();
+ #endif
++#if defined(CONFIG_MTK_TCP)
++		mtk_tcp_periodic_check();
++		if (mtk_tcp_abort_pending()) {
++			mtk_tcp_abort_clear();
++			net_arp_wait_packet_ip.s_addr = 0;
++			net_cleanup_loop();
++			eth_halt();
++			eth_set_last_protocol(BOOTP);
++			led_activity_off();
++			puts("\nAbort\n");
++			ret = -EINTR;
++			goto done;
++		}
++#endif
+ 
+ 		/*
+ 		 *	Abort if ctrl-c was pressed.
+-- 
+2.56.1
+

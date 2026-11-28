@@ -1,0 +1,699 @@
+From 14428533c94bbb8cc6589731b7df214f6b43cff8 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 17:40:03 +0800
+Subject: [PATCH 57/59] rescue: run console commands from the web page
+ (task-97)
+
+Expose the shared console slot to the rescue page the way the upstream
+failsafe does, without building an HTTP-to-telnet bridge:
+
+  - POST /console/exec takes a multipart body with the cmd field (and
+    the optional token field when failsafe_console_token is set), runs
+    run_command() from the poll loop and answers JSON.
+  - POST /console/poll returns the console record bytes as JSON, with
+    avail, overflow and busy; POST /console/abort requests the same
+    mtk_tcp_abort_request() the telnet server uses, and POST
+    /console/clear resets the record ring.
+  - The web console and telnetd share one execution slot: either side
+    answers 503 / "console is busy" while the other runs, and the TCP
+    server keeps its weak busy hook overridden by the rescue.
+  - After a network command the rescue loop re-inits eth outside the TCP
+    callback chain and re-registers the DHCP and DNS handlers.
+  - The header helpers for multipart parsing and JSON escaping live in
+    e2631webconsole.h so a host fixture can exercise them.
+
+The multipart helpers, the JSON escape and the command-field path are
+covered by uboot-port/tests/webconsole_test.c.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c     | 377 +++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631webconsole.h | 165 +++++++++++
+ net/mtk_telnetd.c                      |  14 +
+ 3 files changed, 556 insertions(+)
+ create mode 100644 board/zte/zxhn-e2631/e2631webconsole.h
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 00b9fb72..eff51fbe 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -49,6 +49,7 @@
+ #include <env_internal.h>
+ #include <errno.h>
+ #include <malloc.h>
++#include <membuf.h>
+ #include <memalign.h>
+ #include <mtd.h>
+ #include <net.h>
+@@ -85,6 +86,7 @@
+ #include "e2631page.h"
+ #include "e2631query.h"
+ #include "e2631soc.h"
++#include "e2631webconsole.h"
+ 
+ /*
+  * env_internal.h hides env_htab under DO_DEPS_ONLY, which only the host
+@@ -118,6 +120,9 @@ extern struct hsearch_data env_htab;
+ #define E2631_RESCUE_HDR_MAX	1024
+ #define E2631_RESCUE_OUT_MAX	16384
+ 
++/* Web console (patch 0057): one command at a time, 2 KiB request body. */
++#define E2631_RESCUE_SMALL_MAX		2048
++
+ /*
+  * GET / streams the embedded page: the gzip asset is larger than one
+  * response buffer (E4 v3: 24904 bytes of gzip against 16384 bytes of out),
+@@ -243,6 +248,7 @@ enum e2631_rescue_upload {
+ 	UPLOAD_NONE = 0,
+ 	UPLOAD_FLASH,
+ 	UPLOAD_FIRMWARE,
++	UPLOAD_SMALL,
+ };
+ 
+ struct e2631_rescue_conn {
+@@ -264,6 +270,10 @@ struct e2631_rescue_conn {
+ 	u32 content_len;
+ 	u32 body_len;
+ 	int fw_slot_sel;
++	/* POST /console/exec keeps its multipart body in this small buffer. */
++	u8 small[E2631_RESCUE_SMALL_MAX + 1];
++	u32 small_len;
++	char *hdr_start;
+ 	/* GET /backup streams one region; the block stays put until ACK. */
+ 	bool backup_stream;
+ 	u8 *backup_buf;
+@@ -279,6 +289,11 @@ struct e2631_rescue_conn {
+ 
+ #include "e2631_failsafe_asset.h"
+ 
++/* Web console handlers live further down; body_bytes calls into them. */
++static void rescue_json_reply(struct e2631_rescue_conn *c, int http_code,
++			      const char *status, const char *json);
++static void rescue_webconsole_exec_run(struct e2631_rescue_conn *c);
++
+ static bool rescue_query_value(const char *query, const char *key, char *out,
+ 			       size_t outsz)
+ {
+@@ -1817,6 +1832,15 @@ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/console/exec") ||
++	    !strcmp(c->path, "/console/poll") ||
++	    !strcmp(c->path, "/console/abort") ||
++	    !strcmp(c->path, "/console/clear")) {
++		rescue_json_reply(c, 405, "Method Not Allowed",
++				  "{\"error\":\"method\"}\n");
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/integrity") ||
+ 	    !strcmp(c->path, "/reboot")) {
+ 		rescue_method_reply(c);
+@@ -2272,6 +2296,22 @@ static void rescue_body_bytes(struct e2631_rescue_conn *c, const u8 *data,
+ 	if (c->body_len >= c->content_len)
+ 		return;
+ 
++	if (c->upload_kind == UPLOAD_SMALL) {
++		space = c->content_len - c->body_len;
++		if (len > space)
++			len = space;
++		if (len) {
++			memcpy(c->small + c->body_len, data, len);
++			c->body_len += len;
++		}
++		if (c->body_len < c->content_len)
++			return;
++		c->small[c->small_len ? c->small_len : c->body_len] = 0;
++		c->small_len = c->body_len;
++		rescue_webconsole_exec_run(c);
++		return;
++	}
++
+ 	if (c->upload_kind == UPLOAD_FIRMWARE) {
+ 		base = E2631_FW_STAGE_ADDR;
+ 		space = E2631_FW_STAGE_MAX - c->body_len;
+@@ -2465,6 +2505,309 @@ static void rescue_handle_env(struct e2631_rescue_conn *c, const char *query,
+ 	rescue_reply(c, 200, "OK", "text/plain", NULL, body, (u32)n);
+ }
+ 
++/* ------------------------------------------------------------------ */
++/* Web console: POST /console/exec|poll|abort|clear (patch 0057)       */
++/* ------------------------------------------------------------------ */
++
++#define E2631_WEBCONSOLE_CMD_MAX	256
++#define E2631_WEBCONSOLE_POLL_MAX	8192
++
++static bool webconsole_exec_busy;
++static bool webconsole_net_reinit;
++
++/* telnetd calls this weak hook before it runs a queued command. */
++bool failsafe_console_is_busy(void)
++{
++	return webconsole_exec_busy;
++}
++
++static void rescue_json_reply(struct e2631_rescue_conn *c, int http_code,
++			      const char *status, const char *json)
++{
++	rescue_reply(c, http_code, status, "application/json", NULL, json,
++		     (u32)strlen(json));
++}
++
++static int rescue_webconsole_recording(void)
++{
++	if (!gd->console_out.start && console_record_init())
++		return -1;
++	if (!gd->console_out.start)
++		return -1;
++	gd->flags |= GD_FLG_RECORD;
++
++	return 0;
++}
++
++static void rescue_webconsole_poll(struct e2631_rescue_conn *c)
++{
++	char *chunk = NULL, *esc = NULL, *json = NULL;
++	size_t esc_sz, json_sz;
++	int avail, want, got;
++
++	if (strcmp(c->method, "POST"))
++		goto method;
++
++	if (rescue_webconsole_recording()) {
++		rescue_json_reply(c, 503, "Service Unavailable",
++				  "{\"error\":\"no_console\"}\n");
++		return;
++	}
++
++	avail = membuf_avail(&gd->console_out);
++	want = avail > E2631_WEBCONSOLE_POLL_MAX ? E2631_WEBCONSOLE_POLL_MAX :
++						  avail;
++	chunk = malloc(want + 1);
++	if (!chunk)
++		goto oom;
++	got = want ? membuf_get(&gd->console_out, chunk, want) : 0;
++	chunk[got] = 0;
++
++	/*
++	 * The overflow flag is sticky; clear it once the ring is comfortably
++	 * empty so the client sees a transient warning.
++	 */
++	if ((gd->flags & GD_FLG_RECORD_OVF) &&
++	    membuf_free(&gd->console_out) > E2631_RESCUE_OUT_MAX / 4)
++		gd->flags &= ~GD_FLG_RECORD_OVF;
++
++	esc_sz = (size_t)got * 2 + 64;
++	esc = malloc(esc_sz);
++	if (!esc) {
++		free(chunk);
++		goto oom;
++	}
++	e2631_json_escape(esc, esc_sz, chunk, got);
++	free(chunk);
++	chunk = NULL;
++
++	json_sz = strlen(esc) + 160;
++	json = malloc(json_sz);
++	if (!json) {
++		free(esc);
++		goto oom;
++	}
++	snprintf(json, json_sz,
++		 "{\"data\":\"%s\",\"avail\":%d,\"overflow\":%s,\"busy\":%s}\n",
++		 esc, membuf_avail(&gd->console_out),
++		 (gd->flags & GD_FLG_RECORD_OVF) ? "true" : "false",
++		 (webconsole_exec_busy || mtk_telnetd_exec_active()) ?
++		 "true" : "false");
++	free(esc);
++
++	rescue_json_reply(c, 200, "OK", json);
++	free(json);
++	return;
++
++oom:
++	rescue_json_reply(c, 500, "Internal Server Error",
++			  "{\"error\":\"oom\"}\n");
++	return;
++
++method:
++	rescue_json_reply(c, 405, "Method Not Allowed",
++			  "{\"error\":\"method\"}\n");
++}
++
++static const char *rescue_webconsole_prompt(void)
++{
++	const char *p = env_get("prompt");
++
++	if (p && *p)
++		return p;
++
++	if (CONFIG_SYS_PROMPT[0])
++		return CONFIG_SYS_PROMPT;
++
++	return "=> ";
++}
++
++static bool rescue_webconsole_token_ok(struct e2631_rescue_conn *c,
++				       const char *hdr_start)
++{
++	const char *tok = env_get("failsafe_console_token");
++	char content_type[96];
++	char boundary[96];
++	char given[128];
++	int n;
++
++	if (!tok || !*tok)
++		return true;
++
++	if (!rescue_header_value(hdr_start, "Content-Type", content_type,
++				 sizeof(content_type)))
++		return false;
++	if (e2631_multipart_boundary(content_type, boundary, sizeof(boundary)))
++		return false;
++	n = e2631_multipart_field((const char *)c->small, (int)c->small_len,
++				  boundary, "token", given, sizeof(given));
++	if (n < 0)
++		return false;
++
++	return !strcmp(given, tok);
++}
++
++static void rescue_webconsole_exec_run(struct e2631_rescue_conn *c)
++{
++	const char *prompt = rescue_webconsole_prompt();
++	char content_type[96];
++	char boundary[96];
++	char cmd[E2631_WEBCONSOLE_CMD_MAX + 1];
++	char *esc = NULL, *json = NULL;
++	bool net_cmd;
++	size_t json_sz;
++	int n, ret;
++
++	if (!rescue_webconsole_token_ok(c, c->hdr_start)) {
++		rescue_reply(c, 403, "Forbidden", "text/plain", NULL,
++			     "forbidden", 9);
++		return;
++	}
++
++	if (!rescue_header_value(c->hdr_start, "Content-Type", content_type,
++				 sizeof(content_type)) ||
++	    e2631_multipart_boundary(content_type, boundary, sizeof(boundary))) {
++		rescue_json_reply(c, 400, "Bad Request",
++				  "{\"error\":\"no_cmd\"}\n");
++		return;
++	}
++	n = e2631_multipart_field((const char *)c->small, (int)c->small_len,
++				  boundary, "cmd", cmd, sizeof(cmd));
++	if (n <= 0) {
++		rescue_json_reply(c, 400, "Bad Request",
++				  "{\"error\":\"no_cmd\"}\n");
++		return;
++	}
++
++	if (rescue_webconsole_recording()) {
++		rescue_json_reply(c, 503, "Service Unavailable",
++				  "{\"error\":\"no_console\"}\n");
++		return;
++	}
++
++	printf("%s%s%s\n", prompt,
++	       (prompt[0] && prompt[strlen(prompt) - 1] == ' ') ? "" : " ",
++	       cmd);
++
++	net_cmd = strstr(cmd, "tftp") || strstr(cmd, "ping") ||
++		  strstr(cmd, "dhcp") || strstr(cmd, "bootp") ||
++		  strstr(cmd, "nfs") || strstr(cmd, "rarp") ||
++		  strstr(cmd, "wget") || strstr(cmd, "tcp");
++
++	webconsole_exec_busy = true;
++	ret = run_command(cmd, 0);
++	mtk_tcp_abort_clear();
++	webconsole_exec_busy = false;
++	if (net_cmd)
++		webconsole_net_reinit = true;
++
++	printf("\n%s", prompt);
++
++	esc = malloc(strlen(cmd) * 2 + 64);
++	if (!esc) {
++		rescue_json_reply(c, 500, "Internal Server Error",
++				  "{\"error\":\"oom\"}\n");
++		return;
++	}
++	e2631_json_escape(esc, (int)(strlen(cmd) * 2 + 64), cmd, (int)strlen(cmd));
++	json_sz = strlen(esc) + 128;
++	json = malloc(json_sz);
++	if (!json) {
++		free(esc);
++		rescue_json_reply(c, 500, "Internal Server Error",
++				  "{\"error\":\"oom\"}\n");
++		return;
++	}
++	snprintf(json, json_sz, "{\"ok\":true,\"ret\":%d,\"cmd\":\"%s\"}\n",
++		 ret, esc);
++	free(esc);
++	rescue_json_reply(c, 200, "OK", json);
++	free(json);
++}
++
++static void rescue_webconsole_abort(struct e2631_rescue_conn *c)
++{
++	char json[64];
++	bool aborted;
++
++	if (strcmp(c->method, "POST")) {
++		rescue_json_reply(c, 405, "Method Not Allowed",
++				  "{\"error\":\"method\"}\n");
++		return;
++	}
++
++	aborted = webconsole_exec_busy;
++	if (aborted)
++		mtk_tcp_abort_request();
++
++	snprintf(json, sizeof(json), "{\"ok\":true,\"aborted\":%s}\n",
++		 aborted ? "true" : "false");
++	rescue_json_reply(c, 200, "OK", json);
++}
++
++static void rescue_webconsole_clear(struct e2631_rescue_conn *c)
++{
++	if (strcmp(c->method, "POST")) {
++		rescue_json_reply(c, 405, "Method Not Allowed",
++				  "{\"error\":\"method\"}\n");
++		return;
++	}
++
++	if (rescue_webconsole_recording()) {
++		rescue_json_reply(c, 503, "Service Unavailable",
++				  "{\"error\":\"no_console\"}\n");
++		return;
++	}
++
++	console_record_reset();
++	rescue_json_reply(c, 200, "OK", "{\"ok\":true}\n");
++}
++
++static bool rescue_webconsole_busy(void)
++{
++	return webconsole_exec_busy || mtk_telnetd_exec_pending() ||
++	       mtk_telnetd_exec_active() || rescue_task_busy();
++}
++
++static void rescue_webconsole_exec_start(struct e2631_rescue_conn *c,
++					 const char *hdr_start)
++{
++	char content_type[96];
++	char boundary[96];
++	char value[32];
++
++	if (strcmp(c->method, "POST")) {
++		rescue_json_reply(c, 405, "Method Not Allowed",
++				  "{\"error\":\"method\"}\n");
++		return;
++	}
++
++	if (rescue_webconsole_busy()) {
++		rescue_json_reply(c, 503, "Service Unavailable",
++				  "{\"error\":\"busy\"}\n");
++		return;
++	}
++
++	if (!rescue_header_value(hdr_start, "Content-Length", value,
++				 sizeof(value)))
++		goto bad;
++	c->content_len = (u32)simple_strtoul(value, NULL, 10);
++	if (!c->content_len || c->content_len > E2631_RESCUE_SMALL_MAX)
++		goto bad;
++	if (!rescue_header_value(hdr_start, "Content-Type", content_type,
++				 sizeof(content_type)) ||
++	    e2631_multipart_boundary(content_type, boundary, sizeof(boundary)))
++		goto bad;
++
++	c->hdr_start = (char *)hdr_start;
++	c->upload = true;
++	c->upload_kind = UPLOAD_SMALL;
++	return;
++
++bad:
++	rescue_json_reply(c, 400, "Bad Request", "{\"error\":\"bad_body\"}\n");
++}
++
+ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ {
+ 	char *hdr_start;
+@@ -2524,6 +2867,26 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 		return;
+ 	}
+ 
++	if (!strcmp(c->path, "/console/exec")) {
++		rescue_webconsole_exec_start(c, hdr_start);
++		return;
++	}
++
++	if (!strcmp(c->path, "/console/poll")) {
++		rescue_webconsole_poll(c);
++		return;
++	}
++
++	if (!strcmp(c->path, "/console/abort")) {
++		rescue_webconsole_abort(c);
++		return;
++	}
++
++	if (!strcmp(c->path, "/console/clear")) {
++		rescue_webconsole_clear(c);
++		return;
++	}
++
+ 	if (!strcmp(c->path, "/boot")) {
+ 		rescue_handle_boot(c, query);
+ 		return;
+@@ -3025,6 +3388,20 @@ static int rescue_loop(void)
+ 	rescue_led_start();
+ 	rescue_active = true;
+ 	while (!ctrlc()) {
++		/*
++		 * A console command can leave the stack down (dhcp, ping and
++		 * friends call eth_halt on their way out).  Re-init from the
++		 * loop, never from inside the TCP callback chain.
++		 */
++		if (webconsole_net_reinit ||
++		    (eth_get_dev() && !eth_is_active(eth_get_dev()))) {
++			webconsole_net_reinit = false;
++			eth_init();
++			if (mtk_dhcpd_is_running())
++				mtk_dhcpd_start();
++			if (mtk_dnsd_is_running())
++				mtk_dnsd_start();
++		}
+ 		eth_rx();
+ 		mtk_tcp_periodic_check();
+ 		mtk_telnetd_poll();
+diff --git a/board/zte/zxhn-e2631/e2631webconsole.h b/board/zte/zxhn-e2631/e2631webconsole.h
+new file mode 100644
+index 00000000..da1b47b3
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631webconsole.h
+@@ -0,0 +1,165 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Wire helpers for the E4 web console endpoints.
++ *
++ * The page talks to POST /console/exec with a multipart/form-data body
++ * (FormData) and reads JSON from POST /console/poll.  The helpers below
++ * are standalone so the host fixture can pin the multipart field
++ * extraction and the JSON escaping without the U-Boot network stack.
++ *
++ * Ported for the ZTE ZXHN E2631 rescue page from bl-mt798x-dhcpd
++ * (failsafe/modules/console.c, commit
++ * e4cf4dc72d451dc7a86c9508390ad5a2e50743c4, GPL-2.0).
++ */
++
++#ifndef __BOARD_ZTE_E2631_WEBCONSOLE_H__
++#define __BOARD_ZTE_E2631_WEBCONSOLE_H__
++
++#include <stdbool.h>
++#include <string.h>
++
++/* Extract the boundary parameter from a multipart/form-data Content-Type. */
++static inline int e2631_multipart_boundary(const char *content_type,
++					   char *out, int outsz)
++{
++	const char *p;
++	int n = 0;
++
++	if (!content_type)
++		return -1;
++	p = strstr(content_type, "boundary=");
++	if (!p)
++		return -1;
++	p += strlen("boundary=");
++	if (*p == '"')
++		p++;
++	while (*p && *p != '"' && *p != ';' && *p != ' ' && *p != '\r' &&
++	       *p != '\n') {
++		if (n + 1 >= outsz)
++			return -1;
++		out[n++] = *p++;
++	}
++	if (!n)
++		return -1;
++	out[n] = '\0';
++
++	return 0;
++}
++
++/*
++ * Find a field in a multipart/form-data body and copy its value.
++ * Return the value length, or -1 when the field is missing or the value
++ * does not fit.  The value is NUL-terminated when it fits.
++ */
++static inline int e2631_multipart_field(const char *body, int body_len,
++					const char *boundary,
++					const char *field,
++					char *out, int outsz)
++{
++	char marker[128];
++	char bound_marker[128];
++	int marker_len, blen, len;
++	const char *p, *end;
++
++	if (!body || body_len <= 0 || !boundary || !field || !out || outsz <= 0)
++		return -1;
++
++	marker_len = (int)strlen(field) + (int)strlen("name=\"\"");
++	if (marker_len >= (int)sizeof(marker) || marker_len >= body_len)
++		return -1;
++	memcpy(marker, "name=\"", 6);
++	memcpy(marker + 6, field, strlen(field));
++	memcpy(marker + 6 + strlen(field), "\"", 2);
++
++	p = strstr(body, marker);
++	if (!p)
++		return -1;
++	p = strstr(p, "\r\n\r\n");
++	if (!p)
++		return -1;
++	p += 4;
++
++	blen = (int)strlen(boundary) + (int)strlen("--");
++	if (blen >= (int)sizeof(bound_marker))
++		return -1;
++	memcpy(bound_marker, "--", 2);
++	memcpy(bound_marker + 2, boundary, strlen(boundary));
++	bound_marker[blen] = '\0';
++
++	end = strstr(p, bound_marker);
++	if (!end)
++		end = body + body_len;
++	len = (int)(end - p);
++	while (len > 0 && (p[len - 1] == '\n' || p[len - 1] == '\r'))
++		len--;
++	if (len >= outsz)
++		return -1;
++	memcpy(out, p, len);
++	out[len] = '\0';
++
++	return len;
++}
++
++/* JSON-escape src into dst; return the number of bytes written. */
++static inline int e2631_json_escape(char *dst, int dstsz,
++				     const char *src, int srclen)
++{
++	int i, n = 0;
++
++	if (dstsz <= 0)
++		return 0;
++	for (i = 0; i < srclen; i++) {
++		unsigned char c = (unsigned char)src[i];
++		const char *esc = NULL;
++		char buf[8];
++		int len;
++
++		switch (c) {
++		case '"':
++			esc = "\\\"";
++			break;
++		case '\\':
++			esc = "\\\\";
++			break;
++		case '\n':
++			esc = "\\n";
++			break;
++		case '\r':
++			esc = "\\r";
++			break;
++		case '\t':
++			esc = "\\t";
++			break;
++		default:
++			if (c < 0x20) {
++				static const char hex[] = "0123456789abcdef";
++
++				buf[0] = '\\';
++				buf[1] = 'u';
++				buf[2] = '0';
++				buf[3] = '0';
++				buf[4] = hex[(c >> 4) & 0xF];
++				buf[5] = hex[c & 0xF];
++				buf[6] = '\0';
++				esc = buf;
++			}
++			break;
++		}
++		if (!esc) {
++			if (n + 1 >= dstsz)
++				break;
++			dst[n++] = (char)c;
++			continue;
++		}
++		len = (int)strlen(esc);
++		if (n + len >= dstsz)
++			break;
++		memcpy(dst + n, esc, len);
++		n += len;
++	}
++	dst[n] = '\0';
++
++	return n;
++}
++
++#endif /* __BOARD_ZTE_E2631_WEBCONSOLE_H__ */
+diff --git a/net/mtk_telnetd.c b/net/mtk_telnetd.c
+index 7228398a..d21dbf25 100644
+--- a/net/mtk_telnetd.c
++++ b/net/mtk_telnetd.c
+@@ -33,6 +33,15 @@
+ #include <net/mtk_tcp.h>
+ #include <net/mtk_telnetd.h>
+ 
++/*
++ * The web console owns a single execution slot; it overrides this hook.
++ * The weak default keeps the telnet server usable on its own.
++ */
++bool __weak failsafe_console_is_busy(void)
++{
++	return false;
++}
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ /* --- Telnet protocol (RFC 854) --- */
+@@ -234,6 +243,11 @@ static bool telnetd_ensure_recording(void)
+ 
+ static void telnetd_execute(void)
+ {
++	if (failsafe_console_is_busy()) {
++		telnetd_puts("\r\nconsole is busy\r\n" TELNETD_PROMPT);
++		return;
++	}
++
+ 	struct membuf private_out;
+ 
+ 	if (!telnetd.conn || telnetd.conn_dead)
+-- 
+2.56.1
+
