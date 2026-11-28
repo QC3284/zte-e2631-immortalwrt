@@ -306,15 +306,17 @@ structural 8 KiB safety margin remains as the last line of defence.
 | E4 v3 baseline (`E2631_UBOOT_SIZE_BASELINE`) | 405,368 bytes (task-84 build, run 46109519805) |
 | P1 reclaim (patch 0042) | 12,380 bytes (`CONFIG_CMD_FDT` 8229 + `CONFIG_CMD_TFTPBOOT` 4151) |
 | v3 page growth | +11,131 bytes (page gzip 24904 vs the v1 13773 baseline) |
-| current `u-boot.bin` (task-92 rebuild) | 405,368 - 12,380 (P1) + page/code growth; the task-92 artifact records the exact value |
+| P2 reclaim (patch 0051) | 11,520 bytes measured (`CONFIG_CMD_MII`; applied after the first unified v3 build measured 410,040 bytes) |
+| current `u-boot.bin` (task-92 rebuild, run 46121809714) | **398,520 bytes**; 9,032 bytes below the E4 v3 gate, 6,848 bytes below the v3 baseline, 254,792 bytes (39.00%) below the hard cap |
 | failure behaviour | above 407,552 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
 
-The reserve P2 (`CONFIG_CMD_MII`, ~5,724 bytes) is not applied. The budget
-ruling is: if the unified build trips 407,552 bytes, reclaim P2 first
-(pre-approved), and only then cut the rescue-page I18N as the last resort -
-I18N is preserved ahead of mii. The command set follows the same ruling:
-bootm/MTD/DHCP/PING/OF_LIBFDT/LMB stay mandatory; tftp/mii are conditional
-(patch 0042 drops fdt+tftp, and mii disappears only if P2 is applied).
+The budget ruling was exercised exactly once: the first unified v3 build
+(410,040 bytes) tripped the 407,552-byte gate by 2,488 bytes, so the
+pre-approved P2 (`CONFIG_CMD_MII`) was reclaimed in patch 0051 and the page
+I18N was left untouched - I18N is preserved ahead of mii. The command set
+follows the same ruling: bootm/MTD/DHCP/PING/OF_LIBFDT/LMB stay mandatory;
+tftp/mii are conditional (patch 0042 drops fdt+tftp, patch 0051 drops mii,
+and CI prints `command set: mii retained|reclaimed`).
 
 Every successful build records a footprint table in the artifact's
 `UBOOT-INFO.txt`: `u-boot.bin` bytes, mtd0 image bytes, the environment block

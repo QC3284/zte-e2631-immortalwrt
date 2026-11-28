@@ -155,7 +155,11 @@ A1 在 RAM 里运行不受此限，但同一个二进制后续要进 mtd0，task
 | patch 0048 sha256 | `5f5dba995c699f03189e7fd1e0eb6906790d8afdb97e679eb9b2bc0820d5e0b0` |
 | patch 0049 | `uboot-port/patches/0049-board-zte-let-the-environment-move-the-DHCP-server.patch`（E4 v3：`e2631_dhcp_*` 优先于旧 `dhcpd_pool_*`/内置默认；非法值回落并在 `/status` 报 fallback+warning；`/env` 对四键做语义校验） |
 | patch 0049 sha256 | `ba15e88c0095e65e934e1fb8829e988e8f1e7c3fb9d9f5b6a5d74367af67d904` |
-| am 之后 tree | `8b32cd3c0f050c02e640efe36d30cb50446ec09d`（与机器无关，49 个 patch） |
+| patch 0050 | `uboot-port/patches/0050-rescue-include-the-timestamp-header.patch`（task-92 构建修复：`e2631rescue.c` 显式 include `timestamp.h`，`/sysinfo` 的 `U_BOOT_DATE`/`U_BOOT_TIME` 才能编译） |
+| patch 0050 sha256 | `cbdaed605b5ddb5f958d8290c9b55250722bb3fbbcb09ccfc5d24c9c02d30791` |
+| patch 0051 | `uboot-port/patches/0051-drop-the-mii-command.patch`（task-92 P2：defconfig 关掉 `CONFIG_CMD_MII`，实测省 11,520 B，把统一 v3 构建从 410,040 B 压回 398,520 B） |
+| patch 0051 sha256 | `db9df403d25d8faa5ff6d3f1647f32850d8cc50d20cf80656e0f1e110e5f2230` |
+| am 之后 tree | `5ca68fa0bde4258a7b19b94a3acbfd13acd5ecf9`（与机器无关，51 个 patch） |
 | TEXT_BASE | `0x47F00000` |
 | 载荷上限 | `0x9F800` 字节 |
 | 构建可复现 | `E2631_UBOOT_SOURCE_DATE_EPOCH=1795103079`（固定 banner 时间）+ `git am --committer-date-is-author-date`（固定版本 token）；同 pin 两次 CI 构建字节一致（task-69 item d，见 §4 item 15） |
@@ -173,7 +177,7 @@ git fetch -q --depth 1 origin c1958b5f6cce03956d309ce422b5d9f819955d4a
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 git -c user.name=ci -c user.email=ci@localhost am ../uboot-port/patches/*.patch
 
-test "$(git rev-parse HEAD^{tree})" = 8b32cd3c0f050c02e640efe36d30cb50446ec09d
+test "$(git rev-parse HEAD^{tree})" = 5ca68fa0bde4258a7b19b94a3acbfd13acd5ecf9
 ```
 
 ## 2. 新增/修改的文件
@@ -453,8 +457,8 @@ make O=build -j"$(nproc)"
 ### CI 验收断言（task-44 必须实现）
 
 
-1. `git rev-parse HEAD^{tree}` == `8b32cd3c0f050c02e640efe36d30cb50446ec09d`；每个 patch 的 sha256 与 §1 一致，
-   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 49）。
+1. `git rev-parse HEAD^{tree}` == `5ca68fa0bde4258a7b19b94a3acbfd13acd5ecf9`；每个 patch 的 sha256 与 §1 一致，
+   且 `git rev-list --count <baseline>..HEAD` 等于 patch 数量（当前 51）。
 2. `.config` 精确包含：`CONFIG_ARCH_ZX279128=y`、`CONFIG_TARGET_ZXHN_E2631=y`、
    `CONFIG_TEXT_BASE=0x47F00000`、`CONFIG_OF_EMBED=y`、`CONFIG_ARM_GLOBAL_TIMER=y`、
    `CONFIG_TIMER=y`、`CONFIG_PL01X_SERIAL=y`、`CONFIG_DM_SERIAL=y`、`CONFIG_CLK=y`、
@@ -481,7 +485,7 @@ make O=build -j"$(nproc)"
    逐类注释，并由运行期断言钉成“恰好这四类”；这四类之外的任何 warning 或任何 error 都会让 uboot-build 失败。
    不加 ignore 时的原始统计是 0 errors / 26 reviewed warnings（0008/0009 各 0/0；0011 与 0012 各 0/2；0013 0/0；
    0014 0/4；0015 0/5；0016 0/0；0017 0/2；0018 修正后 0/1；0019 0/1；0020 0/1；0021 0/0；0022 0/1；
-   0036-0039 各 0/0；0040/0041 各 0/0；0042-0049 各 0/0，无新增豁免），分项与原因见 §6；
+   0036-0039 各 0/0；0040/0041 各 0/0；0042-0049 各 0/0；0050/0051 各 0/0，无新增豁免），分项与原因见 §6；
    四类豁免的必要性与 checkpatch.pl 源码依据（2805、3560-3568、2670-2674 行）见
    [evidence/uboot-checkpatch-maintainers-20261122.md](../evidence/uboot-checkpatch-maintainers-20261122.md)。
 7. 内嵌 DTB 的 uart0 compatible 是 `zte,zx29-uart`：`grep -aq 'zte,zx29-uart' build/u-boot.bin`
@@ -628,6 +632,7 @@ make O=build -j"$(nproc)"
 27. task-94 救援自检（0040/0041）：`e2631rescue.c` 必须含 `rescue_fmt_range`、`output cursor corrupted`、`memset(&ctx, 0, sizeof(ctx))`；**整个 `board/zte/zxhn-e2631/` 都不得再出现 `sha256_csum_wd`**；`u-boot.bin` 必须含 `output cursor corrupted` 与 `refusing to hash` 两条文本；打印 `rescue self-check gate: ...`。
 28. E4 v3 端点（0042-0049，task-90）：`e2631rescue.c` 必须含 `rescue_query_raw_len`、`rescue_sysinfo_text`、`rescue_log_snapshot`、`rescue_integrity`、`rescue_handle_reboot`、`rescue_led_start`、`rescue_dhcp_load`；`e2631_slotcore.h` 的 `E2631_PRODUCT_LEN` 必须是 17U；`net/mtk_dhcpd.c` 必须含 `e2631_dhcp_pool_start`；二进制文本见 item 10 的 v3 列表；打印 `E4 v3 rescue gate: ...`。
 29. slot core 主机 fixture 的检查数（task-90）：fixture 输出必须命中 `(52 checks`（0043 增加第 17 字节产品向量），否则 53 个环境里的老副本会被当成通过。
+30. task-92 统一构建（0050/0051）：0050 只加 `#include <timestamp.h>`（checkpatch 0/0；否则 `/sysinfo` 编译失败）；0051 按预算裁决做 P2，defconfig 写 `# CONFIG_CMD_MII is not set`。命令集断言随之改为：bootm/MTD/DHCP/PING/OF_LIBFDT/LMB 必须 `=y`，`# CONFIG_CMD_TFTPBOOT is not set` 必须成立，`CONFIG_CMD_MII` 允许保留或回收（CI 打印 `command set: mii retained|reclaimed`）；页 I18N 保持不动。
 
 ## 5. A1 真机步骤（需用户批准；只读/纯 RAM，不写 flash）
 
@@ -841,8 +846,8 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
   优先于旧的 `dhcpd_pool_start/size` 与内置默认；非法值回落默认并在 `/status` 报 `dhcp_source=fallback` 与 `dhcp_warning`，
   `POST /env` 对这四个键做语义校验（池不越过 .254、不含服务器地址）。
 
-尺寸：0042 回收 12,380 B，v3 端点净增后必须仍满足 `size <= 407,552`（硬上限 653,312 − 240 KiB headroom，
-见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+尺寸：0042 回收 12,380 B、0051 再回收 11,520 B；统一 v3 构建最终 `u-boot.bin` 398,520 B（≤ 407,552，余量 9,032 B，
+比 v3 基线 405,368 B 低 6,848 B；硬上限 653,312 − 240 KiB headroom 的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### 恢复键进救援（0035，task-82；零写入）
 
@@ -1296,5 +1301,17 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
 - 2026-11-28（task-90，E4 v3 C 实现）：新增 patch 0042-0049——defconfig 回收 `CONFIG_CMD_FDT`/`CONFIG_CMD_TFTPBOOT`（12,380 B）、
   产品串按 Linux 比较 17 B、`/console` 原始长度检查、GET `/sysinfo` 与 `/log`、POST `/integrity`、`/backup` 的槽/rootfs/header 流、
   POST `/reboot` 与蓝灯心跳、DHCP 配置进 env（`e2631_dhcp_*`）；49 patches / tree `8b32cd3c0f050c02e640efe36d30cb50446ec09d`；
-  slot core fixture 52 项；尺寸门禁改为 `<= 653,312 − 245,760 = 407,552 B`。构建由 task-92 统一重跑（CI 身份待填）。证据
+  slot core fixture 52 项；尺寸门禁改为 `<= 653,312 − 245,760 = 407,552 B`。构建由 task-92 统一重跑（身份见下一条）。证据
   [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md)。
+
+- 2026-11-28（task-92，E4 v3 统一构建）：CI run `46121809714`（head `7322b7f`）19/19 步绿——49-patch 首次构建在
+  `e2631rescue.c:1172` 因 `U_BOOT_DATE` 未声明失败（0050 补 `#include <timestamp.h>`，checkpatch 0/0），
+  第二次构建 `u-boot.bin` 410,040 B 超 v3 门禁 2,488 B（按预算裁决做 P2，0051 关 `CONFIG_CMD_MII`，
+  实测省 11,520 B，页 I18N 未动），第三次构建 398,520 B（≤ 407,552，余量 9,032 B）。51 patches / tree
+  `5ca68fa0bde4258a7b19b94a3acbfd13acd5ecf9`；fixture 52 项、mtd writer sites 9、checkpatch 0/0、
+  页面 gzip 24,904 B（≤ 32,768）。产物身份：u-boot.bin sha256 `d498aea1ea04daab1f2af7fb5efe7b4c46b72d8686b30ba95ce28f10c2067973`
+  crc32 `a9189ba3`；mtd0 镜像 sha256 `1be77a160be62f852f80a0ac6c82a19b7329433eb87d13d878b490198ee957ac` crc32 `099eca4a`；
+  装配后首 0x800 sha256 `d2fc14b6f3baa69c25f4ae9f3cb5dda27d595ca75757b70afbcec5d4bcfc46ec`；
+  banner `U-Boot 2027.01-rc2-g2bd1efb71eb1`；env 块 `6eee153b…`；artifact `e2631-uboot-46121809714`
+  （id 15254266546，553,598 B）。无 Release/tag、无 firmware.yml、无设备动作。证据
+  [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md) §8。
