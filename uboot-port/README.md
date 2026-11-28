@@ -478,7 +478,7 @@ make O=build -j"$(nproc)"
     自更新/env/以太网/救援命令与 env 设备名确实链接进镜像），且五条 usage 文本（flash/verify/slot/env/rescue 帮助首行）、
     `DO NOT POWER OFF`、救援页的 `X-E2631-SHA256`/`X-E2631-Confirm: write` 与 E2 的 `lan1 up` 启动日志也能 grep 到。
     E4 v2.1 起二进制还须含 `serve the web failsafe (v1+v2) on lan1`、`X-E2631-Part`、
-    `only a single command is allowed`、`rootfs_data layout mismatch`、`slot is not bootable`、
+    `only a single command is allowed`、`rootfs_data` + `layout mismatch`（工厂模块用 `%s` 拼接）、`slot is not bootable`、
     `package size out of range`、`refusing to overwrite a working vendor system`。
 11. A3/C1a/C1b/A5 修复（0008/0009/0011/0012）：`grep -q 'bi_boot_params' board/zte/zxhn-e2631/e2631boot.c`、
     `grep -q 'define ENV_NAME(_name) .name = _name,' include/env_internal.h`、

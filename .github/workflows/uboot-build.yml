@@ -425,7 +425,7 @@ jobs:
             fi
           done
           for v2_text in 'serve the web failsafe (v1+v2) on lan1' 'X-E2631-Part' \
-                         'only a single command is allowed' 'rootfs_data layout mismatch' \
+                         'only a single command is allowed' 'layout mismatch' \
                          'slot is not bootable' 'package size out of range' \
                          'refusing to overwrite a working vendor system'; do
             if ! grep -aq "$v2_text" build/u-boot.bin; then
