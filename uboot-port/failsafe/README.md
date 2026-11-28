@@ -17,9 +17,11 @@
 | `README.md` | 是 | 本文件 |
 | `<u-boot>/board/zte/zxhn-e2631/e2631_failsafe_asset.c/.h` | **否** | 脚本生成物；每次构建重新生成，不入库 |
 
-尺寸预算（E4 v1 门禁）：**gzip 后 ≤ 6144 B**。当前值：原始 7900 B，gzip **4084 B**
-（`tools/embed-failsafe.sh --check` 实测；gzip sha256 随页面内容变化，记录在构建产物的
-`E2631-FAILSAFE-ASSET.txt` 中）。
+尺寸预算（E4 v2 门禁，task-83 契约 + task-87 抬闸；v1 为 6144 B）：**gzip 后 ≤ 32768 B**。
+当前页面：原始 9216 B，gzip **4456 B**（`tools/embed-failsafe.sh --check` 实测；gzip
+sha256 随页面内容变化，记录在构建产物的 `E2631-FAILSAFE-ASSET.txt` 中）。v2 页面按
+`evidence/e4-v2-contract-design-20261128.md` 的 32 KiB 预算重做，闸门由
+`tools/embed-failsafe.sh` 与 `tools/check-workflows.mjs` 强制；超限由 task-81 裁功能，不得抬闸。
 
 ## 2. 冻结接口（不要改符号名/类型）
 
@@ -115,7 +117,7 @@ error=<短原因>        # 仅 result=error 时
 ## 6. 修改页面
 
 1. 只改 `e2631-failsafe.html`；保持单文件、无外部依赖、无 CDN/字体/框架。
-2. 改完跑 `bash tools/embed-failsafe.sh --check`；必须 ≤ 6144 B。
+2. 改完跑 `bash tools/embed-failsafe.sh --check`；必须 ≤ 32768 B（task-87 抬闸后的 v2 预算）。
 3. 本地预览：直接浏览器打开 `e2631-failsafe.html` 可检查布局（按钮无设备会失败，属正常）；
    需要看 gzip 效果可 `gzip -9 -n -c ... | gzip -dc`。
 4. 若改路由/字段/头部，先与 base-builder 对齐（task-72 的 HTTP 处理器按 §5 实现），
@@ -124,7 +126,7 @@ error=<短原因>        # 仅 result=error 时
 
 ## 7. 验收
 
-- `bash tools/embed-failsafe.sh --check` → gzip ≤ 6144 B。
+- `bash tools/embed-failsafe.sh --check` → gzip ≤ 32768 B。
 - `node tools/check-workflows.mjs` → 含救援页/嵌入步骤/产物记录的静态检查全 PASS。
 - `uboot-build` 的 "Embed the failsafe rescue page" 步骤绿，产物含
   `E2631-FAILSAFE-ASSET.txt` 且在 `SHA256SUMS` 中。

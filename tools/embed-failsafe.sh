@@ -20,7 +20,9 @@
 #
 # --check  only validates the gzip size and prints the numbers (CI gate; it does
 #          not write anything). Exits non-zero when the page is over the limit.
-# --max N  size limit in bytes, default 6144 (the E4 v1 budget).
+# --max N  size limit in bytes, default 32768 (the E4 v2 page budget; authority:
+#          evidence/e4-v2-contract-design-20261128.md, task-83 contract, raised
+#          from the v1 6144-byte gate by task-87).
 #
 # The C output is deterministic for a given gzip version: no timestamps, no
 # absolute paths, fixed line width and hex case.
@@ -31,7 +33,7 @@ SRC="$ROOT/uboot-port/failsafe/e2631-failsafe.html"
 OUTDIR=""
 STATS=""
 MODE=embed
-MAX=6144
+MAX=32768
 
 die() { printf 'embed-failsafe: %s\n' "$*" >&2; exit 1; }
 
@@ -87,7 +89,7 @@ import sys
 gz_path, outdir, raw, gz_len = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 data = open(gz_path, "rb").read()
 assert len(data) == int(gz_len), "gzip size changed while reading"
-assert len(data) <= 6144, "asset exceeds the E4 v1 budget"
+assert len(data) <= 32768, "asset exceeds the E4 v2 page budget (task-83 contract: 32768 bytes)"
 
 c_path = outdir.rstrip("/") + "/e2631_failsafe_asset.c"
 h_path = outdir.rstrip("/") + "/e2631_failsafe_asset.h"

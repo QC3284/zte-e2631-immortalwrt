@@ -165,7 +165,8 @@ jobs:
         # Makefile: a build without generation fails at compile time. The C
         # file is deterministic (gzip -9 -n, no timestamps), the generated
         # files are not committed, and the step fails when the gzip asset is
-        # above the 6144-byte E4 v1 budget. E2631-FAILSAFE-ASSET.txt records
+        # above the 32768-byte E4 v2 page budget (task-83 contract; raised from
+        # the v1 6144-byte gate by task-87). E2631-FAILSAFE-ASSET.txt records
         # the raw/gzip sizes and the gzip sha256 in the artifact.
         run: |
           set -euo pipefail
@@ -993,7 +994,7 @@ jobs:
             echo "- crc32: u-boot.bin $payload_crc, mtd0 image $mtd0_crc"
             echo "- command help: E2631-COMMAND-HELP.txt (static dump of the new commands)"
             echo "- sizes: UBOOT-SIZES.txt (per-object .text, sorted descending; see the artifact)"
-            echo "- failsafe page: E2631-FAILSAFE-ASSET.txt ($(grep '^gzip_bytes=' artifacts/E2631-FAILSAFE-ASSET.txt), served as a gzip asset; limit 6144 bytes)"
+            echo "- failsafe page: E2631-FAILSAFE-ASSET.txt ($(grep '^gzip_bytes=' artifacts/E2631-FAILSAFE-ASSET.txt), served as a gzip asset; limit 32768 bytes (E4 v2 page budget))"
             echo "- mtd0 image: e2631-uboot-mtd0.bin ($mtd0_size bytes, 0x20000..0xC0000) sha256 $mtd0_sha"
             echo "- vendor env block: e2631-env-block.bin (0x20000 bytes, not written by the image) sha256 $env_sha"
             echo "- payload footprint: u-boot.bin $size / hard cap $payload_max bytes (headroom $headroom bytes, $headroom_pct%); CI gate $gate bytes; mtd0 image $mtd0_size bytes"
