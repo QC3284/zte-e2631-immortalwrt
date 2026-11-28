@@ -544,7 +544,7 @@ ok('the task-95 page-stream and console-query fixes stay pinned',
 ok('the task-97 upstream-alignment batch stays pinned',
   ['Compile and run the DNS server fixture', 'Compile and run the environment align fixture',
     'Compile and run the web console fixture'].every((s) => has(UBOOT_WF, s)) &&
-  has(UBOOT_WF, 'dnsd fixture: PASS (29 checks)') &&
+  has(UBOOT_WF, 'dnsd fixture: PASS (35 checks)') &&
   has(UBOOT_WF, 'env align fixture: PASS') &&
   has(UBOOT_WF, 'webconsole fixture: PASS') &&
   has(UBOOT_WF, '-idirafter "$UBOOT_DIR/include"') &&
@@ -556,6 +556,18 @@ ok('the task-97 upstream-alignment batch stays pinned',
   has(UBOOT_WF, "grep -q 's_addr & 0xff'") &&
   has(UBOOT_WF, 'console is busy') &&
   has(UBOOT_WF, 'task-97 gate: DNS + telnet + web console wired, shared console slot, env candidate aligned'));
+
+// task-99: the t92e fixes (telnet line hand-off, shared console slot release,
+// cold-rescue refclock guard, DNS answer pinning).  Three host fixtures and the
+// DNS byte vectors run in CI; the DNS fixture count moved from 29 to 35.
+ok('the task-99 t92f fixes stay pinned',
+  ['Compile and run the telnet line fixture', 'Compile and run the refclock state fixture',
+    'Run the task-99 source contract fixture'].every((s) => has(UBOOT_WF, s)) &&
+  ['telnetd line fixture: PASS', 'refclk state fixture: PASS',
+    'task-99 contract fixture: PASS', 'dnsd fixture: PASS (35 checks)']
+    .every((s) => has(UBOOT_WF, s)) &&
+  ['telnetd_line_test.c', 'refclk_state_test.c', 'task99_contract_test.sh']
+    .every((f) => fs.existsSync(path.join(REPO, 'uboot-port/tests', f))));
 ok('UBOOT-INFO records the E4 v3 budget and the final size chain',
   ['E4 v3 gate bytes:', 'headroom bytes vs E4 v3 gate:', 'size delta vs v3 baseline:',
     'E4 v3 budget:'].every((s) => has(UBOOT_WF, s)));

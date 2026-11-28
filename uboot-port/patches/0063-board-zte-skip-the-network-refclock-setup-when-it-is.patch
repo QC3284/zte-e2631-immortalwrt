@@ -1,0 +1,208 @@
+From 36ea79e0ada30c51ddb81854e8873648aa10f048 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 20:15:10 +0800
+Subject: [PATCH 63/64] board: zte: skip the network refclock setup when it is
+ already up
+
+The first e2631rescue command after a fresh RAM load failed with
+'PHY startup failed (-110)' and 'no usable Ethernet device', while the
+same command worked after e2631net had been run once.  The RAM chain
+starts from the vendor U-Boot, whose board_eth_init() has already
+programmed the fractional PLL, the SerDes block and the LSP1 clock and
+started the PHY autonegotiation.  e2631_net_refclk_init() then
+reprogrammed that tree unconditionally, which disturbs the running
+autonegotiation; the next eth_init() sees no link.
+
+Snapshot the six registers the sequence writes and, when they already
+hold the vendor's post-init values, only record that the work is done
+and leave the tree alone.  The detector is a pure helper in a new
+header so a host fixture can pin the expected values.
+
+rescue_loop() now also retries eth_init() up to three times with a
+200 ms delay, so a link transition that is still settling does not kill
+the rescue console; the failure message reports the attempt count.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631net.c    | 30 ++++++++++++++
+ board/zte/zxhn-e2631/e2631refclk.h | 65 ++++++++++++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631rescue.c | 21 ++++++++--
+ 3 files changed, 113 insertions(+), 3 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631refclk.h
+
+diff --git a/board/zte/zxhn-e2631/e2631net.c b/board/zte/zxhn-e2631/e2631net.c
+index b48cbda5..9ab3f9f9 100644
+--- a/board/zte/zxhn-e2631/e2631net.c
++++ b/board/zte/zxhn-e2631/e2631net.c
+@@ -69,6 +69,7 @@
+ #include <stdio.h>
+ 
+ #include "e2631net.h"
++#include "e2631refclk.h"
+ 
+ /* Top CRM: system clock selection, gates, PLLs and resets. */
+ #define E2631_TOP_CRM			0x94000000
+@@ -219,6 +220,20 @@ static void e2631_pinmux_gpio_init(void)
+ 	e2631_gpio_drive(E2631_GPIO_PCIE_RST1, 1);
+ }
+ 
++/*
++ * Snapshot the six registers the sequence below programs.  They are
++ * compared against the vendor's post-init state by e2631_refclk_is_ready().
++ */
++static void e2631_refclk_snapshot(struct e2631_refclk_state *state)
++{
++	state->pll_cfg0 = e2631_readl(E2631_TOP_CRM_PLL0);
++	state->pll_cfg1 = e2631_readl(E2631_TOP_CRM_PLL1);
++	state->top_ctrl8 = e2631_readl(E2631_TOP_CRM_CTRL8);
++	state->crm_4c = e2631_readl(E2631_TOP_CRM_CTRL4C);
++	state->crm2_10 = e2631_readl(E2631_CRM2_CTRL10);
++	state->lsp1_04 = e2631_readl(E2631_LSP1_PERIPH0);
++}
++
+ /*
+  * The vendor ref_clk_set(0) fractional PLL programming on 0x94000050/0x94000054.
+  * Field layout is the one the kernel clock driver documents: FBDIV bits[17:6],
+@@ -228,9 +243,17 @@ static void e2631_pinmux_gpio_init(void)
+  * about 750 ms in total.  Both the kernel hand-off (e2631boot) and the
+  * Ethernet start call it, so it runs once per boot: a second call returns
+  * immediately and leaves the programmed registers untouched.
++ *
++ * When the registers already hold the vendor's post-init state the tree was
++ * brought up by someone else (the RAM chain runs the vendor U-Boot first).
++ * Reprogramming the PLL and the SerDes then drives the PHY autonegotiation
++ * that the vendor started into a timeout, which is why the first cold rescue
++ * command used to fail with 'PHY startup failed (-110)'.  In that case only
++ * remember that the work is done.
+  */
+ void e2631_net_refclk_init(void)
+ {
++	struct e2631_refclk_state state;
+ 	static int refclk_done;
+ 	unsigned int i;
+ 	u32 val, frac, strap;
+@@ -238,6 +261,13 @@ void e2631_net_refclk_init(void)
+ 	if (refclk_done)
+ 		return;
+ 
++	e2631_refclk_snapshot(&state);
++	if (e2631_refclk_is_ready(&state)) {
++		printf("e2631net: network reference clock already set up, skipping\n");
++		refclk_done = 1;
++		return;
++	}
++
+ 	e2631_pinmux_gpio_init();
+ 
+ 	val = e2631_readl(E2631_TOP_CRM_PLL0);
+diff --git a/board/zte/zxhn-e2631/e2631refclk.h b/board/zte/zxhn-e2631/e2631refclk.h
+new file mode 100644
+index 00000000..30912518
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631refclk.h
+@@ -0,0 +1,65 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * ZTE ZXHN E2631 (Sanechips ZX279128S) network clock state detection.
++ *
++ * e2631_net_refclk_init() programs the fractional PLL, the SerDes/analog
++ * block and the LSP1 peripheral clock exactly the way the vendor bootloader
++ * does.  That is required on the flash chain (secondboot -> this U-Boot),
++ * where nothing has set the network clock tree up yet.
++ *
++ * It must NOT run again when the state is already programmed: on the RAM
++ * chain the vendor U-Boot ran its board init first, and reprogramming the
++ * PLL and the SerDes from under the PHYs it just brought up is what made
++ * the first cold rescue command fail with 'PHY startup failed (-110)'.
++ *
++ * The helper is a pure function so a host fixture can pin the expected
++ * register values.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++
++#ifndef __ZXHN_E2631_REFCLK_H__
++#define __ZXHN_E2631_REFCLK_H__
++
++#include <stdbool.h>
++#include <linux/types.h>
++
++/**
++ * struct e2631_refclk_state - the registers e2631_net_refclk_init() writes
++ * @pll_cfg0: TOP CRM 0x94000050 (fractional PLL control 0)
++ * @pll_cfg1: TOP CRM 0x94000054 (fractional PLL control 1)
++ * @top_ctrl8: TOP CRM 0x94000008 (SerDes block gate)
++ * @crm_4c: TOP CRM 0x9400004c (peripheral clock divider)
++ * @crm2_10: CRM2 0x94100010 (network clock select)
++ * @lsp1_04: LSP1 0x9a100004 (peripheral clock enable)
++ */
++struct e2631_refclk_state {
++	u32 pll_cfg0;
++	u32 pll_cfg1;
++	u32 top_ctrl8;
++	u32 crm_4c;
++	u32 crm2_10;
++	u32 lsp1_04;
++};
++
++/**
++ * e2631_refclk_is_ready() - is the network clock tree already programmed?
++ * @state: register snapshot, see e2631_refclk_state
++ *
++ * Return: true when every field matches the state the vendor bootloader
++ * leaves behind (and the state this U-Boot programs itself).
++ */
++static inline bool e2631_refclk_is_ready(const struct e2631_refclk_state *state)
++{
++	if (!state)
++		return false;
++
++	return (state->pll_cfg0 & 0x00ffffffU) == 0x0004176bU &&
++	       (state->pll_cfg1 & 0x00ffffffU) == 0x004fdf3bU &&
++	       state->top_ctrl8 == 0x10061fffU &&
++	       (state->crm_4c & 0x000001ffU) == 0x000001ffU &&
++	       (state->crm2_10 & 0x00000100U) == 0x00000100U &&
++	       state->lsp1_04 == 0x0001381bU;
++}
++
++#endif /* __ZXHN_E2631_REFCLK_H__ */
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 931259cf..737a3d4a 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -3376,14 +3376,29 @@ static int rescue_loop(void)
+ {
+ 	struct in_addr server_ip;
+ 	int ch;
++	int try;
+ 
+ 	printf("e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\n");
+ 	rescue_dhcp_load();
+ 	net_init();
+ 
+-	if (eth_init()) {
+-		printf("e2631rescue: no usable Ethernet device\n");
+-		return CMD_RET_FAILURE;
++	/*
++	 * The first eth_init() after a RAM load can lose the PHY
++	 * autonegotiation race if the vendor bootloader left a link
++	 * transition in flight; a second start, after the clocks have
++	 * settled, is enough (see the t92e cold-rescue regression).  Three
++	 * attempts keep the failure real without hiding it.
++	 */
++	for (try = 1; eth_init(); try++) {
++		if (try >= 3) {
++			printf("e2631rescue: no usable Ethernet device after %d attempts\n",
++			       try);
++			return CMD_RET_FAILURE;
++		}
++
++		printf("e2631rescue: Ethernet start attempt %d failed, retrying\n",
++		       try);
++		mdelay(200);
+ 	}
+ 
+ 	server_ip = rescue_dhcp.ip;
+-- 
+2.56.1
+

@@ -145,6 +145,37 @@ int main(void)
 	CHECK(mtk_dnsd_parse_name_len(q, 12, 12) == 0,
 	      "a packet that ends before the name is rejected");
 
+
+	/*
+	 * The A-record RDATA comes only from the address handed to the
+	 * builder.  The vectors include the address shape seen when net_ip
+	 * had been overwritten (bytes 63 75 65 00) to prove the wire
+	 * builder cannot invent bytes of its own.
+	 */
+	qlen = build_query(q, "rescue.local", MTK_DNSD_TYPE_A, 0);
+	{
+		static const struct {
+			uint32_t addr;
+			unsigned char expect[4];
+		} vec[] = {
+			{ 0x0101a8c0U, { 192, 168, 1, 1 } },
+			{ 0x0100000aU, { 10, 0, 0, 1 } },
+			{ 0x00657563U, { 99, 117, 101, 0 } },
+		};
+		unsigned int i;
+
+		for (i = 0; i < sizeof(vec) / sizeof(vec[0]); i++) {
+			len = mtk_dnsd_build_reply(q, 12, 14,
+						   MTK_DNSD_RCODE_NOERROR,
+						   vec[i].addr, out,
+						   sizeof(out));
+			CHECK(len == 12 + 14 + 4 + 16,
+			      "the A answer is 46 bytes for every address");
+			CHECK(!memcmp(out + 12 + 14 + 4 + 12,
+				      vec[i].expect, 4),
+			      "the RDATA is exactly the configured address");
+		}
+	}
 	printf("dnsd fixture: %s (%d checks)\n", fails ? "FAIL" : "PASS", checks);
 
 	return fails ? 1 : 0;

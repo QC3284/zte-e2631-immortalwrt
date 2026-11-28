@@ -207,7 +207,7 @@ jobs:
             "$GITHUB_WORKSPACE/uboot-port/tests/dnsd_test.c" \
             -o "$RUNNER_TEMP/dnsd-test"
           "$RUNNER_TEMP/dnsd-test" | tee "$RUNNER_TEMP/dnsd-test.out"
-          grep -q 'dnsd fixture: PASS (29 checks)' "$RUNNER_TEMP/dnsd-test.out"
+          grep -q 'dnsd fixture: PASS (35 checks)' "$RUNNER_TEMP/dnsd-test.out"
       - name: Compile and run the environment align fixture
         # task-97/patch 0058: a genuine no-change env write must not see the
         # runtime-only keys (fdtcontroladdr, serial@... stdio). The fixture
@@ -275,6 +275,45 @@ jobs:
             -o "$RUNNER_TEMP/console-query-test"
           "$RUNNER_TEMP/console-query-test" | tee "$RUNNER_TEMP/console-query-test.out"
           grep -q 'console query fixture: PASS' "$RUNNER_TEMP/console-query-test.out"
+      - name: Compile and run the telnet line fixture
+        # task-99/patch 0062: 'version' followed by 'bdinfo' used to run as
+        # 'bdinfon' because the queued line was copied without terminating
+        # the source. The fixture pins the terminating helper and shows a
+        # shorter command cannot inherit a byte from the previous one.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$GITHUB_WORKSPACE/uboot-port/tests/shim" \
+            -idirafter "$UBOOT_DIR/include" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/telnetd_line_test.c" \
+            -o "$RUNNER_TEMP/telnetd-line-test"
+          "$RUNNER_TEMP/telnetd-line-test" | tee "$RUNNER_TEMP/telnetd-line-test.out"
+          grep -q 'telnetd line fixture: PASS' "$RUNNER_TEMP/telnetd-line-test.out"
+      - name: Compile and run the refclock state fixture
+        # task-99/patch 0063: the first cold rescue command failed because
+        # the reference clock and SerDes were reprogrammed after the vendor
+        # bootloader had already started the PHYs. The fixture pins the six
+        # register fields that make the detector say 'already programmed'.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$GITHUB_WORKSPACE/uboot-port/tests/shim" \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/refclk_state_test.c" \
+            -o "$RUNNER_TEMP/refclk-state-test"
+          "$RUNNER_TEMP/refclk-state-test" | tee "$RUNNER_TEMP/refclk-state-test.out"
+          grep -q 'refclk state fixture: PASS' "$RUNNER_TEMP/refclk-state-test.out"
+      - name: Run the task-99 source contract fixture
+        # task-99: the parts that cannot be linked host-side are pinned by a
+        # source contract: every telnet session exit path releases the shared
+        # console slot after restoring the capture buffer, the refclock
+        # detector runs before any reprogramming, and the rescue network pins
+        # the DNS answer and repairs a changed net_ip.
+        run: |
+          set -euo pipefail
+          sh "$GITHUB_WORKSPACE/uboot-port/tests/task99_contract_test.sh" "$UBOOT_DIR" \
+            | tee "$RUNNER_TEMP/task99-contract.out"
+          grep -q 'task-99 contract fixture: PASS' "$RUNNER_TEMP/task99-contract.out"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before

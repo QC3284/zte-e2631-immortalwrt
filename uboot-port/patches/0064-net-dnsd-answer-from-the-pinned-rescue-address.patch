@@ -1,0 +1,162 @@
+From 6dae8e3d24c10c1e0bca93f30009f9776c27e748 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 20:22:43 +0800
+Subject: [PATCH 64/64] net: dnsd: answer from the pinned rescue address
+
+The A record was built from net_ip at answer time.  net_ip is shared
+mutable state: the DHCP server writes it and the ipaddr environment
+callback overwrites it from the environment.  In the t92e probe the
+second rescue command in one boot answered 'failsafe.lan' with
+99.117.101.0 while the DHCP line correctly showed 192.168.1.1, so
+net_ip had changed between those two printfs.  The DNS wire builder is
+fine - it copies exactly the address it is given - but sourcing the
+answer from a global that other subsystems own is the bug.
+
+Add mtk_dnsd_set_answer(), pin the configured rescue address before the
+server starts, and print both the answer and net_ip so the next session
+can tell whether they differ.  rescue_loop() also restores net_ip when
+it sees it changed, before the DNS server starts and in the main loop
+(bounded to three warnings), because DHCP, DNS and TCP replies all use
+net_ip as the source address.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631rescue.c | 31 ++++++++++++++++++++++++++++++
+ include/net/mtk_dnsd.h             | 12 ++++++++++++
+ net/mtk_dnsd.c                     | 19 +++++++++++++++++-
+ 3 files changed, 61 insertions(+), 1 deletion(-)
+
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 737a3d4a..2e0ab443 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -3377,6 +3377,7 @@ static int rescue_loop(void)
+ 	struct in_addr server_ip;
+ 	int ch;
+ 	int try;
++	int net_ip_warn;
+ 
+ 	printf("e2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\n");
+ 	rescue_dhcp_load();
+@@ -3431,6 +3432,20 @@ static int rescue_loop(void)
+ 	}
+ 
+ 	/* A local DNS answer is a convenience: never fail the rescue for it. */
++	/*
++	 * Pin the address the DNS A record must return.  net_ip is shared
++	 * mutable state (DHCP and the ipaddr environment callback write it),
++	 * and a stray change between the assignment above and this point used
++	 * to make the DNS server answer with a different address than the
++	 * DHCP server handed out.  Pin it, and repair a change we can still
++	 * see here.
++	 */
++	if (net_ip.s_addr != server_ip.s_addr) {
++		printf("e2631rescue: WARNING: net_ip changed to %pI4, restoring %pI4\n",
++		       &net_ip, &server_ip);
++		net_ip = server_ip;
++	}
++	mtk_dnsd_set_answer(server_ip.s_addr);
+ 	if (mtk_dnsd_start())
+ 		printf("e2631rescue: WARNING: cannot start the DNS server\n");
+ 
+@@ -3444,7 +3459,23 @@ static int rescue_loop(void)
+ 
+ 	rescue_led_start();
+ 	rescue_active = true;
++	net_ip_warn = 0;
+ 	while (!ctrlc()) {
++		/*
++		 * The same address must keep reaching the wire.  If something
++		 * changes net_ip at run time, say so once and put the
++		 * configured address back; the DHCP, DNS and TCP replies all
++		 * use it as the source address.
++		 */
++		if (net_ip.s_addr != server_ip.s_addr && net_ip_warn < 3) {
++			printf("e2631rescue: WARNING: net_ip changed to %pI4, restoring %pI4\n",
++			       &net_ip, &server_ip);
++			net_ip = server_ip;
++			net_ip_warn++;
++			if (net_ip_warn == 3)
++				printf("e2631rescue: further net_ip changes are ignored\n");
++		}
++
+ 		/*
+ 		 * A console command can leave the stack down (dhcp, ping and
+ 		 * friends call eth_halt on their way out).  Re-init from the
+diff --git a/include/net/mtk_dnsd.h b/include/net/mtk_dnsd.h
+index f6a24904..2817cfd6 100644
+--- a/include/net/mtk_dnsd.h
++++ b/include/net/mtk_dnsd.h
+@@ -190,6 +190,18 @@ static inline int mtk_dnsd_build_reply(const unsigned char *query, int name_off,
+ 	return pos;
+ }
+ 
++/**
++ * mtk_dnsd_set_answer() - pin the address the A record must return
++ * @ip: IPv4 address in network byte order
++ *
++ * Call before mtk_dnsd_start().  The rescue network configures its server
++ * address up front; pinning it keeps the A record independent of net_ip,
++ * which DHCP and the ipaddr environment callback also write.  Without a
++ * pin the answer is resolved once at start from net_ip (falling back to
++ * the ipaddr variable and 192.168.1.1).
++ */
++void mtk_dnsd_set_answer(uint32_t ip);
++
+ int mtk_dnsd_start(void);
+ void mtk_dnsd_stop(void);
+ bool mtk_dnsd_is_running(void);
+diff --git a/net/mtk_dnsd.c b/net/mtk_dnsd.c
+index 09de0626..312d57d1 100644
+--- a/net/mtk_dnsd.c
++++ b/net/mtk_dnsd.c
+@@ -29,6 +29,13 @@
+ static rxhand_f *prev_udp_handler;
+ static bool dnsd_running;
+ 
++/*
++ * Address pinned by the rescue network, in network byte order.  The A
++ * record must come from this value, not from the shared net_ip.
++ */
++static struct in_addr dnsd_answer;
++static bool dnsd_answer_pinned;
++
+ #define DNSD_FALLBACK_DOMAIN "failsafe.lan"
+ #define DNSD_FALLBACK_IP     "192.168.1.1"
+ #define DNSD_ENV_DOMAIN      "dnsd_domain"
+@@ -39,6 +46,9 @@ static struct in_addr dnsd_get_our_ip(void)
+ 	char *ip_str;
+ 	struct in_addr ip = net_ip;
+ 
++	if (dnsd_answer_pinned)
++		return dnsd_answer;
++
+ 	if (ip.s_addr)
+ 		return ip;
+ 
+@@ -160,6 +170,12 @@ forward:
+ 		prev_udp_handler(pkt, dport, sip, sport, len);
+ }
+ 
++void mtk_dnsd_set_answer(uint32_t ip)
++{
++	dnsd_answer.s_addr = ip;
++	dnsd_answer_pinned = ip != 0;
++}
++
+ int mtk_dnsd_start(void)
+ {
+ 	char *domain;
+@@ -187,7 +203,8 @@ int mtk_dnsd_start(void)
+ 	net_set_udp_handler(dnsd_handler);
+ 
+ 	dnsd_running = true;
+-	printf("dnsd: started, resolving '%s' -> %pI4\n", domain, &ip);
++	printf("dnsd: started, resolving '%s' -> %pI4 (net_ip %pI4)\n",
++	       domain, &ip, &net_ip);
+ 
+ 	return 0;
+ }
+-- 
+2.56.1
+

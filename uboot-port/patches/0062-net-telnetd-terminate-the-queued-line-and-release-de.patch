@@ -1,0 +1,173 @@
+From 4ef90d6600034476ebf519e9056b7e52bcdf2e2e Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 20:12:22 +0800
+Subject: [PATCH 62/64] net: telnetd: terminate the queued line and release
+ dead sessions
+
+The line editor keeps only line_len bytes, so copying line_len + 1
+bytes after writing a terminator at exec_line[line_len] copied one
+stale byte from a previous command: "version" followed by "bdinfo"
+ran as "bdinfon".
+
+Copy through mtk_telnetd_copy_line(), which always adds the
+terminator itself, and expose it from the header so a host fixture
+can test it.
+
+Two lifecycle bugs shared the same session state. telnetd_reset_session()
+is a plain memset(), so calling it while the private console capture
+buffer was installed lost saved_out and left gd->console_out pointing
+at freed memory; every later console record then lost its output, the
+"telnet version printed nothing after a full probe sequence" symptom.
+And a connection that died while its output was still draining kept
+draining set forever, so mtk_telnetd_exec_active() reported the shared
+console slot busy and the web console answered 503.
+
+Add telnetd_release_session() (finish the capture, then reset) and use
+it from the new-connection path, the close callbacks and the main poll
+loop whenever no command is running.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ include/net/mtk_telnetd.h | 30 +++++++++++++++++++++++++
+ net/mtk_telnetd.c         | 46 +++++++++++++++++++++++++++++++++------
+ 2 files changed, 69 insertions(+), 7 deletions(-)
+
+diff --git a/include/net/mtk_telnetd.h b/include/net/mtk_telnetd.h
+index 4af2a363..b7a925b1 100644
+--- a/include/net/mtk_telnetd.h
++++ b/include/net/mtk_telnetd.h
+@@ -63,4 +63,34 @@ bool mtk_telnetd_exec_active(void);
+  */
+ void mtk_telnetd_poll(void);
+ 
++/**
++ * mtk_telnetd_copy_line() - copy a queued command with a terminator
++ *
++ * @dst:   destination buffer
++ * @dstsz: size of @dst
++ * @src:   command line bytes (may be NULL when @len is zero)
++ * @len:   number of bytes in @src
++ *
++ * The line editor keeps @len bytes and does not maintain a terminator at
++ * line[len], so the copy must add one itself.  This is the single place
++ * that turns a queued line into a C string; it never leaves stale bytes
++ * from a previous, longer command in @dst.
++ */
++static inline void mtk_telnetd_copy_line(char *dst, unsigned int dstsz,
++					 const char *src, unsigned int len)
++{
++	unsigned int i;
++
++	if (!dst || !dstsz)
++		return;
++
++	if (len >= dstsz)
++		len = dstsz - 1;
++
++	for (i = 0; i < len; i++)
++		dst[i] = src ? src[i] : '\0';
++
++	dst[len] = '\0';
++}
++
+ #endif /* __NET_MTK_TELNETD_H__ */
+diff --git a/net/mtk_telnetd.c b/net/mtk_telnetd.c
+index d21dbf25..493290d4 100644
+--- a/net/mtk_telnetd.c
++++ b/net/mtk_telnetd.c
+@@ -107,6 +107,7 @@ static bool telnetd_running;
+ static u16 telnetd_port;
+ 
+ static void telnetd_pump(void);
++static void telnetd_reset_session(void);
+ 
+ /* ---------------------------------------------------------------- */
+ /* Output ring                                                       */
+@@ -178,6 +179,19 @@ static void telnetd_finish_capture(void)
+ 	telnetd.draining = false;
+ }
+ 
++/*
++ * Drop the whole session: restore the console record buffer first, then
++ * clear every execution and connection flag.  telnetd_reset_session() is a
++ * plain memset(), so it must never run while the private capture buffer is
++ * installed - otherwise gd->console_out keeps pointing at freed memory and
++ * every later console record (telnet or web) silently loses its output.
++ */
++static void telnetd_release_session(void)
++{
++	telnetd_finish_capture();
++	telnetd_reset_session();
++}
++
+ /*
+  * Move captured console output into the TCP ring.  Newlines are converted
+  * to CRLF for the telnet client, but an existing CRLF stays intact.
+@@ -280,7 +294,7 @@ static void telnetd_execute(void)
+ 	mtk_tcp_abort_clear();
+ 
+ 	if (telnetd.conn_dead) {
+-		telnetd_finish_capture();
++		telnetd_release_session();
+ 		return;
+ 	}
+ 
+@@ -303,14 +317,26 @@ void mtk_telnetd_poll(void)
+ 	if (!telnetd_running)
+ 		return;
+ 
++	/*
++	 * A connection that died while its output was still draining would
++	 * otherwise keep exec_queued/exec_active/draining set forever, and
++	 * the shared console slot would report busy for the rest of the boot.
++	 * Release it here, from the main loop, where the console record
++	 * buffer can be restored safely.
++	 */
++	if (telnetd.conn_dead && !telnetd.exec_active) {
++		telnetd_release_session();
++		return;
++	}
++
+ 	if (telnetd.draining)
+ 		telnetd_drain_capture();
+ 
+ 	if (telnetd.exec_queued && !telnetd.exec_active &&
+ 	    !telnetd.draining && telnetd.conn && !telnetd.conn_dead) {
+-		telnetd.exec_line[telnetd.line_len] = '\0';
+-		memcpy(telnetd.exec_line, telnetd.line,
+-		       telnetd.line_len + 1);
++		mtk_telnetd_copy_line(telnetd.exec_line,
++				      sizeof(telnetd.exec_line),
++				      telnetd.line, telnetd.line_len);
+ 		telnetd.line_len = 0;
+ 		telnetd.exec_queued = false;
+ 		telnetd_execute();
+@@ -484,7 +510,7 @@ static void telnetd_cb(struct mtk_tcp_cb_data *cbd)
+ 			mtk_tcp_close_conn(cbd->conn, 1);
+ 			return;
+ 		}
+-		telnetd_reset_session();
++		telnetd_release_session();
+ 		telnetd.conn = cbd->conn;
+ 		mtk_tcp_conn_set_pdata(cbd->conn, &telnetd);
+ 		telnetd_puts(TELNETD_GREETING);
+@@ -518,8 +544,14 @@ static void telnetd_cb(struct mtk_tcp_cb_data *cbd)
+ 		pdata->conn_dead = true;
+ 		pdata->tx_inflight = false;
+ 		mtk_tcp_conn_set_pdata(cbd->conn, NULL);
+-		if (!pdata->exec_active && !pdata->draining)
+-			telnetd_reset_session();
++		/*
++		 * Release even while draining: the peer is gone, so the
++		 * queued output can be dropped.  Doing it here (or from the
++		 * next mtk_telnetd_poll()) keeps the shared console slot
++		 * from staying busy after a dead connection.
++		 */
++		if (!pdata->exec_active)
++			telnetd_release_session();
+ 		break;
+ 	default:
+ 		break;
+-- 
+2.56.1
+
