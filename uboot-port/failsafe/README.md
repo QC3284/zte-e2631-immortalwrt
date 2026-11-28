@@ -174,6 +174,10 @@ PORT=8790 node tools/mock-failsafe.mjs
   含分号/换行请求 400；`/env` 写 `e2631_*` 测试键走五步并回读一致、vendor 键 403；
   `/backup?part=` 五个分区长度/offset/CRC32/SHA-256 与设备一致、未知 part 400。
   页面显示成功且不自动重启；返回 Linux 需要断电重启（reset 命令的修复是独立任务）。
+- 浏览器无关自动化：tools/e4-rescue-acceptance.sh --v21 --firmware-pkg <工厂包> 覆盖上述
+  P2-P6 的 HTTP 断言（六标签/32 KiB、/backup 五分区头、/console 单命令+截断、/firmware
+  validate 正例 + 9 负例含产品串第 17 B、/env no-change 与拒绝、/factory 仅拒绝、/boot
+  RAM 覆盖后清除）；mock 自测 PASS=138 FAIL=0 NOTE=1，详见验收方案 §14。
 
 ## 9. 许可
 

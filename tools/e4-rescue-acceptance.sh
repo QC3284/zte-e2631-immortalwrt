@@ -65,6 +65,10 @@ SKIP_MATRIX=0
 REQUIRE_DIGEST=0
 POLL_TIMEOUT=600
 KEEP_TMP=0
+V21=0
+FW_PKG=""
+BASE_URL=""
+SKIP_LAN=0
 
 TMP=""
 PASS=0
@@ -82,7 +86,7 @@ failcase() {
 fatal() { printf '[e4-accept] ERROR: %s\n' "$*" >&2; exit 2; }
 
 usage() {
-	printf '%s\n' "usage: tools/e4-rescue-acceptance.sh --image <file> [options]" "options:" "  --host IP           device address (default 192.168.1.1)" "  --iface IFACE       host interface on the rescue link" "  --dhcp              run dhclient -1 on --iface (needs root)" "  --page PATH         local page for the served-page comparison" "  --asset-stats PATH  E2631-FAILSAFE-ASSET.txt from the build artifact" "  --write             enable the NET-ZERO write phase" "  --approval TOKEN    required with --write: $E4_APPROVAL_VALUE" "  --skip-matrix       skip the rejection matrix" "  --expected-sha SHA  expected net-zero payload sha256 (default: the 15-patch image region b1ea9a48...)" "  --require-digest    fail if the device does not enforce X-E2631-SHA256" "  --timeout SECS      write-phase poll timeout (default 600)" "  --keep-tmp          keep temporary files" "  -h, --help          this help"
+	printf '%s\n' "usage: tools/e4-rescue-acceptance.sh --image <file> [options]" "options:" "  --host IP           device address (default 192.168.1.1)" "  --iface IFACE       host interface on the rescue link" "  --dhcp              run dhclient -1 on --iface (needs root)" "  --page PATH         local page for the served-page comparison" "  --asset-stats PATH  E2631-FAILSAFE-ASSET.txt from the build artifact" "  --write             enable the NET-ZERO write phase" "  --approval TOKEN    required with --write: $E4_APPROVAL_VALUE" "  --skip-matrix       skip the rejection matrix" "  --expected-sha SHA  expected net-zero payload sha256 (default: the 15-patch image region b1ea9a48...)" "  --require-digest    fail if the device does not enforce X-E2631-SHA256" "  --timeout SECS      write-phase poll timeout (default 600)" "  --keep-tmp          keep temporary files" "  --v21               also run the v2.1 endpoint suite (read-only; needs --firmware-pkg)" "  --firmware-pkg PATH factory package .bin for the /firmware validate matrix" "  --base-url URL      override http://HOST (mock self-test: http://127.0.0.1:PORT)" "  --skip-lan          skip the 192.168.1.0/24 host check (only with --base-url)" "  -h, --help          this help"
 	exit 0
 }
 
@@ -107,12 +111,12 @@ kv() { # kv <text> <key>
 }
 
 get_status() {
-	curl -sS --max-time 5 "http://$HOST/status" 2>/dev/null || true
+	curl -sS --max-time 5 "$BASE/status" 2>/dev/null || true
 }
 
 get_status_hdr() {
 	curl -sS --max-time 5 -D "$TMP/status.hdr" -o "$TMP/status.body" \
-		"http://$HOST/status" 2>/dev/null || true
+		"$BASE/status" 2>/dev/null || true
 }
 
 assert_status_idle() { # assert_status_idle <context>
@@ -143,7 +147,7 @@ assert_no_write_stage() { # assert_no_write_stage <context>
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-	--image|--host|--iface|--page|--asset-stats|--approval|--timeout|--expected-sha)
+	--image|--host|--iface|--page|--asset-stats|--approval|--timeout|--expected-sha|--firmware-pkg|--base-url)
 		[ $# -ge 2 ] || fatal "missing value for $1"
 		case "$1" in
 		--image)       IMAGE=$2 ;;
@@ -154,6 +158,8 @@ while [ $# -gt 0 ]; do
 		--approval)    APPROVAL=$2 ;;
 		--timeout)     POLL_TIMEOUT=$2 ;;
 		--expected-sha) EXPECTED_IMAGE_SHA=$2 ;;
+		--firmware-pkg) FW_PKG=$2 ;;
+		--base-url)    BASE_URL=$2 ;;
 		esac
 		shift 2
 		;;
@@ -162,12 +168,22 @@ while [ $# -gt 0 ]; do
 	--skip-matrix) SKIP_MATRIX=1; shift ;;
 	--require-digest) REQUIRE_DIGEST=1; shift ;;
 	--keep-tmp)    KEEP_TMP=1; shift ;;
+	--v21)         V21=1; shift ;;
+	--skip-lan)    SKIP_LAN=1; shift ;;
 	-h|--help)     usage ;;
 	*)             fatal "unknown argument: $1 (use --help)" ;;
 	esac
 done
 
 [ -n "$IMAGE" ] || fatal "--image is required"
+
+if [ "$V21" = 1 ]; then
+	[ -n "$FW_PKG" ] || fatal "--v21 needs --firmware-pkg <factory package .bin>"
+	[ -f "$FW_PKG" ] || fatal "firmware package not found: $FW_PKG"
+fi
+if [ -n "$BASE_URL" ] && [ "$SKIP_LAN" != 1 ]; then
+	fatal "--base-url is for the mock/loopback self-test; pass --skip-lan too"
+fi
 
 if [ "$WRITE" = 1 ] && [ "$APPROVAL" != "$E4_APPROVAL_VALUE" ]; then
 	printf '[e4-accept] WRITE REFUSED: --write requires --approval %s (Lead approval must be explicit)\n' \
@@ -258,6 +274,9 @@ else
 fi
 
 # --- host network: a DHCP lease in 192.168.1.0/24 on the direct link
+if [ "$SKIP_LAN" = 1 ]; then
+	log "host-network check skipped (--skip-lan: mock/loopback self-test)"
+else
 lan_ip=""
 if [ -n "$IFACE" ]; then
 	lan_ip=$(ip -4 -o addr show dev "$IFACE" 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4; exit}')
@@ -285,7 +304,12 @@ else
 	pass "host has a rescue-network address: $lan_ip"
 fi
 
+fi
+
 BASE="http://$HOST"
+if [ -n "$BASE_URL" ]; then
+	BASE=$BASE_URL
+fi
 
 # --- device reachable and serving the page
 page_code=$(curl -sS --max-time 15 -o "$TMP/page.body" -D "$TMP/page.hdr" -w '%{http_code}' \
@@ -656,6 +680,451 @@ else
 		failcase "write phase skipped because pre-write checks failed; fix the failures and re-run"
 	fi
 fi
+
+# ------------------------------------------------------- v2.1 suite (opt-in)
+
+if [ "$V21" = 1 ]; then
+	log "v2.1 suite: six page tabs, /backup parts, /console, /firmware validate + negatives, /env refusals, /factory refusals, /boot"
+
+	# --- page: the six v2.1 tabs are served and the page stays self-contained
+	if [ -s "$TMP/page.html" ]; then
+		for needle in "系统状态" "固件更新" "引导区" "环境变量" "串口台" "恢复出厂"; do
+			if grep -q "$needle" "$TMP/page.html"; then
+				pass "v2.1 page: carries the tab string: $needle"
+			else
+				failcase "v2.1 page: missing the tab string: $needle"
+			fi
+		done
+		if grep -Eq "https?://|<script[[:space:]]+src=|<link[[:space:]]+href=" "$TMP/page.html"; then
+			failcase "v2.1 page: contains an external URL or an external resource reference"
+		else
+			pass "v2.1 page: no external URL or external resource reference"
+		fi
+		page_gz_bytes=$(stat -c %s "$TMP/page.body")
+		if [ "$page_gz_bytes" -le 32768 ]; then
+			pass "v2.1 page: served gzip asset is $page_gz_bytes B (limit 32768 B)"
+		else
+			failcase "v2.1 page: served gzip asset is $page_gz_bytes B (limit 32768 B)"
+		fi
+	else
+		failcase "v2.1 page: no decompressed page is available for the tab checks"
+	fi
+
+	# --- GET /backup?part=: raw partition + CRC32/SHA-256/offset/length headers
+	hdrval() { # hdrval <file> <header-name>
+		tr -d "\r" <"$1" | awk -v want="$(printf "%s" "$2" | tr "A-Z" "a-z")" -F: 'tolower($1) == want { v = substr($0, index($0, ":") + 1); sub(/^[ \t]+/, "", v); print v; exit }'
+	}
+	backup_fetch() { # backup_fetch <part> <outfile> <hdrfile>
+		BACK_CODE=$(curl -sS --max-time 300 -o "$2" -D "$3" -w "%{http_code}" "$BASE/backup?part=$1" 2>"$TMP/backup.err")
+	}
+	backup_part() { # backup_part <part> <off> <len> <label>
+		local part=$1 off=$2 len=$3 label=$4 out="$TMP/backup-$1.bin" hdr="$TMP/backup-$1.hdr"
+		backup_fetch "$part" "$out" "$hdr"
+		if [ "$BACK_CODE" != 200 ]; then
+			failcase "$label: GET /backup?part=$part returned HTTP $BACK_CODE (body=$(head -c 200 "$out" 2>/dev/null || true))"
+			return
+		fi
+		local size got_off got_len got_part got_crc got_sha computed body_crc body_sha
+		size=$(stat -c %s "$out")
+		got_off=$(hdrval "$hdr" "X-E2631-Offset")
+		got_len=$(hdrval "$hdr" "X-E2631-Length")
+		got_part=$(hdrval "$hdr" "X-E2631-Part")
+		got_crc=$(hdrval "$hdr" "X-E2631-CRC32")
+		got_sha=$(hdrval "$hdr" "X-E2631-SHA256")
+		computed=$(python3 - "$out" <<'PY'
+import sys, hashlib, zlib
+d = open(sys.argv[1], "rb").read()
+print("0x%08x" % (zlib.crc32(d) & 0xFFFFFFFF), hashlib.sha256(d).hexdigest())
+PY
+		)
+		body_crc=${computed%% *}
+		body_sha=${computed##* }
+		if [ "$size" = "$len" ]; then
+			pass "$label: $part body length $size B"
+		else
+			failcase "$label: $part body length $size B, want $len B"
+		fi
+		if [ "$(lc "$got_off")" = "$(lc "$(printf "0x%x" "$off")")" ]; then
+			pass "$label: X-E2631-Offset=$got_off"
+		else
+			failcase "$label: X-E2631-Offset=$(show "$got_off"), want 0x$(printf "%x" "$off")"
+		fi
+		if [ "$(lc "$got_len")" = "$(lc "$(printf "0x%x" "$len")")" ]; then
+			pass "$label: X-E2631-Length=$got_len"
+		else
+			failcase "$label: X-E2631-Length=$(show "$got_len"), want 0x$(printf "%x" "$len")"
+		fi
+		if [ "$got_part" = "$part" ]; then
+			pass "$label: X-E2631-Part=$got_part"
+		else
+			failcase "$label: X-E2631-Part=$(show "$got_part"), want $part"
+		fi
+		if [ "$(lc "$got_crc")" = "$(lc "$body_crc")" ]; then
+			pass "$label: X-E2631-CRC32 matches the body ($body_crc)"
+		else
+			failcase "$label: X-E2631-CRC32 $(show "$got_crc") != body $body_crc"
+		fi
+		if [ "$(lc "$got_sha")" = "$(lc "$body_sha")" ]; then
+			pass "$label: X-E2631-SHA256 matches the body"
+		else
+			failcase "$label: X-E2631-SHA256 $(show "$got_sha") != body $body_sha"
+		fi
+		if grep -q "Content-Type: application/octet-stream" "$hdr" 2>/dev/null; then
+			pass "$label: served as application/octet-stream"
+		else
+			failcase "$label: not served as application/octet-stream"
+		fi
+		if grep -qi "Content-Disposition: attachment; filename=\"e2631-$part.bin\"" "$hdr" 2>/dev/null; then
+			pass "$label: download filename is e2631-$part.bin"
+		else
+			failcase "$label: download filename is not e2631-$part.bin"
+		fi
+	}
+	backup_part bootloader 0x20000 655360 "v2.1 backup bootloader"
+	if [ "$(sha256sum "$TMP/backup-bootloader.bin" 2>/dev/null | awk '{print $1}')" = "$EXPECTED_IMAGE_SHA" ]; then
+		pass "v2.1 backup bootloader: body sha256 equals the net-zero image ($EXPECTED_IMAGE_SHA)"
+	else
+		failcase "v2.1 backup bootloader: body sha256 does not equal the net-zero image"
+	fi
+	backup_part tag 0x100000 1048576 "v2.1 backup tag"
+	backup_part wifi 0x200000 1048576 "v2.1 backup wifi"
+	backup_part usercfg 0x300000 2097152 "v2.1 backup usercfg"
+	backup_part defcfg 0x500000 2097152 "v2.1 backup defcfg"
+	BACK_CODE=$(curl -sS --max-time 20 -o "$TMP/backup-bad.body" -w "%{http_code}" "$BASE/backup?part=bogus" 2>/dev/null || true)
+	if [ "$BACK_CODE" = 400 ] && grep -q "result=error" "$TMP/backup-bad.body" && grep -q "error=" "$TMP/backup-bad.body"; then
+		pass "v2.1 backup: unknown part rejected with HTTP 400 result=error"
+	else
+		failcase "v2.1 backup: unknown part expected HTTP 400 result=error, got HTTP $BACK_CODE"
+	fi
+	assert_status_idle "v2.1 backup"
+
+	# --- POST /console?cmd=: one command, captured stdout, exact refusals
+	console_post() { # console_post <cmd> <outfile>
+		local enc
+		enc=$(python3 - "$1" <<'PY'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=""))
+PY
+		)
+		CON_CODE=$(curl -sS --max-time 30 -o "$2" -w "%{http_code}" -X POST --data "" "$BASE/console?cmd=$enc" 2>"$TMP/console.err")
+	}
+	console_ok() { # console_ok <cmd> <label> [want-substring]
+		local cmd=$1 label=$2 want="${3:-}" body result exitcode stdout truncated err
+		console_post "$cmd" "$TMP/console.body"
+		body=$(cat "$TMP/console.body" 2>/dev/null || true)
+		result=$(kv "$body" result)
+		exitcode=$(kv "$body" exit)
+		stdout=$(kv "$body" stdout)
+		truncated=$(kv "$body" truncated)
+		err=$(kv "$body" error)
+		if [ "$CON_CODE" = 200 ] && [ "$result" = ok ] && [ "$exitcode" = 0 ] && [ -n "$stdout" ]; then
+			pass "$label: HTTP 200 result=ok exit=0 truncated=$(show "$truncated")"
+			if [ -n "$want" ]; then
+				case "$stdout" in
+				*"$want"*) pass "$label: stdout carries '$want'" ;;
+				*) failcase "$label: stdout does not carry '$want' (stdout=$(printf "%s" "$stdout" | head -c 160))" ;;
+				esac
+			fi
+		else
+			failcase "$label: expected HTTP 200 result=ok exit=0 with stdout, got HTTP $CON_CODE (result=$(show "$result"), exit=$(show "$exitcode"), error=$(show "$err"))"
+		fi
+	}
+	console_reject() { # console_reject <cmd> <label> [want-error-substring]
+		local cmd=$1 label=$2 want="${3:-}" body result err
+		console_post "$cmd" "$TMP/console.body"
+		body=$(cat "$TMP/console.body" 2>/dev/null || true)
+		result=$(kv "$body" result)
+		err=$(kv "$body" error)
+		if [ "$CON_CODE" = 400 ] && [ "$result" = error ] && [ -n "$err" ]; then
+			pass "$label: refused with HTTP 400 result=error error=$err"
+			if [ -n "$want" ]; then
+				case "$err" in
+				*"$want"*) pass "$label: error text carries '$want'" ;;
+				*) failcase "$label: error text does not carry '$want' (error=$err)" ;;
+				esac
+			fi
+		else
+			failcase "$label: expected HTTP 400 result=error, got HTTP $CON_CODE (result=$(show "$result"), error=$(show "$err"))"
+		fi
+	}
+	console_ok "version" "v2.1 console version" "U-Boot"
+	console_ok "printenv bootdelay" "v2.1 console printenv bootdelay" "bootdelay="
+	console_ok "md.b 0x47F00000 0x4000" "v2.1 console md.b large read"
+	con_trunc=$(kv "$(cat "$TMP/console.body" 2>/dev/null || true)" truncated)
+	if [ "$con_trunc" = 1 ]; then
+		pass "v2.1 console: output larger than 4 KiB is reported as truncated=1"
+	else
+		failcase "v2.1 console: md.b 0x4000 output was not reported as truncated=1 (truncated=$(show "$con_trunc"))"
+	fi
+	console_reject "" "v2.1 console empty command"
+	console_reject "echo a; echo b" "v2.1 console semicolon" "single command"
+	long_cmd=$(python3 -c 'print("a" * 300)')
+	console_reject "$long_cmd" "v2.1 console overlong command"
+	assert_status_idle "v2.1 console"
+
+	# --- POST /firmware?mode=validate: the factory package matrix (no write)
+	if [ ! -f "$FW_PKG" ]; then
+		failcase "v2.1 firmware: --firmware-pkg file disappeared: $FW_PKG"
+	else
+		fw_sha=$(sha256sum "$FW_PKG" | awk '{print $1}')
+		fw_size=$(stat -c %s "$FW_PKG")
+		fw_body_len=$((fw_size - 0x214))
+		if [ "$fw_size" -ge $((0x214)) ] && [ "$fw_size" -le $((0x1BE0214)) ]; then
+			pass "v2.1 firmware: package size $fw_size B is inside the contract window"
+		else
+			failcase "v2.1 firmware: package size $fw_size B is outside the contract window"
+		fi
+		post_fw() { # post_fw <file> <outfile> [extra-query] [digest-override]
+			local file=$1 out=$2 query="${3:-}" override="${4:-}" sha
+			sha=$(sha256sum "$file" | awk '{print $1}')
+			if [ -n "$override" ]; then sha=$override; fi
+			FW_CODE=$(curl -sS --max-time 600 -o "$out" -w "%{http_code}" \
+				-H "Content-Type: application/octet-stream" \
+				-H "X-E2631-SHA256: $sha" \
+				-X POST --data-binary "@$file" "$BASE/firmware?mode=validate$query" 2>"$TMP/fw.err")
+			FW_RC=$?
+		}
+		fw_validate_ok() { # fw_validate_ok <file> <label>
+			local file=$1 label=$2 body result sha match bodylen slot ident guard
+			post_fw "$file" "$TMP/fw.body"
+			body=$(cat "$TMP/fw.body" 2>/dev/null || true)
+			result=$(kv "$body" result)
+			sha=$(kv "$body" sha256)
+			match=$(kv "$body" sha_match)
+			bodylen=$(kv "$body" body_len)
+			slot=$(kv "$body" slot_target)
+			ident=$(kv "$body" slot_target_identity)
+			guard=$(kv "$body" guard)
+			if [ "$FW_CODE" != 200 ] || [ "$result" != ok ]; then
+				failcase "$label: expected HTTP 200 result=ok, got HTTP $FW_CODE (result=$(show "$result"), body=$(printf "%s" "$body" | head -c 200))"
+				return
+			fi
+			pass "$label: HTTP 200 result=ok (slot_target=$(show "$slot"), guard=$(show "$guard"))"
+			if [ "$(lc "$sha")" = "$(lc "$fw_sha")" ] && [ "$match" = ok ]; then
+				pass "$label: device digest matches (sha256=$sha, sha_match=ok)"
+			else
+				failcase "$label: digest mismatch (sha256=$(show "$sha"), sha_match=$(show "$match"))"
+			fi
+			if [ "$(lc "$bodylen")" = "$(lc "$(printf "0x%x" "$fw_body_len")")" ]; then
+				pass "$label: body_len=$bodylen matches the package body"
+			else
+				failcase "$label: body_len=$(show "$bodylen"), want 0x$(printf "%x" "$fw_body_len")"
+			fi
+			case "$slot" in
+			0|1) pass "$label: slot_target=$slot" ;;
+			*) failcase "$label: slot_target=$(show "$slot") is not 0/1" ;;
+			esac
+			case "$ident" in
+			empty|vendor|ours|unknown) pass "$label: slot_target_identity=$ident" ;;
+			*) failcase "$label: slot_target_identity=$(show "$ident") is not a known identity" ;;
+			esac
+			case "$guard" in
+			ok|weak) pass "$label: guard=$guard" ;;
+			refuse) failcase "$label: guard=refuse for the net-zero package (target slot is a working vendor system?)" ;;
+			*) failcase "$label: guard=$(show "$guard") is not ok/weak/refuse" ;;
+			esac
+		}
+		fw_reject() { # fw_reject <file> <label> [want-error-substring] [extra-query] [digest-override]
+			local file=$1 label=$2 want="${3:-}" query="${4:-}" override="${5:-}" body result err stage
+			post_fw "$file" "$TMP/fw.body" "$query" "$override"
+			body=$(cat "$TMP/fw.body" 2>/dev/null || true)
+			result=$(kv "$body" result)
+			err=$(kv "$body" error)
+			if [ "$FW_CODE" = 400 ] && [ "$result" = error ] && [ -n "$err" ]; then
+				pass "$label: refused with HTTP 400 result=error error=$err"
+				if [ -n "$want" ]; then
+					case "$(printf "%s" "$err" | tr "A-Z" "a-z")" in
+					*"$want"*) pass "$label: error text carries '$want'" ;;
+					*) failcase "$label: error text does not carry '$want' (error=$err)" ;;
+					esac
+				fi
+			elif [ "$FW_CODE" = 000 ] && [ "$FW_RC" != 0 ]; then
+				stage=$(kv "$(get_status)" stage)
+				if [ "$stage" = idle ]; then
+					pass "$label: early reject (connection aborted, curl rc=$FW_RC) with /status idle"
+				else
+					failcase "$label: POST aborted but /status stage=$(show "$stage")"
+				fi
+			else
+				failcase "$label: expected HTTP 400 result=error, got HTTP $FW_CODE (result=$(show "$result"), body=$(printf "%s" "$body" | head -c 200))"
+			fi
+			assert_status_idle "$label"
+		}
+		make_pkg_case() { # make_pkg_case <name> <kind>
+			python3 - "$FW_PKG" "$TMP/fw-$1.bin" "$2" <<'PY'
+import sys, zlib
+src, dst, kind = sys.argv[1:4]
+d = bytearray(open(src, "rb").read())
+hdr_ofs = 0x14 + int.from_bytes(d[0x10:0x14], "little")
+def reseal():
+    h = memoryview(d)[hdr_ofs:hdr_ofs + 0x200]
+    d[hdr_ofs + 0xa4:hdr_ofs + 0xa8] = zlib.crc32(h[:0xa4]).to_bytes(4, "little")
+    h = memoryview(d)[hdr_ofs:hdr_ofs + 0x200]
+    d[hdr_ofs + 0x1fc:hdr_ofs + 0x200] = zlib.crc32(h[:0x1fc]).to_bytes(4, "little")
+if kind == "badmagic":
+    d[0] ^= 0xFF
+elif kind == "badheader":
+    d[0x20] ^= 0xFF
+elif kind == "badkernel":
+    d[0x1000] ^= 0xFF
+elif kind == "badrootfs":
+    d[0x410000] ^= 0xFF
+elif kind == "badproduct":
+    d[hdr_ofs + 0x6c + 16] = ord("X")
+    reseal()
+elif kind == "bootincluded":
+    d[hdr_ofs + 0x8c:hdr_ofs + 0x90] = (1).to_bytes(4, "little")
+    reseal()
+elif kind == "badsize":
+    v = int.from_bytes(d[hdr_ofs + 0x30:hdr_ofs + 0x34], "little")
+    d[hdr_ofs + 0x30:hdr_ofs + 0x34] = (v + 1).to_bytes(4, "little")
+    reseal()
+else:
+    raise SystemExit("unknown kind: " + kind)
+open(dst, "wb").write(d)
+PY
+		}
+		fw_validate_ok "$FW_PKG" "v2.1 firmware validate legal package"
+		fw_reject "$FW_PKG" "v2.1 firmware digest mismatch" "sha256 mismatch" "" "$ZERO_SHA"
+		head -c 500 "$FW_PKG" >"$TMP/fw-small.bin"
+		fw_reject "$TMP/fw-small.bin" "v2.1 firmware package too small" "too small"
+		truncate -s $((0x1BE0215)) "$TMP/fw-large.bin"
+		fw_reject "$TMP/fw-large.bin" "v2.1 firmware package too large" ""
+		make_pkg_case badmagic badmagic
+		fw_reject "$TMP/fw-badmagic.bin" "v2.1 firmware bad outer magic" "outer magic"
+		make_pkg_case badheader badheader
+		fw_reject "$TMP/fw-badheader.bin" "v2.1 firmware header CRC" "header crc"
+		make_pkg_case badkernel badkernel
+		fw_reject "$TMP/fw-badkernel.bin" "v2.1 firmware kernel CRC" "kernel crc"
+		make_pkg_case badrootfs badrootfs
+		fw_reject "$TMP/fw-badrootfs.bin" "v2.1 firmware rootfs CRC" "rootfs crc"
+		make_pkg_case badproduct badproduct
+		fw_reject "$TMP/fw-badproduct.bin" "v2.1 firmware product prefix (17th byte)" "product"
+		make_pkg_case bootincluded bootincluded
+		fw_reject "$TMP/fw-bootincluded.bin" "v2.1 firmware bootloader included" "bootloader"
+		make_pkg_case badsize badsize
+		fw_reject "$TMP/fw-badsize.bin" "v2.1 firmware body size" "body size"
+		fw_reject "$FW_PKG" "v2.1 firmware bad slot" "slot" "&slot=2"
+	fi
+
+	# --- POST /env and /factory: refusal-only probes (no write is ever armed)
+	env_get_code=$(curl -sS --max-time 15 -o "$TMP/env.body" -w "%{http_code}" "$BASE/env" 2>/dev/null || true)
+	if [ "$env_get_code" = 200 ] && grep -q "^bootcmd=" "$TMP/env.body" && grep -q "^bootdelay=" "$TMP/env.body"; then
+		pass "v2.1 env: GET /env is a read-only snapshot with bootcmd/bootdelay"
+	else
+		failcase "v2.1 env: GET /env failed (HTTP $env_get_code) or lacks bootcmd/bootdelay"
+	fi
+	env_keys=$(grep -c "^[a-z0-9_]*=" "$TMP/env.body" 2>/dev/null || true)
+	if [ "$env_keys" -ge 20 ]; then
+		pass "v2.1 env: snapshot carries $env_keys keys"
+	else
+		note "v2.1 env: snapshot carries only $env_keys keys (mock or trimmed build; device carries the full env)"
+	fi
+	cur_bootdelay=$(sed -n "s/^bootdelay=//p" "$TMP/env.body" | head -1)
+	if [ -n "$cur_bootdelay" ]; then
+		env_nochange=$(curl -sS --max-time 20 -o "$TMP/env-nochange.body" -w "%{http_code}" \
+			-H "X-E2631-Confirm: write" -X POST --data "" \
+			"$BASE/env?key=bootdelay&value=$cur_bootdelay&confirm=write" 2>/dev/null || true)
+		nc_body=$(cat "$TMP/env-nochange.body" 2>/dev/null || true)
+		if [ "$env_nochange" = 200 ] && [ "$(kv "$nc_body" result)" = ok ] && [ "$(kv "$nc_body" keys)" = 0 ]; then
+			pass "v2.1 env: writing the current bootdelay=$cur_bootdelay is a no-change (result=ok keys=0)"
+			assert_status_idle "v2.1 env no-change"
+		else
+			failcase "v2.1 env: no-change probe expected HTTP 200 result=ok keys=0, got HTTP $env_nochange (body=$(printf "%s" "$nc_body" | head -c 200))"
+		fi
+	else
+		note "v2.1 env: /env did not expose a bootdelay value; no-change probe skipped"
+	fi
+	env_refusal() { # env_refusal <url-suffix> <label> [want-error]
+		local suffix=$1 label=$2 want="${3:-}" code body result err
+		code=$(curl -sS --max-time 20 -o "$TMP/env-bad.body" -w "%{http_code}" -X POST --data "" "$BASE/env?$suffix" 2>/dev/null || true)
+		body=$(cat "$TMP/env-bad.body" 2>/dev/null || true)
+		result=$(kv "$body" result)
+		err=$(kv "$body" error)
+		if { [ "$code" = 400 ] || [ "$code" = 403 ]; } && [ "$result" = error ] && [ -n "$err" ]; then
+			pass "$label: refused with HTTP $code result=error error=$err"
+		else
+			failcase "$label: expected HTTP 400/403 result=error, got HTTP $code (body=$(printf "%s" "$body" | head -c 200))"
+		fi
+	}
+	env_refusal "key=bootcmd&value=foo&confirm=write" "v2.1 env vendor key refused (no confirm header)" "confirm"
+	curl -sS --max-time 20 -o "$TMP/env-vendor.body" -w "%{http_code}" -H "X-E2631-Confirm: write" -X POST --data "" "$BASE/env?key=bootcmd&value=foo&confirm=write" >"$TMP/env-vendor.code" 2>/dev/null || true
+	vcode=$(cat "$TMP/env-vendor.code")
+	vbody=$(cat "$TMP/env-vendor.body" 2>/dev/null || true)
+	if [ "$vcode" = 403 ] && [ "$(kv "$vbody" result)" = error ] && [ -n "$(kv "$vbody" error)" ]; then
+		pass "v2.1 env: vendor key bootcmd refused with HTTP 403 error=$(kv "$vbody" error)"
+	else
+		failcase "v2.1 env: vendor key expected HTTP 403 result=error, got HTTP $vcode"
+	fi
+	curl -sS --max-time 20 -o "$TMP/env-key.body" -w "%{http_code}" -H "X-E2631-Confirm: write" -X POST --data "" "$BASE/env?key=Bogus_Key&value=1&confirm=write" >"$TMP/env-key.code" 2>/dev/null || true
+	kcode=$(cat "$TMP/env-key.code")
+	if [ "$kcode" = 403 ]; then
+		pass "v2.1 env: an out-of-whitelist key name is refused with HTTP 403"
+	else
+		failcase "v2.1 env: out-of-whitelist key expected HTTP 403, got HTTP $kcode"
+	fi
+	curl -sS --max-time 20 -o "$TMP/env-val.body" -w "%{http_code}" -H "X-E2631-Confirm: write" -X POST --data "" "$BASE/env?key=e2631_test&value=%01&confirm=write" >"$TMP/env-val.code" 2>/dev/null || true
+	valcode=$(cat "$TMP/env-val.code")
+	if [ "$valcode" = 400 ]; then
+		pass "v2.1 env: a non-printable value is refused with HTTP 400"
+	else
+		failcase "v2.1 env: non-printable value expected HTTP 400, got HTTP $valcode"
+	fi
+	assert_status_idle "v2.1 env refusals"
+	assert_no_write_stage "v2.1 env refusals"
+	factory_refusal() { # factory_refusal <query> <header|-> <label>
+		local query=$1 hdr=$2 label=$3 extra=() code body
+		if [ "$hdr" != "-" ]; then extra=(-H "X-E2631-Confirm: $hdr"); fi
+		code=$(curl -sS --max-time 20 -o "$TMP/factory.body" -w "%{http_code}" "${extra[@]}" -X POST --data "" "$BASE/factory$query" 2>/dev/null || true)
+		body=$(cat "$TMP/factory.body" 2>/dev/null || true)
+		if [ "$code" = 400 ] && [ "$(kv "$body" result)" = error ]; then
+			pass "$label: refused with HTTP 400 result=error"
+		else
+			failcase "$label: expected HTTP 400 result=error, got HTTP $code (body=$(printf "%s" "$body" | head -c 160))"
+		fi
+	}
+	factory_refusal "" "-" "v2.1 factory: no confirmation at all"
+	factory_refusal "?confirm=reset" "-" "v2.1 factory: query-only confirmation without header"
+	factory_refusal "?confirm=write" "reset" "v2.1 factory: wrong confirmation value"
+	assert_status_idle "v2.1 factory refusals"
+	assert_no_write_stage "v2.1 factory refusals"
+
+	# --- POST /boot: RAM-only slot override (do this last, then clear it)
+	slots_text=$(curl -sS --max-time 15 "$BASE/slots" 2>/dev/null || true)
+	next_slot=$(kv "$slots_text" next_slot)
+	case "$next_slot" in
+	0|1)
+		boot_code=$(curl -sS --max-time 20 -o "$TMP/boot.body" -w "%{http_code}" -X POST --data "" "$BASE/boot?slot=$next_slot" 2>/dev/null || true)
+		boot_body=$(cat "$TMP/boot.body" 2>/dev/null || true)
+		if [ "$boot_code" = 200 ] && [ "$(kv "$boot_body" result)" = ok ] && [ "$(kv "$boot_body" next_slot)" = "$next_slot" ]; then
+			pass "v2.1 boot: /boot?slot=$next_slot sets the RAM override (result=ok)"
+		else
+			failcase "v2.1 boot: /boot?slot=$next_slot expected HTTP 200 result=ok next_slot=$next_slot, got HTTP $boot_code"
+		fi
+		;;
+	*) note "v2.1 boot: /slots did not expose a usable next_slot ($(show "$next_slot")); boot probe skipped" ;;
+	esac
+	boot_bad=$(curl -sS --max-time 20 -o "$TMP/boot-bad.body" -w "%{http_code}" -X POST --data "" "$BASE/boot?slot=2" 2>/dev/null || true)
+	if [ "$boot_bad" = 400 ] && [ "$(kv "$(cat "$TMP/boot-bad.body" 2>/dev/null || true)" result)" = error ]; then
+		pass "v2.1 boot: bad slot rejected with HTTP 400 result=error"
+	else
+		failcase "v2.1 boot: bad slot expected HTTP 400 result=error, got HTTP $boot_bad"
+	fi
+	clear_enc=$(python3 - <<'PY'
+import urllib.parse
+print(urllib.parse.quote("setenv e2631_next_slot", safe=""))
+PY
+	)
+	clear_code=$(curl -sS --max-time 20 -o "$TMP/boot-clear.body" -w "%{http_code}" -X POST --data "" "$BASE/console?cmd=$clear_enc" 2>/dev/null || true)
+	if [ "$clear_code" = 200 ] && [ "$(kv "$(cat "$TMP/boot-clear.body" 2>/dev/null || true)" result)" = ok ]; then
+		pass "v2.1 boot: cleared the RAM override via /console setenv e2631_next_slot"
+	else
+		failcase "v2.1 boot: could not clear e2631_next_slot via /console (HTTP $clear_code); clear it manually at the prompt"
+	fi
+	assert_status_idle "v2.1 boot"
+	log "v2.1 suite complete (read-only: no slot, overlay or env write was requested)"
+fi
+
 
 # ------------------------------------------------------------------- summary
 

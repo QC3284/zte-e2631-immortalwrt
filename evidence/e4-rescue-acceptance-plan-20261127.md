@@ -332,9 +332,58 @@ S9（设备，正常 Linux）：写后核对。
   强制摘要：validate-only 37 PASS / 0 FAIL / 1 NOTE；--write 50 PASS / 0 FAIL / 1 NOTE；
   不强制摘要（模拟旧构建）：默认 PASS + WARNING + NOTE；加 --require-digest 则 FAIL、退出码 1。
   mock 不写入本仓库（仅临时文件），不作为真机验收证据。
-- 页面基线（本文件写作时）：uboot-port/failsafe/e2631-failsafe.html raw 9,216 B，
-  gzip 4,456 B（上限 6,144 B），sha256 30a8f03e46867bb066947a2537f738e0539fd214ae579a287c301d5ff9e39bda，
-  gzip sha256 8f16817b30d66197364cf5a67d9cf5ddd2720a7a09975e8d01dd2494d78616d3；
-  tools/e4-rescue-acceptance.sh sha256 4b514f9b4e67283a7c7ee366532704fe87068fa655cc16a6b64b3844b46a2e54
-  （执行前请再实测并记录；本文件随提交记录）。
+- 页面基线（2026-11-28 v2.1 页面）：uboot-port/failsafe/e2631-failsafe.html raw 44,003 B，
+  gzip 13,773 B（上限 32,768 B），page sha256 d6bff9225bee6b85f453f2e7b64f15b72eaa7106f8aebfbd6c79aca94b4d2ba2，
+  gzip sha256 496c56514ad79a4aab95cd71f57d01bb0f081c49019991778a96e0b1aaac9f7f；
+  tools/e4-rescue-acceptance.sh sha256 599dc5ce5cac3e79ed770ec826a260bc0a626d4ec194df06a77455b195f457bc
+  （含 §14 的 --v21 套件；执行前请再实测并记录；本文件随提交记录）。
 - 本文件不含任何设备操作结论；真机结果由 verify-docs 在设备会话中按 §5/§10 记录。
+
+## 14. v2.1 端点套件（--v21，task-89 前置扩展）
+
+v2.1 页面/设备端点（契约 §15）的浏览器无关验收，已作为**可选套件**并入本脚本；
+v1 默认行为与写阶段语义完全不变（不带 --v21 时仍只做 v1 流程）。
+
+### 14.1 用法
+
+真机会话（verify-docs 执行；只读，不请求任何槽/overlay/env 写）：
+
+    tools/e4-rescue-acceptance.sh \
+      --image <net-zero e2631-uboot-mtd0.bin> \
+      --firmware-pkg <e2631-immortalwrt-experimental.bin> \
+      --v21
+
+mock 自测（不接设备；--base-url + --skip-lan）：
+
+    E2631_MOCK_BOOTLOADER=<net-zero image> PORT=18092 node tools/mock-failsafe.mjs &
+    tools/e4-rescue-acceptance.sh \
+      --image <net-zero image> --firmware-pkg <factory package> \
+      --base-url http://127.0.0.1:18092 --skip-lan --skip-matrix --v21
+
+--firmware-pkg 是 --v21 的硬前置；--base-url 只允许与 --skip-lan 同用（防止把真机
+地址误换成 mock）。2026-11-28 自测：mock 服务下 PASS=138 FAIL=0 NOTE=1（NOTE 为 mock
+的 /env 只有 13 个键；真机应 ≥20，缺键只 NOTE 不 FAIL）；v1 默认流程同环境 PASS=19 FAIL=0。
+
+### 14.2 覆盖内容（全部只读）
+
+| 组 | 断言 |
+|---|---|
+| 页面 | 六标签字符串（系统状态/固件更新/引导区/环境变量/串口台/恢复出厂）；无外部 URL/外链；服务 gzip ≤32,768 B |
+| GET /backup?part= | 五分区（bootloader/tag/wifi/usercfg/defcfg）逐项：body 长度、X-E2631-Offset/Length/Part/CRC32/SHA256 与本地计算一致、Content-Type/Disposition；bootloader body sha256 == 钉死的 net-zero 镜像（b1ea9a48…）；未知 part → 400 |
+| POST /console | version/printenv bootdelay/md.b 0x4000 正例；>4 KiB 输出 truncated=1；空命令、分号、>256 B 均 400 result=error（分号须含 single command） |
+| POST /firmware?mode=validate | 合法包正例：sha_match=ok、body_len=0x1500000、slot_target 0/1、identity 四值、guard=ok/weak；负例：摘要不符、包过小、包过大、outer magic、头部 CRC、kernel CRC、rootfs CRC、产品串第 17 B（16→17 对齐的 parity 向量）、H_BOOT_INCLUDED=1、body size、slot=2（后六类按契约做 CRC1/CRC2 重封，真机与 mock 均应拒绝） |
+| POST /env | GET /env 只读快照含 bootcmd/bootdelay；写当前 bootdelay 同值为 no-change（200 result=ok keys=0，不启动 envwrite）；vendor 键 403、白名单外键名 403、非可打印值 400、缺确认头 400 |
+| POST /factory | 仅负例：无确认、仅 query 确认、确认值错误均 400；不发合法双确认，绝不擦 overlay |
+| POST /boot | 按 /slots 的 next_slot 设置 RAM override（200 result=ok）；slot=2 → 400；最后用 /console setenv e2631_next_slot 清除，避免影响后续 e2631boot |
+
+### 14.3 明确不做与限制
+
+- 不发送 /firmware?mode=write、/flash?mode=write、合法 /factory、reset/reboot；
+  结束时 /status 必须回 idle（脚本逐组断言）。
+- 固件负例每个上传 22 MB（8 类 ≈ 176 MB）；31 MB/s 链路上约 6–10 s，1 Mb 链路需数分钟，
+  --timeout 不作用于这些 POST（curl 上限 600 s）。
+- /firmware 正例的 body_len 用本地包长 − 0x214 计算，不把 0x1500000 写死。
+- mock 的 /backup 内容由 E2631_MOCK_BOOTLOADER 指定文件提供；不指定时为合成镜像，
+  此时 bootloader body sha 断言会按预期 FAIL（mock 自测必须指定真实 net-zero 镜像）。
+- 本套件不替代 task-86 的真机判据；它把 P2–P6 中可用 HTTP 断言的项自动化，页面渲染/人工
+  断电重启仍由 verify-docs 记录。
