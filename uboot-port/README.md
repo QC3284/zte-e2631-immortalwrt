@@ -906,9 +906,10 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
   （0052：主机八位组经 `ntohl()` 取，192.168.1.1 的主机八位组是 1，默认池 100..200 不包含它）。
 
 尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B、0053/0054 净减 72 B；0055-0059（DNS/telnet/
-web console/env 对齐/池规则）与页面 v3.1 合计 +18,544 B，第四次统一构建（run 46132729322）最终
+web console/env 对齐/池规则）与页面 v3.1 合计 +18,544 B，第四次统一构建（run 46132729322）时
 `u-boot.bin` 417,024 B（≤ 460,000，余量 42,976 B，比 v3 基线 405,368 B 高 11,656 B；
-硬上限 653,312 − 193,312 headroom 的算法见 §4 item 3/26）。0060/0061 的修复（构造器与键名副本）增量很小，具体字节数由 task-92 下次统一构建测量。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+硬上限 653,312 − 193,312 headroom 的算法见 §4 item 3/26）；0060/0061 的修复（构造器与键名副本）实测 +728 B，
+第五次统一构建（t92e，run 46136469366）最终 `u-boot.bin` 417,752 B（≤ 460,000，余量 42,248 B，比 v3 基线高 12,384 B）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### E4 v3.1 上游对齐服务（0055-0059，task-97；零写入优先）
 
@@ -934,7 +935,8 @@ web console/env 对齐/池规则）与页面 v3.1 合计 +18,544 B，第四次�
   `e2631_flashboot` 从 `reset` 改成 `failsafe.lan` 并写了 env 块（CRC `0xf95a816e` → `0xa4f2c14c`）：0058 的对齐记录把
   键名指向第一次导出缓冲，第二次导出覆盖后 restore 用野键名 `env_set()`，同时写出的候选块被 parse 拆成
   `key\0value` 形式（下次开机必然 bad CRC）。0060 起 `/env` 候选块只由 flash 基线块 + 请求的单个键生成，
-  RAM 环境完全不参与；0061 让对齐记录持有键名副本，并在 CLI 保存前把候选块还原成 `key=value`。验收见 §4 item 37/38。
+  RAM 环境完全不参与；0061 让对齐记录持有键名副本，并在 CLI 保存前把候选块还原成 `key=value`。验收见 §4 item 37/38；
+t92e 构建（run `46136469366`，`u-boot.bin` 417,752 B）已带 env candidate 65 / env tweak 27 两项 fixture 门禁。
 
 零写入验收顺序（同一 RAM 链会话）：先 `GET /sysinfo`、`GET /log`、`POST /integrity` 与五个小分区
 `/backup` 确认只读；再 `GET / 页面并点 DNS/telnet/web console；`POST /firmware?mode=validate` 用合法包
@@ -1486,5 +1488,15 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   待写缓冲）；0061 让对齐记录持有键名副本，CLI 保存前把候选块还原成 `key=value`。61 patches / tree
   `88ecf6d6b8bbe3a5a14ccb73455c20c757ac6ebf`；主机 fixture：env candidate 65 项、env tweak 27 项（另 slot core 52、
   DHCP pool 18、DNS 29、env align 13、web console 13、console query 14、page stream 17）；checkpatch 0060/0061 各 0/0。
-  构建与真机 t92d 复测由 task-92/verify-docs 统一执行，本提交未 dispatch。证据
+  t92e 统一构建 run `46136469366`（`u-boot.bin` 417,752 B，env candidate 65 / env tweak 27 fixture 全过，
+  checkpatch 0/0）已执行；真机 t92d 复测由 verify-docs 执行。证据
   [evidence/uboot-env-write-fix-20261128.md](../evidence/uboot-env-write-fix-20261128.md)。
+- 2026-11-28（task-92 t92e，第五次统一构建）：run `46136469366`（head `3497032`，61 patches）27/27 步绿。
+  `u-boot.bin` **417,752 B** sha256 `2755e76f745fd82be7633bab5a6e3bfa9134b00aee3790c5f14b742bdf66d710`
+  crc32 `2d5f28d7`（≤ 460,000，余量 42,248 B；比 t92d +728 B）；`mtd0.bin` 655,360 B sha256
+  `9a45adae8c287f3f4c6c4c65237f8d7c8e28f5e87f45fc982bf13868cb2d07b8` crc32 `9e3c82ac`；装配后首 0x800 sha256
+  `814f41f0…`；env 块 `6eee153b…`、`.config` `0670a0aa…` 未变；banner `U-Boot 2027.01-rc2-gfc5b1f0f2eeb`；
+  页面 gzip 31,518 B（≤ 32,768）。fixture：slot core 52 / DHCP pool 18 / DNS 29 / env align 13 /
+  **env candidate 65** / **env tweak 27** / web console 13 / console query 14 / page stream 17；writer sites 9、
+  checkpatch 0E/0W；artifact `e2631-uboot-46136469366`（id 15259972242，11 文件 `sha256sum -c` 全过）。
+  无 Release/tag、无设备动作。证据 [evidence/uboot-env-write-fix-20261128.md](../evidence/uboot-env-write-fix-20261128.md) §11。

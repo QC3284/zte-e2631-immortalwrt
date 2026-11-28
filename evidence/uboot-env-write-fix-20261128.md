@@ -1,6 +1,6 @@
 # t92d `/env` 写事故：根因与修复（task-98，patches 0060/0061）
 
-日期：2026-11-28　作者：base-builder　状态：代码已提交；构建与真机复测待 task-92 / verify-docs 执行
+日期：2026-11-28　作者：base-builder　状态：代码已提交；t92e 统一构建已执行（run `46136469366`，身份见 §11），真机零写复测待 verify-docs
 
 ## 0. 结论
 
@@ -14,7 +14,7 @@
   52 个条目全部被拆开），下次开机必然 bad CRC。
 - 修复：0060 让 `/env` 候选块只由 flash 基线块 + 请求的单个键生成（`e2631env_build.h` 纯构造器，
   不再改 RAM env、不再解析待写缓冲）；0061 让对齐记录持有键名副本，并在 CLI 保存前把候选块还原成
-  `key=value`。61 patches / post-am tree `88ecf6d6b8bbe3a5a14ccb73455c20c757ac6ebf`。
+  `key=value`。61 patches / post-am tree `88ecf6d6b8bbe3a5a14ccb73455c20c757ac6ebf`；t92e 统一构建（run `46136469366`）`u-boot.bin` 417,752 B（比 t92d +728 B，余量 42,248 B），身份见 §11。
 
 ## 1. 现场证据（t92d，2026-11-28）
 
@@ -127,3 +127,23 @@ CI 在 `uboot-build.yml` 里编译并运行这两个 fixture，期望 `env candi
 - `/home/qc233/zte/e2631-p3/e2/e4-v3-phasea/t92d-run-1/`
 - `uboot-port/README.md` §4 item 37/38、§5 E4 v3.1 小节、§8 changelog
 - Lead task-98 要求：`m11664` / `m11683`
+
+## 11. t92e 统一构建（run 46136469366）
+
+- 触发：`uboot-build.yml` workflow_dispatch（kit head `3497032`，61 patches，`checkpatch=true`），
+  2026-11-28T10:42:51Z → 10:44:52Z，27/27 步 SUCCESS。
+- 身份：banner `U-Boot 2027.01-rc2-gfc5b1f0f2eeb (Nov 19 2026 - 15:44:39 +0000)`；`u-boot.bin` **417,752 B**
+  sha256 `2755e76f745fd82be7633bab5a6e3bfa9134b00aee3790c5f14b742bdf66d710` crc32 `2d5f28d7`；
+  `mtd0.bin` 655,360 B sha256 `9a45adae8c287f3f4c6c4c65237f8d7c8e28f5e87f45fc982bf13868cb2d07b8`
+  crc32 `9e3c82ac`；装配后首 0x800 sha256 `814f41f0fd99065285d6dc5da79f6cddce925fd17067494b98d730fc6d8ebb26`；
+  env 块 `6eee153b…` 未变；`.config` `0670a0aa…` 未变（0060/0061 只新增头文件与代码路径）；
+  entry `0x47f00000`；post-am tree `88ecf6d6…`。
+- 尺寸：417,752 ≤ 460,000（余量 42,248 B；比 v3 基线 405,368 B 高 12,384 B，比 t92d 的 417,024 B 多 728 B），
+  硬上限余量 235,560 B（36.06%）。页面未改动（raw 113,057 / gzip 31,518 / sha256 `e452fb02…`）。
+- 门禁实测：fixture 全 PASS——rescue header、slot core 52、DHCP pool 18、DNS 29、env align 13、
+  **env candidate 65**、**env tweak 27**、web console 13、console query 14、page stream 17（8 chunks）；
+  task-98 env write gate、task-97、E4 v3 rescue、self-check、DHCP pool、page stream、E4 v3 size gate 全绿；
+  `mtd writer sites: 9`；`command set: mii reclaimed`；`checkpatch: errors=0 warnings=0`（61 patches）。
+- 产物：artifact `e2631-uboot-46136469366`（id `15259972242`，zip 592,721 B，11 文件 `sha256sum -c` 全过）；
+  归档 `/home/qc233/zte/e2631-t5-artifacts/t92e-46136469366/`。
+- 边界：无 Release/tag、无 firmware.yml dispatch、kit main 未动、真机未碰；真机零写复测（§8）交 verify-docs。
