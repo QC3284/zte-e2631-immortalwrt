@@ -80,6 +80,7 @@
 | [../evidence/e4-rescue-write/](../evidence/e4-rescue-write/) | task-79 附件：驱动日志、串口原始字节、session-results、step1/step2 状态机响应、postcheck、final-0034 第三写/救援包、final-coldboot 真冷启动包、驱动与产物清单、sha256 清单 |
 | [../evidence/e4-coldrescue-0034-20261128.md](../evidence/e4-coldrescue-0034-20261128.md) | patch 0034 冷启动救援顺序修复零写入真机验证（warm reset + RAM 加载）：从当前 flash E4 提示符加载 0034（banner g1673d5c89c7b，u-boot sha b7ea6bbc…）后 e2631rescue 作为第一条网络命令 —— PHY autoneg done、lan1 up 1 Gbps、GET / 页面 gzip 8f16817b…、/status idle、validate 200 result=ok sha_match=ok（crc32 0x1e5ff289）；Ctrl-C + e2631boot 回 Linux；mtd0 d87db54a… / region 8a38896e… 未变，15/15 checks GREEN；真冷启动需 0034 刷写后的第三写验收 |
 | [../evidence/e4-coldrescue-0034/](../evidence/e4-coldrescue-0034/) | patch 0034 冷启动救援验证附件：results.json、驱动/串口/控制台、page/status/validate 响应、首跑失败输出、驱动与产物清单、sha256 清单 |
+| [../evidence/recovery-button-research-20261128.md](../evidence/recovery-button-research-20261128.md) | 恢复键调研（task-80）：reset = flat GPIO 18（`&gpio1 2`）/ mesh = flat GPIO 20（`&gpio1 4`），均低有效（DTS、厂商板级表 entry[27]/[29]、ledkey_m 三方一致）；内核现状（reset 短按重启、按住 ≥5 s factory reset；mesh 仅 WPS 灯闪 120 s、无配对动作；hotplug 初始化即上报按下 → 「按住过启动」今天等于 factory reset）；厂商 U-Boot 只在 boot-mode shell 读 pin18（约 5.25 s 释放等待后跑 `downver version`+`reset`，本 payload 无 downver 命令 → 死代码，正常启动路径从不进入）；上游 `glbtn` 4 s 长按 → `httpd` 先例（需 DM_GPIO/button，本 U-Boot 40-60 行裸 MMIO 复刻）；选项 A/B/C/D 对照与推荐 A（reset 连续 2 s，`board_late_init` 内 RAM 改 bootcmd → `e2631rescue`）、实现草图、风险/零写入验证矩阵、SSH 证据缺口 |
 
 | 文件 | 内容 |
 |---|---|
