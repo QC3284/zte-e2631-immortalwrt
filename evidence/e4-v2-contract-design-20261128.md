@@ -281,7 +281,7 @@ written_serial=<将要盖章的 serial>
 | 3 | 头部偏移 `hdr_ofs = 0x14 + rd32(0x10)`；`body_ofs = hdr_ofs + 0x200 <= len` | `truncated header` |
 | 4 | `H_INNER_MAGIC` == `33x4 66x4 99x4 ccx4` | `bad version header magic` |
 | 5 | `crc32(header[0:0xa4]) == rd32(H_CRC)` 且 `crc32(header[0:0x1fc]) == rd32(H_CRC2)` | `header CRC mismatch` |
-| 6 | `H_PRODUCT` 前 15 B == `ZXHN E2631 V1.0.0` | `package is not for this product` |
+| 6 | `H_PRODUCT` 前 17 B == `ZXHN E2631 V1.0.0` | `package is not for this product` |
 | 7 | `rd32(H_BOOT_INCLUDED) == 0` | `package wants to update the bootloader` |
 | 8 | `rd32(H_FW_SIZE) == len - body_ofs` | `body size mismatch` |
 | 9 | `rd32(H_SLOT0) == 0x00700000 && rd32(H_SLOT1) == 0x02300000` | `package declares different slot addresses` |
@@ -292,6 +292,8 @@ written_serial=<将要盖章的 serial>
 | 14 | `X-E2631-SHA256`（写必填）与设备 SHA-256 一致 | `sha256 mismatch` / `sha256 header required` |
 
 几何补充：`body_len <= slot_span - 0x20000`（写 body 后还要一个头块）；`koff/ksz/foff/fsz` 来自版本头；当前包 `koff=0x234`（uImage 头）、`foff=0x400214`。
+
+产品串比较长度与 Linux 唯一实现严格对齐：`e2631-fwslot.c:101` 的 `PRODUCT` 是 17 字节，`:644` 用 `sizeof(PRODUCT) - 1`（17）比较，因此本表第 6 条为 17 B（实测包 `H_PRODUCT` 前 17 B 为 `ZXHN E2631 V1.0.0`，其后是 NUL 填充）。2026-11-28 复核发现 U-Boot 侧 `e2631_slotcore.h:63` 的 `E2631_PRODUCT_LEN` 是 16（只比较到 `ZXHN E2631 V1.0.`），对真实包无影响，但会放宽一个字节；已报 base-builder 在后续构建中改为 17，验收 P5 不依赖该差异（负例不覆盖产品串第 17 B）。
 
 ### 5.2 守卫规则（写前判定，validate 也返回）
 
