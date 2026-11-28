@@ -196,6 +196,20 @@ jobs:
             -o "$RUNNER_TEMP/dhcp-pool-test"
           "$RUNNER_TEMP/dhcp-pool-test" | tee "$RUNNER_TEMP/dhcp-pool-test.out"
           grep -q '(14 checks' "$RUNNER_TEMP/dhcp-pool-test.out"
+      - name: Compile and run the console query fixture
+        # task-95/patch 0054: the request parser used to copy the URI into a
+        # 96-byte buffer before the console length guard, so a 257-byte
+        # command looked like 82 bytes. The fixture pins the 256/257 guard
+        # boundary, the raw query scan and the split of a 275-byte request
+        # line, against the same e2631query.h the patch installs.
+        run: |
+          set -euo pipefail
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/console_query_test.c" \
+            -o "$RUNNER_TEMP/console-query-test"
+          "$RUNNER_TEMP/console-query-test" | tee "$RUNNER_TEMP/console-query-test.out"
+          grep -q 'console query fixture: PASS' "$RUNNER_TEMP/console-query-test.out"
       - name: Embed the failsafe rescue page
         # E4 v1 (task-73): the rescue page is a single self-contained HTML file
         # (no CDN, no i18n). The embed step runs after "git am" and before
@@ -213,6 +227,24 @@ jobs:
             --stats "$UBOOT_DIR/artifacts/E2631-FAILSAFE-ASSET.txt"
           test -s "$UBOOT_DIR/board/zte/zxhn-e2631/e2631_failsafe_asset.c"
           test -s "$UBOOT_DIR/artifacts/E2631-FAILSAFE-ASSET.txt"
+      - name: Compile and run the rescue page stream fixture
+        # task-95/patch 0053: the page (v3: 24904 bytes of gzip) is larger than
+        # the 16 KiB response buffer, so GET / streams it in chunks. The
+        # fixture takes the real gzip length from the asset just generated and
+        # walks the chunk arithmetic the DATA_SENT callback uses.
+        run: |
+          set -euo pipefail
+          page_len=$(sed -n 's/^const unsigned int e2631_failsafe_html_gz_len = \([0-9][0-9]*\);/\1/p' \
+            "$UBOOT_DIR/board/zte/zxhn-e2631/e2631_failsafe_asset.c")
+          test -n "$page_len"
+          echo "failsafe gzip asset length: $page_len bytes"
+          gcc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$UBOOT_DIR/board/zte/zxhn-e2631" \
+            -DE2631_PAGE_LEN="$page_len" \
+            "$GITHUB_WORKSPACE/uboot-port/tests/page_stream_test.c" \
+            -o "$RUNNER_TEMP/page-stream-test"
+          "$RUNNER_TEMP/page-stream-test" | tee "$RUNNER_TEMP/page-stream-test.out"
+          grep -q 'page stream fixture: PASS' "$RUNNER_TEMP/page-stream-test.out"
       - name: Configure and build with the ARM cross toolchain
         run: |
           set -euo pipefail
@@ -499,7 +531,7 @@ jobs:
           done
           echo "rescue self-check gate: zeroed digest contexts and the output-cursor guard are wired"
           # task-90/E4 v3: the six new endpoints and their invariants.
-          for v3_marker in rescue_query_raw_len rescue_sysinfo_text \
+          for v3_marker in rescue_sysinfo_text \
                            rescue_log_snapshot rescue_integrity \
                            rescue_handle_reboot rescue_led_start \
                            rescue_dhcp_load; do
@@ -528,6 +560,41 @@ jobs:
             exit 1
           fi
           echo "DHCP pool gate: host octet through ntohl() and the shared pool check"
+          # task-95/patch 0053: the rescue page is larger than one response
+          # buffer, so GET / streams it in 4 KiB chunks from the embedded asset
+          # instead of copying it into c->out.  A regression back to the
+          # single-buffer reply would silently kill GET / again.
+          grep -q 'rescue_page_start(c' "$rescue_c"
+          grep -q 'e2631_page_chunk_len' "$rescue_c"
+          grep -qE '^#define E2631_RESCUE_PAGE_CHUNK[[:space:]]+4096U' "$rescue_c"
+          grep -q 'e2631_page_chunk_len' board/zte/zxhn-e2631/e2631page.h
+          if grep -q 'rescue_reply(c, 200, "OK", "text/html' "$rescue_c"; then
+            echo "::error::GET / copies the page into the response buffer again"
+            exit 1
+          fi
+          echo "page stream gate: GET / streams the gzip page in chunks"
+          # task-95/patch 0054: the URI stays untruncated (the path points into
+          # the header line) and the console length guard measures the raw
+          # value, so a 257-byte command is refused before it is copied.  A
+          # dying connection must also release its pdata and the 1 MiB backup
+          # buffer instead of leaking them.
+          grep -q 'e2631_query_raw_len' "$rescue_c"
+          grep -q 'e2631_console_cmd_len_ok' "$rescue_c"
+          grep -q 'c->path = rest;' "$rescue_c"
+          grep -q 'e2631_query_raw_len' board/zte/zxhn-e2631/e2631query.h
+          if grep -q 'snprintf(c->path' "$rescue_c"; then
+            echo "::error::the request path is copied into a fixed buffer again"
+            exit 1
+          fi
+          if ! awk '/^static void rescue_tcp_cb\(/,/^}/' "$rescue_c" | grep -q 'rescue_conn_closed(c);'; then
+            echo "::error::a REMOTE_CLOSED connection does not release its pdata"
+            exit 1
+          fi
+          if ! grep -q 'c->backup_buf = NULL;' "$rescue_c"; then
+            echo "::error::the backup bounce buffer is not released before the close"
+            exit 1
+          fi
+          echo "console query gate: untruncated URI, raw length guard, released connections"
           # task-82: holding reset (gpio18) or mesh (gpio20) through
           # board_late_init() must override bootcmd to e2631rescue in RAM only.
           boot_c=board/zte/zxhn-e2631/e2631boot.c

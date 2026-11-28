@@ -507,7 +507,7 @@ ok('the P1 reclaim and the retained command set follow the v3 budget ruling',
   has(UBOOT_WF, 'command set: mii reclaimed (P2 applied)') &&
   has(UBOOT_WF, 'no defined CONFIG_CMD_MII state'));
 ok('the E4 v3 rescue endpoints and binary texts are gated',
-  ['rescue_query_raw_len', 'rescue_sysinfo_text', 'rescue_log_snapshot', 'rescue_integrity',
+  ['e2631_query_raw_len', 'rescue_sysinfo_text', 'rescue_log_snapshot', 'rescue_integrity',
     'rescue_handle_reboot', 'rescue_led_start', 'rescue_dhcp_load'].every((m) => has(UBOOT_WF, m)) &&
   has(UBOOT_WF, 'E2631_PRODUCT_LEN[[:space:]]+17U') &&
   has(UBOOT_WF, 'e2631_dhcp_pool_start') &&
@@ -517,6 +517,24 @@ ok('the E4 v3 rescue endpoints and binary texts are gated',
   has(UBOOT_WF, 'rescue_sha256') &&
   has(UBOOT_WF, "grep -q 'sha256_csum_wd' \"$src\"") &&
   has(UBOOT_WF, "grep -q '(52 checks'"));
+// task-95: two deterministic v3 defects.  GET / used to copy the 24904-byte
+// gzip page into a 16384-byte response buffer (empty reply), and a 257-byte
+// console command was measured after the URI had been truncated into a
+// 96-byte path buffer; the dying connections of three slot backups then
+// exhausted the heap and reset every later request.  Fixtures and gates pin
+// both fixes so a later refactor cannot restore them.
+ok('the task-95 page-stream and console-query fixes stay pinned',
+  ['Compile and run the console query fixture', 'Compile and run the rescue page stream fixture',
+    'console query fixture: PASS', 'page stream fixture: PASS'].every((s) => has(UBOOT_WF, s)) &&
+  has(UBOOT_WF, 'page stream gate: GET / streams the gzip page in chunks') &&
+  has(UBOOT_WF, 'console query gate: untruncated URI, raw length guard, released connections') &&
+  has(UBOOT_WF, 'rescue_page_start(c') &&
+  has(UBOOT_WF, 'E2631_RESCUE_PAGE_CHUNK') &&
+  has(UBOOT_WF, 'c->path = rest;') &&
+  has(UBOOT_WF, 'DE2631_PAGE_LEN="$page_len"') &&
+  has(UBOOT_WF, "if grep -q 'snprintf(c->path'") &&
+  has(UBOOT_WF, 'the request path is copied into a fixed buffer again') &&
+  has(UBOOT_WF, 'rescue_conn_closed(c);'));
 ok('UBOOT-INFO records the E4 v3 budget and the final size chain',
   ['E4 v3 gate bytes:', 'headroom bytes vs E4 v3 gate:', 'size delta vs v3 baseline:',
     'E4 v3 budget:'].every((s) => has(UBOOT_WF, s)));

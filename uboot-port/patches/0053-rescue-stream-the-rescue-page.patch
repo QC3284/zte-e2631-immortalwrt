@@ -1,0 +1,212 @@
+From 4bbd5d5d2e155195b47ef52da29dfab21a88e233 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 16:27:21 +0800
+Subject: [PATCH 1/2] rescue: stream the rescue page instead of copying it
+
+The E4 v3 page is 24904 bytes of gzip, while struct e2631_rescue_conn.out
+holds 16384.  GET / passed the whole asset to rescue_reply(), which found
+n + body_len > sizeof(out), reset the connection and returned -ENOSPC: the
+browser got an empty reply (curl rc 56) and the page never loaded.
+
+Serve the page the way GET /backup streams a partition: send the headers
+from c->out, then let the TCP DATA_SENT callback pump the next 4096-byte
+chunk straight out of the embedded asset, and close the connection only
+after the final chunk has been acknowledged.  e2631page.h carries the chunk
+arithmetic so a host fixture can exercise it.
+
+GET / stays read-only and the response keeps Content-Encoding: gzip and the
+exact asset length as Content-Length.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631page.h   | 32 ++++++++++
+ board/zte/zxhn-e2631/e2631rescue.c | 94 ++++++++++++++++++++++++++++--
+ 2 files changed, 122 insertions(+), 4 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631page.h
+
+diff --git a/board/zte/zxhn-e2631/e2631page.h b/board/zte/zxhn-e2631/e2631page.h
+new file mode 100644
+index 00000000..7b399b3c
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631page.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Chunk arithmetic for streaming the embedded rescue page.
++ *
++ * The page asset is far larger than one response buffer (E4 v3: 24,904 bytes
++ * of gzip against a 16,384-byte e2631_rescue_conn.out), so GET / sends it in
++ * chunks driven by the TCP DATA_SENT callback.  Keeping the size calculation
++ * in one header lets the host fixture in uboot-port/tests exercise it without
++ * pulling in the U-Boot network stack.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++#ifndef __E2631_PAGE_H
++#define __E2631_PAGE_H
++
++/*
++ * Return the number of bytes of the page still to send at @off, capped at
++ * @chunk; 0 means "everything has been sent".
++ */
++static inline unsigned int e2631_page_chunk_len(unsigned int off,
++						unsigned int total,
++						unsigned int chunk)
++{
++	if (off >= total || !chunk)
++		return 0;
++	if (total - off < chunk)
++		return total - off;
++
++	return chunk;
++}
++
++#endif /* __E2631_PAGE_H */
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index a782a0f0..76c2622c 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -7,7 +7,7 @@
+  * and no md.b ladder:
+  *
+  *   - DHCP  : 192.168.1.1/24, pool 192.168.1.100-200 (lan1 only)
+- *   - HTTP  : GET  /                       rescue page (gzip, in-tree)
++ *   - HTTP  : GET  /                       rescue page (gzip, streamed)
+  *             GET  /status                 key=value progress snapshot
+  *             GET  /slots                  slot headers and the decision
+  *             GET  /env                    read-only environment dump
+@@ -80,6 +80,7 @@
+ #include "e2631dhcp.h"
+ #include "e2631http.h"
+ #include "e2631net.h"
++#include "e2631page.h"
+ #include "e2631soc.h"
+ 
+ /*
+@@ -114,6 +115,13 @@ extern struct hsearch_data env_htab;
+ #define E2631_RESCUE_HDR_MAX	1024
+ #define E2631_RESCUE_OUT_MAX	16384
+ 
++/*
++ * GET / streams the embedded page: the gzip asset is larger than one
++ * response buffer (E4 v3: 24904 bytes of gzip against 16384 bytes of out),
++ * so it leaves in chunks driven by the TCP DATA_SENT callback.
++ */
++#define E2631_RESCUE_PAGE_CHUNK	4096U
++
+ static_assert(E2631_RESCUE_IMG_ADDR >= 0x45000000UL + 0x1000000UL,
+ 	      "the rescue upload buffer must stay clear of the network DMA arena");
+ static_assert(E2631_RESCUE_IMG_ADDR > CONFIG_SYS_LOAD_ADDR,
+@@ -259,6 +267,9 @@ struct e2631_rescue_conn {
+ 	u32 backup_sent;
+ 	u32 backup_total;
+ 	u32 backup_block;
++	/* GET / streams the embedded page from the gzip asset; DATA_SENT drives it. */
++	bool page_stream;
++	u32 page_off;
+ 	u8 out[E2631_RESCUE_OUT_MAX];
+ };
+ 
+@@ -1679,14 +1690,79 @@ static void rescue_backup_start(struct e2631_rescue_conn *c, const char *query)
+ 	}
+ }
+ 
++/*
++ * Send one stream chunk.  Unlike rescue_tcp_send() this does not latch
++ * close_after_send: the DATA_SENT callback asks for the next chunk.
++ */
++static int rescue_stream_send(struct e2631_rescue_conn *c, const void *data,
++			      u32 len)
++{
++	if (mtk_tcp_send_data(c->conn, data, len)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return -EIO;
++	}
++
++	return 0;
++}
++
++/* Send the next page chunk; 0 when the page has been fully sent. */
++static int rescue_page_block(struct e2631_rescue_conn *c)
++{
++	u32 n = e2631_page_chunk_len(c->page_off, e2631_failsafe_html_gz_len,
++				     E2631_RESCUE_PAGE_CHUNK);
++
++	if (!n)
++		return 0;
++	if (rescue_stream_send(c, e2631_failsafe_html_gz + c->page_off, n))
++		return -EIO;
++	c->page_off += n;
++
++	return 0;
++}
++
++/*
++ * Serve GET /: the headers go out from c->out (which outlives the send),
++ * then every ACK drives the next chunk until the whole gzip asset has been
++ * acknowledged, and only then is the connection closed.  Copying the page
++ * into the 16 KiB response buffer is not an option: the E4 v3 asset is
++ * 24904 bytes and any future page will be at least as large.
++ */
++static void rescue_page_start(struct e2631_rescue_conn *c)
++{
++	int n;
++
++	n = snprintf((char *)c->out, sizeof(c->out),
++		     "HTTP/1.1 200 OK\r\n"
++		     "Server: e2631rescue\r\n"
++		     "Content-Type: text/html; charset=utf-8\r\n"
++		     "Content-Encoding: gzip\r\n"
++		     "Content-Length: %u\r\n"
++		     "Cache-Control: no-store\r\n"
++		     "Connection: close\r\n"
++		     "\r\n", e2631_failsafe_html_gz_len);
++	if (n <= 0 || (u32)n >= sizeof(c->out)) {
++		mtk_tcp_close_conn(c->conn, 1);
++		return;
++	}
++
++	c->responded = true;
++	c->page_stream = true;
++	c->page_off = 0;
++
++	if (rescue_stream_send(c, c->out, (u32)n)) {
++		c->page_stream = false;
++		return;
++	}
++
++	/* The first body chunk follows as soon as the headers are ACKed. */
++}
++
+ static void rescue_handle_get(struct e2631_rescue_conn *c, const char *query)
+ {
+ 	char body[1024];
+ 
+ 	if (!strcmp(c->path, "/")) {
+-		rescue_reply(c, 200, "OK", "text/html; charset=utf-8",
+-			     "gzip", e2631_failsafe_html_gz,
+-			     e2631_failsafe_html_gz_len);
++		rescue_page_start(c);
+ 		return;
+ 	}
+ 
+@@ -2668,6 +2744,16 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 			reboot_ack = true;
+ 		if (!c)
+ 			return;
++		if (c->page_stream) {
++			if (c->page_off >= e2631_failsafe_html_gz_len) {
++				c->page_stream = false;
++				mtk_tcp_close_conn(c->conn, 0);
++			} else if (rescue_page_block(c)) {
++				c->page_stream = false;
++				mtk_tcp_close_conn(c->conn, 1);
++			}
++			return;
++		}
+ 		if (c->backup_stream) {
+ 			if (c->backup_sent >= c->backup_total) {
+ 				c->backup_stream = false;
+-- 
+2.56.1
+

@@ -1,0 +1,238 @@
+From 326dc852046e6bafb1e8dbeba5366003e2fb4cd8 Mon Sep 17 00:00:00 2001
+From: QC3284 <2078725082@qq.com>
+Date: Sat, 28 Nov 2026 16:28:15 +0800
+Subject: [PATCH 2/2] rescue: keep the URI untruncated and release dead
+ connections
+
+Two defects from the v3 Phase A device probe.
+
+The request parser copied the URI into a 96-byte path buffer, so a long
+console request was truncated before the handler ran: the 257-byte command
+looked like 82 bytes, passed the length guard and was executed as a prefix.
+Keep the URI where it is in hdr and hand the handler a pointer instead; the
+raw query length is now measured on the full value (new header e2631query.h
+also carries the 256-byte limit so the host fixture can pin the boundary),
+and a 257-byte command takes the documented 400 bad_body path.
+
+The same probe left the rescue unable to answer any later connection.  On
+MTK_TCP_CB_REMOTE_CLOSED the stack has already forgotten the connection and
+no CLOSED callback follows, but the callback called mtk_tcp_close_conn() on
+the dying connection, which is a no-op: struct e2631_rescue_conn and the
+1 MiB /backup bounce buffer leaked.  Three large downloads in Phase A were
+enough to exhaust the 4 MiB heap, after which NEW_CONN's calloc failed and
+every SYN was reset.  Free our state on REMOTE_CLOSED, and release the
+bounce buffer as soon as the last block is acknowledged so it cannot sit in
+FIN_WAIT_2 for up to five minutes.
+
+Signed-off-by: QC3284 <2078725082@qq.com>
+---
+ board/zte/zxhn-e2631/e2631query.h  | 54 ++++++++++++++++++++
+ board/zte/zxhn-e2631/e2631rescue.c | 81 +++++++++++++++++-------------
+ 2 files changed, 99 insertions(+), 36 deletions(-)
+ create mode 100644 board/zte/zxhn-e2631/e2631query.h
+
+diff --git a/board/zte/zxhn-e2631/e2631query.h b/board/zte/zxhn-e2631/e2631query.h
+new file mode 100644
+index 00000000..e9472c38
+--- /dev/null
++++ b/board/zte/zxhn-e2631/e2631query.h
+@@ -0,0 +1,54 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Query-string helpers for the rescue HTTP server.
++ *
++ * rescue_query_value() copies at most outsz - 1 bytes of a value, so an
++ * over-long console command would be silently truncated and a prefix of it
++ * executed.  e2631_query_raw_len() measures the undecoded value first, which
++ * lets the handler reject it before anything is copied.  Header-only so the
++ * host fixture in uboot-port/tests can exercise the boundary without the
++ * U-Boot build; the caller includes <string.h> first.
++ *
++ * Copyright (C) 2026 QC3284
++ */
++#ifndef __E2631_QUERY_H
++#define __E2631_QUERY_H
++
++/*
++ * Return the length of the undecoded value for @key in @query, or -1 when
++ * the key is absent.
++ */
++static inline int e2631_query_raw_len(const char *query, const char *key)
++{
++	const char *p = query;
++	unsigned int klen;
++	unsigned int n;
++
++	if (!query)
++		return -1;
++	klen = (unsigned int)strlen(key);
++	while (*p) {
++		if (!strncmp(p, key, klen)) {
++			const char *v = p + klen;
++
++			n = 0;
++			while (v[n] && v[n] != '&')
++				n++;
++			return (int)n;
++		}
++		p = strchr(p, '&');
++		if (!p)
++			break;
++		p++;
++	}
++
++	return -1;
++}
++
++/* The console endpoint accepts one command of at most 256 raw bytes. */
++static inline int e2631_console_cmd_len_ok(int raw_len)
++{
++	return raw_len > 0 && raw_len <= 256;
++}
++
++#endif /* __E2631_QUERY_H */
+diff --git a/board/zte/zxhn-e2631/e2631rescue.c b/board/zte/zxhn-e2631/e2631rescue.c
+index 76c2622c..269eeb50 100644
+--- a/board/zte/zxhn-e2631/e2631rescue.c
++++ b/board/zte/zxhn-e2631/e2631rescue.c
+@@ -81,6 +81,7 @@
+ #include "e2631http.h"
+ #include "e2631net.h"
+ #include "e2631page.h"
++#include "e2631query.h"
+ #include "e2631soc.h"
+ 
+ /*
+@@ -252,7 +253,8 @@ struct e2631_rescue_conn {
+ 	bool upload;
+ 	enum e2631_rescue_upload upload_kind;
+ 	char method[8];
+-	char path[96];
++	/* Points into hdr and is never truncated (see rescue_handle_request). */
++	char *path;
+ 	char mode[16];
+ 	char slot_sel[8];
+ 	char sha_header[SHA256_SUM_LEN * 2 + 1];
+@@ -299,37 +301,6 @@ static bool rescue_query_value(const char *query, const char *key, char *out,
+ 	return false;
+ }
+ 
+-/*
+- * Return the length of the undecoded value for @key, or -1 when the key is
+- * absent.  rescue_query_value() cannot stop at the end of the value, so the
+- * console endpoint uses this to reject an over-long command instead of
+- * running the part it managed to copy.
+- */
+-static int rescue_query_raw_len(const char *query, const char *key)
+-{
+-	const char *p = query;
+-	size_t klen = strlen(key);
+-	const char *v;
+-	size_t n;
+-
+-	if (!query)
+-		return -1;
+-	while (*p) {
+-		if (!strncmp(p, key, klen)) {
+-			v = p + klen;
+-			n = 0;
+-			while (v[n] && v[n] != '&')
+-				n++;
+-			return (int)n;
+-		}
+-		p = strchr(p, '&');
+-		if (!p)
+-			break;
+-		p++;
+-	}
+-
+-	return -1;
+-}
+ static const unsigned char *rescue_image(void)
+ {
+ 	return (const unsigned char *)(uintptr_t)E2631_RESCUE_IMG_ADDR;
+@@ -2011,8 +1982,8 @@ static void rescue_handle_console(struct e2631_rescue_conn *c, const char *query
+ 			     strlen(bad_body));
+ 		return;
+ 	}
+-	raw_len = rescue_query_raw_len(query, "cmd=");
+-	if (raw_len <= 0 || raw_len > 256 ||
++	raw_len = e2631_query_raw_len(query, "cmd=");
++	if (!e2631_console_cmd_len_ok(raw_len) ||
+ 	    !rescue_query_value(query, "cmd=", raw_cmd, sizeof(raw_cmd)) ||
+ 	    rescue_has_nul_escape(raw_cmd)) {
+ 		rescue_reply(c, 400, "Bad Request", "text/plain", NULL, bad_body,
+@@ -2520,7 +2491,15 @@ static void rescue_handle_request(struct e2631_rescue_conn *c)
+ 	if (!sp2)
+ 		goto bad;
+ 	*sp2 = 0;
+-	snprintf(c->path, sizeof(c->path), "%s", rest);
++
++	/*
++	 * Keep the URI in place instead of copying it into a fixed buffer.
++	 * A copy used to truncate long URIs before the handlers ran, which
++	 * both hid the /console length guard (a 257-byte command looked like
++	 * 82 bytes) and could route on a prefix; hdr is NUL-terminated and
++	 * outlives the request, so a pointer is enough.
++	 */
++	c->path = rest;
+ 
+ 	query = strchr(c->path, '?');
+ 	if (query) {
+@@ -2759,11 +2738,24 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 				c->backup_stream = false;
+ 				backup_active = false;
+ 				rescue_backup_part_name[0] = 0;
++				/*
++				 * The 1 MiB bounce buffer is the largest
++				 * allocation of the whole rescue; release it
++				 * as soon as the last block is acknowledged
++				 * instead of holding it through the close
++				 * handshake (which may sit in FIN_WAIT_2 for
++				 * up to five minutes on a silently closed
++				 * peer).
++				 */
++				free(c->backup_buf);
++				c->backup_buf = NULL;
+ 				mtk_tcp_close_conn(c->conn, 0);
+ 			} else if (rescue_backup_block(c)) {
+ 				c->backup_stream = false;
+ 				backup_active = false;
+ 				rescue_backup_part_name[0] = 0;
++				free(c->backup_buf);
++				c->backup_buf = NULL;
+ 				mtk_tcp_close_conn(c->conn, 1);
+ 			}
+ 			return;
+@@ -2774,10 +2766,27 @@ static void rescue_tcp_cb(struct mtk_tcp_cb_data *cbd)
+ 		}
+ 		return;
+ 	case MTK_TCP_CB_REMOTE_CLOSING:
+-	case MTK_TCP_CB_REMOTE_CLOSED:
+ 		if (c)
+ 			mtk_tcp_close_conn(c->conn, 0);
+ 		return;
++	case MTK_TCP_CB_REMOTE_CLOSED:
++		/*
++		 * The stack delivers REMOTE_CLOSED once and then forgets the
++		 * connection: no CLOSED callback follows.  This used to call
++		 * mtk_tcp_close_conn() on the dying connection, which is a
++		 * no-op, so struct e2631_rescue_conn and a 1 MiB /backup
++		 * bounce buffer leaked per reset or timed-out connection.
++		 * During the v3 Phase A probe three large downloads leaked
++		 * roughly the whole 4 MiB heap; the next SYN then failed its
++		 * calloc in NEW_CONN and every later request was reset --
++		 * what looked like "the 257-byte console request wedges the
++		 * rescue".  Release our state here instead.
++		 */
++		if (c) {
++			mtk_tcp_conn_set_pdata(cbd->conn, NULL);
++			rescue_conn_closed(c);
++		}
++		return;
+ 	case MTK_TCP_CB_CLOSED:
+ 		if (c) {
+ 			mtk_tcp_conn_set_pdata(cbd->conn, NULL);
+-- 
+2.56.1
+
