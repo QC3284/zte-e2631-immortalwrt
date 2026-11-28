@@ -1,0 +1,75 @@
+{
+ "statuses": [
+  {
+   "name": "post-large-status-1",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "name": "post-large-status-2",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "name": "post-large-status-3",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "name": "post-large-status-4",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "name": "post-large-status-5",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "name": "post-large-status-6",
+   "path": "/status",
+   "rc": 0,
+   "status": 200,
+   "body_len": 705,
+   "body_sha256": "1da0051a3656167418dc7aea1bbac614df961b92c4ae933c20d796495ef73e4d",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=f2e47ab355a60b18338f039e6dc2f84ea9b665ccf9b3e745a21afe2c99a18123\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  }
+ ],
+ "legal": {
+  "status": 200,
+  "elapsed_s": 110.183,
+  "body": "result=ok\nsha256=66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d\nbrowser_sha256=66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d\nsha_match=ok\ncrc32=0x496cca28\nbody_len=22020096\nslot_target=1\nslot_target_identity=ours\nguard=ok\nguard_reason=\n",
+  "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 273\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+  "received": [
+   "e2631rescue: received 22020628 firmware bytes, sha256 66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d"
+  ],
+  "abort": [],
+  "serial_tail": "e2631rescue: received 22020628 firmware bytes, sha256 66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d\r\n"
+ }
+}

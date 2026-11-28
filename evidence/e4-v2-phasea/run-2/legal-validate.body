@@ -1,0 +1,10 @@
+result=ok
+sha256=66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d
+browser_sha256=66805b26afa47b612e535ca0885fd088b0b37461c959fb75212548d30c58294d
+sha_match=ok
+crc32=0x496cca28
+body_len=22020096
+slot_target=1
+slot_target_identity=ours
+guard=ok
+guard_reason=

@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Server: e2631rescue
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="e2631-usercfg.bin"
+Content-Length: 2097152
+X-E2631-CRC32: 0x26a32cb2
+X-E2631-SHA256: 015447a00db714a94364665825aab9b1569c4c429dc248746ebe06c961a64957
+X-E2631-Offset: 0x00300000
+X-E2631-Length: 0x00200000
+X-E2631-Part: usercfg
+Cache-Control: no-store
+Connection: close
+

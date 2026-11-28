@@ -1,0 +1,87 @@
+{
+ "boot": {
+  "kernel_at_s": 5.9,
+  "kernel_started": true,
+  "linux_marker": true,
+  "panic": false,
+  "tail": "00-0x204fffff pref]\r\n[    0.703672] pcieport 0001:00:00.0: PME: Signaling with IRQ 29\r\n[    0.704727] pcieport 0001:00:00.0: AER: enabled with IRQ 29\r\n[    0.845476] zx279128s-eth 92000000.ethernet lan3 (uninitialized): PHY [9a101000.mdio:0a] driver [Generic PHY] (irq=POLL)\r\n[    0.846445] zx279128s-eth 92000000.ethernet lan2 (uninitialized): PHY [9a101000.mdio:0b] driver [Generic PHY] (irq=POLL)\r\n[    0.847431] zx279128s-eth 92000000.ethernet lan1 (uninitialized): PHY [9a101000.mdio:0c] driver [Generic PHY] (irq=POLL)\r\n[    0.848393] zx279128s-eth 92000000.ethernet wan (uninitialized): PHY [9a101000.mdio:0d] driver [Generic PHY] (irq=POLL)\r\n[    0.853064] clk: Disabling unused clocks\r\n[    0.855530] check access for rdinit=/init failed: -2, ignoring\r\n[    0.855701] mtdblock: MTD device 'rootfs' is NAND, please consider using UBI block devices instead.\r\n[    0.861322] VFS: Mounted root (squashfs filesystem) readonly on device 31:7.\r\n[    0.864895] Freeing unused kernel image (initmem) memory: 1024K\r\n[    0.872412] Run /sbin/init as init process\r\n[    1.446411] init: Console is alive\r\n[    2.404762] kmodloader: loading kernel modules from /etc/modules-boot.d/*\r\n[    2.506880] gpio_button_hotplug: loading out-of-tree module taints kernel.\r\n[    2.511704] kmodloader: done loading kernel modules from /etc/modules-boot.d/*\r\n[    2.524104] init: - preinit -\r\n[    5.979434] random: crng init done\r\n[    6.509725] zx279128s-eth 92000000.ethernet lan1: configuring for phy/internal link mode\r\nPress the [f] key and hit [enter] to enter failsafe mode\r\nPress the [1], [2], [3] or [4] key and hit [enter] to select the debug level\r\n[   10.639881] zx279128s-eth 92000000.ethernet lan1: Link is Up - 1Gbps/Full - flow control off\r\n[   10.826254] ubi0: attaching mtd10\r\n[   10.913480] ubi0: scanning is finished\r\n[   10.913509] ubi0 error: ubi_read_volume_table: the layout volume was not found\r\n[   10.949561] ubi0 error: ubi_attach_mtd_dev: failed to attach mtd10, error -22\r\n[   11.080334] mount_root: loading kmods from internal overlay\r\n[   11.095687] kmodloader: loading kernel modules from //etc/modules-boot.d/*\r\n[   11.100751] kmodloader: done loading kernel modules from //etc/modules-boot.d/*\r\n[   11.207090] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.236216] block: attempting to load /etc/config/fstab\r\n[   11.295239] block: extroot: not configured\r\n[   11.295559] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes\r\n[   11.378299] jffs2: notice: (570) jffs2_build_xattr_subsystem: complete building xattr subsystem, 39 of xdatum (17 unchecked, 22 orphan) and 66 of xref (42 dead, 0 orphan) found.\r\n[   11.396765] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab\r\n[   11.397872] block: extroot: not configured\r\n[   11.399856] jffs2: NAND pages can be programmed once: clean markers are in the data, 2048 bytes\r\n[   11.482677] jffs2: notice: (568) jffs2_build_xattr_subsystem: complete building xattr subsystem, 39 of xdatum (17 unchecked, 22 orphan) and 66 of xref (42 dead, 0 orphan) found.\r\n[   11.486657] mount_root: loading kmods from internal overlay\r\n[   11.519292] kmodloader: loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*\r\n[   11.531713] kmodloader: done loading kernel modules from /tmp/overlay/upper/etc/modules-boot.d/*\r\n[   11.539353] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.591976] block: attempting to load /tmp/overlay/upper/etc/config/fstab\r\n[   11.593058] block: extroot: not configured\r\n[   11.593497] block: attempting to load /tmp/jffs_cfg/upper/etc/config/fstab\r\n[   11.593944] block: extroot: not configured\r\n[   11.595681] mount_root: switching to jffs2 overlay\r\n[   11.604990] overlayfs: upper fs does not support tmpfile.\r\n[   11.609643] urandom-seed: Seeding with /etc/urandom.seed\r\n[   11.733783] zx279128s-eth 92000000.ethernet lan1: Link is Down\r\n[   11.740279] procd: - early -\r\n[   11.877622] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.928614] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   11.979802] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.030988] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.095400] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.147167] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.198960] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.250083] mtdblock: MTD device 'rootfs_data' is NAND, please consider using UBI block devices instead.\r\n[   12.296854] procd: - ubus -\r\n[   12.405399] procd: - init -\r\nPlease press Enter to activate this console.\r\n"
+ },
+ "boot_ok": true,
+ "capture_after": {
+  "bootwatch_pids": [
+   2459846
+  ],
+  "events_tail": "2026-11-28T13:56:06+08:00 reader-start pid=2329443\n2026-11-28T14:38:46+08:00 reader-start pid=2459799",
+  "ok": true,
+  "restore_rc": 0,
+  "supervisor_pids": [
+   2459799
+  ],
+  "tty_holders": [
+   2459809
+  ]
+ },
+ "clear_override": "setenv e2631_next_slot\r\n=> ",
+ "cleared": true,
+ "device": {
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "kv": {
+   "ENV": "6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893",
+   "KERNEL": "6.18.60",
+   "MTD0": "ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f",
+   "MTD1": "e2bba3332de45858b5f3d3b68b57d58d5e6a47de437de3a0fa6ba3389e752f3d",
+   "MTD2": "a7b72db92a81f9c9a804933371beece2f1b90bdc9a36fc90393f705d8a3744bc",
+   "MTD3": "0d4e5a76e58f9d0f81872795e0c961ef4cc457caf60564689d22d3a31b01793a",
+   "MTD4": "360bf435e5967d6f69fe1645f3e43b1aba123ee99c391d307d4a5e820a987d24",
+   "MTD5": "c0dd53794028ef38414d53706036e0f50d9b963d23c64fbd0f3a2df0cd2f5b7f",
+   "MTD6": "042fda05dd65b54066c719063aaa8dc1cd623db15c4400309451bc4ed91cb2f0",
+   "MTD7": "db1b68288ab29248d0138d78e95d0dc3bd8f963b4907f654e09188c13e8d26f9",
+   "MTD8": "47a6a30fe4cd28cc52572383385b1bdcbeb0f34d143c279b0aeae6a01d1f09db",
+   "REGION": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "SECOND": "540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd",
+   "UPTIME": "66",
+   "USERDATA": "unmounted",
+   "VERSION": "ImmortalWrt v1.10.0"
+  },
+  "raw": "VERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\nUPTIME=66\nMTD0=ac06d7bcccfc1ed2baa18e792cffce8c7912981eb5491e5b3ea67b1a1172325f\nREGION=23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\nENV=6e2c01da4084ea9e20e66d2985db74aa124d632c819928b7666686cc4acf3893\nSECOND=540db4350cca5e77228b65ba3b387ea86be545e7f10a81db19b81d6f7816e1fd\nUSERDATA=unmounted\nMTD1=e2bba3332de45858b5f3d3b68b57d58d5e6a47de437de3a0fa6ba3389e752f3d\nMTD2=a7b72db92a81f9c9a804933371beece2f1b90bdc9a36fc90393f705d8a3744bc\nMTD3=0d4e5a76e58f9d0f81872795e0c961ef4cc457caf60564689d22d3a31b01793a\nMTD4=360bf435e5967d6f69fe1645f3e43b1aba123ee99c391d307d4a5e820a987d24\nMTD5=c0dd53794028ef38414d53706036e0f50d9b963d23c64fbd0f3a2df0cd2f5b7f\nMTD6=042fda05dd65b54066c719063aaa8dc1cd623db15c4400309451bc4ed91cb2f0\nMTD7=db1b68288ab29248d0138d78e95d0dc3bd8f963b4907f654e09188c13e8d26f9\nMTD8=47a6a30fe4cd28cc52572383385b1bdcbeb0f34d143c279b0aeae6a01d1f09db\n",
+  "rc": 0
+ },
+ "final_checks": {
+  "env": true,
+  "kernel": true,
+  "mtd0": true,
+  "region": true,
+  "secondboot": true,
+  "version": true
+ },
+ "finished": "2026-11-28T14:39:52+0800",
+ "health": {
+  "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+  "kv": {
+   "FWSLOT": "{\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}",
+   "KERNEL": "6.18.60",
+   "MT7916": "0",
+   "PANICS": "0",
+   "UPTIME": "60",
+   "VERSION": "ImmortalWrt v1.10.0",
+   "WIFI": "0"
+  },
+  "raw": "VERSION=ImmortalWrt v1.10.0\nKERNEL=6.18.60\nUPTIME=60\nPANICS=0\nMT7916=0\nWIFI=0\nFWSLOT={\"running\":1,\"next\":1,\"slots\":[{\"slot\":0,\"mtd\":5,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":7,\"header_at\":\"0x1560000\",\"version\":\"V1.0.0.7B5.8000\",\"build\":\"20250925221124\",\"product\":\"ZXHN E2631 V1.0.0\"},{\"slot\":1,\"mtd\":6,\"partition_is_slot\":true,\"valid\":true,\"intact\":true,\"serial\":12,\"header_at\":\"0x1500000\",\"version\":\"ImmortalWrt v1.10.0\",\"build\":\"20261120\",\"product\":\"ZXHN E2631 V1.0.0\"}]}\n\n",
+  "rc": 0
+ },
+ "http_audit": {
+  "probe_ok": false,
+  "write_requests": []
+ },
+ "mode": "exit",
+ "ok": true,
+ "prompt_after_ctrlc": true,
+ "rescue_left": true,
+ "serial_audit": {
+  "forbidden": [],
+  "path": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/serial.log",
+  "size": 17106,
+  "write_words": 0
+ },
+ "started": "2026-11-28T14:38:23+0800"
+}

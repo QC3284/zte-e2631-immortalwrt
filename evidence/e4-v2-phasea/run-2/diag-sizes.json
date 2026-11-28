@@ -1,0 +1,54 @@
+[
+ {
+  "n": 532,
+  "rc": 0,
+  "status": 400,
+  "elapsed_s": 0.847,
+  "body": "result=error\nerror=bad outer magic\n",
+  "serial": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n",
+  "received": [
+   "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e"
+  ],
+  "abort": [],
+  "expected": "7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e"
+ },
+ {
+  "n": 65536,
+  "rc": 0,
+  "status": 400,
+  "elapsed_s": 0.955,
+  "body": "result=error\nerror=bad outer magic\n",
+  "serial": "e2631rescue: received 65536 firmware bytes, sha256 7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2\r\n",
+  "received": [
+   "e2631rescue: received 65536 firmware bytes, sha256 7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
+  ],
+  "abort": [],
+  "expected": "7daca2095d0438260fa849183dfc67faa459fdf4936e1bc91eec6b281b27e4c2"
+ },
+ {
+  "n": 1048576,
+  "rc": 0,
+  "status": 400,
+  "elapsed_s": 2.779,
+  "body": "result=error\nerror=bad outer magic\n",
+  "serial": "e2631rescue: received 1048576 firmware bytes, sha256 fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83\r\n",
+  "received": [
+   "e2631rescue: received 1048576 firmware bytes, sha256 fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83"
+  ],
+  "abort": [],
+  "expected": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83"
+ },
+ {
+  "n": 4194304,
+  "rc": 0,
+  "status": 400,
+  "elapsed_s": 8.646,
+  "body": "result=error\nerror=bad outer magic\n",
+  "serial": "e2631rescue: received 4194304 firmware bytes, sha256 2b07811057df887086f06a67edc6ebf911de8b6741156e7a2eb1416a4b8b1b2e\r\n",
+  "received": [
+   "e2631rescue: received 4194304 firmware bytes, sha256 2b07811057df887086f06a67edc6ebf911de8b6741156e7a2eb1416a4b8b1b2e"
+  ],
+  "abort": [],
+  "expected": "2b07811057df887086f06a67edc6ebf911de8b6741156e7a2eb1416a4b8b1b2e"
+ }
+]

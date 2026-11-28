@@ -1,0 +1,121 @@
+{
+ "capture": {
+  "bootwatch_pids": [
+   2264172
+  ],
+  "free": true,
+  "supervisor_pids": [
+   2264125
+  ],
+  "tty_holders": [
+   2264135
+  ],
+  "tty_holders_after": []
+ },
+ "commands": [
+  {
+   "cmd": "mtd read spi-nand0 0x47eff800 0x3f00000 0xa0000",
+   "elapsed_s": 0.61,
+   "out": "mtd read spi-nand0 0x47eff800 0x3f00000 0xa0000\r\nReading 655360 byte(s) (320 page(s)) at offset 0x03f00000\r\n=> "
+  },
+  {
+   "cmd": "crc32 0x47eff800 0xa0000",
+   "elapsed_s": 0.21,
+   "out": "crc32 0x47eff800 0xa0000\r\ncrc32 for 47eff800 ... 47f9f7ff ==> 64c4e55d\r\n=> "
+  },
+  {
+   "cmd": "md.l 0x47eff810 1",
+   "elapsed_s": 0.04,
+   "out": "md.l 0x47eff810 1\r\n47eff810: 73383231                             128s\r\n=> "
+  }
+ ],
+ "header_magic_ok": true,
+ "help_rescue": "help e2631rescue\r\ne2631rescue - serve the web failsafe (v1+v2) on lan1\r\n\r\nUsage:\r\ne2631rescue e2631rescue - start DHCP and the HTTP failsafe page. GET /, /status,\r\n              /slots, /env, /backup; POST /flash, /firmware, /boot,\r\n              /factory, /env, /console.  No flash is written until a\r\n              validated image is uploaded with the X-E2631-Confirm\r\n              header.  Ctrl-C leaves the rescue mode.\r\n\r\n=> ",
+ "hub_pid": 2267731,
+ "image_crc_ok": true,
+ "mode": "load",
+ "new_boot": {
+  "banner_seen": true,
+  "prompt": true,
+  "tail": "go 0x47f00000\r\n## Starting application at 0x47F00000 ...\r\n\r\n\r\nU-Boot 2027.01-rc2-g49f13e0cbe40 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  8 devices, 8 uclasses, devicetree: embed\r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   eth0: ethernet@92000000\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=> "
+ },
+ "new_version": "version\r\nU-Boot 2027.01-rc2-g49f13e0cbe40 (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+ "new_version_ok": true,
+ "ok": true,
+ "read_ok": true,
+ "reboot": {
+  "capture": {
+   "bootwatch_pids": [
+    2264172
+   ],
+   "free": true,
+   "supervisor_pids": [
+    2264125
+   ],
+   "tty_holders": [
+    2264135
+   ],
+   "tty_holders_after": []
+  },
+  "flash_boot": {
+   "banner_seen": true,
+   "prompt": true,
+   "tail": "[14810.623368] br-lan: port 3(lan3) entered disabled state\r\n[14810.624903] br-lan: port 2(lan2) entered disabled state\r\n[14810.625780] zx279128s-eth 92000000.ethernet lan1: Link is Down\r\n[14810.626077] br-lan: port 1(lan1) entered disabled state\r\n[14810.651603] reboot: Restarting system\r\n\r\nBoot SPI NAND\r\nstart read bootheader\r\nstart read secondboot\r\nnon secure boot \r\nJump\r\n\r\nenter bootloader...\r\ncrpm init enter\r\ncrpm init done\r\nddr init enter, rate is 1333 Mbps\r\n5ddr init done \r\nserial init start \r\nserial init done \r\nSPI NAND\r\nnon secure uboot \r\nbackup header!!\r\nJump\r\n\r\n\r\nU-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)\r\n\r\nModel: ZTE ZXHN E2631 (ZX279128S)\r\nDRAM:  256 MiB\r\nWARNING: Caches not enabled\r\nCore:  8 devices, 8 uclasses, devicetree: embed\r\nLoading Environment from MTD...\rLoading Environment from MTD... OK\r\nIn:    serial@94404000\r\nOut:   serial@94404000\r\nErr:   serial@94404000\r\nNet:   eth0: ethernet@92000000\r\n\u001b[2K\rHit any key to stop autoboot: 3\u001b[2K\rHit any key to stop autoboot: 0\r\n=> "
+  },
+  "flash_version": "version\r\nU-Boot 2027.01-rc2-g1673d5c89c7b (Nov 19 2026 - 15:44:39 +0000)\r\n\r\narm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009\r\nGNU ld (2.42-1ubuntu1+23) 2.42\r\n=> ",
+  "flash_version_ok": true,
+  "hub_pid": 2267731,
+  "reboot_ssh": {
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "out": "",
+   "rc": 0
+  },
+  "started": "2026-11-28T13:35:45+0800"
+ },
+ "reevaluated_after_driver_fix": {
+  "help_line": "e2631rescue - serve the web failsafe (v1+v2) on lan1",
+  "image_crc_raw": "==> 64c4e55d",
+  "reason": "driver string checks were wrong: U-Boot prints crc32 without 0x; v2.1 short help is 'serve the web failsafe ...'"
+ },
+ "rescue_help_ok": true,
+ "rescue_marker": true,
+ "rescue_running": true,
+ "rescue_tail": "e2631rescue\r\ne2631rescue: starting lan1 at 192.168.1.1/24, DHCP pool 192.168.1.100+\r\nethernet@92000000 Waiting for PHY auto negotiation to complete...... done\r\nzx279128s: lan1 up, 1000 Mbit/s full duplex, MAC 00:41:71:00:00:50\r\ne2631rescue: open http://192.168.1.1/",
+ "slot_before": "e2631slot\r\ne2631slot: slot0 base 0x00700000 span 0x01c00000 serial 7\r\ne2631slot:   version \"V1.0.0.7B5.8000\", header 0x01c60000 (+0x1560000)\r\ne2631slot: slot1 base 0x02300000 span 0x01c00000 serial 12\r\ne2631slot:   version \"ImmortalWrt v1.10.0\", header 0x03800000 (+0x1500000)\r\ne2631slot: cspboot would boot slot1\r\n=> ",
+ "stage": {
+  "copy": {
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\r\n",
+   "out": "856703a10c741bae202eb308c548fe5a24d5ac15ac9c8200f973d48a8f272bbe  /tmp/e4v2-stage.bin\n",
+   "rc": 0
+  },
+  "erase": {
+   "elapsed_s": 0.86,
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\nErasing userdata ...\n",
+   "out": "ERASE_RC=0\n",
+   "rc": 0
+  },
+  "image": "/home/qc233/zte/e2631-t5-artifacts/t85-46111271598/files/e2631-uboot-mtd0.bin",
+  "ok": true,
+  "readback": {
+   "elapsed_s": 0.26,
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "out": "856703a10c741bae202eb308c548fe5a24d5ac15ac9c8200f973d48a8f272bbe  -\n",
+   "rc": 0
+  },
+  "sha256": "856703a10c741bae202eb308c548fe5a24d5ac15ac9c8200f973d48a8f272bbe",
+  "size": 655360,
+  "sync": {
+   "elapsed_s": 0.18,
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\n",
+   "out": "SYNCED\n",
+   "rc": 0
+  },
+  "write": {
+   "elapsed_s": 0.43,
+   "err": "Warning: Permanently added '192.168.1.1' (ED25519) to the list of known hosts.\nUnlocking userdata ...\n\nWriting from /tmp/e4v2-stage.bin to userdata ...  [ ]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b[e]\b\b\b[w]\b\b\b\b    \n",
+   "out": "WRITE_RC=0\n",
+   "rc": 0
+  }
+ },
+ "started": "2026-11-28T13:35:42+0800"
+}

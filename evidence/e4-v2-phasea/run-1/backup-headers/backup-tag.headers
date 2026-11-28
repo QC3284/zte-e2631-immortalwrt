@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Server: e2631rescue
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="e2631-tag.bin"
+Content-Length: 1048576
+X-E2631-CRC32: 0x7894ca96
+X-E2631-SHA256: 9b12973d0d25c1c1fea9ef1fbecfe2de8f832bf2742dbaad314191b5f996f7bd
+X-E2631-Offset: 0x00100000
+X-E2631-Length: 0x00100000
+X-E2631-Part: tag
+Cache-Control: no-store
+Connection: close
+

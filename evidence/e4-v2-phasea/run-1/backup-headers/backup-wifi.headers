@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Server: e2631rescue
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="e2631-wifi.bin"
+Content-Length: 1048576
+X-E2631-CRC32: 0xd16e39b9
+X-E2631-SHA256: 1bec50bd80947043530d3d17ad6be5c1021aa62bfcb1daf6307544345557bf61
+X-E2631-Offset: 0x00200000
+X-E2631-Length: 0x00100000
+X-E2631-Part: wifi
+Cache-Control: no-store
+Connection: close
+

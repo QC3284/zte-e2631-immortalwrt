@@ -1,0 +1,227 @@
+{
+ "started": "2026-11-28T14:30:49+0800",
+ "steps": [
+  {
+   "step": "status_before",
+   "status": 200,
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=\nresult=\nerror=\ncrc32=\nsha256=\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+  },
+  {
+   "step": "backup1",
+   "status": 200,
+   "hdr_crc": "0x1e5ff289",
+   "hdr_sha": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "body_sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "body_len": 655360
+  },
+  {
+   "step": "backup2",
+   "status": 200,
+   "hdr_crc": "0x1e5ff289",
+   "hdr_sha": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "body_sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "body_len": 655360
+  },
+  {
+   "step": "status_after_backup",
+   "status": 200,
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=\nresult=\nerror=\ncrc32=\nsha256=\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+  },
+  {
+   "step": "p532_1",
+   "status": 400,
+   "body": "result=error\nerror=bad outer magic\n",
+   "serial": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n"
+  },
+  {
+   "step": "p532_2",
+   "status": 400,
+   "body": "result=error\nerror=bad outer magic\n",
+   "serial": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n"
+  },
+  {
+   "step": "status_after_p532",
+   "status": 200,
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+  }
+ ],
+ "serial_offset_start": 3261,
+ "status_before": {
+  "name": "diag-status-before",
+  "path": "/status",
+  "rc": 0,
+  "stderr": "",
+  "elapsed_s": 53.322,
+  "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-before.hdr",
+  "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-before.body",
+  "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 629\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+  "body_len": 629,
+  "body_sha256": "ee05aac842a65f97ff63f8e6d759d2d6f170d017e396a88c19c75f3a25b101b4",
+  "status": 200,
+  "body_text": "stage=idle\nprogress=0\nop=idle\nmode=\nresult=\nerror=\ncrc32=\nsha256=\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+ },
+ "backup": [
+  {
+   "name": "diag-bk1",
+   "path": "/backup?part=bootloader",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 2.802,
+   "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-bk1.hdr",
+   "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-bk1.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=\"e2631-bootloader.bin\"\r\nContent-Length: 655360\r\nX-E2631-CRC32: 0x1e5ff289\r\nX-E2631-SHA256: 23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\r\nX-E2631-Offset: 0x00020000\r\nX-E2631-Length: 0x000a0000\r\nX-E2631-Part: bootloader\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "body_len": 655360,
+   "body_sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "status": 200,
+   "body_text": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000128s0\u0095\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u00000001ZXIC..\u0000\u0000\u0000\u0000\u0000\u0000BOOTROM\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000RSA2048\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0080`\u0006\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000L\u00d5u\u0092'\u009dG@\u008f\u0091\u00b6\u00c3\u0086\u0010\u00fe\u0092\u00d7\u0092h\u00b3\u00ecd\u00fe\u00fb\u00bf\u00e8{\u00ff\u00e5.\u00d0\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+   "hdr_crc": "0x1e5ff289",
+   "hdr_sha": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "hdr_len": "655360"
+  },
+  {
+   "name": "diag-bk2",
+   "path": "/backup?part=bootloader",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 2.765,
+   "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-bk2.hdr",
+   "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-bk2.body",
+   "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=\"e2631-bootloader.bin\"\r\nContent-Length: 655360\r\nX-E2631-CRC32: 0x1e5ff289\r\nX-E2631-SHA256: 23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1\r\nX-E2631-Offset: 0x00020000\r\nX-E2631-Length: 0x000a0000\r\nX-E2631-Part: bootloader\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "body_len": 655360,
+   "body_sha256": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "status": 200,
+   "body_text": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000128s0\u0095\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u00000001ZXIC..\u0000\u0000\u0000\u0000\u0000\u0000BOOTROM\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000RSA2048\u0000\u0000\u0000\u0000\u0000\u0004\u0000\u0000\u0000\u0080`\u0006\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000L\u00d5u\u0092'\u009dG@\u008f\u0091\u00b6\u00c3\u0086\u0010\u00fe\u0092\u00d7\u0092h\u00b3\u00ecd\u00fe\u00fb\u00bf\u00e8{\u00ff\u00e5.\u00d0\t\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+   "hdr_crc": "0x1e5ff289",
+   "hdr_sha": "23395533c123ea1099c951fee55a73f264636ca9d33d8298b160efb6d0fdb7d1",
+   "hdr_len": "655360"
+  }
+ ],
+ "status_after_backup": {
+  "name": "diag-status-after-backup",
+  "path": "/status",
+  "rc": 0,
+  "stderr": "",
+  "elapsed_s": 0.017,
+  "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-after-backup.hdr",
+  "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-after-backup.body",
+  "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 629\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+  "body_len": 629,
+  "body_sha256": "ee05aac842a65f97ff63f8e6d759d2d6f170d017e396a88c19c75f3a25b101b4",
+  "status": 200,
+  "body_text": "stage=idle\nprogress=0\nop=idle\nmode=\nresult=\nerror=\ncrc32=\nsha256=\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+ },
+ "p532": {
+  "path": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/p532.bin",
+  "size": 532,
+  "sha256": "7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e"
+ },
+ "p532_posts": [
+  {
+   "name": "diag-p532-1",
+   "path": "/firmware?mode=validate&slot=auto",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.024,
+   "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-p532-1.hdr",
+   "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-p532-1.body",
+   "headers": "HTTP/1.1 400 Bad Request\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 35\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 400,
+   "body_len": 35,
+   "body_sha256": "8bb27de555faae3c8764725abc167bf1ecdb499e34342f8351884258d3f589f8",
+   "body_text": "result=error\nerror=bad outer magic\n",
+   "serial": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n"
+  },
+  {
+   "name": "diag-p532-2",
+   "path": "/firmware?mode=validate&slot=auto",
+   "rc": 0,
+   "stderr": "",
+   "elapsed_s": 0.024,
+   "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-p532-2.hdr",
+   "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-p532-2.body",
+   "headers": "HTTP/1.1 400 Bad Request\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 35\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+   "status": 400,
+   "body_len": 35,
+   "body_sha256": "8bb27de555faae3c8764725abc167bf1ecdb499e34342f8351884258d3f589f8",
+   "body_text": "result=error\nerror=bad outer magic\n",
+   "serial": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n"
+  }
+ ],
+ "status_after_p532": {
+  "name": "diag-status-after-p532",
+  "path": "/status",
+  "rc": 0,
+  "stderr": "",
+  "elapsed_s": 0.016,
+  "hdr": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-after-p532.hdr",
+  "body": "/home/qc233/zte/e2631-p3/e2/e4-v2-phasea/run-2/diag-status-after-p532.body",
+  "headers": "HTTP/1.1 200 OK\r\nServer: e2631rescue\r\nContent-Type: text/plain\r\nContent-Length: 705\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+  "body_len": 705,
+  "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+  "status": 200,
+  "body_text": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n"
+ },
+ "status_series": [
+  {
+   "n": 1,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "n": 2,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "n": 3,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "n": 4,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "n": 5,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  },
+  {
+   "n": 6,
+   "status": 200,
+   "rc": 0,
+   "body_len": 705,
+   "body_sha256": "33b8260c9ae065522aa064ceb7ba1e31c4d2f0a7756b37d6feb17efc348df96b",
+   "body": "stage=idle\nprogress=0\nop=idle\nmode=validate\nresult=\nerror=\ncrc32=\nsha256=7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\nbrowser_sha256=\nsha_match=absent\nbytes_total=0\nbytes_done=0\nslot=auto\nslot_target=-1\nslot_target_identity=\nguard=\nguard_reason=\nwritten_serial=0\nversion=U-Boot_U-Boot_2027.01-rc2-g49f13e0cbe40_(Nov_19_2026_-_15:44:39_+0000)\nnext_slot=1\nnext_reason=serial\nbootloader_region_crc32=0x1e5ff289\nslot0_valid=1\nslot0_intact=1\nslot0_identity=vendor\nslot0_serial=7\nslot0_version=V1.0.0.7B5.8000\nslot0_header_at=0x01c60000\nslot1_valid=1\nslot1_intact=1\nslot1_identity=ours\nslot1_serial=12\nslot1_version=ImmortalWrt_v1.10.0\nslot1_header_at=0x03800000\nslot1_header_partition=mtd8\n",
+   "stderr": ""
+  }
+ ],
+ "serial_tail": "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\ne2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e\r\n",
+ "received_lines": [
+  "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e",
+  "e2631rescue: received 532 firmware bytes, sha256 7d9ce3f2824cb3aabd7c327a39cd625ccaa5615db24b2a2aa8bf547a0ea6f90e"
+ ],
+ "abort_lines": [],
+ "finished": "2026-11-28T14:31:52+0800"
+}
