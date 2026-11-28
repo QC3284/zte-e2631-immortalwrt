@@ -889,9 +889,10 @@ C 侧必须与 `tools/mock-failsafe.mjs` 行为一致）。本批新增/变化�
   `POST /env` 对这四个键做语义校验（池不越过 .254、不含服务器地址）。干净环境必须保持 `dhcp_source=default` 且无 warning
   （0052：主机八位组经 `ntohl()` 取，192.168.1.1 的主机八位组是 1，默认池 100..200 不包含它）。
 
-尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B、0053/0054 净减 72 B；第三次统一 v3 构建
-（run 46126880665）最终 `u-boot.bin` 398,480 B（≤ 407,552，余量 9,072 B，比 v3 基线 405,368 B 低 6,888 B；
-硬上限 653,312 − 240 KiB headroom 的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
+尺寸：0042 回收 12,380 B、0051 再回收 11,520 B、0052 只加 32 B、0053/0054 净减 72 B；0055-0059（DNS/telnet/
+web console/env 对齐/池规则）与页面 v3.1 合计 +18,544 B，第四次统一构建（run 46132729322）最终
+`u-boot.bin` 417,024 B（≤ 460,000，余量 42,976 B，比 v3 基线 405,368 B 高 11,656 B；
+硬上限 653,312 − 193,312 headroom 的算法见 §4 item 3/26）。零写入验收顺序：先只读 `/sysinfo`、`/log`、`/integrity` 与五个小分区备份，再跑 `validate` 负例；
 `/reboot` 与整槽备份放在用户批准的真机会话里最后一次做，不要在写任务进行中触发。
 ### E4 v3.1 上游对齐服务（0055-0059，task-97；零写入优先）
 
@@ -1007,7 +1008,7 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   保持救援模式运行。`/console` 还允许阻塞式命令（没有超时保护），可能把救援会话卡住；阻塞类操作只接物理串口。
 - **E4 v3 删掉了控制台的 `fdt`/`tftp` 命令（0042）**：这是尺寸回收的代价，不是回归。恢复/更新通道改为救援页（`POST /flash`、
   `POST /firmware`）与串口 `loadx` + `e2631flash`；若需要在控制台做设备树/变量调试，请临时打开 defconfig 里的对应符号
-  （默认关闭），并预期镜像会超过 407,552 B 门禁。
+  （默认关闭），并预期镜像会超过 460,000 B 门禁（task-97 起的自我门）。
 - **E4 v3 的 `/reboot` 会真复位（0048）**：只在确认头 + 空 body 下触发，写任务/备份期间 409；复位前救援 LED 恢复原值。
   RAM 链上 `/reboot` 会重跑 BootROM→secondboot→已写入的 U-Boot，若镜像只在 RAM 里，复位后就回到 flash 镜像——
   这是预期行为，页面文案不能写成“已升级”。
@@ -1016,9 +1017,10 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
 - **E4 v3 的页面曾超出单个响应缓冲（task-95，0053 修复）**：`GET /` 原先把整块 gzip 页面拷进 16,384 B 的 `c->out`，
   v3 页面 24,904 B 装不下，v3 设备探针里 `GET /` 直接空回复（curl 56）；0053 改为 4 KiB 分块流式发送后，
   页面大小不再受响应缓冲限制（仍受页面预算 32,768 B 与 U-Boot 尺寸门禁约束）。
-- **E4 v3 的尺寸门禁会把页面算进来（task-92）**：v3 页面 gzip 约 24,904 B（v1 基线 13,773 B），加上 v3 C 代码后
-  u-boot.bin 可能逼近 407,552 B；若 task-92 构建被门禁拒绝，按 Lead 裁决先回收 P2 的 `CONFIG_CMD_MII`（约 5,724 B，
-  预批），仍不足才砍页面 I18N（最后手段，需用户授权）——I18N 优先于 mii 保留。
+- **E4 v3 的尺寸门禁会把页面算进来（task-92）**：页面 gzip 24,904 B（v1 基线 13,773 B），加上 v3 C 代码后
+  u-boot.bin 曾逼近 v3 门禁，按 Lead 裁决先回收 P2 的 `CONFIG_CMD_MII`（约 5,724 B，预批），I18N 未动；
+  v3.1 再加 DNS/telnet/web console 与更大页面（31,518 B）后，task-97 把自我门放宽到 460,000 B，
+  t92d 实测 417,024 B（余量 42,976 B）。仍不得通过放宽硬上限解决。
 - **E4 v2.1 的写路径只能在受控会话里验收**：`/firmware` 写目标槽（整槽擦/写/回读）、`/factory` 擦 `rootfs_data` 都是
   破坏性操作；首次验收必须在 RAM 链、已记录目标槽/整盘 sha256 的前提下，由用户单独批准，先跑 net-zero validate 与负例矩阵，
   再跑一次真实的空槽/净零写入，写后回读 slot 校验并核对 mtd0 未变。固件包上限 `0x1BE0214`、暂存 `0x46100000`，
@@ -1380,11 +1382,11 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   `796c2a4` 工厂错误串由 %s 拼接、`065742d` -O2 内联后的 do_ 前缀）。真机验收（零写入 validate +
   只读探针 + 首次真实写）交 task-86，需 Lead/用户批准。证据
   [evidence/uboot-e4-v2-20261128.md](../evidence/uboot-e4-v2-20261128.md)。
-- 2026-11-28（task-94，救援自检防御）：新增 patch 0040/0041——所有 SHA-256 改为显式清零的 `sha256_context` 并在哈希前校验上传窗口基址/长度（`rescue_sha256()` 越界即 FATAL），`rescue_fmt()` 在输出游标离开已登记缓冲区时 FATAL 并拒绝渲染，`/status`、`/slots` 返回 500 `output cursor corrupted`；41 patches / tree `58c996fe8151ca81f45829d8fb5c41f7aea3b38b`；构建由 task-92 统一重跑（CI 身份待填）。证据 [evidence/uboot-rescue-defenses-20261128.md](../evidence/uboot-rescue-defenses-20261128.md)。
+- 2026-11-28（task-94，救援自检防御）：新增 patch 0040/0041——所有 SHA-256 改为显式清零的 `sha256_context` 并在哈希前校验上传窗口基址/长度（`rescue_sha256()` 越界即 FATAL），`rescue_fmt()` 在输出游标离开已登记缓冲区时 FATAL 并拒绝渲染，`/status`、`/slots` 返回 500 `output cursor corrupted`；41 patches / tree `58c996fe8151ca81f45829d8fb5c41f7aea3b38b`；构建由 task-92 统一重跑（t92d run `46132729322`，身份见下文的 t92d 条）。证据 [evidence/uboot-rescue-defenses-20261128.md](../evidence/uboot-rescue-defenses-20261128.md)。
 - 2026-11-28（task-90，E4 v3 C 实现）：新增 patch 0042-0049——defconfig 回收 `CONFIG_CMD_FDT`/`CONFIG_CMD_TFTPBOOT`（12,380 B）、
   产品串按 Linux 比较 17 B、`/console` 原始长度检查、GET `/sysinfo` 与 `/log`、POST `/integrity`、`/backup` 的槽/rootfs/header 流、
   POST `/reboot` 与蓝灯心跳、DHCP 配置进 env（`e2631_dhcp_*`）；49 patches / tree `8b32cd3c0f050c02e640efe36d30cb50446ec09d`；
-  slot core fixture 52 项；尺寸门禁改为 `<= 653,312 − 245,760 = 407,552 B`。构建由 task-92 统一重跑（身份见下一条）。证据
+  slot core fixture 52 项；尺寸门禁当时改为 `<= 653,312 − 245,760 = 407,552 B`（task-97 起为 460,000 B）。构建由 task-92 统一重跑，身份见 t92d 条（run `46132729322`）。证据
   [evidence/uboot-e4-v3-20261128.md](../evidence/uboot-e4-v3-20261128.md)。
 
 - 2026-11-28（task-92，E4 v3 统一构建）：CI run `46121809714`（head `7322b7f`）19/19 步绿——49-patch 首次构建在
@@ -1443,5 +1445,13 @@ bit4 = mesh，低电平=按下），只采用进入函数时已经按下的键�
   59 patches / tree `f8144b84cda597ad387d87ee39c6b50a2bbd6898`；尺寸自我门按裁决由 407,552 B 放宽到
   460,000 B（`E2631_UBOOT_HEADROOM_MIN` 245,760 → 193,312，硬上限 653,312 B 与打包门 645,120 B 不变）；
   主机 fixture：DNS 29 项、env align 13 项、web console 13 项、DHCP pool 14→18 项、slot core 52 项；
-  checkpatch 0055-0059 各 0/0。构建由 task-92 统一执行（身份待填）。证据
+  checkpatch 0055-0059 各 0/0。构建由 task-92 第四次统一构建执行（run `46132729322`，身份见下一条）。证据
   [evidence/uboot-e4-v31-20261128.md](../evidence/uboot-e4-v31-20261128.md)。
+- 2026-11-28（task-92 t92d，第四次统一构建）：run `46132729322`（head `431831d`，59 patches）27/27 步绿。
+  `u-boot.bin` **417,024 B** sha256 `6a352b6f99050ce7672ad88103acc3835aa492db0b9c01a04a56b5bccda25a74`
+  crc32 `184afaa4`（≤ 460,000，余量 42,976 B；比第三次统一构建 +18,544 B）；`mtd0.bin` 655,360 B sha256
+  `2f0aedbd9824e7acba3228652499f816a189a733f042e4773c7975fc3fc7e385` crc32 `e68cda7a`；env 块 `6eee153b…`
+  未变；banner `U-Boot 2027.01-rc2-g942c3c38b2d5`；页面 gzip 31,518 B（≤ 32,768）。fixture：slot core 52 /
+  DHCP pool 18 / DNS 29 / env align 13 / web console 13 / console query 14 / page stream 17；writer sites 9、
+  checkpatch 0E/0W；artifact `e2631-uboot-46132729322`（id 15257768236，11 文件 `sha256sum -c` 全过）。
+  无 Release/tag、无设备动作。证据 [evidence/uboot-e4-v31-20261128.md](../evidence/uboot-e4-v31-20261128.md) §12。

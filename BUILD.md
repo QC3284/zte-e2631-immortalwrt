@@ -302,7 +302,7 @@ as the last line of defence.
 |---|---|
 | payload window | mtd0 `0x20800..0xBFFFF` (0x9F800) |
 | hard cap | **653312 bytes (638 KiB)** |
-| E4 v3 gate (`E2631_UBOOT_HARD_LIMIT` - `E2631_UBOOT_HEADROOM_MIN`) | **460,000 bytes** (653312 - 193,312 = 193,312 headroom; task-97 moved this from the v3 407,552-byte gate) |
+| E4 v3 gate (`E2631_UBOOT_HARD_LIMIT` - `E2631_UBOOT_HEADROOM_MIN`) | **460,000 bytes** (653312 - 193,312; task-97 moved this from the v3 407,552-byte gate) |
 | structural safety gate | **645120 bytes** (hard cap - 8192 bytes; last line of defence before mtd0 assembly) |
 | E4 v3 baseline (`E2631_UBOOT_SIZE_BASELINE`) | 405,368 bytes (task-84 build, run 46109519805) |
 | P1 reclaim (patch 0042) | 12,380 bytes (`CONFIG_CMD_FDT` 8229 + `CONFIG_CMD_TFTPBOOT` 4151) |
@@ -310,7 +310,8 @@ as the last line of defence.
 | P2 reclaim (patch 0051) | 11,520 bytes measured (`CONFIG_CMD_MII`; applied after the first unified v3 build measured 410,040 bytes) |
 | DHCP fix growth (patch 0052) | +32 bytes (the `ntohl()` helper and its inline header) |
 | page-stream fix (patch 0053/0054) | -72 bytes net (streaming send and the connection release replace the copy path) |
-| current `u-boot.bin` (task-92 third rebuild, run 46126880665) | **398,480 bytes**; 9,072 bytes below the E4 v3 gate, 6,888 bytes below the v3 baseline, 254,832 bytes (39.01%) below the hard cap |
+| task-97 growth (patches 0055-0059 + page v3.1) | +18,544 bytes measured (398,480 -> 417,024; the page gzip grew 24,904 -> 31,518) |
+| current `u-boot.bin` (task-92 t92d fourth rebuild, run 46132729322) | **417,024 bytes**; 42,976 bytes below the E4 v3 gate, 11,656 bytes above the v3 baseline, 236,288 bytes (36.17%) below the hard cap |
 | failure behaviour | above 460,000 bytes the build fails before mtd0 assembly and prints the observed size and the E4 v3 budget |
 
 The budget ruling was exercised exactly once: the first unified v3 build
@@ -326,7 +327,7 @@ Every successful build records a footprint table in the artifact's
 sha256, the `.config` sha256, the headroom against both the hard cap and the
 E4 v3 gate, and the size delta against the v3 baseline.
 `node tools/check-workflows.mjs` cross-checks the 8 KiB/645120 structural gate
-and the 407552/245760 v3 gate against `uboot-port/README.md` and this table,
+and the 460000/193312 v3 gate against `uboot-port/README.md` and this table,
 and asserts both gates run before mtd0 assembly.
 
 Besides UBOOT-INFO.txt, every build ships `UBOOT-SIZES.txt`: the authoritative
