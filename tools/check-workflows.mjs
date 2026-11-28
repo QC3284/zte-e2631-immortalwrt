@@ -529,7 +529,7 @@ ok('the U-Boot workflow embeds the rescue page after git am, before make, and sh
   UBOOT_WF.includes('e2631_failsafe_asset.c') &&
   UBOOT_WF.includes('e2631_failsafe_asset.h') &&
   /sha256sum[^\n]*e2631_failsafe_asset\.c/.test(UBOOT_WF) &&
-  UBOOT_WF.includes('failsafe rescue page (E4 v1, task-73):'),
+  UBOOT_WF.includes('failsafe rescue page (E4 v2.1, task-73/task-87/task-88):'),
   'embed at ' + failsafeEmbedAt + ', post-am at ' + failsafePatchAt + ', build at ' + failsafeBuildAt);
 ok('uboot-port/failsafe/README.md documents the frozen interface, the protocol and the size budget',
   ['e2631_failsafe_html_gz', 'e2631_failsafe_html_gz_len', 'POST /flash?mode=validate',

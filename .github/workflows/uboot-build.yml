@@ -1076,7 +1076,7 @@ jobs:
             echo "  env block sha256: $env_sha"
             echo "  .config sha256: $config_sha"
             echo ""
-            echo "failsafe rescue page (E4 v1, task-73):"
+            echo "failsafe rescue page (E4 v2.1, task-73/task-87/task-88):"
             sed 's/^/  /' artifacts/E2631-FAILSAFE-ASSET.txt
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Hardware tested: NO (A1/A2/A3 RAM-chain sessions are separate, user-approved steps)"
